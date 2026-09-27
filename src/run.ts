@@ -1,5 +1,5 @@
 import { ExampleApp } from "./app.js";
-import { runNamed, type RunnerName } from "./runners.js";
+import { runNamed, type RunnerName } from "./dev/runners.js";
 
 const arg = process.argv[2];
 

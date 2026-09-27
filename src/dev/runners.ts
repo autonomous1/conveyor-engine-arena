@@ -1,5 +1,5 @@
 import { defineScenario, run, type LinkProfile } from "conveyor-graph-simulator/reference";
-import { SimulatedNetPath } from "conveyor-engine-replication";
+import { SimulatedNetPath } from "conveyor-engine-replication/simulator";
 
 const PAWN = { type: "pawn" as const, shape: "capsule" as const };
 

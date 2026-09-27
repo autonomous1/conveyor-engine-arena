@@ -4,7 +4,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { AuthoritativeWorld } from "conveyor-engine-world";
 import { Replicator } from "conveyor-engine-replication";
 import { labelMix, NetworkScheduler, SplitMix64 } from "conveyor-graph-simulator/reference";
-import { ARENA_COLLISION, ARENA_BUNDLE_ID, arenaStaticWorld } from "./arena-assets.js";
+import { ARENA_COLLISION, ARENA_BUNDLE_ID, arenaStaticWorld } from "../arena-assets.js";
 
 function unit01(rng: SplitMix64): number {
   return Number(rng.nextU64() >> 11n) / 2 ** 53;
@@ -167,7 +167,7 @@ export async function recordArenaWander(opts: {
 
   const out =
     opts.outFile ??
-    join(dirname(fileURLToPath(import.meta.url)), "..", "viewer", "replay", "arena-wander.jsonl");
+    join(dirname(fileURLToPath(import.meta.url)), "..", "..", "viewer", "replay", "arena-wander.jsonl");
   const horizon = ticks + (netProfile.latencyTicks ?? 0) + (netProfile.jitterTicks ?? 0) + 4;
   for (let extra = 1; extra <= horizon - ticks; extra++) drainNet(ticks + extra);
   await mkdir(dirname(out), { recursive: true });

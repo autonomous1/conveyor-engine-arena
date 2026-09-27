@@ -1,6 +1,7 @@
 import type { AuthoritativeWorld } from "conveyor-engine-world";
 import type { EngineWsServer } from "conveyor-engine-transport-ws";
 import { MOVEMENTS, movementIntent } from "../shared/movements.js";
+import { dispatchHostFrame, hostSnapPath } from "./host-path.js";
 import type { WanderAgent } from "./world-loader.js";
 
 /** 20 Hz. Measured later; not a competitive tick rate. */
@@ -31,6 +32,9 @@ export function startWanderLoop(
   log: (line: string) => void = () => {},
 ): () => void {
   const rng = splitMix(20260917);
+  const snaps = hostSnapPath((clientId, envelope) => {
+    server.sendSnapshot(clientId, envelope);
+  });
   let tick = 0;
   let open = true;
   const timer = setInterval(() => {
@@ -59,7 +63,8 @@ export function startWanderLoop(
     const envelopes = server.replicator.publish(world, snap);
     for (const clientId of server.connected) {
       const env = envelopes.get(clientId);
-      if (env) server.sendSnapshot(clientId, env);
+      if (!env) continue;
+      dispatchHostFrame(snaps, { type: "snap", clientId, envelope: env }, { to: `client:${clientId}`, kind: "snap" });
     }
     if (tick <= 3 || tick % 40 === 0) {
       log(`[live] ${JSON.stringify({
@@ -72,6 +77,7 @@ export function startWanderLoop(
   timer.unref();
   return () => {
     open = false;
+    snaps.close();
     clearInterval(timer);
   };
 }

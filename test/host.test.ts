@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
+import { decodeFrame, encodeFrame } from "conveyor-engine-transport-ws";
 import { arenaStaticWorld } from "../dist/arena-assets.js";
+import { createHostSocketPaths, hostSnapPath, type HostSnapFrame } from "../dist/server/host-path.js";
 import { startArenaServer } from "../dist/server/main.js";
 
 const require = createRequire(import.meta.url);
@@ -33,6 +36,89 @@ function walkImports(entry: string, seen = new Set<string>()): Set<string> {
   }
   return seen;
 }
+
+test("production dependencies keep the simulator off the runtime graph", () => {
+  const pkg = JSON.parse(readFileSync(fileURLToPath(new URL("../package.json", import.meta.url)), "utf8")) as {
+    dependencies: Record<string, string>;
+    devDependencies: Record<string, string>;
+  };
+  assert.equal(Object.hasOwn(pkg.dependencies, "conveyor-graph-simulator"), false);
+  assert.equal(typeof pkg.devDependencies["conveyor-graph-simulator"], "string");
+});
+
+test("server sources do not name NetworkScheduler", () => {
+  const dir = fileURLToPath(new URL("../src/server/", import.meta.url));
+  const names = readdirSync(dir).filter((name) => name.endsWith(".ts"));
+  assert.ok(names.includes("host-path.ts"));
+  for (const name of names) {
+    const text = readFileSync(join(dir, name), "utf8");
+    assert.equal(text.includes("NetworkScheduler"), false, name);
+  }
+});
+
+test("host DirectNetPath delivers a snap frame in the same turn", async () => {
+  const seen: HostSnapFrame[] = [];
+  let sinkCalls = 0;
+  const path = hostSnapPath((clientId, envelope) => {
+    sinkCalls += 1;
+    seen.push({ type: "snap", clientId, envelope });
+  });
+  const frame: HostSnapFrame = {
+    type: "snap",
+    clientId: 1,
+    envelope: {
+      kind: "full",
+      seq: 4,
+      tick: 2n,
+      baseline: 0,
+      lastProcessedInput: 0,
+      worldVersion: "example-v1",
+      protocol: 1,
+      spawns: [],
+      updates: [],
+      despawns: [],
+    },
+  };
+  const pending = path.send(frame, { to: "client:1", kind: "snap" });
+  assert.equal(sinkCalls, 1);
+  assert.equal(seen[0]!.envelope, frame.envelope);
+  assert.deepEqual(seen[0], frame);
+  assert.deepEqual(await pending, { ok: true, seq: 1 });
+
+  const wires: string[] = [];
+  const inbound: unknown[] = [];
+  let wireCalls = 0;
+  const socket = createHostSocketPaths({
+    writeWire(text) {
+      wireCalls += 1;
+      wires.push(text);
+    },
+    onEngineText(text) {
+      inbound.push(decodeFrame(text));
+    },
+  });
+  const snap = { v: 1, type: "snapshot", envelope: { kind: "full", seq: 3, tick: 1n } };
+  socket.sendEncoded(encodeFrame(snap));
+  assert.equal(wireCalls, 1);
+  const written = decodeFrame(wires[0]!) as { type: string; envelope: { kind: string; seq: number } };
+  assert.equal(written.type, "snapshot");
+  assert.equal(written.envelope.kind, "full");
+  assert.equal(written.envelope.seq, 3);
+
+  for (const type of ["welcome", "error"] as const) {
+    const before = wireCalls;
+    socket.sendEncoded(encodeFrame({ v: 1, type, reason: "x" }));
+    assert.equal(wireCalls, before + 1);
+    assert.equal((decodeFrame(wires.at(-1)!) as { type: string }).type, type);
+  }
+  for (const type of ["input", "ack", "resync"] as const) {
+    const before = inbound.length;
+    socket.deliverEncoded(encodeFrame({ v: 1, type, seq: 1, snapshotSeq: 1 }));
+    assert.equal(inbound.length, before + 1);
+    assert.equal((inbound.at(-1) as { type: string }).type, type);
+  }
+  socket.close();
+});
 
 test("production server graph does not import the simulator", () => {
   const entry = require.resolve("../dist/server/main.js");

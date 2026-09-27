@@ -6,6 +6,7 @@ import { WebSocketServer, type WebSocket } from "ws";
 import { EngineWsServer } from "conveyor-engine-transport-ws";
 import type { TransportSocket } from "conveyor-engine-transport-ws";
 import { startWanderLoop } from "./game.js";
+import { createHostSocketPaths } from "./host-path.js";
 import { loadArena } from "./world-loader.js";
 
 const webRoot = fileURLToPath(new URL("../../dist/web/", import.meta.url));
@@ -41,18 +42,29 @@ function send(res: ServerResponse, status: number, body: string | Uint8Array, co
 function socketFromWs(ws: WebSocket): TransportSocket {
   const messages: Array<(text: string) => void> = [];
   const closes: Array<() => void> = [];
+  const wire = (data: Buffer | ArrayBuffer | Buffer[] | string): string =>
+    typeof data === "string" ? data : Buffer.from(data as Buffer).toString("utf8");
+  const paths = createHostSocketPaths({
+    writeWire(text) {
+      if (ws.readyState === ws.OPEN) ws.send(text);
+    },
+    onEngineText(text) {
+      for (const handler of messages) handler(text);
+    },
+  });
   ws.on("message", (data: Buffer | ArrayBuffer | Buffer[]) => {
-    const text = typeof data === "string" ? data : Buffer.from(data as Buffer).toString("utf8");
-    for (const handler of messages) handler(text);
+    paths.deliverEncoded(wire(data));
   });
   ws.on("close", () => {
+    paths.close();
     for (const handler of closes) handler();
   });
   return {
     send(text) {
-      if (ws.readyState === ws.OPEN) ws.send(text);
+      paths.sendEncoded(text);
     },
     close() {
+      paths.close();
       if (ws.readyState === ws.OPEN || ws.readyState === ws.CONNECTING) ws.close();
     },
     onMessage(handler) {

@@ -29,7 +29,7 @@
     "run:partition": "node dist/run.js partition",
     "bench": "node dist/bench-cli.js",
     "viewer": "npm run start",
-    "record:arena": "node dist/arena-scenario.js",
+    "record:arena": "node dist/dev/arena-scenario.js",
     "live:arena": "npm run start"
   },
   "license": "ISC",
