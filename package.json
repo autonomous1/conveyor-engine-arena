@@ -1,0 +1,56 @@
+{
+  "name": "conveyor-engine-arena",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Browser arena client and authoritative host for Conveyor Engine",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "clean": "rm -rf dist",
+    "build:server": "tsc -p tsconfig.server.json",
+    "build:client": "node scripts/build-client.mjs",
+    "build": "npm run clean && npm run build:server && npm run build:client",
+    "typecheck": "tsc -p tsconfig.server.json --noEmit && tsc -p tsconfig.client.json --noEmit",
+    "test": "node --experimental-strip-types --test test/*.test.ts",
+    "start": "node dist/server/main.js",
+    "dev": "npm run build && npm run start",
+    "start:arena": "node dist/run.js arena",
+    "start:arena-wall": "node dist/run.js arena 40",
+    "start:arena-miss": "node dist/run.js arena-miss",
+    "run:lossless": "node dist/run.js lossless",
+    "run:lossy": "node dist/run.js lossy",
+    "run:partition": "node dist/run.js partition",
+    "bench": "node dist/bench-cli.js",
+    "viewer": "npm run start",
+    "record:arena": "node dist/arena-scenario.js",
+    "live:arena": "npm run start"
+  },
+  "license": "ISC",
+  "dependencies": {
+    "conveyor-engine-assets": "file:../conveyor-engine-packages/conveyor-engine-assets",
+    "conveyor-engine-client": "file:../conveyor-engine-packages/conveyor-engine-client",
+    "conveyor-engine-core": "file:../conveyor-engine-packages/conveyor-engine-core",
+    "conveyor-engine-replication": "file:../conveyor-engine-packages/conveyor-engine-replication",
+    "conveyor-engine-three": "file:../conveyor-engine-packages/conveyor-engine-three",
+    "conveyor-engine-transport-ws": "file:../conveyor-engine-packages/conveyor-engine-transport-ws",
+    "conveyor-engine-world": "file:../conveyor-engine-packages/conveyor-engine-world",
+    "three": "~0.186.0",
+    "three-gamepad-controls": "^0.24.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/ws": "^8.5.14",
+    "conveyor-graph": "file:../conveyor-graph",
+    "conveyor-graph-simulator": "file:../conveyor-graph-simulator",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.8.2"
+  }
+}
