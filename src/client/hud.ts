@@ -6,6 +6,19 @@ export function createHud() {
     "padding:8px 12px", "background:#12151ccc", "color:#d7dde8",
     "font:13px/1.4 ui-sans-serif, system-ui", "pointer-events:none",
   ].join(";");
+  const label = document.createElement("span");
+  label.id = "status-text";
+  const profileButton = document.createElement("button");
+  profileButton.id = "gamepad-profile";
+  profileButton.type = "button";
+  profileButton.title = "Gamepad profile (F10)";
+  profileButton.textContent = "standard";
+  profileButton.style.cssText = [
+    "pointer-events:auto", "margin-left:12px", "padding:0 6px",
+    "border:1px solid #3c4454", "border-radius:4px", "background:#1c2230",
+    "color:inherit", "font:inherit", "cursor:pointer", "vertical-align:baseline",
+  ].join(";");
+  status.append(label, profileButton);
   const cross = document.createElement("div");
   cross.id = "crosshair";
   cross.style.cssText = [
@@ -17,10 +30,22 @@ export function createHud() {
   const horz = document.createElement("div");
   horz.style.cssText = "position:absolute;left:0;top:7px;width:16px;height:2px;background:#f2f6fb";
   cross.append(vert, horz);
+  let onProfileToggle = () => {};
+  profileButton.addEventListener("click", (ev) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    onProfileToggle();
+  });
   document.body.append(status, cross);
   return {
     setStatus(text: string) {
-      status.textContent = text;
+      label.textContent = text;
+    },
+    setProfile(name: string) {
+      profileButton.textContent = name;
+    },
+    onProfileToggle(handler: () => void) {
+      onProfileToggle = handler;
     },
   };
 }

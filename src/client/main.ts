@@ -18,6 +18,8 @@ const arena = createArenaScene(view.shadows.quality);
 const visuals = await loadArenaVisuals(view, arena);
 const pawns = createPawnLayer(arena.content, visuals.templates, view.pawnHeight);
 const input = attachPlayInput(arena.renderer.domElement);
+hud.onProfileToggle(() => input.toggleProfile());
+hud.setProfile(input.profile);
 const client = new EngineClient(1, { delayMs: 80, extraMs: 0, predictOwned: false });
 let statusText = "connecting";
 let aimedPawn: number | undefined;
@@ -63,6 +65,7 @@ function frame(now: number) {
   }
   const look = input.locked ? "look locked" : "click to look";
   hud.setStatus(`${statusText} · ${look} · meshes ${pawns.count} models ${pawns.count - pawns.fallbacks} fallback ${pawns.fallbacks + visuals.fallbacks}`);
+  hud.setProfile(input.profile);
   arena.renderer.render(arena.scene, arena.camera);
   requestAnimationFrame(frame);
 }
