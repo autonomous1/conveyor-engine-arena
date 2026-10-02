@@ -8,3 +8,4 @@ dist/
 .env
 .env.*
 .vscode
+conveyor-engine-arena.code-workspace

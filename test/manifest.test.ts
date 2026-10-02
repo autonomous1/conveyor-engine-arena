@@ -33,7 +33,7 @@ test("installed manifest matches the authoritative world and keeps spawns clear"
   assert.equal(game.view.walls.length, 4);
   assert.equal(game.view.shadows.quality, "realistic");
   assert.deepEqual(game.view.cityscape, {
-    texture: "/assets/textures/cityscape-pano-3.png",
+    texture: "/assets/textures/cityscape-pano-3-lt.png",
     shape: "cylinder",
     radius: 80,
     height: 80.534,
@@ -43,16 +43,16 @@ test("installed manifest matches the authoritative world and keeps spawns clear"
     { texture: "/assets/textures/dark-sky-pano-4.png", shape: "dome", radius: 160, height: 320 },
   );
   const characterScale = Object.fromEntries(game.view.characters.map((character) => [character.id, character.scale]));
-  assert.deepEqual(characterScale, { "player-a": 6, "player-b": 6 });
+  assert.deepEqual(characterScale, { 'player-a': 4, 'player-b': 4, 'player-1': 3 });
   const rider = game.view.characters.find((character) => character.id === "player-a");
   const skeleton = game.view.characters.find((character) => character.id === "player-b");
   assert.ok(rider && skeleton);
   assert.deepEqual(
     Object.fromEntries(Object.entries(rider.animations).map(([movement, entry]) => [movement, entry.speed])),
-    { idle: 0, walk: 1, run: 2, fall: 0, angry: 0 },
+    { idle: 0, walk: 1, run: 2, fall: 0, angry: 3 },
   );
   assert.equal(rider.animations.walk.clip, "please generate a ilitary marching walk and call it \"walk\".001");
-  assert.equal(skeleton.animations.run.clip, "Zombie Run");
+  assert.equal(skeleton.animations.run.clip, "I would like to make a \"zombie run\"");
   assert.equal(skeleton.animations.fall.clip, "fall");
   assert.equal(skeleton.animations.angry.clip, "angry_01");
   const faceModel = Object.fromEntries(game.view.walls.map((wall) => [wall.face, wall.model]));

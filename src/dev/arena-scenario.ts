@@ -157,7 +157,7 @@ export async function recordArenaWander(opts: {
         seq: t,
         moveX: Math.sin(a.heading) * scale,
         moveZ: Math.cos(a.heading) * scale,
-        yaw: a.heading,
+        yaw: a.heading
       });
     }
     const snap = world.commit(BigInt(t));

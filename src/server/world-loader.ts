@@ -6,9 +6,9 @@ import type { Movement } from "../shared/movements.js";
 export type WanderAgent = {
   id: number;
   heading: number;
-  gait: Movement;
+  gait: string;
   nextTurn: number;
-  speeds: Record<Movement, number>;
+  speeds: Record<string, number>;
 };
 
 export type LoadedArena = {
@@ -35,7 +35,8 @@ export function loadArena(): LoadedArena {
     world.enqueue({ kind: "setBounds", entity: id, radius: game.view.pawnRadius });
     const animations = game.view.characters.find((character) => character.id === assetKey)?.animations;
     const gait: Movement = "walk";
-    world.triggerAction(id, gait);
+    // TODO: fix
+    //world.triggerAction(id, gait);
     const speeds = Object.fromEntries(
       (Object.entries(animations ?? {}) as Array<[Movement, { speed: number }]>).map(([movement, entry]) => [movement, entry.speed]),
     ) as Record<Movement, number>;

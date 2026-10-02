@@ -3,7 +3,7 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { clone as cloneWithSkeleton } from "three/addons/utils/SkeletonUtils.js";
 import type { ArenaView, BackdropShape } from "../shared/arena-view.js";
 import type { Movement } from "../shared/movements.js";
-import { shadowSettings, type ShadowQuality } from "../shared/shadows.js";
+import { shadowSettings, type ShadowQuality } from "../shared/shadows.ts";
 
 export type ArenaScene = {
   renderer: THREE.WebGLRenderer;

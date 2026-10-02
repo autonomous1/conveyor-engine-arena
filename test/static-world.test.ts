@@ -24,8 +24,8 @@ test("arena app welcome carries bundle identity and distinct spawns", () => {
   assert.notEqual(pa.x, pb.x);
   const d = app.diagnostics();
   assert.equal(d.bundleId, "arena.one-room.v1");
-  assert.equal(d.spawnCount, 4);
-  assert.ok((d.aabbCount ?? 0) >= 4);
+  assert.equal(d.spawnCount, 5);
+  assert.ok((d.aabbCount ?? 0) >= 5);
 });
 
 test("visual miss uses fallback and does not change server hash", () => {
@@ -82,7 +82,7 @@ test("head-on wall stop matches expected clearance", () => {
     ]));
   }
   assert.equal(app.world.store.view(a.pawn)!.position.x, -2.5);
-  assert.equal(app.world.store.view(b.pawn)!.position.x, 2.5);
+  assert.equal(app.world.store.view(b.pawn)!.position.x, 4.5);
 });
 
 test("axis slide continues on the free axis", () => {

@@ -3,9 +3,17 @@ import { EngineClient, type IncomingSnapshot } from "conveyor-engine-client";
 const TOKEN_KEY = "ce-arena-token";
 
 export type LiveStatus = {
+  phase: "hello" | "welcome" | "snap" | "resync" | "reject" | "error";
   text: string;
   clientId?: number;
   ownedEntityId?: number;
+  snapSeq?: number;
+  resyncs: number;
+};
+
+export type LiveLink = {
+  sendInput(moveX: number, moveZ: number, yaw: number): void;
+  close(): void;
 };
 
 function revive(value: unknown): unknown {
@@ -40,14 +48,29 @@ export function connectLive(opts: {
   client: EngineClient;
   onStatus: (status: LiveStatus) => void;
   onApplied: () => void;
-}): () => void {
+}): LiveLink {
   const ws = new WebSocket(`${location.origin.replace(/^http/, "ws")}/`);
   let lastSeq = 0;
   let lastSnapAt = 0;
+  let inputSeq = 1;
+  let ownedId: number | undefined;
+  let resyncs = 0;
+  const requestResync = () => {
+    if (ws.readyState !== WebSocket.OPEN) return;
+    resyncs += 1;
+    ws.send(JSON.stringify({ v: 1, type: "resync" }));
+    opts.onStatus({
+      phase: "resync",
+      text: `resync ${resyncs}`,
+      ownedEntityId: ownedId,
+      snapSeq: lastSeq || undefined,
+      resyncs,
+    });
+  };
   const onVisibility = () => {
     if (document.visibilityState !== "visible" || ws.readyState !== WebSocket.OPEN) return;
     if (Date.now() - lastSnapAt < 2500) return;
-    ws.send(JSON.stringify({ v: 1, type: "resync" }));
+    requestResync();
   };
   document.addEventListener("visibilitychange", onVisibility);
   ws.addEventListener("open", () => {
@@ -61,9 +84,9 @@ export function connectLive(opts: {
       authoritativeHash: opts.authoritativeHash,
       token,
     }));
-    opts.onStatus({ text: "hello sent" });
+    opts.onStatus({ phase: "hello", text: "hello sent", resyncs });
   });
-  ws.addEventListener("error", () => opts.onStatus({ text: "socket error" }));
+  ws.addEventListener("error", () => opts.onStatus({ phase: "error", text: "socket error", ownedEntityId: ownedId, resyncs }));
   ws.addEventListener("message", (ev) => {
     try {
       const text = typeof ev.data === "string" ? ev.data : new TextDecoder().decode(ev.data as ArrayBuffer);
@@ -73,46 +96,73 @@ export function connectLive(opts: {
         if (token) sessionStorage.setItem(TOKEN_KEY, token);
         const owned = Number(msg.ownedEntityId);
         const clientId = Number(msg.clientId) || 1;
-        if (Number.isFinite(owned)) opts.client.connect(owned, clientId);
+        ownedId = Number.isFinite(owned) ? owned : undefined;
+        inputSeq = 1;
+        if (ownedId !== undefined) opts.client.connect(ownedId, clientId);
         lastSeq = 0;
         opts.onStatus({
-          text: `welcome client ${clientId} owned ${Number.isFinite(owned) ? owned : "?"}`,
+          phase: "welcome",
+          text: `welcome client ${clientId} owned ${ownedId ?? "none"}`,
           clientId,
-          ownedEntityId: Number.isFinite(owned) ? owned : undefined,
+          ownedEntityId: ownedId,
+          resyncs,
         });
         return;
       }
       if (msg.type === "reject" || msg.type === "error") {
-        opts.onStatus({ text: `${String(msg.type)} ${String(msg.reason ?? msg.code ?? "")}` });
+        opts.onStatus({
+          phase: msg.type,
+          text: `${String(msg.type)} ${String(msg.reason ?? msg.code ?? "")}`,
+          ownedEntityId: ownedId,
+          resyncs,
+        });
         return;
       }
       if (msg.type !== "snapshot" || !msg.envelope || typeof msg.envelope !== "object") return;
       const snap = asSnapshot(msg.envelope as Record<string, unknown>);
-      if (snap.kind !== "full" && lastSeq > 0 && snap.seq > lastSeq + 1) {
-        ws.send(JSON.stringify({ v: 1, type: "resync" }));
-      }
+      if (snap.kind !== "full" && lastSeq > 0 && snap.seq > lastSeq + 1) requestResync();
       lastSeq = Number.isFinite(snap.seq) ? snap.seq : lastSeq;
       lastSnapAt = Date.now();
-      if (!opts.client.connected) {
-        const first = snap.spawns[0] ?? snap.updates[0];
-        if (first) opts.client.connect(Number(first.entity), 1);
-      }
       opts.client.applySnapshot(snap);
       ws.send(JSON.stringify({ v: 1, type: "ack", snapshotSeq: snap.seq }));
-      if (snap.kind === "delta" && opts.client.renderSnapshot().entities.length === 0) {
-        ws.send(JSON.stringify({ v: 1, type: "resync" }));
-      }
+      const rendered = opts.client.renderSnapshot();
+      if (snap.kind === "delta" && rendered.entities.length === 0) requestResync();
       opts.onStatus({
-        text: `snap ${snap.seq} tick ${snap.tick} ${snap.kind} pawns ${opts.client.renderSnapshot().entities.length}`,
+        phase: "snap",
+        text: `snap ${snap.seq} tick ${snap.tick} ${snap.kind} owned ${ownedId ?? "?"} pawns ${rendered.entities.length}`,
+        clientId: opts.client.clientId,
+        ownedEntityId: ownedId,
+        snapSeq: snap.seq,
+        resyncs,
       });
       opts.onApplied();
     } catch (err) {
-      opts.onStatus({ text: `apply failed ${err instanceof Error ? err.message : String(err)}` });
-      if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ v: 1, type: "resync" }));
+      opts.onStatus({
+        phase: "error",
+        text: `apply failed ${err instanceof Error ? err.message : String(err)}`,
+        ownedEntityId: ownedId,
+        resyncs,
+      });
+      requestResync();
     }
   });
-  return () => {
-    document.removeEventListener("visibilitychange", onVisibility);
-    ws.close();
+  return {
+    sendInput(moveX, moveZ, yaw) {
+      if (ownedId === undefined || ws.readyState !== WebSocket.OPEN) return;
+      ws.send(JSON.stringify({
+        v: 1,
+        type: "input",
+        seq: inputSeq++,
+        moveX,
+        moveZ,
+        yaw,
+        buttons: 0,
+        entity: ownedId,
+      }));
+    },
+    close() {
+      document.removeEventListener("visibilitychange", onVisibility);
+      ws.close();
+    },
   };
 }

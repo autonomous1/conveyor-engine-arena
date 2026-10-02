@@ -13,6 +13,7 @@ type Pawn = {
   action?: THREE.AnimationAction;
   movement?: string;
   clips: Map<string, THREE.AnimationClip>;
+  assetKey?: string;
 };
 
 export function createPawnLayer(parent: THREE.Object3D, templates: CharacterTemplates, pawnHeight: number) {
@@ -42,6 +43,8 @@ export function createPawnLayer(parent: THREE.Object3D, templates: CharacterTemp
   function play(pawn: Pawn, movement: string): void {
     if (!pawn.mixer || pawn.movement === movement) return;
     const clip = pawn.clips.get(movement);
+    // TODO spammy log
+    //console.log("id:", pawn.assetKey, "movement:", movement, "clip:", clip?.name);
     if (!clip) return;
     const next = pawn.mixer.clipAction(clip);
     next.reset().fadeIn(0.15).play();
@@ -70,14 +73,17 @@ export function createPawnLayer(parent: THREE.Object3D, templates: CharacterTemp
       root.add(capsule(id));
     }
     parent.add(root);
-    const pawn = { root, px: 0, pz: 0, fallback, mixer, clips };
+    const pawn = { root, px: 0, pz: 0, fallback, mixer, clips, assetKey };
     pawns.set(id, pawn);
     return pawn;
   }
 
   return {
-    /** Positions come only from the render snapshot supplied by the frame loop. */
-    apply(render: RenderSnapshot, dt: number, movementOf: (id: number) => string | undefined) {
+    /**
+     * Positions and facing come only from the render snapshot. The owned pawn
+     * is hidden so the first-person camera is not inside the mesh.
+     */
+    apply(render: RenderSnapshot, dt: number, movementOf: (id: number) => string | undefined, ownedId?: number) {
       const seen = new Set<number>();
       for (const entity of render.entities) {
         const id = Number(entity.id);
@@ -85,22 +91,18 @@ export function createPawnLayer(parent: THREE.Object3D, templates: CharacterTemp
         seen.add(id);
         const pawn = ensure(id, entity.render?.assetKey);
         const named = movementOf(id);
-        const movement = named && (MOVEMENTS as readonly string[]).includes(named) ? named : "idle";
+        //let movement = named && (MOVEMENTS as readonly string[]).includes(named) ? named : "idle";
+        const movement = entity.clip;
+        const speed = entity.speed;
+        // TODO: spammy log
+        //console.log(`pawn ${id} movement:${movement} speed:${entity.animation?.speed}`);
         play(pawn, movement);
         pawn.mixer?.update(dt);
-        const dx = entity.position.x - pawn.px;
-        const dz = entity.position.z - pawn.pz;
         pawn.px = entity.position.x;
         pawn.pz = entity.position.z;
         pawn.root.position.set(pawn.px, entity.position.y, pawn.pz);
-        const speed = Math.hypot(dx, dz);
-        if (speed > 0.04) {
-          const target = Math.atan2(dx, dz);
-          let delta = target - pawn.root.rotation.y;
-          while (delta > Math.PI) delta -= Math.PI * 2;
-          while (delta < -Math.PI) delta += Math.PI * 2;
-          pawn.root.rotation.y += delta * 0.65;
-        }
+        pawn.root.quaternion.set(entity.rotation.x, entity.rotation.y, entity.rotation.z, entity.rotation.w);
+        pawn.root.visible = ownedId === undefined || id !== ownedId;
       }
       for (const [id, pawn] of pawns) {
         if (seen.has(id)) continue;
@@ -117,6 +119,15 @@ export function createPawnLayer(parent: THREE.Object3D, templates: CharacterTemp
         }
         pawns.delete(id);
       }
+      const report = [...pawns.entries()].map(([id, pawn]) => ({
+        id,
+        assetKey: pawn.assetKey,
+        movement: pawn.movement,
+        clips: [...pawn.clips.keys()],
+        time: pawn.mixer?.time ?? 0,
+        running: pawn.action?.isRunning() ?? false,
+      }));
+      (globalThis as { __pawnAnim?: unknown }).__pawnAnim = report;
     },
     get count() {
       return pawns.size;

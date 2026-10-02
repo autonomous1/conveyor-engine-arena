@@ -1,8 +1,9 @@
 import { EngineClient } from "conveyor-engine-client";
 import type { ArenaView } from "../shared/arena-view.js";
+import { eyeLook, INPUT_HZ, moveIntent, yawFromQuat } from "../shared/look.js";
 import { createArenaScene, loadArenaVisuals } from "./arena-scene.js";
 import { createHud } from "./hud.js";
-import { attachCameraControls } from "./input.js";
+import { attachPlayInput } from "./input.js";
 import { connectLive } from "./net.js";
 import { createPawnLayer } from "./presentation.js";
 
@@ -12,28 +13,56 @@ const view = await fetch("/arena.json").then((res) => {
 });
 
 const hud = createHud();
-hud.set("loading arena");
+hud.setStatus("loading arena");
 const arena = createArenaScene(view.shadows.quality);
 const visuals = await loadArenaVisuals(view, arena);
 const pawns = createPawnLayer(arena.content, visuals.templates, view.pawnHeight);
-const controls = attachCameraControls(arena.camera, arena.renderer);
+const input = attachPlayInput(arena.renderer.domElement);
 const client = new EngineClient(1, { delayMs: 80, extraMs: 0, predictOwned: false });
+let statusText = "connecting";
+let aimedPawn: number | undefined;
 
-connectLive({
+const link = connectLive({
   bundleId: view.bundleId,
   authoritativeHash: view.authoritativeHash,
   world: view.world,
   client,
-  onStatus: (status) => hud.set(`${status.text} · meshes ${pawns.count} models ${pawns.count - pawns.fallbacks} fallback ${pawns.fallbacks + visuals.fallbacks}`),
+  onStatus: (status) => {
+    statusText = status.text;
+  },
   onApplied: () => {},
 });
 
 let last = performance.now();
+let sendAcc = 0;
+const sendDt = 1 / INPUT_HZ;
 function frame(now: number) {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
-  pawns.apply(client.renderSnapshot(), dt, (id) => client.authoritative(id)?.action);
-  controls.update(dt);
+  input.update(dt);
+  const sample = input.sample();
+  const render = client.renderSnapshot();
+  const ownedId = client.ownedEntity;
+  const owned = ownedId === undefined ? undefined : render.entities.find((entity) => entity.id === ownedId);
+  if (owned && ownedId !== aimedPawn) {
+    input.setYaw(yawFromQuat(owned.rotation));
+    aimedPawn = ownedId;
+  }
+  if (owned) {
+    const aim = eyeLook(owned.position, sample.yaw, sample.pitch);
+    arena.camera.position.set(aim.position.x, aim.position.y, aim.position.z);
+    arena.camera.up.set(0, 1, 0);
+    arena.camera.lookAt(aim.target.x, aim.target.y, aim.target.z);
+  }
+  pawns.apply(render, dt, (id) => client.authoritative(id)?.action, ownedId);
+  sendAcc += dt;
+  if (sendAcc >= sendDt) {
+    sendAcc = Math.min(sendAcc - sendDt, sendDt);
+    const move = moveIntent(sample.yaw, sample.forward, sample.strafe);
+    link.sendInput(move.moveX, move.moveZ, sample.yaw);
+  }
+  const look = input.locked ? "look locked" : "click to look";
+  hud.setStatus(`${statusText} · ${look} · meshes ${pawns.count} models ${pawns.count - pawns.fallbacks} fallback ${pawns.fallbacks + visuals.fallbacks}`);
   arena.renderer.render(arena.scene, arena.camera);
   requestAnimationFrame(frame);
 }
