@@ -36,7 +36,23 @@ export function createHud() {
     ev.stopPropagation();
     onProfileToggle();
   });
-  document.body.append(status, cross);
+  const stats = document.createElement("pre");
+  stats.id = "stats";
+  stats.style.cssText = [
+    "position:fixed", "left:12px", "bottom:12px", "z-index:2", "margin:0",
+    "background:#12151ccc", "color:#d7dde8", "padding:8px 10px", "border-radius:6px",
+    "white-space:pre", "font:11px/1.4 ui-monospace, SFMono-Regular, monospace",
+    "pointer-events:none",
+  ].join(";");
+  let statsVisible = true;
+  const onStatsKey = (ev: KeyboardEvent) => {
+    if (ev.repeat || ev.code !== "F3") return;
+    ev.preventDefault();
+    statsVisible = !statsVisible;
+    stats.style.display = statsVisible ? "block" : "none";
+  };
+  window.addEventListener("keydown", onStatsKey);
+  document.body.append(status, stats, cross);
   return {
     setStatus(text: string) {
       label.textContent = text;
@@ -46,6 +62,13 @@ export function createHud() {
     },
     onProfileToggle(handler: () => void) {
       onProfileToggle = handler;
+    },
+    get statsVisible() {
+      return statsVisible;
+    },
+    setStats(text: string) {
+      if (!statsVisible) return;
+      stats.textContent = text;
     },
   };
 }

@@ -78,6 +78,9 @@ export function createPawnLayer(parent: THREE.Object3D, templates: CharacterTemp
     return pawn;
   }
 
+  const order: number[] = [];
+  const byId = (a: number, b: number) => a - b;
+
   return {
     /**
      * Positions and facing come only from the render snapshot. The owned pawn
@@ -136,6 +139,21 @@ export function createPawnLayer(parent: THREE.Object3D, templates: CharacterTemp
       let n = 0;
       for (const pawn of pawns.values()) if (pawn.fallback) n += 1;
       return n;
+    },
+    /** Presentation xz, lowest id first, labeled A, B, C. */
+    positionLine(): string {
+      order.length = 0;
+      for (const id of pawns.keys()) order.push(id);
+      if (order.length > 1) order.sort(byId);
+      let text = "";
+      for (let i = 0; i < order.length; i++) {
+        const pawn = pawns.get(order[i]!);
+        if (!pawn) continue;
+        if (text) text += " ";
+        const label = i < 26 ? String.fromCharCode(65 + i) : String(i + 1);
+        text += label + "(" + pawn.px.toFixed(2) + "," + pawn.pz.toFixed(2) + ")";
+      }
+      return text;
     },
   };
 }

@@ -6,6 +6,7 @@ import { createHud } from "./hud.js";
 import { attachPlayInput } from "./input.js";
 import { connectLive } from "./net.js";
 import { createPawnLayer } from "./presentation.js";
+import { createRateWindow, formatOverlay } from "./rates.js";
 
 const view = await fetch("/arena.json").then((res) => {
   if (!res.ok) throw new Error("arena.json " + res.status);
@@ -31,12 +32,16 @@ const link = connectLive({
   client,
   onStatus: (status) => {
     statusText = status.text;
+    resyncs = status.resyncs;
   },
   onApplied: () => {},
 });
 
 let last = performance.now();
 let sendAcc = 0;
+let seenSnaps = 0;
+let resyncs = 0;
+const rates = createRateWindow(500);
 const sendDt = 1 / INPUT_HZ;
 function frame(now: number) {
   const dt = Math.min(0.05, (now - last) / 1000);
@@ -67,6 +72,37 @@ function frame(now: number) {
   hud.setStatus(`${statusText} · ${look} · meshes ${pawns.count} models ${pawns.count - pawns.fallbacks} fallback ${pawns.fallbacks + visuals.fallbacks}`);
   hud.setProfile(input.profile);
   arena.renderer.render(arena.scene, arena.camera);
+  const info = arena.renderer.info;
+  const calls = info.render.calls;
+  const tris = info.render.triangles;
+  const geoms = info.memory.geometries;
+  const tex = info.memory.textures;
+  if (!info.autoReset) info.reset();
+  const snaps = client.metrics.snapshotReceive;
+  const snapTick = snaps === 0 ? undefined : Number(render.serverTick);
+  const sampleRates = rates.push(now, snaps !== seenSnaps ? snapTick : undefined);
+  seenSnaps = snaps;
+  if (hud.statsVisible) {
+    hud.setStats(formatOverlay({
+      fps: sampleRates.fps,
+      tickPerSec: sampleRates.tickPerSec,
+      tick: snapTick,
+      snaps,
+      resyncs,
+      seq: snaps === 0 ? undefined : render.snapshotSeq,
+      calls,
+      tris: Math.round(tris),
+      geoms,
+      tex,
+      shadows: arena.renderer.shadowMap.enabled ? "on" : "off",
+      shadowMap: arena.renderer.shadowMap.type,
+      tone: arena.renderer.toneMapping,
+      exposure: arena.renderer.toneMappingExposure,
+      pawns: pawns.count,
+      owned: client.ownedEntity,
+      positions: pawns.positionLine(),
+    }));
+  }
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
