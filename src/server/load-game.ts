@@ -1,7 +1,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { compileGame, GameManifestError, type CompiledGame } from "./game-manifest.js";
+import { compileGame, GameManifestError, placementRefsOf, type CompiledGame, type CompileSources, type PlacementFileSource } from "./game-manifest.js";
+import { resolvePlacementsPath } from "./placements-file.js";
 
 const MANIFEST = join("web", "game", "arena.game.json");
 
@@ -38,6 +39,55 @@ export function loadInstalledGame(): CompiledGame {
   } catch (err) {
     throw new GameManifestError([{ path: "$", message: `invalid json: ${err instanceof Error ? err.message : String(err)}` }]);
   }
-  cached = compileGame(doc, (uri) => readUnderWeb(root, uri));
+  const sources = readManifestSources(root, doc);
+  cached = compileGame(doc, (uri) => readUnderWeb(root, uri), sources);
   return cached;
+}
+
+/**
+ * Read placements, and bounds or spawnPoints when those fields are paths.
+ * Inline bounds and spawn points are left for `compileGame`. Absent placements
+ * is `undefined`. An empty placements list is `{ placementFiles: [] }`.
+ */
+export function readManifestSources(root: string, doc: unknown): CompileSources | undefined {
+  if (!doc || typeof doc !== "object") return undefined;
+  const scene = (doc as { scene?: unknown }).scene;
+  if (!scene || typeof scene !== "object") return undefined;
+  const record = scene as Record<string, unknown>;
+  const sources: CompileSources = {};
+  if (Object.prototype.hasOwnProperty.call(record, "placements")) {
+    sources.placementFiles = readPlacementFiles(root, doc);
+  }
+  if (typeof record.bounds === "string") {
+    sources.boundsFile = readSceneText(root, record.bounds, "scene.bounds");
+  }
+  if (typeof record.spawnPoints === "string") {
+    sources.spawnPointsFile = readSceneText(root, record.spawnPoints, "scene.spawnPoints");
+  }
+  if (!sources.placementFiles && !sources.boundsFile && !sources.spawnPointsFile) return undefined;
+  return sources;
+}
+
+/** Read every `scene.placements` path. Absent is `undefined`. An empty list is `[]`. */
+export function readPlacementFiles(root: string, doc: unknown): PlacementFileSource[] | undefined {
+  if (!doc || typeof doc !== "object") return undefined;
+  const scene = (doc as { scene?: unknown }).scene;
+  if (!scene || typeof scene !== "object" || !Object.prototype.hasOwnProperty.call(scene, "placements")) return undefined;
+  const { refs, issues } = placementRefsOf(scene);
+  if (issues.length) throw new GameManifestError(issues);
+  return refs.map((ref) => readSceneText(root, ref.file, ref.path));
+}
+
+function readSceneText(root: string, ref: string, issuePath: string): PlacementFileSource {
+  let file: string;
+  try {
+    file = resolvePlacementsPath(root, ref);
+  } catch (err) {
+    throw new GameManifestError([{ path: issuePath, message: err instanceof Error ? err.message : String(err) }]);
+  }
+  try {
+    return { path: ref, text: readFileSync(file, "utf8") };
+  } catch {
+    throw new GameManifestError([{ path: issuePath, message: `cannot read ${ref}` }]);
+  }
 }

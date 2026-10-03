@@ -1,9 +1,19 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { EngineWsClient, EngineWsServer, memoryPair } from "conveyor-engine-transport-ws";
 import { ARENA_INTEREST_RADIUS, noteArenaInterest } from "../dist/server/game.js";
 import { startArenaServer } from "../dist/server/main.js";
 import { loadArena } from "../dist/server/world-loader.js";
+
+function coverCrate(): { minX: number; maxX: number; minZ: number; maxZ: number } {
+  const doc = JSON.parse(readFileSync(new URL("../web/game/props.placements.json", import.meta.url), "utf8")) as {
+    obstacles: Array<{ id: string; min: number[]; max: number[] }>;
+  };
+  const box = doc.obstacles.find((item) => item.id === "cover-crate-2-box");
+  if (!box) throw new Error("cover-crate-2-box missing");
+  return { minX: box.min[0]!, maxX: box.max[0]!, minZ: box.min[2]!, maxZ: box.max[2]! };
+}
 
 type Pose = { x: number; z: number };
 
@@ -92,28 +102,35 @@ test("arena interest override is wider than the room diagonal", () => {
   assert.equal(server.replicator.get(id)?.interestRadius, ARENA_INTEREST_RADIUS);
 });
 
-test("full walk input stops on the center cover and stays inside the room", () => {
+test("full walk input stops on the cover crate and stays inside the room", () => {
   const loaded = loadArena();
+  const crate = coverCrate();
+  const radius = loaded.view.pawnRadius;
+  const face = crate.minX - radius;
+  const z0 = (crate.minZ + crate.maxZ) / 2;
   const pawn = loaded.agents[0]!.id;
-  let x = loaded.world.store.view(pawn)!.position.x;
-  let z = loaded.world.store.view(pawn)!.position.z;
-  assert.ok(x < -8);
-  assert.ok(Math.abs(z) < 0.1);
-  let maxX = x;
-  for (let tick = 1; tick <= 80; tick++) {
+  loaded.world.enqueue({
+    kind: "setTransform",
+    entity: pawn,
+    position: { x: face - 3, y: 0, z: z0 },
+    rotation: { x: 0, y: 0, z: 0, w: 1 },
+    scale: { x: 1, y: 1, z: 1 },
+  });
+  loaded.world.commit(0n);
+  const room = loaded.view.bounds;
+  let x = face - 3;
+  let z = z0;
+  for (let tick = 1; tick <= 30; tick++) {
     loaded.world.enqueue({ kind: "applyInput", entity: pawn, seq: tick, moveX: 1, moveZ: 0, yaw: Math.PI / 2 });
     loaded.world.commit(BigInt(tick));
     const pose = loaded.world.store.view(pawn)!.position;
     x = pose.x;
     z = pose.z;
-    if (x > maxX) maxX = x;
-    assert.ok(x > -23.6 && x < 23.6, `x ${x}`);
-    assert.ok(z > -23.6 && z < 23.6, `z ${z}`);
+    assert.ok(x > room.minX + radius && x < room.maxX - radius, `x ${x}`);
+    assert.ok(z > room.minZ + radius && z < room.maxZ - radius, `z ${z}`);
   }
-  assert.ok(maxX < 0, `tunneled through cover to ${maxX}`);
-  assert.ok(x < -2, `passed the cover face at ${x}`);
-  assert.ok(x > -3.2, `stopped short at ${x}`);
-  assert.ok(Math.abs(z) < 0.75);
+  assert.equal(x, face);
+  assert.ok(Math.abs(z - z0) < 1e-9);
 });
 
 test("two players own different pawns and only their own input moves them", async () => {

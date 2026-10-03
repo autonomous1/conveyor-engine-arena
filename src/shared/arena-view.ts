@@ -23,7 +23,8 @@ export type ArenaView = {
   collisionContentHash: string;
   world: string;
   bounds: { minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number };
-  floor: { y: number; texture: string };
+  /** Omitted when the manifest has no floor block. */
+  floor?: { y: number; texture: string };
   walls: Array<{
     face: "north" | "south" | "east" | "west";
     minX: number;
@@ -32,10 +33,27 @@ export type ArenaView = {
     maxZ: number;
     height: number;
     model: string;
+    /** World meters. Omitted on an old manifest: the face anchor. */
+    position?: [number, number, number];
+    /** Degrees about +Y, the same y-up-90 turn as a baked placement. Omitted: the face anchor. */
+    yaw?: number;
+    /** Uniform visual scale. Omitted: 1. This is the baked stencil scale, not a fit to the wall span. */
+    scale?: number;
   }>;
-  sky: { kind: "sky-dome"; texture: string; shape: BackdropShape; radius: number; height: number };
-  cityscape: { texture: string; shape: BackdropShape; radius: number; height: number };
-  shadows: { quality: ShadowQuality };
+  /** Instances loaded from `scene.placements`. The mesh uses this scale, not the asset scale. */
+  buildings: Array<{
+    id: string;
+    model: string;
+    position: [number, number, number];
+    yaw: number;
+    scale: number;
+  }>;
+  /** Omitted when the manifest has no sky block. */
+  sky?: { kind: "sky-dome"; texture: string; shape: BackdropShape; radius: number; height: number };
+  /** Omitted when the manifest has no cityscape block. */
+  cityscape?: { texture: string; shape: BackdropShape; radius: number; height: number };
+  /** Omitted when the manifest has no shadows block. */
+  shadows?: { quality: ShadowQuality };
   props: Array<{
     id: string;
     model: string;

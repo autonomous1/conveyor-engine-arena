@@ -1,0 +1,83 @@
+{
+  "formatVersion": 1,
+  "units": "meters",
+  "placements": [
+    {
+      "id": "cover-crate-2",
+      "model": "cover-crate",
+      "position": [
+        -6.312501,
+        0,
+        0.413101
+      ],
+      "yaw": 0,
+      "scale": 1
+    },
+    {
+      "id": "cover-crate-1",
+      "model": "cover-crate",
+      "position": [
+        2.160715,
+        0,
+        -5.042289
+      ],
+      "yaw": 0,
+      "scale": 1
+    },
+    {
+      "id": "cover-crate-3",
+      "model": "cover-crate",
+      "position": [
+        3.339286,
+        0,
+        7.189868
+      ],
+      "yaw": 90,
+      "scale": 1
+    }
+  ],
+  "obstacles": [
+    {
+      "id": "cover-crate-2-box",
+      "kind": "aabb",
+      "min": [
+        -7.866072,
+        0,
+        -0.533327
+      ],
+      "max": [
+        -4.758929,
+        0,
+        1.35953
+      ]
+    },
+    {
+      "id": "cover-crate-1-box",
+      "kind": "aabb",
+      "min": [
+        0.607143,
+        0,
+        -5.988717
+      ],
+      "max": [
+        3.714286,
+        0,
+        -4.09586
+      ]
+    },
+    {
+      "id": "cover-crate-3-box",
+      "kind": "aabb",
+      "min": [
+        2.392857,
+        0,
+        5.636297
+      ],
+      "max": [
+        4.285715,
+        0,
+        8.74344
+      ]
+    }
+  ]
+}

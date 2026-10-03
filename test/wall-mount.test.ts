@@ -1,50 +1,95 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import * as THREE from "three";
-import { facadeFit, wallAnchor } from "../src/client/arena-scene.ts";
+import * as arenaScene from "../src/client/arena-scene.ts";
+import type { ArenaView } from "../src/shared/arena-view.ts";
 
-const bounds = { minX: -24, maxX: 24, minY: -2, maxY: 12, minZ: -24, maxZ: 24 };
-const walls = {
-  south: { minX: -24, maxX: 24, minZ: -24, maxZ: -22 },
-  north: { minX: -24, maxX: 24, minZ: 22, maxZ: 24 },
-  east: { minX: 22, maxX: 24, minZ: -24, maxZ: 24 },
-  west: { minX: -24, maxX: -22, minZ: -24, maxZ: 24 },
-} as const;
+const { placeBuildingModel, placeWallModel } = arenaScene;
 
-const facade = { minX: -0.49, maxX: 0.49, minY: 0, maxY: 0.53, minZ: -0.18, maxZ: 0.18 };
+const bounds: ArenaView["bounds"] = { minX: -24, maxX: 24, minY: -2, maxY: 12, minZ: -24, maxZ: 24 };
 
-function mounted(face: keyof typeof walls): THREE.Group {
-  const wall = walls[face];
-  const anchor = wallAnchor(face, wall, bounds);
-  const fit = facadeFit(facade, anchor.span);
-  const group = new THREE.Group();
-  group.position.set(anchor.x, 0, anchor.z);
-  group.rotation.y = anchor.yaw;
-  const model = new THREE.Object3D();
-  model.scale.setScalar(fit.scale);
-  model.position.set(fit.x, fit.y, fit.z);
-  group.add(model);
-  group.updateMatrixWorld(true);
-  return group;
+function wall(partial: Partial<ArenaView["walls"][number]> = {}): ArenaView["walls"][number] {
+  return {
+    face: "south",
+    minX: -24,
+    maxX: 24,
+    minZ: -24,
+    maxZ: -22,
+    height: 12,
+    model: "/assets/models/box.glb",
+    ...partial,
+  };
 }
 
-test("each facade front sits on the inner wall and faces the room", () => {
-  for (const face of ["south", "north", "east", "west"] as const) {
-    const group = mounted(face);
-    const model = group.children[0]!;
-    const midX = (facade.minX + facade.maxX) / 2;
-    const front = new THREE.Vector3(midX, facade.minY, facade.maxZ).applyMatrix4(model.matrixWorld);
-    const back = new THREE.Vector3(midX, facade.minY, facade.minZ).applyMatrix4(model.matrixWorld);
-    const edge = new THREE.Vector3(facade.maxX, facade.minY, facade.maxZ).applyMatrix4(model.matrixWorld);
-    const anchor = wallAnchor(face, walls[face], bounds);
-    assert.ok(front.distanceTo(new THREE.Vector3(anchor.x, 0, anchor.z)) < 1e-6, `${face} front center ${front.x},${front.z}`);
-    const center = new THREE.Vector3();
-    const inward = front.clone().sub(back);
-    inward.y = 0;
-    const toCenter = center.clone().sub(front);
-    toCenter.y = 0;
-    assert.ok(inward.dot(toCenter) > 0, `${face} depth points out of the room`);
-    const width = edge.distanceTo(new THREE.Vector3(facade.minX, facade.minY, facade.maxZ).applyMatrix4(model.matrixWorld));
-    assert.ok(Math.abs(width - anchor.span) < 1e-6, `${face} width ${width}`);
-  }
+/** 1 m cube centered on the origin. World size is this cube times the manifest scale. */
+function boxTemplate(): THREE.Mesh {
+  return new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1));
+}
+
+test("a manifest scale of 2 is applied and the facade is not fit to the wall span", () => {
+  const template = boxTemplate();
+  const group = placeWallModel(template, wall({ scale: 2, position: [8, 0, -8], yaw: 0 }), bounds);
+  const model = group.children[0]!;
+  assert.equal(model.scale.x, 2);
+  assert.equal(model.scale.y, 2);
+  assert.equal(model.scale.z, 2);
+  assert.deepEqual([model.position.x, model.position.y, model.position.z], [0, 0, 0]);
+  assert.equal(template.scale.x, 1);
+  group.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(group);
+  const size = box.getSize(new THREE.Vector3());
+  assert.ok(Math.abs(size.x - 2) < 1e-6, `width ${size.x}`);
+  assert.ok(Math.abs(size.y - 2) < 1e-6, `height ${size.y}`);
+  assert.ok(Math.abs(size.z - 2) < 1e-6, `depth ${size.z}`);
+  const center = box.getCenter(new THREE.Vector3());
+  assert.ok(center.distanceTo(new THREE.Vector3(8, 0, -8)) < 1e-6, `center ${center.x},${center.y},${center.z}`);
+  assert.equal(Object.hasOwn(arenaScene, "facadeFit"), false);
+});
+
+test("an omitted scale is 1 and an omitted pose uses the south anchor", () => {
+  const group = placeWallModel(boxTemplate(), wall(), bounds);
+  const model = group.children[0]!;
+  assert.equal(model.scale.x, 1);
+  assert.equal(model.scale.y, 1);
+  assert.equal(model.scale.z, 1);
+  assert.deepEqual([group.position.x, group.position.y, group.position.z], [0, 0, -22]);
+  assert.equal(group.rotation.y, 0);
+  group.updateMatrixWorld(true);
+  const size = new THREE.Box3().setFromObject(group).getSize(new THREE.Vector3());
+  assert.ok(Math.abs(size.x - 1) < 1e-6, `width ${size.x}`);
+});
+
+test("a baked building uses its own scale and yaw 270 sends local +X to world +Z", () => {
+  const template = boxTemplate();
+  const group = placeBuildingModel(template, {
+    id: "brutalist-urban-1",
+    model: "/assets/models/brutalist-urban-1.glb",
+    position: [40.449, 0, -217.69447],
+    yaw: 270,
+    scale: 100,
+  });
+  const model = group.children[0]!;
+  assert.equal(model.scale.x, 100);
+  assert.equal(template.scale.x, 1);
+  assert.ok(Math.abs(group.rotation.y + Math.PI / 2) < 1e-9);
+  group.updateMatrixWorld(true);
+  const origin = new THREE.Vector3(0, 0, 0).applyMatrix4(model.matrixWorld);
+  const tip = new THREE.Vector3(1, 0, 0).applyMatrix4(model.matrixWorld);
+  const dir = tip.sub(origin);
+  assert.ok(Math.abs(dir.x) < 1e-6, `x ${dir.x}`);
+  assert.ok(Math.abs(dir.z - 100) < 1e-4, `z ${dir.z}`);
+  assert.ok(origin.distanceTo(new THREE.Vector3(40.449, 0, -217.69447)) < 1e-6);
+});
+
+test("yaw 90 sends local +X to world -Z", () => {
+  const group = placeWallModel(boxTemplate(), wall({ yaw: 90, position: [0, 0, 0], scale: 1 }), bounds);
+  assert.ok(Math.abs(group.rotation.y - Math.PI / 2) < 1e-9, `rotation.y ${group.rotation.y}`);
+  group.updateMatrixWorld(true);
+  const model = group.children[0]!;
+  const origin = new THREE.Vector3(0, 0, 0).applyMatrix4(model.matrixWorld);
+  const tip = new THREE.Vector3(1, 0, 0).applyMatrix4(model.matrixWorld);
+  const dir = tip.sub(origin);
+  assert.ok(Math.abs(dir.x) < 1e-6, `x ${dir.x}`);
+  assert.ok(Math.abs(dir.y) < 1e-6, `y ${dir.y}`);
+  assert.ok(Math.abs(dir.z + 1) < 1e-6, `z ${dir.z}`);
 });

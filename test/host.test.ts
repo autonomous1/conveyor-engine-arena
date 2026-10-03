@@ -146,7 +146,7 @@ test("host serves the bundle and refuses package paths", async () => {
     const expected = arenaStaticWorld();
     assert.equal(view.bundleId, expected.definition.bundleId);
     assert.equal(view.authoritativeHash, expected.hash);
-    assert.equal(view.walls.length, 4);
+    assert.equal(view.walls.length, 0);
     assert.match(view.presentationHash, /^sha256:/);
     for (const path of ["/pkg/three/index.js", "/node_modules/three/package.json", "/viewer/viewer.mjs", "/src/server/main.ts", "/client.js.map"]) {
       const denied = await fetch(host.url + path);

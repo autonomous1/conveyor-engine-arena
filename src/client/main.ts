@@ -15,7 +15,7 @@ const view = await fetch("/arena.json").then((res) => {
 
 const hud = createHud();
 hud.setStatus("loading arena");
-const arena = createArenaScene(view.shadows.quality);
+const arena = createArenaScene(view.shadows?.quality ?? "off");
 const visuals = await loadArenaVisuals(view, arena);
 const pawns = createPawnLayer(arena.content, visuals.templates, view.pawnHeight);
 const input = attachPlayInput(arena.renderer.domElement);

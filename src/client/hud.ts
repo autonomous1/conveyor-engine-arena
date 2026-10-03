@@ -3,7 +3,7 @@ export function createHud() {
   status.id = "status";
   status.style.cssText = [
     "position:fixed", "top:0", "left:0", "right:0", "z-index:2",
-    "padding:8px 12px", "background:#12151ccc", "color:#d7dde8",
+    "padding:8px 12px", "background:#12151ccc", "color:#ffffff",
     "font:13px/1.4 ui-sans-serif, system-ui", "pointer-events:none",
   ].join(";");
   const label = document.createElement("span");
@@ -40,8 +40,10 @@ export function createHud() {
   stats.id = "stats";
   stats.style.cssText = [
     "position:fixed", "left:12px", "bottom:12px", "z-index:2", "margin:0",
-    "background:#12151ccc", "color:#d7dde8", "padding:8px 10px", "border-radius:6px",
-    "white-space:pre", "font:11px/1.4 ui-monospace, SFMono-Regular, monospace",
+    "background:#12151c88", "color:#ffffffff", "padding:8px 10px", "border-radius:6px",
+    "white-space:pre",
+    "font-family: \"DejaVu Sans Mono\", \"Liberation Mono\", \"Noto Sans Mono\", monospace;",
+    "font-weight: 400; font-size: 14px; line-height: 1.35;text-shadow: 0 1px 0 #000;",
     "pointer-events:none",
   ].join(";");
   let statsVisible = true;

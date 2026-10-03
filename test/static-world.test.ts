@@ -1,7 +1,20 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { EngineWsClient, memoryPair } from "conveyor-engine-transport-ws";
 import { ExampleApp, arenaStaticWorld } from "../dist/index.js";
+
+const PAWN_RADIUS = 0.5;
+
+/** West cover from props.placements.json. Faces are this box, expanded by the pawn radius. */
+function coverCrate(): { minX: number; maxX: number; minZ: number; maxZ: number } {
+  const doc = JSON.parse(readFileSync(new URL("../web/game/props.placements.json", import.meta.url), "utf8")) as {
+    obstacles: Array<{ id: string; min: number[]; max: number[] }>;
+  };
+  const box = doc.obstacles.find((item) => item.id === "cover-crate-2-box");
+  if (!box) throw new Error("cover-crate-2-box missing");
+  return { minX: box.min[0]!, maxX: box.max[0]!, minZ: box.min[2]!, maxZ: box.max[2]! };
+}
 
 test("arena fixture has required authoritative content", () => {
   const arena = arenaStaticWorld();
@@ -72,38 +85,47 @@ function place(app: ExampleApp, entity: number, x: number, z: number) {
 }
 
 test("head-on wall stop matches expected clearance", () => {
+  const crate = coverCrate();
+  const west = crate.minX - PAWN_RADIUS;
+  const east = crate.maxX + PAWN_RADIUS;
+  const z = (crate.minZ + crate.maxZ) / 2;
   const app = ExampleApp.arena({ presentation: "skipped" });
   const a = app.connectClient();
   const b = app.connectClient();
+  place(app, a.pawn, west - 2, z);
+  place(app, b.pawn, east + 2, z);
+  app.step();
   for (let i = 0; i < 40; i++) {
     app.step(new Map([
       [a.id, { moveX: 1, moveZ: 0 }],
       [b.id, { moveX: -1, moveZ: 0 }],
     ]));
   }
-  assert.equal(app.world.store.view(a.pawn)!.position.x, -2.5);
-  assert.equal(app.world.store.view(b.pawn)!.position.x, 4.5);
+  assert.equal(app.world.store.view(a.pawn)!.position.x, west);
+  assert.equal(app.world.store.view(b.pawn)!.position.x, east);
 });
 
 test("axis slide continues on the free axis", () => {
+  const crate = coverCrate();
+  const west = crate.minX - PAWN_RADIUS;
   const app = ExampleApp.arena({ presentation: "skipped" });
   const a = app.connectClient();
-  place(app, a.pawn, -4, 0);
+  place(app, a.pawn, west - 0.2, crate.minZ + 0.2);
   app.step();
   let zAtTouch: number | undefined;
   for (let i = 0; i < 12; i++) {
     app.step(new Map([[a.id, { moveX: 1, moveZ: 1 }]]));
     const p = app.world.store.view(a.pawn)!.position;
-    if (p.x !== -2.5) continue;
+    if (p.x !== west) continue;
     if (zAtTouch === undefined) {
       zAtTouch = p.z;
       continue;
     }
-    assert.equal(p.x, -2.5);
+    assert.equal(p.x, west);
     assert.ok(p.z > zAtTouch, `expected +z slide, ${zAtTouch} -> ${p.z}`);
     return;
   }
-  assert.ok(zAtTouch !== undefined, "never reached west face of center AABB");
+  assert.ok(zAtTouch !== undefined, "never reached west face of cover crate");
 });
 
 test("world bounds clamp escape", () => {

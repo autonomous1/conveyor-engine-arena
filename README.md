@@ -53,7 +53,11 @@ A status line at the top shows the connection and how many pawn meshes fell back
 
 `web/game/arena.game.json` is the authored game (`bundleId` `arena.one-room.v1`, `worldVersion` `example-v1`). On startup the server compiles it into the static world and the `/arena.json` view the client renders. A bad manifest stops startup with a field path and a message: invalid version, a path that escapes `web/`, a missing file, a model that is not a GLB, or a spawn that intersects an obstacle.
 
-Scene fields cover bounds, floor, walls, sky, cityscape, shadows, spawn points, props, and collision boxes. `scene.walls.faces` is required. Each of `south`, `east`, `north`, and `west` names a model asset. Collision ids 10–13 are reserved for the generated wall boxes.
+`scene.id` and `scene.bounds` are required. `floor`, `walls`, `sky`, `cityscape`, `shadows`, `spawnPoints`, `props`, `collision`, and `placements` are optional. A missing block is left out: no facade slots without `walls`, no backdrop without `sky` or `cityscape`, and no stand-in for a missing floor or shadow setting. Missing spawn points leave the host fallback spawn in place. When `walls` is present, each of `south`, `east`, `north`, and `west` names a model asset, and collision ids 10–13 are reserved for those boxes.
+
+`scene.bounds` is the bounds object, or a path to a JSON file of that object. `scene.spawnPoints` is the spawn array, or a path to a JSON file of that array. A path uses the same rules as a placements file: relative to the arena repo, or into the sibling blueprint-scene checkout. A missing file fails the load.
+
+`scene.placements` is a list of placements files. A single path string is accepted as a one-element list. Each file's placements and obstacles are concatenated, and ids must be unique across files. A missing file fails the load. A placement file may also carry `scene.spawnPoints`, `scene.props`, and `scene.collision`, which are appended. It does not replace `floor`, `sky`, `cityscape`, `shadows`, or the manifest `bounds`.
 
 `scene.shadows.quality` is `off`, `basic`, `soft`, or `realistic`. `realistic` is a 4096 variance shadow map, `soft` is PCF at 2048, and `basic` is an unfiltered 512 map.
 

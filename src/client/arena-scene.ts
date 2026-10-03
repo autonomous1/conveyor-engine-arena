@@ -162,55 +162,64 @@ export function wallAnchor(face: WallFace, wall: Pick<Bounds2, "minX" | "maxX" |
   return { x: wall.maxX, z: midZ, yaw: Math.PI / 2, span };
 }
 
-/**
- * Scale the facade so its width matches the wall span. Local position puts the
- * base on y=0, the width centered, and the front (max Z) on the panel plane.
- * Depth then extends along local -Z, outside the room.
- */
-export function facadeFit(box: Bounds2, span: number): { scale: number; x: number; y: number; z: number } {
-  const width = box.maxX - box.minX;
-  const scale = width > 1e-4 ? span / width : 1;
-  return {
-    scale,
-    x: -((box.minX + box.maxX) / 2) * scale,
-    y: -box.minY * scale,
-    z: -box.maxZ * scale,
-  };
+/** Quarter-turns match `yawConvention: "y-up-90"`. 90° sends model +X to world −Z. */
+function yawToRadians(degrees: number): number {
+  const wrapped = ((degrees % 360) + 360) % 360;
+  if (wrapped < 1e-6 || wrapped > 360 - 1e-6) return 0;
+  if (Math.abs(wrapped - 90) < 1e-6) return Math.PI / 2;
+  if (Math.abs(wrapped - 180) < 1e-6) return Math.PI;
+  if (Math.abs(wrapped - 270) < 1e-6) return -Math.PI / 2;
+  return degrees * (Math.PI / 180);
 }
 
-function placeWallModel(template: THREE.Object3D, wall: ArenaView["walls"][number], bounds: ArenaView["bounds"]): THREE.Group {
-  const anchor = wallAnchor(wall.face, wall, bounds);
-  const measured = new THREE.Box3().setFromObject(template);
-  const fitted = facadeFit({
-    minX: measured.min.x, maxX: measured.max.x,
-    minY: measured.min.y, maxY: measured.max.y,
-    minZ: measured.min.z, maxZ: measured.max.z,
-  }, anchor.span);
+/**
+ * Place the model at the manifest position, yaw, and scale. The origin stays
+ * the GLB origin, so the mesh matches the baked AABBs. Scale defaults to 1.
+ */
+/** Place a baked building at its manifest position, yaw, and scale. The origin stays the GLB origin. */
+export function placeBuildingModel(template: THREE.Object3D, building: ArenaView["buildings"][number]): THREE.Group {
   const group = new THREE.Group();
-  group.position.set(anchor.x, 0, anchor.z);
-  group.rotation.y = anchor.yaw;
+  group.position.set(building.position[0], building.position[1], building.position[2]);
+  group.rotation.y = yawToRadians(building.yaw);
   const model = template.clone(true);
-  model.scale.setScalar(fitted.scale);
-  model.position.set(fitted.x, fitted.y, fitted.z);
+  model.scale.setScalar(building.scale);
+  model.position.set(0, 0, 0);
+  group.add(model);
+  return group;
+}
+
+export function placeWallModel(template: THREE.Object3D, wall: ArenaView["walls"][number], bounds: ArenaView["bounds"]): THREE.Group {
+  const anchor = wallAnchor(wall.face, wall, bounds);
+  const scale = wall.scale ?? 1;
+  const group = new THREE.Group();
+  if (wall.position) group.position.set(wall.position[0], wall.position[1], wall.position[2]);
+  else group.position.set(anchor.x, 0, anchor.z);
+  group.rotation.y = wall.yaw === undefined ? anchor.yaw : yawToRadians(wall.yaw);
+  const model = template.clone(true);
+  model.scale.setScalar(scale);
+  model.position.set(0, 0, 0);
   group.add(model);
   return group;
 }
 
 export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Promise<{ templates: CharacterTemplates; fallbacks: number }> {
   let fallbacks = 0;
-  const floorMap = await texture(view.floor.texture);
-  if (!floorMap) fallbacks += 1;
-  if (floorMap) floorMap.repeat.set(12, 12);
-  const width = view.bounds.maxX - view.bounds.minX;
-  const depth = view.bounds.maxZ - view.bounds.minZ;
-  const floor = new THREE.Mesh(
-    new THREE.PlaneGeometry(width*2, depth*2, 1, 1),
-    new THREE.MeshStandardMaterial({ map: floorMap, color: floorMap ? 0xffffff : 0x2a303a, roughness: 0.95 }),
-  );
-  floor.rotation.x = -Math.PI / 2;
-  floor.position.y = view.floor.y;
-  floor.receiveShadow = view.shadows.quality !== "off";
-  arena.scene.add(floor);
+  const castsShadow = view.shadows !== undefined && view.shadows.quality !== "off";
+  if (view.floor) {
+    const floorMap = await texture(view.floor.texture);
+    if (!floorMap) fallbacks += 1;
+    if (floorMap) floorMap.repeat.set(12, 12);
+    const width = view.bounds.maxX - view.bounds.minX;
+    const depth = view.bounds.maxZ - view.bounds.minZ;
+    const floor = new THREE.Mesh(
+      new THREE.PlaneGeometry(width*2, depth*2, 1, 1),
+      new THREE.MeshStandardMaterial({ map: floorMap, color: floorMap ? 0xffffff : 0x2a303a, roughness: 0.95 }),
+    );
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.y = view.floor.y;
+    floor.receiveShadow = castsShadow;
+    arena.scene.add(floor);
+  }
 
   const loader = new GLTFLoader();
   const modelCache = new Map<string, { scene: THREE.Object3D; clips: THREE.AnimationClip[] } | undefined>();
@@ -237,29 +246,45 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
     }
     // Facade front is local +Z (mesh normals). Same yaw the panel planes used.
     const facade = placeWallModel(template, wall, view.bounds);
-    markShadowCasters(facade, view.shadows.quality !== "off");
+    markShadowCasters(facade, castsShadow);
     arena.scene.add(facade);
   }
 
-  const skyMap = await texture(view.sky.texture);
-  if (!skyMap) fallbacks += 1;
-  arena.scene.add(backdropMesh(
-    skyMap,
-    view.sky.shape,
-    view.sky.radius,
-    view.sky.height,
-    new THREE.MeshBasicMaterial({ color: skyMap ? 0xffffff : 0x8eb8d4, side: THREE.BackSide, depthWrite: false }),
-  ));
+  for (const building of view.buildings ?? []) {
+    const loaded = await model(building.model);
+    const template = loaded?.scene;
+    if (!template) {
+      fallbacks += 1;
+      continue;
+    }
+    const mesh = placeBuildingModel(template, building);
+    markShadowCasters(mesh, castsShadow);
+    arena.scene.add(mesh);
+  }
 
-  const cityMap = await cityscapeTexture(view.cityscape.texture);
-  if (!cityMap) fallbacks += 1;
-  else arena.scene.add(backdropMesh(
-    cityMap,
-    view.cityscape.shape,
-    view.cityscape.radius,
-    view.cityscape.height,
-    new THREE.MeshBasicMaterial({ side: THREE.BackSide, alphaTest: 0.5 }),
-  ));
+  if (view.sky) {
+    const skyMap = await texture(view.sky.texture);
+    if (!skyMap) fallbacks += 1;
+    arena.scene.add(backdropMesh(
+      skyMap,
+      view.sky.shape,
+      view.sky.radius,
+      view.sky.height,
+      new THREE.MeshBasicMaterial({ color: skyMap ? 0xffffff : 0x8eb8d4, side: THREE.BackSide, depthWrite: false }),
+    ));
+  }
+
+  if (view.cityscape) {
+    const cityMap = await cityscapeTexture(view.cityscape.texture);
+    if (!cityMap) fallbacks += 1;
+    else arena.scene.add(backdropMesh(
+      cityMap,
+      view.cityscape.shape,
+      view.cityscape.radius,
+      view.cityscape.height,
+      new THREE.MeshBasicMaterial({ side: THREE.BackSide, alphaTest: 0.5 }),
+    ));
+  }
 
   for (const prop of view.props) {
     const template = (await model(prop.model))?.scene;
@@ -273,14 +298,14 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
         new THREE.MeshStandardMaterial({ color: 0x6b7380, roughness: 0.7 }),
       );
       box.position.set((prop.minX + prop.maxX) / 2, prop.minY + h / 2, (prop.minZ + prop.maxZ) / 2);
-      markShadowCasters(box, view.shadows.quality !== "off");
+      markShadowCasters(box, castsShadow);
       arena.content.add(box);
       continue;
     }
     const mesh = template.clone(true);
     mesh.scale.set(w, h, d);
     mesh.position.set((prop.minX + prop.maxX) / 2, prop.minY, (prop.minZ + prop.maxZ) / 2);
-    markShadowCasters(mesh, view.shadows.quality !== "off");
+    markShadowCasters(mesh, castsShadow);
     arena.content.add(mesh);
   }
 
@@ -295,7 +320,7 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
     // Drop position tracks so a clip cannot carry the pawn away from the snapshot.
     const template = cloneWithSkeleton(source.scene);
     template.scale.multiplyScalar(character.scale);
-    markShadowCasters(template, view.shadows.quality !== "off");
+    markShadowCasters(template, castsShadow);
     const clips = source.clips.map((clip) => new THREE.AnimationClip(
       clip.name,
       clip.duration,
