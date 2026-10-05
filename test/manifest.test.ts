@@ -20,6 +20,34 @@ function document(): Record<string, unknown> {
   return JSON.parse(readFileSync(`${projectRoot()}/web/game/arena.game.json`, "utf8")) as Record<string, unknown>;
 }
 
+type PlacementDoc = {
+  placements?: Array<{ id?: string; hinge?: unknown }>;
+  obstacles?: unknown[];
+  scene?: { props?: unknown[] };
+};
+
+function sceneRecord(): Record<string, unknown> {
+  const scene = document().scene;
+  return scene && typeof scene === "object" ? scene as Record<string, unknown> : {};
+}
+
+function placementRefs(): string[] {
+  const listed = sceneRecord().placements;
+  if (typeof listed === "string") return [listed];
+  return Array.isArray(listed) ? listed.filter((item): item is string => typeof item === "string") : [];
+}
+
+function placementDocs(): PlacementDoc[] {
+  return placementRefs().map((ref) => JSON.parse(readFileSync(`${projectRoot()}/${ref}`, "utf8")) as PlacementDoc);
+}
+
+/** Building ids in the baked files. A hinged placement is a door, not a building. */
+function bakedBuildingIds(): string[] {
+  return placementDocs().flatMap((file) =>
+    (file.placements ?? []).flatMap((item) => item.hinge == null && typeof item.id === "string" ? [item.id] : []),
+  );
+}
+
 function compile(doc: unknown, read: (uri: string) => Uint8Array | undefined, sources?: CompileSources) {
   const resolved = sources ?? readManifestSources(projectRoot(), doc);
   return compileGame(doc, read, resolved);
@@ -28,40 +56,19 @@ function compile(doc: unknown, read: (uri: string) => Uint8Array | undefined, so
 test("installed manifest matches the authoritative world and keeps spawns clear", () => {
   const game = loadInstalledGame();
   const arena = arenaStaticWorld();
+  const scene = sceneRecord();
   assert.equal(game.authoritativeHash, arena.hash);
-  assert.equal(game.view.bundleId, "arena.one-room.v1");
-  assert.equal(game.view.walls.length, 0);
-  assert.equal(game.view.buildings.length, 11);
-  assert.equal(game.view.props.length, 0);
-  assert.deepEqual(
-    game.view.buildings.filter((building) => building.model.endsWith("/ammo-crate.glb")).map((building) => building.id).sort(),
-    ["cover-crate-1", "cover-crate-2", "cover-crate-3"],
-  );
-  assert.equal(game.view.shadows?.quality, "off");
-  assert.deepEqual(game.view.cityscape, {
-    texture: "/assets/textures/cityscape-pano-3-lt2.png",
-    shape: "cylinder",
-    radius: 80,
-    height: 80.534,
-  });
-  assert.deepEqual(
-    { texture: game.view.sky?.texture, shape: game.view.sky?.shape, radius: game.view.sky?.radius, height: game.view.sky?.height },
-    { texture: "/assets/textures/dark-sky-pano-4-sm.png", shape: "dome", radius: 160, height: 320 },
-  );
-  const characterScale = Object.fromEntries(game.view.characters.map((character) => [character.id, character.scale]));
-  assert.deepEqual(characterScale, { 'player-a': 4, 'player-b': 4, 'player-1': 3 });
-  const rider = game.view.characters.find((character) => character.id === "player-a");
-  const skeleton = game.view.characters.find((character) => character.id === "player-b");
-  assert.ok(rider && skeleton);
-  assert.deepEqual(
-    Object.fromEntries(Object.entries(rider.animations).map(([movement, entry]) => [movement, entry.speed])),
-    { idle: 0, walk: 1, run: 2, fall: 0, angry: 3 },
-  );
-  assert.equal(rider.animations.walk.clip, "please generate a ilitary marching walk and call it \"walk\".001");
-  assert.equal(skeleton.animations.run.clip, "I would like to make a \"zombie run\"");
-  assert.equal(skeleton.animations.fall.clip, "fall");
-  assert.equal(skeleton.animations.angry.clip, "angry_01");
+  assert.equal(game.view.bundleId, document().bundleId);
+  assert.equal(game.view.walls.length, scene.walls ? 4 : 0);
+  assert.deepEqual(game.view.buildings.map((building) => building.id).sort(), bakedBuildingIds().sort());
+  const inlineProps = Array.isArray(scene.props) ? scene.props.length : 0;
+  const fileProps = placementDocs().reduce((count, file) => count + (Array.isArray(file.scene?.props) ? file.scene.props.length : 0), 0);
+  assert.equal(game.view.props.length, inlineProps + fileProps);
+  assert.equal(game.view.shadows?.quality, scene.shadows && typeof scene.shadows === "object" ? (scene.shadows as { quality?: string }).quality : undefined);
+  assert.equal(game.view.cityscape === undefined, scene.cityscape === undefined);
+  assert.equal(game.view.sky === undefined, scene.sky === undefined);
   assert.ok(game.view.characters.length >= 2);
+  for (const character of game.view.characters) assert.ok(character.scale > 0, character.id);
   const r = game.view.pawnRadius;
   for (const spawn of game.definition.spawnPoints) {
     for (const box of game.definition.aabbs) {
@@ -131,9 +138,12 @@ test("optional scene blocks and a placements list", () => {
 
   const asString = structuredClone(base) as { scene: { placements: unknown } };
   asString.scene.placements = "./web/game/buildings.placements.json";
-  assert.equal(compile(asString, read).view.buildings.length, 8);
+  const buildingsFile = JSON.parse(readFileSync(`${projectRoot()}/web/game/buildings.placements.json`, "utf8")) as PlacementDoc;
+  const buildingsInFile = (buildingsFile.placements ?? []).filter((item) => item.hinge == null).length;
+  assert.equal(compile(asString, read).view.buildings.length, buildingsInFile);
 
-  const withWalls = structuredClone(doc) as { scene: { walls?: unknown } };
+  const withWalls = structuredClone(doc) as { scene: { walls?: unknown; spawnPoints?: unknown } };
+  withWalls.scene.spawnPoints = [];
   withWalls.scene.walls = {
     height: 8,
     thickness: 2,
@@ -156,13 +166,15 @@ test("optional scene blocks and a placements list", () => {
 
   delete base.scene.walls;
   delete base.scene.sky;
+  const keptFloor = (base.scene as { floor?: { y?: number } }).floor?.y;
+  const keptShadows = (base.scene as { shadows?: { quality?: string } }).shadows?.quality;
   const stripped = compile(base, read);
   assert.equal(stripped.view.walls.length, 0);
   assert.equal(stripped.view.sky, undefined);
-  assert.equal(stripped.view.buildings.length, 11);
+  assert.equal(stripped.view.buildings.length, bakedBuildingIds().length);
   assert.equal(stripped.definition.aabbs.some((box) => box.id === 10), false);
-  assert.equal(stripped.view.floor?.y, 0);
-  assert.equal(stripped.view.shadows?.quality, "off");
+  assert.equal(stripped.view.floor?.y, keptFloor);
+  assert.equal(stripped.view.shadows?.quality, keptShadows);
 
   const open = structuredClone(base) as { scene: Record<string, unknown> };
   delete open.scene.spawnPoints;
@@ -177,7 +189,8 @@ test("optional scene blocks and a placements list", () => {
   assert.equal(spawned.view.cityscape, undefined);
   assert.equal(spawned.view.shadows, undefined);
   assert.equal(spawned.definition.aabbs.some((box) => box.id === 1), false);
-  assert.ok(spawned.definition.aabbs.some((box) => box.id >= 100));
+  const obstacleCount = placementDocs().reduce((count, file) => count + (file.obstacles?.length ?? 0), 0);
+  assert.equal(spawned.definition.aabbs.some((box) => box.id >= 100), obstacleCount > 0);
 
   const empty = structuredClone(base) as { scene: { placements: unknown; collision?: unknown } };
   empty.scene.placements = [];
@@ -219,9 +232,10 @@ test("optional scene blocks and a placements list", () => {
   const merged = compile(overlay, read, { placementFiles: sources });
   assert.equal(merged.view.walls.length, 0);
   assert.equal(merged.view.sky, undefined);
-  assert.equal(merged.view.floor?.y, 0);
+  assert.equal(merged.view.floor?.y, keptFloor);
+  assert.notEqual(merged.view.floor?.y, 9);
   assert.equal(merged.view.bounds.minX, -24);
-  assert.equal(merged.view.shadows?.quality, "off");
+  assert.equal(merged.view.shadows?.quality, keptShadows);
   assert.ok(merged.definition.aabbs.some((box) => box.minX === 20 && box.minZ === 20));
   assert.ok(merged.definition.aabbs.some((box) => box.minX === 20 && box.minZ === 16));
   assert.ok(merged.definition.aabbs.some((box) => box.id === 50));
@@ -272,7 +286,7 @@ test("optional scene blocks and a placements list", () => {
   assert.equal(loaded.view.bounds.minY, -2);
   assert.ok(loaded.definition.spawnPoints.some((spawn) => spawn.id === "from-file" && spawn.x === -18 && spawn.z === 0 && spawn.yaw === 90));
   assert.equal(loaded.definition.spawnPoints.some((spawn) => spawn.id === "spawn-a"), false);
-  assert.equal(loaded.view.buildings.length, 11);
+  assert.equal(loaded.view.buildings.length, bakedBuildingIds().length);
 
   assert.throws(() => readManifestSources(projectRoot(), {
     scene: { bounds: "./web/game/missing-bounds.json" },

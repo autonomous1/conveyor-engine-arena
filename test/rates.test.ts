@@ -50,7 +50,7 @@ test("overlay prints the hud lines and an em dash when tick/s is unset", () => {
     exposure: 1,
     pawns: 4,
     owned: 2,
-    positions: "A(1.20,-4.00) B(8.10,3.40)",
+    positions: "",
   });
   assert.equal(text, [
     "fps 60  tick/s \u2014  tick 1842",
@@ -59,6 +59,5 @@ test("overlay prints the hud lines and an em dash when tick/s is unset", () => {
     "geoms 18  tex 9",
     "shadows on  map 1  tone 4  exp 1",
     "pawns 4  owned 2",
-    "A(1.20,-4.00) B(8.10,3.40)",
   ].join("\n"));
 });

@@ -59,21 +59,36 @@ test("a bad yaw, an unknown model, and an escaping path fail", () => {
   }
 });
 
-test("arena-1.placements.json loads the baked buildings and boxes", () => {
+test("the manifest placements file loads every building and box it lists", () => {
   const root = path.join(import.meta.dirname, "..");
   const manifest = JSON.parse(readFileSync(path.join(root, "web/game/arena.game.json"), "utf8")) as {
+    assets?: Array<{ id?: string; kind?: string }>;
     scene: { placements: string | string[] };
   };
   const listed = manifest.scene.placements;
   const placementPath = Array.isArray(listed) ? listed[0] : listed;
   if (!placementPath) throw new Error("arena.game.json has no placements path");
   const file = resolvePlacementsPath(root, placementPath);
-  const baked = interpretPlacements(JSON.parse(readFileSync(file, "utf8")), models, new Set([1, 2, 3]));
+  const raw = JSON.parse(readFileSync(file, "utf8")) as {
+    placements?: Array<{ id?: string; model?: string; scale?: number; hinge?: unknown }>;
+    obstacles?: unknown[];
+  };
+  const known = new Set(
+    (manifest.assets ?? []).flatMap((asset) => asset.kind === "model" && asset.id ? [asset.id] : []),
+  );
+  const baked = interpretPlacements(raw, known, new Set([1, 2, 3]));
   assert.deepEqual(baked.issues, []);
-  assert.equal(baked.buildings.length, 8);
-  assert.equal(baked.boxes.length, 206);
-  assert.equal(baked.boxes[0]?.id, 100);
-  assert.equal(baked.boxes[205]?.id, 305);
-  assert.equal(baked.buildings[0]?.model, "brutalist-urban-1");
-  assert.equal(baked.buildings[0]?.scale, 36.000004);
+  const placements = raw.placements ?? [];
+  const buildings = placements.filter((item) => item.hinge == null);
+  const doors = placements.filter((item) => item.hinge != null);
+  assert.equal(baked.buildings.length, buildings.length);
+  assert.equal(baked.doors.length, doors.length);
+  assert.equal(baked.boxes.length, raw.obstacles?.length ?? 0);
+  if (baked.boxes.length > 0) assert.equal(baked.boxes[0]?.id, 100);
+  for (const placement of buildings) {
+    const found = baked.buildings.find((building) => building.id === placement.id);
+    assert.ok(found, placement.id);
+    assert.equal(found.model, placement.model);
+    assert.equal(found.scale, placement.scale);
+  }
 });

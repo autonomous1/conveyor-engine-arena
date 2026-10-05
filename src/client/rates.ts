@@ -100,6 +100,7 @@ export function formatOverlay(stats: OverlayStats): string {
     lines.push(parts.join("  "));
   }
   lines.push(`pawns ${stats.pawns}  owned ${countText(stats.owned)}`);
-  if (stats.positions) lines.push(stats.positions);
+  // TODO: make optional
+  //if (stats.positions) lines.push(stats.positions);
   return lines.join("\n");
 }

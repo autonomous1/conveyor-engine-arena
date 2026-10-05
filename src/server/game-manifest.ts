@@ -558,6 +558,7 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
   });
 
   const bakedBuildings: ArenaView["buildings"] = [];
+  const bakedDoors: ArenaView["doors"] = [];
   const { refs: placementRefs, issues: placementIssues } = placementRefsOf(scene);
   for (const issue of placementIssues) issues.push(issue);
   const providedFiles = sources?.placementFiles ?? [];
@@ -606,6 +607,15 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
       }
       seenBuildingIds.add(building.id);
     }
+    for (const door of baked.doors) {
+      if (localBuildings.has(door.id)) continue;
+      localBuildings.add(door.id);
+      if (seenBuildingIds.has(door.id)) {
+        issues.push({ path: ref.path, message: `duplicate placement id ${door.id} in ${ref.file}` });
+        fileOk = false;
+      }
+      seenBuildingIds.add(door.id);
+    }
     if (!fileOk) return;
     for (const building of baked.buildings) {
       const asset = assets.get(building.model);
@@ -616,6 +626,19 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
         position: building.position,
         yaw: building.yaw,
         scale: building.scale,
+      });
+    }
+    for (const door of baked.doors) {
+      const asset = assets.get(door.model);
+      if (!asset || asset.kind !== "model") continue;
+      bakedDoors.push({
+        id: door.id,
+        model: asset.uri,
+        position: door.position,
+        yaw: door.yaw,
+        hinge: door.hinge,
+        size: door.size,
+        open: door.open,
       });
     }
     for (const box of baked.boxes) {
@@ -859,6 +882,7 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
       };
     }),
     buildings: bakedBuildings,
+    doors: bakedDoors,
     ...(skyAsset?.uri && skyAsset.shape && skyAsset.radius && skyAsset.height
       ? { sky: { kind: "sky-dome" as const, texture: skyAsset.uri, shape: skyAsset.shape, radius: skyAsset.radius, height: skyAsset.height } }
       : {}),

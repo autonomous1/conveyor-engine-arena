@@ -1,7 +1,6 @@
 agents/
-scripts/
-assets/
 viewer/
+generated/
 node_modules/
 dist/
 *.log

@@ -1,18 +1,27 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { EngineWsClient, EngineWsServer, memoryPair } from "conveyor-engine-transport-ws";
 import { ARENA_INTEREST_RADIUS, noteArenaInterest } from "../dist/server/game.js";
 import { startArenaServer } from "../dist/server/main.js";
 import { loadArena } from "../dist/server/world-loader.js";
 
-function coverCrate(): { minX: number; maxX: number; minZ: number; maxZ: number } {
-  const doc = JSON.parse(readFileSync(new URL("../web/game/props.placements.json", import.meta.url), "utf8")) as {
-    obstacles: Array<{ id: string; min: number[]; max: number[] }>;
-  };
-  const box = doc.obstacles.find((item) => item.id === "cover-crate-2-box");
-  if (!box) throw new Error("cover-crate-2-box missing");
-  return { minX: box.min[0]!, maxX: box.max[0]!, minZ: box.min[2]!, maxZ: box.max[2]! };
+type XzBox = { minX: number; maxX: number; minZ: number; maxZ: number };
+
+/** An obstacle the pawn can walk into from the west without meeting another box first. */
+function westFace(aabbs: readonly XzBox[], bounds: XzBox, radius: number): XzBox {
+  const found = aabbs.find((box) => {
+    const z = (box.minZ + box.maxZ) / 2;
+    const start = box.minX - radius - 3;
+    if (box.maxX - box.minX < 0.05 || box.maxZ - box.minZ < 0.3) return false;
+    if (start <= bounds.minX + radius || z <= bounds.minZ + radius || z >= bounds.maxZ - radius) return false;
+    if (box.minX - radius >= bounds.maxX - radius) return false;
+    return !aabbs.some((other) =>
+      other !== box
+      && z > other.minZ - radius && z < other.maxZ + radius
+      && other.maxX + radius > start && other.minX - radius < box.minX - radius);
+  });
+  if (!found) throw new Error("no isolated obstacle inside the room");
+  return found;
 }
 
 type Pose = { x: number; z: number };
@@ -87,7 +96,9 @@ function hello(url: string, view: { world: string; bundleId: string; authoritati
 }
 
 test("arena interest override is wider than the room diagonal", () => {
-  assert.ok(ARENA_INTEREST_RADIUS >= 72);
+  const bounds = loadArena().view.bounds;
+  const diagonal = Math.hypot(bounds.maxX - bounds.minX, bounds.maxZ - bounds.minZ);
+  assert.ok(ARENA_INTEREST_RADIUS >= diagonal, `${ARENA_INTEREST_RADIUS} < room diagonal ${diagonal}`);
   const server = new EngineWsServer({
     compatibility: { protocol: 1, world: "example-v1" },
     onHello: () => 1,
@@ -102,10 +113,10 @@ test("arena interest override is wider than the room diagonal", () => {
   assert.equal(server.replicator.get(id)?.interestRadius, ARENA_INTEREST_RADIUS);
 });
 
-test("full walk input stops on the cover crate and stays inside the room", () => {
+test("full walk input stops on an obstacle and stays inside the room", () => {
   const loaded = loadArena();
-  const crate = coverCrate();
   const radius = loaded.view.pawnRadius;
+  const crate = westFace(loaded.view.aabbs, loaded.view.bounds, radius);
   const face = crate.minX - radius;
   const z0 = (crate.minZ + crate.maxZ) / 2;
   const pawn = loaded.agents[0]!.id;
@@ -137,7 +148,13 @@ test("two players own different pawns and only their own input moves them", asyn
   const host = await startArenaServer(0);
   try {
     const page = await fetch(host.url + "/arena.json");
-    const view = await page.json() as { world: string; bundleId: string; authoritativeHash: string };
+    const view = await page.json() as {
+      world: string;
+      bundleId: string;
+      authoritativeHash: string;
+      bounds: { minX: number; maxX: number; minZ: number; maxZ: number };
+      pawnRadius: number;
+    };
     const a = hello(host.url, view);
     const aw = await a.welcome;
     const b = hello(host.url, view);
@@ -155,7 +172,9 @@ test("two players own different pawns and only their own input moves them", asyn
     assert.ok(endA);
     assert.ok(endB);
     assert.ok(endA.x > startA.x + 1.5, `A ${startA.x} -> ${endA.x}`);
-    assert.ok(endA.x < 23.5 && endA.z > -23.5 && endA.z < 23.5);
+    const limit = view.pawnRadius;
+    assert.ok(endA.x > view.bounds.minX + limit && endA.x < view.bounds.maxX - limit, `A x ${endA.x}`);
+    assert.ok(endA.z > view.bounds.minZ + limit && endA.z < view.bounds.maxZ - limit, `A z ${endA.z}`);
     assert.ok(Math.abs(endB.x - startB.x) < 1.2, `B x ${startB.x} -> ${endB.x}`);
     assert.ok(Math.abs(endB.z - startB.z) < 1.2, `B z ${startB.z} -> ${endB.z}`);
     stopA();
@@ -177,17 +196,19 @@ test("a hello with no free pawn is refused", async () => {
   const open: WebSocket[] = [];
   try {
     const view = await (await fetch(host.url + "/arena.json")).json() as { world: string; bundleId: string; authoritativeHash: string };
+    const seats = loadArena().agents.length;
     const seated = [];
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < seats; i++) {
       const client = hello(host.url, view);
       open.push(client.ws);
       seated.push(await client.welcome);
     }
     const ids = new Set(seated.map((row) => row.ownedEntityId));
-    assert.equal(ids.size, 5);
+    assert.equal(ids.size, seats);
     const extra = hello(host.url, view);
     open.push(extra.ws);
     await assert.rejects(extra.welcome, /no free pawn/);
+    if (seats === 0) return;
     open[0]!.close();
     await new Promise((resolve) => setTimeout(resolve, 100));
     const next = hello(host.url, view);

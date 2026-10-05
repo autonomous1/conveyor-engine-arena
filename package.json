@@ -24,6 +24,7 @@
     "start:arena": "node dist/run.js arena",
     "start:arena-wall": "node dist/run.js arena 40",
     "start:arena-miss": "node dist/run.js arena-miss",
+    "bake:scene": "scripts/bake.sh",
     "run:lossless": "node dist/run.js lossless",
     "run:lossy": "node dist/run.js lossy",
     "run:partition": "node dist/run.js partition",
@@ -49,6 +50,7 @@
     "@types/node": "^22.10.0",
     "@types/ws": "^8.5.14",
     "conveyor-graph": "file:../conveyor-graph",
+    "blueprint-scene": "file:../blueprint-scene",
     "conveyor-graph-simulator": "file:../conveyor-graph-simulator",
     "esbuild": "^0.25.0",
     "typescript": "^5.8.2"

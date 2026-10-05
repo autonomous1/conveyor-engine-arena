@@ -22,11 +22,12 @@
       "material": "cityscape-pano"
     },
     "shadows": {
-      "quality": "off"
+      "quality": "soft"
     },
     "spawnPoints": "./web/game/spawn-points.json",
     "placements": [
       "./web/game/buildings.placements.json",
+      "./web/game/doors.placements.json",
       "./web/game/props.placements.json"
     ]
   },
@@ -143,7 +144,7 @@
       "id": "player-a",
       "kind": "model",
       "uri": "/assets/models/mechi-rider.glb",
-      "scale": 4,
+      "scale": 3,
       "animations": {
         "idle": {
           "clip": "place the character's feet on either side of the wheel move the",
@@ -180,7 +181,7 @@
       "id": "player-b",
       "kind": "model",
       "uri": "/assets/models/anatomical-skeleton-cross-3d-model.glb",
-      "scale": 4,
+      "scale": 2,
       "animations": {
         "idle": {
           "clip": "I would like to make a \"zombie run\"",
@@ -217,7 +218,7 @@
       "id": "player-1",
       "kind": "model",
       "uri": "/assets/models/player-2.glb",
-      "scale": 3,
+      "scale": 2,
       "animations": {
         "idle": {
           "clip": "idle.001",
@@ -251,6 +252,62 @@
       }
     },
     {
+      "id": "door-1",
+      "kind": "model",
+      "uri": "/assets/models/door1.glb",
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "CC0-1.0",
+        "status": "spdx"
+      },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Original procedural placeholder made for this arena. No third-party art."
+      }
+    },
+    {
+      "id": "door-2",
+      "kind": "model",
+      "uri": "/assets/models/door2.glb",
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "CC0-1.0",
+        "status": "spdx"
+      },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Original procedural placeholder made for this arena. No third-party art."
+      }
+    },
+    {
+      "id": "ammo-box",
+      "kind": "model",
+      "uri": "/assets/models/ammo-box.glb",
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "CC0-1.0",
+        "status": "spdx"
+      },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Original procedural placeholder made for this arena. No third-party art."
+      }
+    },
+    {
+      "id": "med-kit",
+      "kind": "model",
+      "uri": "/assets/models/med-kit.glb",
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "CC0-1.0",
+        "status": "spdx"
+      },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Original procedural placeholder made for this arena. No third-party art."
+      }
+    },
+    {
       "id": "cover-crate",
       "kind": "model",
       "uri": "/assets/models/ammo-crate.glb",
@@ -269,9 +326,9 @@
     "radius": 0.5,
     "height": 1.8,
     "modelChoices": [
+      "player-1",
       "player-a",
-      "player-b",
-      "player-1"
+      "player-b"
     ]
   }
 }

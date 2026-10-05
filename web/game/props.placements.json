@@ -4,7 +4,7 @@
   "placements": [
     {
       "id": "cover-crate-2",
-      "model": "cover-crate",
+      "model": "med-kit",
       "position": [
         -6.312501,
         0,
@@ -15,7 +15,7 @@
     },
     {
       "id": "cover-crate-1",
-      "model": "cover-crate",
+      "model": "med-kit",
       "position": [
         2.160715,
         0,
@@ -26,13 +26,57 @@
     },
     {
       "id": "cover-crate-3",
-      "model": "cover-crate",
+      "model": "med-kit",
       "position": [
         3.339286,
         0,
         7.189868
       ],
       "yaw": 90,
+      "scale": 1
+    },
+    {
+      "id": "cover-crate-2-1",
+      "model": "ammo-box",
+      "position": [
+        -6.304716,
+        0,
+        12.826821
+      ],
+      "yaw": 0,
+      "scale": 1
+    },
+    {
+      "id": "cover-crate-2-1-7",
+      "model": "ammo-box",
+      "position": [
+        -9.185318,
+        0,
+        -11.522419
+      ],
+      "yaw": 0,
+      "scale": 1
+    },
+    {
+      "id": "cover-crate-2-1-71",
+      "model": "ammo-box",
+      "position": [
+        11.631115,
+        0,
+        3.206712
+      ],
+      "yaw": 270,
+      "scale": 1
+    },
+    {
+      "id": "cover-crate-2-1-1",
+      "model": "ammo-box",
+      "position": [
+        6.52212,
+        0,
+        -12.718129
+      ],
+      "yaw": 0,
       "scale": 1
     }
   ],
@@ -77,6 +121,62 @@
         4.285715,
         0,
         8.74344
+      ]
+    },
+    {
+      "id": "cover-crate-2-1-box",
+      "kind": "aabb",
+      "min": [
+        -7.858287,
+        0,
+        11.880393
+      ],
+      "max": [
+        -4.751144,
+        0,
+        13.77325
+      ]
+    },
+    {
+      "id": "cover-crate-2-1-7-box",
+      "kind": "aabb",
+      "min": [
+        -10.73889,
+        0,
+        -12.468847
+      ],
+      "max": [
+        -7.631747,
+        0,
+        -10.57599
+      ]
+    },
+    {
+      "id": "cover-crate-2-1-71-box",
+      "kind": "aabb",
+      "min": [
+        10.684686,
+        0,
+        1.65314
+      ],
+      "max": [
+        12.577543,
+        0,
+        4.760283
+      ]
+    },
+    {
+      "id": "cover-crate-2-1-1-box",
+      "kind": "aabb",
+      "min": [
+        4.968548,
+        0,
+        -13.664557
+      ],
+      "max": [
+        8.075692,
+        0,
+        -11.7717
       ]
     }
   ]

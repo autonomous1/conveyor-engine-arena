@@ -64,6 +64,21 @@ export type ArenaView = {
     minZ: number;
     maxZ: number;
   }>;
+  /**
+   * Hinged panels from a doors placements file. `model` is that placement's
+   * GLB uri, the same lookup a prop uses. The file faces out on +Z with the
+   * hinge at the mesh origin. Placement yaw is the wall face, applied once.
+   * `open` yaws only the hinge node. The frame stays on that yaw. There is no AABB.
+   */
+  doors: Array<{
+    id: string;
+    model: string;
+    position: [number, number, number];
+    yaw: number;
+    hinge: "left" | "right";
+    size: [number, number, number];
+    open: boolean;
+  }>;
   characters: Array<{ id: string; model: string; scale: number; animations: Record<Movement, CharacterAnimation> }>;
   aabbs: Array<{ id: number; minX: number; maxX: number; minZ: number; maxZ: number }>;
   pawnRadius: number;

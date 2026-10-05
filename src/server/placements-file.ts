@@ -28,6 +28,17 @@ export type BakedBox = {
   maxZ: number;
 };
 
+/** A hinged panel. It is not a building and it has no AABB. `model` is an asset id. */
+export type BakedDoor = {
+  id: string;
+  model: string;
+  position: [number, number, number];
+  yaw: number;
+  hinge: "left" | "right";
+  size: [number, number, number];
+  open: boolean;
+};
+
 /**
  * Resolve `scene.placements` against the arena root.
  * The file may live in this repo or in the sibling `blueprint-scene` checkout.
@@ -68,13 +79,14 @@ export function interpretPlacements(
   value: unknown,
   knownModels: ReadonlySet<string>,
   usedCollisionIds: ReadonlySet<number>,
-): { issues: PlacementIssue[]; buildings: BakedBuilding[]; boxes: BakedBox[] } {
+): { issues: PlacementIssue[]; buildings: BakedBuilding[]; boxes: BakedBox[]; doors: BakedDoor[] } {
   const issues: PlacementIssue[] = [];
   const buildings: BakedBuilding[] = [];
   const boxes: BakedBox[] = [];
+  const doors: BakedDoor[] = [];
   if (!isObject(value)) {
     issues.push({ path: "scene.placements", message: "must be an object" });
-    return { issues, buildings, boxes };
+    return { issues, buildings, boxes, doors };
   }
   if (value.formatVersion !== 1) issues.push({ path: "scene.placements.formatVersion", message: "must be 1" });
   if (value.units !== "meters") issues.push({ path: "scene.placements.units", message: "must be meters" });
@@ -82,7 +94,7 @@ export function interpretPlacements(
   const obstacleList = Array.isArray(value.obstacles) ? value.obstacles : undefined;
   if (!placementList) issues.push({ path: "scene.placements.placements", message: "required array" });
   if (!obstacleList) issues.push({ path: "scene.placements.obstacles", message: "required array" });
-  if (issues.length || !placementList || !obstacleList) return { issues, buildings, boxes };
+  if (issues.length || !placementList || !obstacleList) return { issues, buildings, boxes, doors };
 
   const seenBuildings = new Set<string>();
   for (let index = 0; index < placementList.length; index += 1) {
@@ -90,6 +102,13 @@ export function interpretPlacements(
     const path = `scene.placements.placements[${index}]`;
     if (!isObject(item)) {
       issues.push({ path, message: "must be an object" });
+      continue;
+    }
+    if (Object.prototype.hasOwnProperty.call(item, "hinge")) {
+      const door = takeDoor(item, path, knownModels, issues);
+      if (door && seenBuildings.has(door.id)) issues.push({ path: `${path}.id`, message: `duplicate id ${door.id}` });
+      if (door) seenBuildings.add(door.id);
+      if (door && !issues.some((issue) => issue.path.startsWith(path))) doors.push(door);
       continue;
     }
     const id = str(item.id, `${path}.id`, issues);
@@ -140,7 +159,42 @@ export function interpretPlacements(
       minZ: min[2], maxZ: max[2],
     });
   }
-  return { issues, buildings, boxes };
+  return { issues, buildings, boxes, doors };
+}
+
+/**
+ * A placement with `hinge` is a door. `model` is an asset id, the same check a
+ * building uses. It does not need a scale, and it does not become an obstacle.
+ */
+function takeDoor(
+  item: Record<string, unknown>,
+  path: string,
+  knownModels: ReadonlySet<string>,
+  issues: PlacementIssue[],
+): BakedDoor | undefined {
+  const id = str(item.id, `${path}.id`, issues);
+  const model = str(item.model, `${path}.model`, issues);
+  const position = vec3(item.position, `${path}.position`, issues);
+  const yaw = item.yaw === undefined ? undefined : cardinalYaw(item.yaw, `${path}.yaw`, issues);
+  if (item.yaw === undefined) issues.push({ path: `${path}.yaw`, message: "required finite number" });
+  const hinge = item.hinge === "left" || item.hinge === "right" ? item.hinge : undefined;
+  if (!hinge) issues.push({ path: `${path}.hinge`, message: "must be left or right" });
+  const size = vec3(item.size, `${path}.size`, issues);
+  if (size && (size[0] <= 0 || size[1] <= 0 || size[2] <= 0)) {
+    issues.push({ path: `${path}.size`, message: "must be > 0" });
+  }
+  let open = false;
+  if (item.open !== undefined && typeof item.open !== "boolean") {
+    issues.push({ path: `${path}.open`, message: "must be true or false" });
+    open = false;
+  } else if (item.open === true) open = true;
+  if (model && !knownModels.has(model)) issues.push({ path: `${path}.model`, message: `unknown asset ${model}` });
+  if (!id || !model || !position || yaw === undefined || !hinge || !size || size[0] <= 0 || size[1] <= 0 || size[2] <= 0) {
+    return undefined;
+  }
+  if (!knownModels.has(model)) return undefined;
+  if (issues.some((issue) => issue.path.startsWith(path))) return undefined;
+  return { id, model, position, yaw, hinge, size, open };
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {

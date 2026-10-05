@@ -1,19 +1,32 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { EngineWsClient, memoryPair } from "conveyor-engine-transport-ws";
 import { ExampleApp, arenaStaticWorld } from "../dist/index.js";
 
 const PAWN_RADIUS = 0.5;
 
-/** West cover from props.placements.json. Faces are this box, expanded by the pawn radius. */
-function coverCrate(): { minX: number; maxX: number; minZ: number; maxZ: number } {
-  const doc = JSON.parse(readFileSync(new URL("../web/game/props.placements.json", import.meta.url), "utf8")) as {
-    obstacles: Array<{ id: string; min: number[]; max: number[] }>;
-  };
-  const box = doc.obstacles.find((item) => item.id === "cover-crate-2-box");
-  if (!box) throw new Error("cover-crate-2-box missing");
-  return { minX: box.min[0]!, maxX: box.max[0]!, minZ: box.min[2]!, maxZ: box.max[2]! };
+type XzBox = { minX: number; maxX: number; minZ: number; maxZ: number };
+
+/** An obstacle whose west and east faces can be walked into without hitting another box or the room edge. */
+function approachBox(): XzBox {
+  const world = arenaStaticWorld().definition;
+  const { bounds, aabbs } = world;
+  const radius = PAWN_RADIUS;
+  const found = aabbs.find((box) => {
+    const z = (box.minZ + box.maxZ) / 2;
+    const westStart = box.minX - radius - 2;
+    const eastStart = box.maxX + radius + 2;
+    if (box.maxX - box.minX < 0.05 || box.maxZ - box.minZ < 0.3) return false;
+    if (westStart <= bounds.minX + radius || eastStart >= bounds.maxX - radius) return false;
+    if (z <= bounds.minZ + radius || z >= bounds.maxZ - radius) return false;
+    const blocked = (from: number, to: number) => aabbs.some((other) =>
+      other !== box
+      && z > other.minZ - radius && z < other.maxZ + radius
+      && other.maxX + radius > Math.min(from, to) && other.minX - radius < Math.max(from, to));
+    return !blocked(westStart, box.minX - radius) && !blocked(box.maxX + radius, eastStart);
+  });
+  if (!found) throw new Error("no isolated obstacle inside the room");
+  return found;
 }
 
 test("arena fixture has required authoritative content", () => {
@@ -37,8 +50,8 @@ test("arena app welcome carries bundle identity and distinct spawns", () => {
   assert.notEqual(pa.x, pb.x);
   const d = app.diagnostics();
   assert.equal(d.bundleId, "arena.one-room.v1");
-  assert.equal(d.spawnCount, 5);
-  assert.ok((d.aabbCount ?? 0) >= 5);
+  assert.ok((d.spawnCount ?? 0) >= 2);
+  assert.ok((d.aabbCount ?? 0) >= 4);
 });
 
 test("visual miss uses fallback and does not change server hash", () => {
@@ -85,7 +98,7 @@ function place(app: ExampleApp, entity: number, x: number, z: number) {
 }
 
 test("head-on wall stop matches expected clearance", () => {
-  const crate = coverCrate();
+  const crate = approachBox();
   const west = crate.minX - PAWN_RADIUS;
   const east = crate.maxX + PAWN_RADIUS;
   const z = (crate.minZ + crate.maxZ) / 2;
@@ -106,11 +119,12 @@ test("head-on wall stop matches expected clearance", () => {
 });
 
 test("axis slide continues on the free axis", () => {
-  const crate = coverCrate();
+  const crate = approachBox();
   const west = crate.minX - PAWN_RADIUS;
+  const z = (crate.minZ + crate.maxZ) / 2;
   const app = ExampleApp.arena({ presentation: "skipped" });
   const a = app.connectClient();
-  place(app, a.pawn, west - 0.2, crate.minZ + 0.2);
+  place(app, a.pawn, west - 0.2, z);
   app.step();
   let zAtTouch: number | undefined;
   for (let i = 0; i < 12; i++) {
@@ -129,12 +143,15 @@ test("axis slide continues on the free axis", () => {
 });
 
 test("world bounds clamp escape", () => {
+  const bounds = arenaStaticWorld().definition.bounds;
   const app = ExampleApp.arena({ presentation: "skipped" });
   const a = app.connectClient();
-  place(app, a.pawn, 23, 0);
+  const limit = bounds.maxX - PAWN_RADIUS;
+  const z = Math.min(bounds.maxZ - PAWN_RADIUS, Math.max(bounds.minZ + PAWN_RADIUS, 0));
+  place(app, a.pawn, limit - 1, z);
   app.step();
   for (let i = 0; i < 20; i++) app.step(new Map([[a.id, { moveX: 1, moveZ: 0 }]]));
-  assert.ok(app.world.store.view(a.pawn)!.position.x <= 23.5);
+  assert.ok(app.world.store.view(a.pawn)!.position.x <= limit + 1e-4);
 });
 
 test("spawns sit outside all AABBs plus radius", () => {

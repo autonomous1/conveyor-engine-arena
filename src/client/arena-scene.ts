@@ -162,6 +162,128 @@ export function wallAnchor(face: WallFace, wall: Pick<Bounds2, "minX" | "maxX" |
   return { x: wall.maxX, z: midZ, yaw: Math.PI / 2, span };
 }
 
+/**
+ * Closed is yaw 0 on the hinge. Open is about 100° so the panel clears the
+ * doorway. Sliding is not a door motion. The swing is not a GLB clip.
+ */
+export const DOOR_OPEN_DEGREES = 100;
+
+/**
+ * Left hinge, panel along +X: +100° sends the latch toward local −Z.
+ * Right hinge, panel along −X: −100° sends that latch toward local −Z too.
+ * The door GLB's outward normal is local +Z, so local −Z is into the building
+ * when the placement yaw has turned +Z to the outside of the wall.
+ */
+export function doorSwingRadians(hinge: "left" | "right", open: boolean): number {
+  if (!open) return 0;
+  const radians = DOOR_OPEN_DEGREES * Math.PI / 180;
+  return hinge === "left" ? radians : -radians;
+}
+
+/**
+ * Mount one door GLB. Each placement brings its own scene; this clones that
+ * scene and does not reuse a clone made for another door.
+ *
+ * Placement position and yaw are applied once. The file already faces out:
+ * front normals are +Z and the hinge is the mesh origin on the left edge.
+ * No extra quarter turn.
+ *
+ * `frame` carries the placement yaw and does not swing. The door mesh is a
+ * child of `hinge` at that mesh origin. `open` yaws only the hinge.
+ * The frame bottom sits on the placement's y. The building scale is not applied.
+ *
+ * Check: yaw 0, position (0, 0, 0). A source normal (0, 0, 1) stays world +Z,
+ * the frame quaternion is identity, and the hinge quaternion is identity.
+ * Yaw 90 sets the frame quaternion to +90° about Y, which sends local +Z to world +X.
+ */
+export function placeDoorModel(template: THREE.Object3D, door: ArenaView["doors"][number]): THREE.Group {
+  const frameSrc = template.getObjectByName("frame");
+  const doorSrc = template.getObjectByName("door");
+  if (!frameSrc || !doorSrc) throw new Error("door GLB is missing frame or door");
+  const frame = cloneDoorPiece(frameSrc);
+  const panel = cloneDoorPiece(doorSrc);
+  frame.name = "frame";
+  panel.name = "door";
+  const group = new THREE.Group();
+  group.name = door.id;
+  group.position.set(door.position[0], door.position[1], door.position[2]);
+  frame.quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), yawToRadians(door.yaw));
+  frame.position.set(0, -meshMinY(frame), 0);
+  const hinge = new THREE.Group();
+  hinge.name = "hinge";
+  hinge.rotation.y = doorSwingRadians(door.hinge, door.open);
+  hinge.add(panel);
+  frame.add(hinge);
+  group.add(frame);
+  return group;
+}
+
+/**
+ * Load each door from `door.model` and clone that scene. Two models are two
+ * loads. A second placement is not a clone of the first placement's group.
+ */
+export async function placeDoorPlacements(
+  doors: readonly ArenaView["doors"][number][],
+  load: (url: string) => Promise<THREE.Object3D | undefined>,
+): Promise<THREE.Group[]> {
+  const groups: THREE.Group[] = [];
+  for (const door of doors) {
+    const template = await load(door.model);
+    if (!template) continue;
+    groups.push(placeDoorModel(template, door));
+  }
+  return groups;
+}
+
+/** Share the loaded material. A clone that dropped its map gets the source material back. */
+function cloneDoorPiece(source: THREE.Object3D): THREE.Object3D {
+  const clone = source.clone(true);
+  const sources: THREE.Mesh[] = [];
+  const clones: THREE.Mesh[] = [];
+  source.traverse((obj) => { if ((obj as THREE.Mesh).isMesh) sources.push(obj as THREE.Mesh); });
+  clone.traverse((obj) => { if ((obj as THREE.Mesh).isMesh) clones.push(obj as THREE.Mesh); });
+  clones.forEach((mesh, index) => keepDoorMap(mesh, sources[index]));
+  return clone;
+}
+
+function keepDoorMap(clone: THREE.Mesh, source: THREE.Mesh | undefined): void {
+  const cloned = materialList(clone.material);
+  const loaded = source ? materialList(source.material) : [];
+  const next = cloned.map((material, index) => {
+    const from = loaded[index] ?? loaded[0];
+    const map = textureMap(material) ?? (from ? textureMap(from) : null);
+    if (!map) return material;
+    map.colorSpace = THREE.SRGBColorSpace;
+    if (textureMap(material)) return material;
+    return from ?? material;
+  });
+  clone.material = Array.isArray(clone.material) ? next : next[0]!;
+}
+
+function materialList(material: THREE.Material | THREE.Material[]): THREE.Material[] {
+  return Array.isArray(material) ? material : [material];
+}
+
+function textureMap(material: THREE.Material): THREE.Texture | null {
+  if (!("map" in material)) return null;
+  return (material as THREE.MeshStandardMaterial).map;
+}
+
+function meshMinY(object: THREE.Object3D): number {
+  let minY = Infinity;
+  object.traverse((child) => {
+    const mesh = child as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    const geometry = mesh.geometry;
+    if (!geometry.boundingBox) geometry.computeBoundingBox();
+    const box = geometry.boundingBox;
+    if (!box) return;
+    minY = Math.min(minY, box.min.y);
+  });
+  if (!Number.isFinite(minY)) throw new Error("door frame has no vertices");
+  return minY;
+}
+
 /** Quarter-turns match `yawConvention: "y-up-90"`. 90° sends model +X to world −Z. */
 function yawToRadians(degrees: number): number {
   const wrapped = ((degrees % 360) + 360) % 360;
@@ -208,7 +330,7 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
   if (view.floor) {
     const floorMap = await texture(view.floor.texture);
     if (!floorMap) fallbacks += 1;
-    if (floorMap) floorMap.repeat.set(12, 12);
+    if (floorMap) floorMap.repeat.set(36, 36);
     const width = view.bounds.maxX - view.bounds.minX;
     const depth = view.bounds.maxZ - view.bounds.minZ;
     const floor = new THREE.Mesh(
@@ -284,6 +406,14 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
       view.cityscape.height,
       new THREE.MeshBasicMaterial({ side: THREE.BackSide, alphaTest: 0.5 }),
     ));
+  }
+
+  const doorList = view.doors ?? [];
+  const doorGroups = await placeDoorPlacements(doorList, async (url) => (await model(url))?.scene);
+  fallbacks += doorList.length - doorGroups.length;
+  for (const panel of doorGroups) {
+    markShadowCasters(panel, castsShadow);
+    arena.content.add(panel);
   }
 
   for (const prop of view.props) {
