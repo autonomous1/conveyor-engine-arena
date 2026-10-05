@@ -11,10 +11,10 @@ The server ticks at 20 Hz. Each spawn point gets a pawn. The wander loop picks `
 Node.js 22 or newer. This repo expects three sibling checkouts, because `package.json` uses `file:` dependencies:
 
 ```text
-~/dev/conveyor-engine-arena/          this repo
-~/dev/conveyor-engine-packages/       kernel (dependencies)
-~/dev/conveyor-graph/                 devDependency
-~/dev/conveyor-graph-simulator/       devDependency
+../conveyor-engine-arena/          this repo
+../conveyor-engine-packages/       kernel (dependencies)
+../conveyor-graph/                 devDependency
+../conveyor-graph-simulator/       devDependency
 ```
 
 Those packages publish from `dist/`. Build them before `npm install` here when that output is missing. The live server publishes snapshots on its own. `conveyor-graph-simulator` is used by the headless runners, the bench, and `record:arena`.
