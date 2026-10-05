@@ -1,5 +1,7 @@
 # Conveyor Engine Arena
 
+![Arena, eight buildings, door openings](docs/arena-screenshot-10-5-2026.png)
+
 A one-room browser arena for [Conveyor Engine](https://github.com/autonomous1/conveyor-engine-packages). A Node host owns the simulation and publishes snapshots over a same-origin WebSocket. A Three.js client renders those snapshots: floor, four facade walls, cover, a city cylinder, a sky dome, and wandering characters.
 
 The server ticks at 20 Hz. Each spawn point gets a pawn. The wander loop picks `idle`, `walk`, `run`, `fall`, or `angry`, plays that clip, and scales movement by that gait’s speed relative to the fastest gait on the model. Connecting a browser assigns a free pawn, and the camera stays a free-fly view.
