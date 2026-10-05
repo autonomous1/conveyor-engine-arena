@@ -109,7 +109,7 @@
     {
       "id": "cityscape-pano",
       "kind": "texture",
-      "uri": "/assets/textures/cityscape-pano-3-lt2.png",
+      "uri": "/assets/textures/cityscape-pano-4.png",
       "shape": "cylinder",
       "radius": 80,
       "height": 80.534,
