@@ -1,10 +1,12 @@
 import { EngineClient } from "conveyor-engine-client";
 import type { ArenaView } from "../shared/arena-view.js";
 import { eyeLook, INPUT_HZ, moveIntent, yawFromQuat } from "../shared/look.js";
+import { createAabbDebug } from "./aabb-debug.js";
 import { createArenaScene, loadArenaVisuals } from "./arena-scene.js";
 import { createHud } from "./hud.js";
 import { attachPlayInput } from "./input.js";
 import { connectLive } from "./net.js";
+import { createOptionsDialog } from "./options.js";
 import { createPawnLayer } from "./presentation.js";
 import { createRateWindow, formatOverlay } from "./rates.js";
 
@@ -16,6 +18,9 @@ const view = await fetch("/arena.json").then((res) => {
 const hud = createHud();
 hud.setStatus("loading arena");
 const arena = createArenaScene(view.shadows?.quality ?? "off");
+const collisionDebug = createAabbDebug(view.aabbs);
+arena.scene.add(collisionDebug.group);
+createOptionsDialog((on) => collisionDebug.setVisible(on));
 const visuals = await loadArenaVisuals(view, arena);
 const pawns = createPawnLayer(arena.content, visuals.templates, view.pawnHeight);
 const input = attachPlayInput(arena.renderer.domElement);
