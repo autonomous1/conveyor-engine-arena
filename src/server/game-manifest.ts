@@ -908,7 +908,12 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
       .map((asset) => asset.uri)
       .sort((a, b) => a.localeCompare(b)),
     aabbs: resolved.definition.aabbs.map((box) => ({
-      id: box.id, minX: box.minX, maxX: box.maxX, minZ: box.minZ, maxZ: box.maxZ,
+      id: box.id,
+      minX: box.minX,
+      maxX: box.maxX,
+      minZ: box.minZ,
+      maxZ: box.maxZ,
+      ...(typeof box.minY === "number" && typeof box.maxY === "number" ? { minY: box.minY, maxY: box.maxY } : {}),
     })),
     pawnRadius,
     pawnHeight,

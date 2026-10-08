@@ -52,7 +52,6 @@
       "id": "brutalist-building-1-a",
       "kind": "model",
       "instance":"static",
-      "scale": 40,
       "uri": "/assets/models/brutalist-building-1-a.glb",
       "mediaType": "model/gltf-binary",
       "license": {
@@ -68,7 +67,6 @@
       "id": "brutalist-building-2",
       "kind": "model",
       "instance":"static",
-      "scale": 40,
       "uri": "/assets/models/brutalist-building-2.glb",
       "mediaType": "model/gltf-binary",
       "license": {
@@ -84,7 +82,6 @@
       "id": "brutalist-building-3-a",
       "kind": "model",
       "instance":"static",
-      "scale": 40,
       "uri": "/assets/models/brutalist-building-3-a.glb",
       "mediaType": "model/gltf-binary",
       "license": {

@@ -86,7 +86,8 @@ export type ArenaView = {
    * list are cloned. Skinned pawns are never instanced, even if listed.
    */
   staticModels: string[];
-  aabbs: Array<{ id: number; minX: number; maxX: number; minZ: number; maxZ: number }>;
+  /** `minY` / `maxY` are present when the obstacle has a vertical span. */
+  aabbs: Array<{ id: number; minX: number; maxX: number; minZ: number; maxZ: number; minY?: number; maxY?: number }>;
   pawnRadius: number;
   pawnHeight: number;
 };

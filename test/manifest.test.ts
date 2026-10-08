@@ -168,19 +168,19 @@ test("optional scene blocks and a placements list", () => {
     thickness: 2,
     collision: true,
     faces: {
-      south: "brutalist-urban-1",
-      west: "brutalist-urban-2",
-      north: "brutalist-urban-3",
-      east: "brutalist-urban-4",
+      south: "brutalist-building-1-a",
+      west: "brutalist-building-2",
+      north: "brutalist-building-3-a",
+      east: "brutalist-building-1-a",
     },
   };
   const faced = compile(withWalls, read);
   const faceModel = Object.fromEntries(faced.view.walls.map((wall) => [wall.face, wall.model]));
   assert.deepEqual(faceModel, {
-    south: "/assets/models/brutalist-urban-1.glb",
-    west: "/assets/models/brutalist-urban-2.glb",
-    north: "/assets/models/brutalist-urban-3.glb",
-    east: "/assets/models/brutalist-urban-4.glb",
+    south: "/assets/models/brutalist-building-1-a.glb",
+    west: "/assets/models/brutalist-building-2.glb",
+    north: "/assets/models/brutalist-building-3-a.glb",
+    east: "/assets/models/brutalist-building-1-a.glb",
   });
 
   delete base.scene.walls;
@@ -234,7 +234,7 @@ test("optional scene blocks and a placements list", () => {
   const b = {
     formatVersion: 1,
     units: "meters",
-    placements: [{ id: "prop-b", model: "brutalist-urban-1", position: [12, 0, 18], yaw: 0, scale: 1 }],
+    placements: [{ id: "prop-b", model: "brutalist-building-1-a", position: [12, 0, 18], yaw: 0, scale: 1 }],
     obstacles: [{ id: "box-b", kind: "aabb", min: [20, 0, 16], max: [21, 1, 17] }],
     scene: {
       props: [{ id: "from-b", model: "cover-crate", collision: 50 }],
@@ -334,6 +334,43 @@ test("optional scene blocks and a placements list", () => {
   assert.throws(() => compile(noId, read), (err: unknown) => {
     assert.ok(err instanceof GameManifestError);
     assert.ok(err.issues.some((issue) => issue.path === "scene.id"));
+    return true;
+  });
+});
+
+test("a prop AABB is not inflated, so a spawn 0.6 m from the face is accepted", () => {
+  const doc = document() as { scene: Record<string, unknown>; player: { radius: number } };
+  assert.equal(doc.player.radius, 0.5);
+  const scene = structuredClone(doc) as { scene: Record<string, unknown> };
+  scene.scene.placements = ["./crate.json"];
+  scene.scene.bounds = { minX: -24, maxX: 24, minY: -2, maxY: 12, minZ: -24, maxZ: 24 };
+  scene.scene.spawnPoints = [{ id: "near", x: 1.2, y: 0, z: 0, yaw: 0 }];
+  const file = {
+    formatVersion: 1,
+    units: "meters",
+    placements: [],
+    obstacles: [{ id: "crate-box", kind: "aabb", min: [-0.6, 0, -0.4], max: [0.6, 0.8, 0.4] }],
+  };
+  const files = filesFromDisk();
+  const read = (uri: string) => files.get(uri);
+  const sources = { placementFiles: [{ path: "./crate.json", text: JSON.stringify(file) }] };
+  const game = compile(scene, read, sources);
+  const box = game.view.aabbs.find((item) => item.minX === -0.6 && item.maxX === 0.6);
+  assert.ok(box);
+  assert.equal(box.minY, 0);
+  assert.equal(box.maxY, 0.8);
+  assert.equal(box.minZ, -0.4);
+  assert.equal(box.maxZ, 0.4);
+  const authored = game.definition.aabbs.find((item) => item.id === box.id);
+  assert.ok(authored);
+  assert.equal(authored.maxX, 0.6);
+  assert.equal(authored.minX, -0.6);
+  assert.ok(game.definition.spawnPoints.some((spawn) => spawn.id === "near" && spawn.x === 1.2));
+
+  scene.scene.spawnPoints = [{ id: "tight", x: 1.0, y: 0, z: 0, yaw: 0 }];
+  assert.throws(() => compile(scene, read, sources), (err: unknown) => {
+    assert.ok(err instanceof GameManifestError);
+    assert.match(err.message, /tight/);
     return true;
   });
 });
