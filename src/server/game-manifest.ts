@@ -557,6 +557,8 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
 
   const collisionBoxes: CollisionBox[] = [];
   const seenCollision = new Set<number>();
+  /** Prop obstacles are named `<id>-box` and bound one mesh. Wall runs are not. */
+  const meshObstacleIds = new Set<number>();
   pushCollision(sceneArray(scene, "collision", "scene.collision", issues), (index) => `scene.collision[${index}]`, issues, seenCollision, collisionBoxes);
 
   const propEntries: Array<{ item: unknown; path: string }> = [];
@@ -660,6 +662,7 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
         minY: box.minY, maxY: box.maxY,
         minZ: box.minZ, maxZ: box.maxZ,
       });
+      if (box.sourceId.endsWith("-box")) meshObstacleIds.add(box.id);
     }
   });
 
@@ -914,6 +917,7 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
       minZ: box.minZ,
       maxZ: box.maxZ,
       ...(typeof box.minY === "number" && typeof box.maxY === "number" ? { minY: box.minY, maxY: box.maxY } : {}),
+      ...(meshObstacleIds.has(box.id) ? { mesh: true as const } : {}),
     })),
     pawnRadius,
     pawnHeight,

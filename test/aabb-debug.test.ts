@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import * as THREE from "three";
-import { AABB_DEBUG_COLOR, AABB_DEBUG_NAME, createAabbDebug, type WorldAabb } from "../src/client/aabb-debug.ts";
+import { AABB_DEBUG_COLOR, AABB_DEBUG_MESH_MARGIN, AABB_DEBUG_NAME, AABB_DEBUG_RENDER_ORDER, createAabbDebug, type WorldAabb } from "../src/client/aabb-debug.ts";
 import {
   SHOW_COLLISION_STORAGE_KEY,
   createOptionsModel,
@@ -196,3 +196,121 @@ test("show collision persists only the on value and defaults off", () => {
   assert.deepEqual(seen, [false, true]);
   assert.equal(model.showCollision, true);
 });
+
+test("a prop mesh box is drawn slightly outside the obstacle, and a wall run is not", () => {
+  const debug = createAabbDebug([
+    { mesh: true, min: [-0.3, 0, -0.25], max: [0.3, 0.5, 0.25] },
+    { minX: -4, maxX: 4, minZ: 0, maxZ: 1, minY: 0, maxY: 3 },
+  ]);
+  const [prop, run] = debug.group.children as THREE.LineSegments[];
+  const margin = AABB_DEBUG_MESH_MARGIN;
+  const propBox = worldBox(prop);
+  assertNear(propBox.min.x, -0.3 - margin, "prop minX");
+  assertNear(propBox.max.x, 0.3 + margin, "prop maxX");
+  assertNear(propBox.min.y, 0 - margin, "prop minY");
+  assertNear(propBox.max.y, 0.5 + margin, "prop maxY");
+  assertNear(propBox.min.z, -0.25 - margin, "prop minZ");
+  assertNear(propBox.max.z, 0.25 + margin, "prop maxZ");
+  const runBox = worldBox(run);
+  assertNear(runBox.min.x, -4, "run minX");
+  assertNear(runBox.max.x, 4, "run maxX");
+  assertNear(runBox.min.y, 0, "run minY");
+  assertNear(runBox.max.y, 3, "run maxY");
+  assertNear(runBox.min.z, 0, "run minZ");
+  assertNear(runBox.max.z, 1, "run maxZ");
+});
+
+test("a box inside a building is hidden by the wall and visible through the gap", () => {
+  // Footprint is x −3..3, z −3..3. The debug box is centered inside it.
+  // The near wall sits at z ≈ 3 with a gap from x −0.4 to 0.4.
+  const inside: WorldAabb = { min: [-1, 0, -1], max: [1, 2, 1] };
+  const debug = createAabbDebug([inside]);
+  debug.setVisible(true);
+  const lines = debug.group.children[0] as THREE.LineSegments;
+  const material = lines.material as THREE.LineBasicMaterial;
+  assert.equal(Array.isArray(material), false);
+  assert.equal(material.depthTest, true);
+  assert.equal(material.depthWrite, false);
+  assert.equal(material.transparent, true);
+  assert.equal(debug.group.renderOrder, AABB_DEBUG_RENDER_ORDER);
+  assert.ok(debug.group.renderOrder > 0);
+  assert.equal(lines.isLine, true);
+
+  const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x886655 });
+  assert.equal(wallMaterial.depthTest, true);
+  assert.equal(wallMaterial.depthWrite, true);
+  const wall = (x: number) => {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(2.6, 4, 0.4), wallMaterial);
+    mesh.position.set(x, 2, 3);
+    mesh.renderOrder = 0;
+    return mesh;
+  };
+  const walls = [wall(-1.7), wall(1.7)];
+  const scene = new THREE.Scene();
+  scene.add(walls[0], walls[1], debug.group);
+  scene.updateMatrixWorld(true);
+
+  const center = new THREE.Vector3(0, 1, 0);
+  const footprint = new THREE.Box3(new THREE.Vector3(-3, 0, -3), new THREE.Vector3(3, 4, 3.2));
+  assert.ok(footprint.containsPoint(center));
+  const drawn = worldBox(lines);
+  assertNear(drawn.min.x, -1, "box minX");
+  assertNear(drawn.max.x, 1, "box maxX");
+  assertNear(drawn.min.y, 0, "box minY");
+  assertNear(drawn.max.y, 2, "box maxY");
+  assertNear(drawn.min.z, -1, "box minZ");
+  assertNear(drawn.max.z, 1, "box maxZ");
+
+  const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 40);
+  camera.position.set(0, 1.2, 8);
+  camera.lookAt(0, 1, 0);
+  camera.updateMatrixWorld(true);
+
+  const frontTop = segmentWhere(lines, (a, b) => close(a.y, 2) && close(b.y, 2) && close(a.z, 1) && close(b.z, 1));
+  const throughGap = frontTop[0].clone().lerp(frontTop[1], 0.5);
+  const behindWall = frontTop[0].clone().lerp(frontTop[1], 0.85);
+  assert.ok(Math.abs(throughGap.x) < 0.4, `gap sample x ${throughGap.x}`);
+  assert.ok(Math.abs(behindWall.x) > 0.4, `wall sample x ${behindWall.x}`);
+  for (const point of [throughGap, behindWall]) {
+    const ndc = point.clone().project(camera);
+    assert.ok(Math.abs(ndc.x) < 1 && Math.abs(ndc.y) < 1, "sample is inside the camera view");
+  }
+
+  assert.equal(fragmentShows(material, debug.group, camera, walls, throughGap), true);
+  assert.equal(fragmentShows(material, debug.group, camera, walls, behindWall), false);
+});
+
+/** A debug fragment shows when the group is drawn after the scene and the depth test passes. */
+function fragmentShows(
+  material: THREE.LineBasicMaterial,
+  group: THREE.Group,
+  camera: THREE.PerspectiveCamera,
+  walls: readonly THREE.Object3D[],
+  point: THREE.Vector3,
+): boolean {
+  if (!(group.renderOrder > 0 && material.transparent === true && material.depthWrite === false)) return false;
+  if (material.depthTest === false) return true;
+  const direction = point.clone().sub(camera.position);
+  const reach = direction.length();
+  direction.multiplyScalar(1 / reach);
+  const raycaster = new THREE.Raycaster(camera.position.clone(), direction, 0, reach - 1e-3);
+  return raycaster.intersectObjects(walls, false).length === 0;
+}
+
+function close(actual: number, expected: number): boolean {
+  return Math.abs(actual - expected) < 1e-6;
+}
+
+function segmentWhere(
+  mesh: THREE.LineSegments,
+  match: (a: THREE.Vector3, b: THREE.Vector3) => boolean,
+): [THREE.Vector3, THREE.Vector3] {
+  mesh.updateWorldMatrix(true, false);
+  const position = mesh.geometry.getAttribute("position");
+  for (let i = 0; i < position.count; i += 2) {
+    const a = new THREE.Vector3().fromBufferAttribute(position, i).applyMatrix4(mesh.matrixWorld);
+    const b = new THREE.Vector3().fromBufferAttribute(position, i + 1).applyMatrix4(mesh.matrixWorld);
+    if (match(a, b) || match(b, a)) return [a, b];
+  }
+  throw new Error("missing edge");
+}

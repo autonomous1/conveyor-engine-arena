@@ -25,11 +25,11 @@
      borderopacity="1.0"
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
-     inkscape:zoom="2.460992"
-     inkscape:cx="5.1172186"
-     inkscape:cy="-25.665481"
+     inkscape:zoom="8.4376869"
+     inkscape:cx="3.6570619"
+     inkscape:cy="9.752165"
      inkscape:document-units="mm"
-     inkscape:current-layer="layer3"
+     inkscape:current-layer="layer4"
      showgrid="false"
      inkscape:window-width="2812"
      inkscape:window-height="1549"
@@ -53,91 +53,87 @@
      id="layer4"
      inkscape:label="props">
     <rect
-       style="color:#000000;overflow:visible;opacity:1;vector-effect:none;fill:#3ef267;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:0.52916664px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
-       id="cover-crate-2"
-       width="3.1071432"
-       height="1.8928572"
-       x="-10.446333"
-       y="297.89819"
-       inkscape:label="model:med-kit" />
-    <rect
-       style="color:#000000;overflow:visible;opacity:1;vector-effect:none;fill:#3ef267;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:0.52916664px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
-       id="cover-crate-1"
-       width="3.1071432"
-       height="1.8928572"
-       x="0.069588691"
-       y="303.46109"
-       inkscape:label="model:med-kit" />
-    <rect
-       style="color:#000000;overflow:visible;opacity:1;vector-effect:none;fill:#3ef267;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:0.52916664px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
-       id="cover-crate-3"
-       width="3.1071432"
-       height="1.8928572"
-       x="284.49368"
-       y="-7.5110402"
-       transform="rotate(90)"
-       inkscape:label="model:med-kit" />
-    <rect
-       style="color:#000000;overflow:visible;opacity:1;vector-effect:none;fill:#3ef267;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:0.52916664px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
+       style="color:#000000;overflow:visible;opacity:1;vector-effect:none;fill:#3e67f2;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:0.10959286px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
        id="cover-crate-2-1"
-       width="3.1071432"
-       height="1.8928572"
+       width="0.51800001"
+       height="0.48699999"
        x="-7.8582873"
-       y="283.22675"
+       y="284.6326"
        inkscape:label="model:ammo-box" />
     <rect
-       style="color:#000000;overflow:visible;opacity:1;vector-effect:none;fill:#3ef267;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:0.52916664px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
+       style="color:#000000;overflow:visible;opacity:1;vector-effect:none;fill:#3e67f2;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:0.10959286px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
        id="cover-crate-2-1-7"
-       width="3.1071432"
-       height="1.8928572"
+       width="0.51800001"
+       height="0.48699999"
        x="-10.73889"
-       y="307.57599"
+       y="308.98184"
        inkscape:label="model:ammo-box" />
     <rect
-       style="color:#000000;overflow:visible;opacity:1;vector-effect:none;fill:#3ef267;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:0.52916664px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
+       style="color:#000000;overflow:visible;opacity:1;vector-effect:none;fill:#3e67f2;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:0.10959286px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
        id="cover-crate-2-1-71"
-       width="3.1071432"
-       height="1.8928572"
+       width="0.51800001"
+       height="0.48699999"
        x="-295.34686"
        y="10.684686"
        inkscape:label="model:ammo-box"
        transform="rotate(-90)" />
     <rect
-       style="color:#000000;overflow:visible;opacity:1;vector-effect:none;fill:#3ef267;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:0.52916664px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
+       style="color:#000000;overflow:visible;opacity:1;vector-effect:none;fill:#3e67f2;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:0.10959286px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
        id="cover-crate-2-1-1"
-       width="3.1071432"
-       height="1.8928572"
+       width="0.51800001"
+       height="0.48699999"
        x="4.9685483"
-       y="308.7717"
+       y="310.17755"
        inkscape:label="model:ammo-box" />
-    <g
-       id="g11699"
-       transform="translate(1.6855334,-20.315878)">
-      <rect
-         inkscape:label="model:med-kit"
-         y="291.49228"
-         x="-1.7816365"
-         height="1.8928572"
-         width="3.1071432"
-         id="cover-crate-2-0"
-         style="color:#000000;overflow:visible;opacity:1;vector-effect:none;fill:#3ef267;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:0.52916664px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke" />
-      <rect
-         inkscape:label="model:med-kit"
-         y="294.22906"
-         x="-2.0857232"
-         height="1.8928572"
-         width="3.1071432"
-         id="cover-crate-2-9"
-         style="color:#000000;overflow:visible;opacity:1;vector-effect:none;fill:#3ef267;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:0.52916664px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke" />
-      <rect
-         inkscape:label="model:med-kit"
-         y="292.78464"
-         x="0.7270779"
-         height="1.8928572"
-         width="3.1071432"
-         id="cover-crate-2-6"
-         style="color:#000000;overflow:visible;opacity:1;vector-effect:none;fill:#3ef267;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:0.52916664px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke" />
-    </g>
+    <rect
+       style="color:#000000;overflow:visible;opacity:1;vector-effect:none;fill:#087420;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:0.12563834px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
+       id="cover-crate-2-9"
+       width="0.67799997"
+       height="0.48899999"
+       x="-7.7109275"
+       y="280.37003"
+       inkscape:label="model:med-kit" />
+    <rect
+       style="color:#000000;overflow:visible;opacity:1;vector-effect:none;fill:#087420;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:0.12563834px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
+       id="cover-crate-2-6"
+       width="0.67799997"
+       height="0.48899999"
+       x="-4.8981261"
+       y="278.9256"
+       inkscape:label="model:med-kit" />
+    <rect
+       style="color:#000000;overflow:visible;opacity:1;vector-effect:none;fill:#087420;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:0.12563834px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
+       id="cover-crate-2-6-4"
+       width="0.67799997"
+       height="0.48899999"
+       x="-7.3630419"
+       y="277.59616"
+       inkscape:label="model:med-kit" />
+    <rect
+       style="color:#000000;overflow:visible;opacity:1;vector-effect:none;fill:#087420;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:0.12563834px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
+       id="cover-crate-2-6-8"
+       width="0.67799997"
+       height="0.48899999"
+       x="-9.401268"
+       y="301.27097"
+       inkscape:label="model:med-kit" />
+    <rect
+       style="color:#000000;overflow:visible;opacity:1;vector-effect:none;fill:#087420;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:0.12563834px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
+       id="cover-crate-2-6-1"
+       width="0.67799997"
+       height="0.48899999"
+       x="1.4797251"
+       y="305.75507"
+       inkscape:label="model:med-kit" />
+    <rect
+       style="color:#000000;overflow:visible;opacity:1;vector-effect:none;fill:#087420;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:0.12563834px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
+       id="cover-crate-2-6-0"
+       width="0.67799997"
+       height="0.48899999"
+       x="-287.08514"
+       y="5.8388224"
+       inkscape:label="model:med-kit"
+       transform="rotate(-90)" />
   </g>
   <g
      inkscape:groupmode="layer"

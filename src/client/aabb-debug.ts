@@ -11,6 +11,21 @@ export const AABB_DEBUG_NAME = "aabb-debug";
 /** Walls and building runs share this color. Door gaps are not drawn. */
 export const AABB_DEBUG_COLOR = 0x3dff9a;
 
+/**
+ * Scene meshes use group order 0. This group is later, and the material is
+ * transparent, so the lines are drawn after those meshes have filled the
+ * depth buffer. depthTest clips an edge behind a wall. depthWrite stays off
+ * so the wireframe does not hide the scene.
+ */
+export const AABB_DEBUG_RENDER_ORDER = 1;
+
+/**
+ * A prop mesh box is drawn this far outside the obstacle on every side.
+ * Small protrusions then sit behind the wireframe. Wall runs are not grown.
+ * The host obstacle is unchanged.
+ */
+export const AABB_DEBUG_MESH_MARGIN = 0.02;
+
 const DEFAULT_MIN_Y = 0;
 const DEFAULT_MAX_Y = 3;
 
@@ -27,6 +42,8 @@ export type WorldAabb = {
   maxY?: number;
   minZ?: number;
   maxZ?: number;
+  /** Set for a prop mesh box. The wireframe is drawn outside the obstacle. */
+  mesh?: boolean;
 };
 
 type Extents = {
@@ -50,12 +67,13 @@ export function createAabbDebug(obstacles: readonly WorldAabb[]): AabbDebug {
   const group = new THREE.Group();
   group.name = AABB_DEBUG_NAME;
   group.visible = false;
+  group.renderOrder = AABB_DEBUG_RENDER_ORDER;
   group.raycast = ignoreRaycast;
   const material = new THREE.LineBasicMaterial({
     color: AABB_DEBUG_COLOR,
     transparent: true,
     opacity: 1,
-    depthTest: false,
+    depthTest: true,
     depthWrite: false,
     toneMapped: false,
     fog: false,
@@ -89,8 +107,9 @@ function clearMeshes(group: THREE.Group): void {
 
 function meshFor(obstacle: WorldAabb, material: THREE.Material): THREE.LineSegments | null {
   if (isDoorGap(obstacle) || isDoorLeaf(obstacle)) return null;
-  const box = extents(obstacle);
-  if (!box) return null;
+  const tight = extents(obstacle);
+  if (!tight) return null;
+  const box = obstacle.mesh === true ? grow(tight, AABB_DEBUG_MESH_MARGIN) : tight;
   const width = box.maxX - box.minX;
   const height = box.maxY - box.minY;
   const depth = box.maxZ - box.minZ;
@@ -146,6 +165,17 @@ function extents(obstacle: WorldAabb): Extents | null {
     maxY = maxYIn;
   }
   return { minX, maxX, minY, maxY, minZ, maxZ };
+}
+
+function grow(box: Extents, margin: number): Extents {
+  return {
+    minX: box.minX - margin,
+    maxX: box.maxX + margin,
+    minY: box.minY - margin,
+    maxY: box.maxY + margin,
+    minZ: box.minZ - margin,
+    maxZ: box.maxZ + margin,
+  };
 }
 
 function coord(value: readonly number[] | undefined, index: number): number | undefined {

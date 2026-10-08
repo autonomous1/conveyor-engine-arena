@@ -86,8 +86,12 @@ export type ArenaView = {
    * list are cloned. Skinned pawns are never instanced, even if listed.
    */
   staticModels: string[];
-  /** `minY` / `maxY` are present when the obstacle has a vertical span. */
-  aabbs: Array<{ id: number; minX: number; maxX: number; minZ: number; maxZ: number; minY?: number; maxY?: number }>;
+  /**
+   * `minY` / `maxY` are present when the obstacle has a vertical span.
+   * `mesh` is set for a prop obstacle (`<id>-box`). The host min/max stay the
+   * mesh bounds. The debug wireframe draws that box slightly larger.
+   */
+  aabbs: Array<{ id: number; minX: number; maxX: number; minZ: number; maxZ: number; minY?: number; maxY?: number; mesh?: boolean }>;
   pawnRadius: number;
   pawnHeight: number;
 };

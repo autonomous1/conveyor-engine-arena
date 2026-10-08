@@ -357,6 +357,7 @@ test("a prop AABB is not inflated, so a spawn 0.6 m from the face is accepted", 
   const game = compile(scene, read, sources);
   const box = game.view.aabbs.find((item) => item.minX === -0.6 && item.maxX === 0.6);
   assert.ok(box);
+  assert.equal(box.mesh, true);
   assert.equal(box.minY, 0);
   assert.equal(box.maxY, 0.8);
   assert.equal(box.minZ, -0.4);
