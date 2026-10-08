@@ -6,6 +6,7 @@ const installed = loadInstalledGame();
 
 export const ARENA_BUNDLE_ID = installed.view.bundleId;
 export const ARENA_BUNDLE_VERSION = installed.bundleVersion;
+export const ARENA_PAWN_HEIGHT = installed.view.pawnHeight;
 export const ARENA_COLLISION = installed.collision;
 
 export function arenaVisualGlb(): Uint8Array {

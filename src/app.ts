@@ -13,7 +13,7 @@ import {
 import { EngineWsClient, EngineWsServer, memoryPair } from "conveyor-engine-transport-ws";
 import { AuthoritativeWorld, applyStaticWorldDefinition } from "conveyor-engine-world";
 import { resolvePresentation, visualAssetFromManifest } from "conveyor-engine-assets";
-import { arenaStaticWorld, arenaVisualGlb } from "./arena-assets.js";
+import { ARENA_PAWN_HEIGHT, arenaStaticWorld, arenaVisualGlb } from "./arena-assets.js";
 
 export type ExampleClient = {
   id: ClientId;
@@ -65,6 +65,7 @@ export class ExampleApp {
     if (opts.useArena) {
       const arena = arenaStaticWorld();
       authoritativeHash = applyStaticWorldDefinition(this.world, arena.definition);
+      this.world.pawnHeight = ARENA_PAWN_HEIGHT;
       bundleId = arena.definition.bundleId;
       this.bundleId = bundleId;
       this.authoritativeHash = authoritativeHash;

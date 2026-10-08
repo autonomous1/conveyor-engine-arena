@@ -4,7 +4,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { AuthoritativeWorld } from "conveyor-engine-world";
 import { Replicator } from "conveyor-engine-replication";
 import { labelMix, NetworkScheduler, SplitMix64 } from "conveyor-graph-simulator/reference";
-import { ARENA_COLLISION, ARENA_BUNDLE_ID, arenaStaticWorld } from "../arena-assets.js";
+import { ARENA_COLLISION, ARENA_BUNDLE_ID, ARENA_PAWN_HEIGHT, arenaStaticWorld } from "../arena-assets.js";
 
 function unit01(rng: SplitMix64): number {
   return Number(rng.nextU64() >> 11n) / 2 ** 53;
@@ -35,10 +35,18 @@ export async function recordArenaWander(opts: {
   const arena = arenaStaticWorld();
   const world = new AuthoritativeWorld({ worldVersion: "example-v1" });
   world.actorSeparation = true;
+  world.pawnHeight = ARENA_PAWN_HEIGHT;
   world.setBundleIdentity(arena.definition.bundleId, arena.hash);
   world.setWorldBounds(ARENA_COLLISION.bounds);
   for (const box of ARENA_COLLISION.aabbs ?? []) {
-    world.addObstacle({ id: box.id, minX: box.minX, maxX: box.maxX, minZ: box.minZ, maxZ: box.maxZ });
+    world.addObstacle({
+      id: box.id,
+      minX: box.minX,
+      maxX: box.maxX,
+      minZ: box.minZ,
+      maxZ: box.maxZ,
+      ...(box.minY !== undefined && box.maxY !== undefined ? { minY: box.minY, maxY: box.maxY } : {}),
+    });
   }
   const agents = (ARENA_COLLISION.spawnPoints ?? []).map((s, i) => {
     const id = world.createEntity(0n, { type: "pawn", shape: "capsule", assetKey: i === 2 ? "prey" : "fox" }, i + 1);

@@ -20,6 +20,7 @@ export type LoadedArena = {
 export function loadArena(): LoadedArena {
   const game = loadInstalledGame();
   const world = new AuthoritativeWorld({ worldVersion: game.view.world });
+  world.pawnHeight = game.view.pawnHeight;
   applyStaticWorldDefinition(world, game.definition);
   const choices = game.view.characters.map((character) => character.id);
   const agents: WanderAgent[] = game.definition.spawnPoints.map((spawn, index) => {
