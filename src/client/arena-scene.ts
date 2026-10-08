@@ -181,8 +181,10 @@ export function doorSwingRadians(hinge: "left" | "right", open: boolean): number
 }
 
 /**
- * Mount one door GLB. Each placement brings its own scene; this clones that
- * scene and does not reuse a clone made for another door.
+ * Mount one door GLB. The default clones the frame and the leaf. Pass
+ * `{ frameMeshes: false }` when the frame is drawn with InstancedMesh: the
+ * frame node stays as the yaw pivot, and the leaf is still its own clone.
+ * Each opening gets its own leaf. A second opening is not that clone.
  *
  * Placement position and yaw are applied once. The file already faces out:
  * front normals are +Z and the hinge is the mesh origin on the left edge.
@@ -196,19 +198,23 @@ export function doorSwingRadians(hinge: "left" | "right", open: boolean): number
  * the frame quaternion is identity, and the hinge quaternion is identity.
  * Yaw 90 sets the frame quaternion to +90° about Y, which sends local +Z to world +X.
  */
-export function placeDoorModel(template: THREE.Object3D, door: ArenaView["doors"][number]): THREE.Group {
+export function placeDoorModel(
+  template: THREE.Object3D,
+  door: ArenaView["doors"][number],
+  options?: { frameMeshes?: boolean },
+): THREE.Group {
   const frameSrc = template.getObjectByName("frame");
   const doorSrc = template.getObjectByName("door");
   if (!frameSrc || !doorSrc) throw new Error("door GLB is missing frame or door");
-  const frame = cloneDoorPiece(frameSrc);
+  const frame = options?.frameMeshes === false ? new THREE.Group() : cloneDoorPiece(frameSrc);
+  if (options?.frameMeshes === false) frame.scale.copy(frameSrc.scale);
   const panel = cloneDoorPiece(doorSrc);
   frame.name = "frame";
   panel.name = "door";
   const group = new THREE.Group();
   group.name = door.id;
   group.position.set(door.position[0], door.position[1], door.position[2]);
-  frame.quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), yawToRadians(door.yaw));
-  frame.position.set(0, -meshMinY(frame), 0);
+  orientDoorFrame(frame, door.yaw, meshMinY(frameSrc));
   const hinge = new THREE.Group();
   hinge.name = "hinge";
   hinge.rotation.y = doorSwingRadians(door.hinge, door.open);
@@ -294,6 +300,165 @@ function yawToRadians(degrees: number): number {
   return degrees * (Math.PI / 180);
 }
 
+const UP = new THREE.Vector3(0, 1, 0);
+
+/**
+ * One placement of a static model. `yaw` is degrees about +Y, the same number
+ * a baked placement stores. `scale` is uniform, or the prop's width, height, and depth.
+ */
+export type InstancePose = {
+  position: [number, number, number];
+  yaw: number;
+  scale: number | [number, number, number];
+};
+
+/**
+ * One InstancedMesh per non-skinned mesh. Geometry and material are the loaded
+ * objects, not copies. Meshes are not merged, so two materials stay two draws.
+ * The matrix matches `placeBuildingModel`: yaw on the parent, scale on the model,
+ * and the GLB root position is dropped while its rotation is kept.
+ */
+export function placeStaticInstances(template: THREE.Object3D, poses: readonly InstancePose[]): THREE.InstancedMesh[] {
+  if (poses.length === 0) return [];
+  const meshes = staticMeshes(template, false);
+  if (meshes.length === 0) return [];
+  template.updateMatrixWorld(true);
+  const rootInverse = new THREE.Matrix4().copy(template.matrixWorld).invert();
+  const relatives = meshes.map((mesh) => new THREE.Matrix4().multiplyMatrices(rootInverse, mesh.matrixWorld));
+  const rootQuaternion = template.quaternion.clone();
+  return meshes.map((mesh, index) => instanceMesh(mesh, poses.length, (pose, target) => {
+    target.copy(modelMatrix(pose, rootQuaternion)).multiply(relatives[index]!);
+  }, poses));
+}
+
+/**
+ * Frame pieces of a static door. The `door` node is not included: that leaf
+ * stays a clone under a hinge. One InstancedMesh per frame mesh, count equal
+ * to the openings. The matrix is the same frame yaw and floor offset as
+ * `placeDoorModel`.
+ */
+export function placeStaticDoorFrames(
+  template: THREE.Object3D,
+  doors: readonly ArenaView["doors"][number][],
+): THREE.InstancedMesh[] {
+  if (doors.length === 0) return [];
+  const frameSrc = template.getObjectByName("frame");
+  if (!frameSrc) return [];
+  const meshes = staticMeshes(frameSrc, true);
+  if (meshes.length === 0) return [];
+  frameSrc.updateWorldMatrix(true, true);
+  const frameInverse = new THREE.Matrix4().copy(frameSrc.matrixWorld).invert();
+  const relatives = meshes.map((mesh) => new THREE.Matrix4().multiplyMatrices(frameInverse, mesh.matrixWorld));
+  const frameScale = frameSrc.scale.clone();
+  const minY = meshMinY(frameSrc);
+  return meshes.map((mesh, index) => instanceMesh(mesh, doors.length, (door, target) => {
+    target.copy(doorFrameMatrix(door, frameScale, minY)).multiply(relatives[index]!);
+  }, doors));
+}
+
+/** Degrees for a wall that omitted yaw. These are the four `wallAnchor` results, not a new turn. */
+export function wallInstancePose(wall: ArenaView["walls"][number], bounds: ArenaView["bounds"]): InstancePose {
+  const anchor = wallAnchor(wall.face, wall, bounds);
+  const position: [number, number, number] = wall.position ?? [anchor.x, 0, anchor.z];
+  return {
+    position,
+    yaw: wall.yaw === undefined ? anchorDegrees(anchor.yaw) : wall.yaw,
+    scale: wall.scale ?? 1,
+  };
+}
+
+/** A prop sits on its AABB bottom. Yaw is 0. Scale is the box size, not a uniform asset scale. */
+export function propInstancePose(prop: ArenaView["props"][number]): InstancePose {
+  const w = Math.max(0.1, prop.maxX - prop.minX);
+  const h = Math.max(0.1, prop.maxY - prop.minY);
+  const d = Math.max(0.1, prop.maxZ - prop.minZ);
+  return {
+    position: [(prop.minX + prop.maxX) / 2, prop.minY, (prop.minZ + prop.maxZ) / 2],
+    yaw: 0,
+    scale: [w, h, d],
+  };
+}
+
+function anchorDegrees(radians: number): number {
+  if (Math.abs(radians) < 1e-6) return 0;
+  if (Math.abs(radians - Math.PI) < 1e-6) return 180;
+  if (Math.abs(radians + Math.PI / 2) < 1e-6) return 270;
+  if (Math.abs(radians - Math.PI / 2) < 1e-6) return 90;
+  return radians * (180 / Math.PI);
+}
+
+function orientDoorFrame(frame: THREE.Object3D, yawDegrees: number, minY: number): void {
+  frame.quaternion.setFromAxisAngle(UP, yawToRadians(yawDegrees));
+  frame.position.set(0, -minY, 0);
+}
+
+function doorFrameMatrix(door: ArenaView["doors"][number], frameScale: THREE.Vector3, minY: number): THREE.Matrix4 {
+  const group = new THREE.Group();
+  group.position.set(door.position[0], door.position[1], door.position[2]);
+  const frame = new THREE.Group();
+  frame.scale.copy(frameScale);
+  orientDoorFrame(frame, door.yaw, minY);
+  group.add(frame);
+  group.updateMatrixWorld(true);
+  return frame.matrixWorld.clone();
+}
+
+/**
+ * `T * R(yaw) * R(glb root) * S`. Same parent yaw and child scale as
+ * `placeBuildingModel`. The root translation in the file is not reapplied.
+ */
+function modelMatrix(pose: InstancePose, rootQuaternion: THREE.Quaternion): THREE.Matrix4 {
+  const group = new THREE.Group();
+  group.position.set(pose.position[0], pose.position[1], pose.position[2]);
+  group.rotation.y = yawToRadians(pose.yaw);
+  const model = new THREE.Group();
+  model.quaternion.copy(rootQuaternion);
+  const scale = pose.scale;
+  if (typeof scale === "number") model.scale.setScalar(scale);
+  else model.scale.set(scale[0], scale[1], scale[2]);
+  group.add(model);
+  group.updateMatrixWorld(true);
+  return model.matrixWorld.clone();
+}
+
+function instanceMesh<T>(
+  source: THREE.Mesh,
+  count: number,
+  matrixAt: (item: T, target: THREE.Matrix4) => void,
+  items: readonly T[],
+): THREE.InstancedMesh {
+  const instanced = new THREE.InstancedMesh(source.geometry, source.material, count);
+  instanced.name = source.name;
+  const matrix = new THREE.Matrix4();
+  for (let index = 0; index < count; index += 1) {
+    matrixAt(items[index]!, matrix);
+    instanced.setMatrixAt(index, matrix);
+  }
+  instanced.instanceMatrix.needsUpdate = true;
+  instanced.computeBoundingSphere();
+  return instanced;
+}
+
+function staticMeshes(root: THREE.Object3D, skipDoor: boolean): THREE.Mesh[] {
+  const meshes: THREE.Mesh[] = [];
+  root.traverse((object) => {
+    const mesh = object as THREE.SkinnedMesh;
+    if (!mesh.isMesh || mesh.isSkinnedMesh) return;
+    if (skipDoor && underNamed(mesh, "door")) return;
+    meshes.push(mesh);
+  });
+  return meshes;
+}
+
+function underNamed(object: THREE.Object3D, name: string): boolean {
+  let current: THREE.Object3D | null = object;
+  while (current) {
+    if (current.name === name) return true;
+    current = current.parent;
+  }
+  return false;
+}
+
 /**
  * Place the model at the manifest position, yaw, and scale. The origin stays
  * the GLB origin, so the mesh matches the baked AABBs. Scale defaults to 1.
@@ -359,7 +524,63 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
     }
   }
 
+  const staticUris = new Set(view.staticModels ?? []);
+  // World-space batches. Walls and buildings share a parent, so one model is one InstancedMesh.
+  const sceneBatches = new Map<string, Array<{ pose: InstancePose; clone: (template: THREE.Object3D) => void }>>();
+  function pushScene(url: string, pose: InstancePose, clone: (template: THREE.Object3D) => void) {
+    const list = sceneBatches.get(url) ?? [];
+    list.push({ pose, clone });
+    sceneBatches.set(url, list);
+  }
+
+  const cloneWalls: ArenaView["walls"] = [];
   for (const wall of view.walls) {
+    if (!staticUris.has(wall.model)) {
+      cloneWalls.push(wall);
+      continue;
+    }
+    pushScene(wall.model, wallInstancePose(wall, view.bounds), (template) => {
+      const facade = placeWallModel(template, wall, view.bounds);
+      markShadowCasters(facade, castsShadow);
+      arena.scene.add(facade);
+    });
+  }
+
+  const cloneBuildings: ArenaView["buildings"] = [];
+  for (const building of view.buildings ?? []) {
+    if (!staticUris.has(building.model)) {
+      cloneBuildings.push(building);
+      continue;
+    }
+    pushScene(building.model, {
+      position: building.position,
+      yaw: building.yaw,
+      scale: building.scale,
+    }, (template) => {
+      const mesh = placeBuildingModel(template, building);
+      markShadowCasters(mesh, castsShadow);
+      arena.scene.add(mesh);
+    });
+  }
+
+  for (const [url, entries] of sceneBatches) {
+    const template = (await model(url))?.scene;
+    if (!template) {
+      fallbacks += entries.length;
+      continue;
+    }
+    const meshes = placeStaticInstances(template, entries.map((entry) => entry.pose));
+    if (meshes.length === 0) {
+      for (const entry of entries) entry.clone(template);
+      continue;
+    }
+    for (const mesh of meshes) {
+      markShadowCasters(mesh, castsShadow);
+      arena.scene.add(mesh);
+    }
+  }
+
+  for (const wall of cloneWalls) {
     const loaded = await model(wall.model);
     const template = loaded?.scene;
     if (!template) {
@@ -372,7 +593,7 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
     arena.scene.add(facade);
   }
 
-  for (const building of view.buildings ?? []) {
+  for (const building of cloneBuildings) {
     const loaded = await model(building.model);
     const template = loaded?.scene;
     if (!template) {
@@ -409,15 +630,73 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
   }
 
   const doorList = view.doors ?? [];
-  const doorGroups = await placeDoorPlacements(doorList, async (url) => (await model(url))?.scene);
-  fallbacks += doorList.length - doorGroups.length;
+  const staticDoors = new Map<string, ArenaView["doors"]>();
+  const cloneDoors: ArenaView["doors"] = [];
+  for (const door of doorList) {
+    if (!staticUris.has(door.model)) {
+      cloneDoors.push(door);
+      continue;
+    }
+    const list = staticDoors.get(door.model) ?? [];
+    list.push(door);
+    staticDoors.set(door.model, list);
+  }
+  for (const [url, doors] of staticDoors) {
+    const template = (await model(url))?.scene;
+    if (!template) {
+      fallbacks += doors.length;
+      continue;
+    }
+    const frames = placeStaticDoorFrames(template, doors);
+    for (const frame of frames) {
+      markShadowCasters(frame, castsShadow);
+      arena.content.add(frame);
+    }
+    for (const door of doors) {
+      // No static frame meshes (a skinned file): clone the whole door.
+      // Otherwise the leaf is the only clone. The frame draw is the InstancedMesh above.
+      const group = placeDoorModel(template, door, frames.length === 0 ? undefined : { frameMeshes: false });
+      markShadowCasters(group, castsShadow);
+      arena.content.add(group);
+    }
+  }
+  const doorGroups = await placeDoorPlacements(cloneDoors, async (url) => (await model(url))?.scene);
+  fallbacks += cloneDoors.length - doorGroups.length;
   for (const panel of doorGroups) {
     markShadowCasters(panel, castsShadow);
     arena.content.add(panel);
   }
 
+  const cloneProps: ArenaView["props"] = [];
+  const propBatches = new Map<string, ArenaView["props"]>();
   for (const prop of view.props) {
-    const template = (await model(prop.model))?.scene;
+    if (!staticUris.has(prop.model)) {
+      cloneProps.push(prop);
+      continue;
+    }
+    const list = propBatches.get(prop.model) ?? [];
+    list.push(prop);
+    propBatches.set(prop.model, list);
+  }
+  for (const [url, props] of propBatches) {
+    const template = (await model(url))?.scene;
+    if (!template) {
+      for (const prop of props) addProp(undefined, prop);
+      continue;
+    }
+    const meshes = placeStaticInstances(template, props.map(propInstancePose));
+    if (meshes.length === 0) {
+      for (const prop of props) addProp(template, prop);
+      continue;
+    }
+    for (const mesh of meshes) {
+      markShadowCasters(mesh, castsShadow);
+      arena.content.add(mesh);
+    }
+  }
+  for (const prop of cloneProps) addProp((await model(prop.model))?.scene, prop);
+
+  function addProp(template: THREE.Object3D | undefined, prop: ArenaView["props"][number]) {
     const w = Math.max(0.1, prop.maxX - prop.minX);
     const h = Math.max(0.1, prop.maxY - prop.minY);
     const d = Math.max(0.1, prop.maxZ - prop.minZ);
@@ -430,7 +709,7 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
       box.position.set((prop.minX + prop.maxX) / 2, prop.minY + h / 2, (prop.minZ + prop.maxZ) / 2);
       markShadowCasters(box, castsShadow);
       arena.content.add(box);
-      continue;
+      return;
     }
     const mesh = template.clone(true);
     mesh.scale.set(w, h, d);
@@ -446,6 +725,7 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
       fallbacks += 1;
       continue;
     }
+    // Skinned pawns are cloned per spawn. `"instance": "static"` does not apply.
     // Scale the spawned copy from the asset's scale. The cached scene stays at 1.
     // Drop position tracks so a clip cannot carry the pawn away from the snapshot.
     const template = cloneWithSkeleton(source.scene);

@@ -69,6 +69,15 @@ test("installed manifest matches the authoritative world and keeps spawns clear"
   assert.equal(game.view.sky === undefined, scene.sky === undefined);
   assert.ok(game.view.characters.length >= 2);
   for (const character of game.view.characters) assert.ok(character.scale > 0, character.id);
+  assert.ok(game.view.staticModels.includes("/assets/models/brutalist-building-1-a.glb"));
+  assert.ok(game.view.staticModels.includes("/assets/models/med-kit.glb"));
+  assert.ok(game.view.staticModels.includes("/assets/models/ammo-box.glb"));
+  assert.ok(game.view.staticModels.includes("/assets/models/ammo-crate.glb"));
+  assert.ok(game.view.staticModels.includes("/assets/models/door1.glb"));
+  assert.ok(game.view.staticModels.includes("/assets/models/door2.glb"));
+  for (const character of game.view.characters) {
+    assert.equal(game.view.staticModels.includes(character.model), false, character.id);
+  }
   const r = game.view.pawnRadius;
   for (const spawn of game.definition.spawnPoints) {
     for (const box of game.definition.aabbs) {
@@ -106,6 +115,16 @@ test("invalid manifest names the field", () => {
   player.scale = 4;
   const compiled = compile(scaled, read);
   assert.equal(compiled.view.characters.find((character) => character.id === "player-a")!.scale, 4);
+
+  const instanced = structuredClone(doc) as { assets: Array<Record<string, unknown>> };
+  const crate = instanced.assets.find((asset) => asset.id === "cover-crate");
+  assert.ok(crate);
+  crate.instance = "clone";
+  assert.throws(() => compile(instanced, read), (err: unknown) => {
+    assert.ok(err instanceof GameManifestError);
+    assert.ok(err.issues.some((issue) => issue.path.endsWith(".instance") && issue.message === "must be static"));
+    return true;
+  });
 });
 
 test("replacing texture bytes changes presentation identity only", () => {

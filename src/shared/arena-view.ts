@@ -80,6 +80,12 @@ export type ArenaView = {
     open: boolean;
   }>;
   characters: Array<{ id: string; model: string; scale: number; animations: Record<Movement, CharacterAnimation> }>;
+  /**
+   * Model URIs whose asset says `"instance": "static"`. Repeated placements of
+   * one of these share one InstancedMesh per source mesh. URIs absent from this
+   * list are cloned. Skinned pawns are never instanced, even if listed.
+   */
+  staticModels: string[];
   aabbs: Array<{ id: number; minX: number; maxX: number; minZ: number; maxZ: number }>;
   pawnRadius: number;
   pawnHeight: number;

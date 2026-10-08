@@ -52,6 +52,8 @@ type AssetRec = {
   radius?: number;
   height?: number;
   animations?: Record<Movement, CharacterAnimation>;
+  /** `"static"` placements share one InstancedMesh per source mesh. Omitted means clone. */
+  instance?: "static";
 };
 
 /** A wall face from the manifest. Position and yaw are optional; the client falls back to the face anchor. */
@@ -122,6 +124,14 @@ function parseCharacterAnimations(raw: unknown, path: string, issues: GameIssue[
     out[movement] = { clip, speed };
   }
   return ok ? out : undefined;
+}
+
+/** Only `"static"` is instanced. Anything else is a manifest error, not a silent clone. */
+function parseInstance(value: unknown, path: string, issues: GameIssue[]): "static" | undefined {
+  if (value === undefined) return undefined;
+  if (value === "static") return "static";
+  issues.push({ path, message: "must be static" });
+  return undefined;
 }
 
 function modelScale(value: unknown, path: string, issues: GameIssue[]): number {
@@ -508,6 +518,7 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
       const notes = isObject(item.provenance) && typeof item.provenance.notes === "string" ? item.provenance.notes : undefined;
       if (id && assets.has(id)) issues.push({ path: `${path}.id`, message: `duplicate id ${id}` });
       const scale = kind === "model" ? modelScale(item.scale, `${path}.scale`, issues) : undefined;
+      const instance = parseInstance(item.instance, `${path}.instance`, issues);
       const animations = kind === "model" && item.animations !== undefined
         ? parseCharacterAnimations(item.animations, `${path}.animations`, issues)
         : undefined;
@@ -525,7 +536,7 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
         if (height !== undefined && height <= 0) issues.push({ path: `${path}.height`, message: "must be > 0" });
       }
       if (id && kind && uri && mediaType && licenseId && origin) {
-        assets.set(id, { id, kind, uri, mediaType, licenseId, origin, notes, scale, shape, radius, height, animations });
+        assets.set(id, { id, kind, uri, mediaType, licenseId, origin, notes, scale, shape, radius, height, animations, instance });
       }
     });
   }
@@ -892,6 +903,10 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
     ...(shadowQuality ? { shadows: { quality: shadowQuality } } : {}),
     props,
     characters,
+    staticModels: [...assets.values()]
+      .filter((asset) => asset.kind === "model" && asset.instance === "static")
+      .map((asset) => asset.uri)
+      .sort((a, b) => a.localeCompare(b)),
     aabbs: resolved.definition.aabbs.map((box) => ({
       id: box.id, minX: box.minX, maxX: box.maxX, minZ: box.minZ, maxZ: box.maxZ,
     })),
