@@ -36,6 +36,7 @@
       "id": "floor-stone",
       "kind": "texture",
       "uri": "/assets/textures/floor-stone.png",
+      "instance":"static",
       "mediaType": "image/png",
       "license": {
         "id": "CC0-1.0",
@@ -46,11 +47,13 @@
         "notes": "Original procedural placeholder made for this arena. No third-party art."
       }
     },
+
     {
-      "id": "brutalist-urban-1",
+      "id": "brutalist-building-1-a",
       "kind": "model",
+      "instance":"static",
       "scale": 40,
-      "uri": "/assets/models/brutalist-urban-1.glb",
+      "uri": "/assets/models/brutalist-building-1-a.glb",
       "mediaType": "model/gltf-binary",
       "license": {
         "id": "unspecified",
@@ -58,14 +61,15 @@
       },
       "provenance": {
         "origin": "manual",
-        "notes": "South facade model supplied for this arena."
+        "notes": "East facade model supplied for this arena."
       }
     },
     {
-      "id": "brutalist-urban-2",
+      "id": "brutalist-building-2",
       "kind": "model",
+      "instance":"static",
       "scale": 40,
-      "uri": "/assets/models/brutalist-urban-2.glb",
+      "uri": "/assets/models/brutalist-building-2.glb",
       "mediaType": "model/gltf-binary",
       "license": {
         "id": "unspecified",
@@ -73,29 +77,15 @@
       },
       "provenance": {
         "origin": "manual",
-        "notes": "West facade model supplied for this arena."
+        "notes": "East facade model supplied for this arena."
       }
     },
     {
-      "id": "brutalist-urban-3",
+      "id": "brutalist-building-3-a",
       "kind": "model",
+      "instance":"static",
       "scale": 40,
-      "uri": "/assets/models/brutalist-urban-3.glb",
-      "mediaType": "model/gltf-binary",
-      "license": {
-        "id": "unspecified",
-        "status": "unknown"
-      },
-      "provenance": {
-        "origin": "manual",
-        "notes": "North facade model supplied for this arena."
-      }
-    },
-    {
-      "id": "brutalist-urban-4",
-      "kind": "model",
-      "scale": 40,
-      "uri": "/assets/models/brutalist-urban-4.glb",
+      "uri": "/assets/models/brutalist-building-3-a.glb",
       "mediaType": "model/gltf-binary",
       "license": {
         "id": "unspecified",
@@ -147,11 +137,11 @@
       "scale": 3,
       "animations": {
         "idle": {
-          "clip": "place the character's feet on either side of the wheel move the",
+          "clip": "idle",
           "speed": 0
         },
         "walk": {
-          "clip": "please generate a ilitary marching walk and call it \"walk\".001",
+          "clip": "walk",
           "speed": 1
         },
         "run": {
@@ -184,15 +174,15 @@
       "scale": 2,
       "animations": {
         "idle": {
-          "clip": "I would like to make a \"zombie run\"",
+          "clip": "zombie run",
           "speed": 0
         },
         "walk": {
-          "clip": "I would like to make a \"zombie walk\"",
+          "clip": "zombie walk",
           "speed": 1
         },
         "run": {
-          "clip": "I would like to make a \"zombie run\"",
+          "clip": "zombie run",
           "speed": 2
         },
         "fall": {
@@ -201,6 +191,43 @@
         },
         "angry": {
           "clip": "angry_01",
+          "speed": 0
+        }
+      },
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "CC0-1.0",
+        "status": "spdx"
+      },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Original procedural placeholder made for this arena. No third-party art."
+      }
+    },
+    {
+      "id": "player-d",
+      "kind": "model",
+      "uri": "/assets/models/quad-skeleton-3.glb",
+      "scale": 2,
+      "animations": {
+        "idle": {
+          "clip": "freaky.001",
+          "speed": 0
+        },
+        "walk": {
+          "clip": "zombie walk",
+          "speed": 1
+        },
+        "run": {
+          "clip": "zombie run",
+          "speed": 2
+        },
+        "fall": {
+          "clip": "defeat_03.001",
+          "speed": 0
+        },
+        "angry": {
+          "clip": "dance_04.001",
           "speed": 0
         }
       },
@@ -328,7 +355,8 @@
     "modelChoices": [
       "player-1",
       "player-a",
-      "player-b"
+      "player-b",
+      "player-d"
     ]
   }
 }
