@@ -6,7 +6,7 @@ import { advanceFireClock, LASER_MS, traceHitscan, type TraceCapsule } from "../
 import { createAabbDebug } from "./aabb-debug.js";
 import { createArenaScene, loadArenaVisuals } from "./arena-scene.js";
 import { createHitMarker } from "./hit-marker.js";
-import { createHud } from "./hud.js";
+import { createHud, localHealthLabel } from "./hud.js";
 import { attachPlayInput } from "./input.js";
 import { createLaserBeams } from "./laser.js";
 import { connectLive, type LaserNotice } from "./net.js";
@@ -49,7 +49,7 @@ let debugPawn: number | undefined;
 let debugPawnWatch = false;
 let sawFiniteCamera = true;
 const laserQueue: LaserNotice[] = [];
-const pawnHp = new Map<number, number>();
+const pawnVital = new Map<number, { hp: number; dead: boolean }>();
 
 const link = connectLive({
   bundleId: view.bundleId,
@@ -66,7 +66,10 @@ const link = connectLive({
     laserQueue.push(laser);
   },
   onHealth: (health) => {
-    pawnHp.set(health.entity, health.hp);
+    pawnVital.set(health.entity, { hp: health.hp, dead: health.dead });
+  },
+  onAudit: (audit) => {
+    options.setAudit(audit);
   },
   onInbound(summary) {
     if (!options.fireDebug || !awaitFireReply) return;
@@ -235,8 +238,9 @@ function drawFrame(now: number) {
   }
   sawFiniteCamera = camOk;
   const look = input.locked ? "look locked" : "click to look";
-  const mine = ownedId === undefined ? undefined : pawnHp.get(ownedId);
-  const hpText = mine === undefined ? "" : ` · hp ${mine}`;
+  const mine = ownedId === undefined ? undefined : pawnVital.get(ownedId);
+  const hpLabel = localHealthLabel(mine);
+  const hpText = hpLabel === "" ? "" : ` · ${hpLabel}`;
   if (!pinnedError) {
     hud.setStatus(`${statusText} · ${look}${hpText} · meshes ${pawns.count} models ${pawns.count - pawns.fallbacks} fallback ${pawns.fallbacks + visuals.fallbacks}`);
   }
@@ -271,7 +275,7 @@ function drawFrame(now: number) {
       pawns: pawns.count,
       owned: client.ownedEntity,
       positions: pawns.positionLine(),
-      hp: ownedId === undefined ? undefined : pawnHp.get(ownedId),
+      hp: mine?.hp,
     }));
   }
 }

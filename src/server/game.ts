@@ -1,7 +1,9 @@
 import type { AuthoritativeWorld } from "conveyor-engine-world";
 import type { EngineWsServer } from "conveyor-engine-transport-ws";
+import type { Audit } from "../shared/audit.js";
 import { pickRespawnSpawn, type PawnHealth } from "../shared/health.js";
 import { MOVEMENTS, movementIntent } from "../shared/movements.js";
+import { deliverAuditFrame } from "./audit.js";
 import { deliverHealthFrames } from "./health.js";
 import { dispatchHostFrame, hostSnapPath } from "./host-path.js";
 import type { WanderAgent } from "./world-loader.js";
@@ -75,6 +77,7 @@ export function startWanderLoop(
   held: HeldInputs,
   log: (line: string) => void = () => {},
   health?: PawnHealth,
+  audit?: Audit,
 ): () => void {
   const rng = splitMix(20260917);
   const snaps = hostSnapPath((clientId, envelope) => {
@@ -180,6 +183,7 @@ export function startWanderLoop(
       dispatchHostFrame(snaps, { type: "snap", clientId, envelope: env }, { to: `client:${clientId}`, kind: "snap" });
       if (healthFrames.length > 0) deliverHealthFrames(server, [clientId], healthFrames);
     }
+    if (audit) deliverAuditFrame(server, audit.frame());
     if (tick <= 3 || tick % 40 === 0) {
       log(`[live] ${JSON.stringify({
         t: tick,

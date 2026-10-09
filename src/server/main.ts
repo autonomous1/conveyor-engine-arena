@@ -5,6 +5,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { WebSocketServer, type WebSocket } from "ws";
 import { decodeFrame, encodeFrame, EngineWsServer } from "conveyor-engine-transport-ws";
 import type { TransportSocket } from "conveyor-engine-transport-ws";
+import { createAudit } from "../shared/audit.js";
 import { createPawnHealth } from "../shared/health.js";
 import { createArenaFire } from "./fire.js";
 import { createHeldInputs, startWanderLoop } from "./game.js";
@@ -123,6 +124,7 @@ export async function startArenaServer(port = Number(process.env.PORT ?? 4173)):
   const loaded = loadArena();
   const held = createHeldInputs();
   const health = createPawnHealth();
+  const audit = createAudit();
   for (const agent of loaded.agents) health.note(agent.id);
   const refused = new Set<number>();
   const engine: EngineWsServer = new EngineWsServer({
@@ -149,11 +151,12 @@ export async function startArenaServer(port = Number(process.env.PORT ?? 4173)):
       held.admit(owned, { moveX: input.moveX, moveZ: input.moveZ, yaw: input.yaw, seq: input.seq, clip:"" });
     },
   });
-  const stopLoop = startWanderLoop(loaded.world, loaded.agents, engine, held, (line) => console.error(line), health);
+  const stopLoop = startWanderLoop(loaded.world, loaded.agents, engine, held, (line) => console.error(line), health, audit);
   const fire = createArenaFire({
     world: loaded.world,
     server: engine,
     health,
+    audit,
     send(clientId, frame) {
       engine.session(clientId)?.socket.send(encodeFrame(frame));
     },

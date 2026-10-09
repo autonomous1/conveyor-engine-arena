@@ -1,3 +1,13 @@
+import { MAX_HP, MIN_HP } from "../shared/health.ts";
+
+/** Local health from a `{ t: "health" }` frame. Dead stays until a respawn frame clears it. */
+export function localHealthLabel(vital: { hp: number; dead: boolean } | undefined): string {
+  if (!vital || !Number.isFinite(vital.hp)) return "";
+  const hp = Math.min(MAX_HP, Math.max(MIN_HP, vital.hp));
+  if (vital.dead) return `hp ${hp} dead`;
+  return `hp ${hp}`;
+}
+
 export function createHud() {
   const status = document.createElement("div");
   status.id = "status";

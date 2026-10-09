@@ -3,7 +3,10 @@
  * The button is not the canvas click, so it does not request pointer lock.
  * Escape is not handled here; the browser still unlocks the pointer.
  * Show collision and Fire debug stay in localStorage and are not part of the input message.
+ * Host fire counters are painted here. They are not part of the crosshair HUD.
  */
+
+import { emptyAudit, formatAudit, type AuditCounters } from "../shared/audit.ts";
 
 export const SHOW_COLLISION_STORAGE_KEY = "arena.showCollision.v1";
 export const FIRE_DEBUG_STORAGE_KEY = "arena.fireDebug.v1";
@@ -22,6 +25,10 @@ export type OptionsModel = {
   toggleFireDebug(): void;
   /** F2 toggles the dialog. Every other key, including Escape, is left alone. */
   onKey(code: string): boolean;
+};
+
+export type OptionsDialog = OptionsModel & {
+  setAudit(counters: AuditCounters): void;
 };
 
 export function loadShowCollision(storage: KeyValueStorage | null | undefined): boolean {
@@ -117,8 +124,9 @@ function browserStorage(): KeyValueStorage | null {
 export function createOptionsDialog(
   onShowCollision: (on: boolean) => void,
   storage: KeyValueStorage | null = browserStorage(),
-): OptionsModel {
+): OptionsDialog {
   const model = createOptionsModel(storage, onShowCollision);
+  let audit = emptyAudit();
 
   const button = document.createElement("button");
   button.id = "options-button";
@@ -166,7 +174,17 @@ export function createOptionsDialog(
   fireSwitch.setAttribute("role", "switch");
   fireSwitch.style.cssText = `${switchStyle};margin-top:8px`;
 
-  panel.append(title, collisionSwitch, fireSwitch);
+  const auditView = document.createElement("pre");
+  auditView.id = "audit-counters";
+  auditView.style.cssText = [
+    "margin:12px 0 0",
+    "padding-top:8px",
+    "border-top:1px solid #3c4454",
+    "white-space:pre",
+    "font:12px/1.45 ui-monospace, monospace",
+  ].join(";");
+
+  panel.append(title, collisionSwitch, fireSwitch, auditView);
 
   const paintSwitch = (el: HTMLButtonElement, on: boolean, label: string) => {
     el.setAttribute("aria-checked", on ? "true" : "false");
@@ -178,6 +196,7 @@ export function createOptionsDialog(
     button.setAttribute("aria-expanded", model.open ? "true" : "false");
     paintSwitch(collisionSwitch, model.showCollision, "Show collision");
     paintSwitch(fireSwitch, model.fireDebug, "Fire debug");
+    auditView.textContent = formatAudit(audit);
   };
   paint();
 
@@ -217,5 +236,27 @@ export function createOptionsDialog(
   if (status) status.append(button);
   else document.body.append(button);
   document.body.append(panel);
-  return model;
+  const dialog = model as OptionsDialog;
+  dialog.setAudit = (next) => {
+    if (sameAudit(audit, next)) return;
+    audit = {
+      fired: next.fired,
+      accepted: next.accepted,
+      droppedDuplicate: next.droppedDuplicate,
+      droppedRate: next.droppedRate,
+      hits: next.hits,
+      kills: next.kills,
+    };
+    auditView.textContent = formatAudit(audit);
+  };
+  return dialog;
+}
+
+function sameAudit(a: AuditCounters, b: AuditCounters): boolean {
+  return a.fired === b.fired
+    && a.accepted === b.accepted
+    && a.droppedDuplicate === b.droppedDuplicate
+    && a.droppedRate === b.droppedRate
+    && a.hits === b.hits
+    && a.kills === b.kills;
 }

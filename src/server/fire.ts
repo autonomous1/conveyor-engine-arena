@@ -2,6 +2,7 @@ import type { EngineWsServer } from "conveyor-engine-transport-ws";
 import type { AuthoritativeWorld } from "conveyor-engine-world";
 import { aimDirection, clampPitch, EYE_HEIGHT } from "../shared/look.js";
 import { createFireDebugLog, fireDebugErrorLine, fireDebugLine, fireFrameWantsDebug } from "../shared/fire-debug.js";
+import { createAudit, type Audit } from "../shared/audit.js";
 import { healthFrame, type PawnHealth } from "../shared/health.js";
 import {
   admitFire,
@@ -13,6 +14,7 @@ import {
   type LaserFrame,
   type TraceCapsule,
 } from "../shared/hitscan.js";
+import { deliverAuditFrame } from "./audit.js";
 import { clientSeesPawn, deliverHealthFrames } from "./health.js";
 
 /**
@@ -27,15 +29,22 @@ export function createArenaFire(opts: {
   send: (clientId: number, frame: LaserFrame) => void;
   /** Arena-owned pawn health. Absent in tests that only trace. */
   health?: PawnHealth;
+  /** Shared with the wander tick so a later client still receives the totals. */
+  audit?: Audit;
 }) {
   const now = opts.now ?? Date.now;
   const gates = new Map<number, { sessionId: number; gate: FireGate }>();
   const watched = watchPawnWrites(opts.world.store);
+  const audit = opts.audit ?? createAudit();
 
   return {
+    get counters() {
+      return audit.counts;
+    },
     onFrame(clientId: number, frame: unknown) {
       const debug = fireFrameWantsDebug(frame);
       const log = createFireDebugLog(() => debug);
+      let noted = false;
       try {
         const fire = parseFire(frame);
         log.receive(fire ? `client=${clientId} seq=${fire.seq}` : `client=${clientId} unparsed`);
@@ -59,6 +68,8 @@ export function createArenaFire(opts: {
         }
         const admitted = admitFire(row.gate, fire.seq, now());
         log.dedupe(`${admitted} seq=${fire.seq}`);
+        audit.gate(admitted);
+        noted = true;
         if (admitted !== "accept") return;
         if (opts.health?.isDead(owned)) {
           log.trace("dead");
@@ -91,19 +102,34 @@ export function createArenaFire(opts: {
           opts.send(id, laser);
         }
         const hitId = shot.hitId;
-        if (opts.health && hitId !== undefined && hitId !== owned && capsules.some((cap) => cap.id === hitId)) {
-          const next = opts.health.wound(hitId);
-          if (next) {
-            log.writePawn(`health pawn=${hitId} ${next.hp}`);
-            deliverHealthFrames(opts.server, opts.server.connected, [healthFrame(hitId, next.hp, next.dead)]);
+        if (hitId !== undefined && hitId !== owned && capsules.some((cap) => cap.id === hitId)) {
+          let killed = false;
+          if (opts.health) {
+            const next = opts.health.wound(hitId);
+            if (next) {
+              log.writePawn(`health pawn=${hitId} ${next.hp}`);
+              deliverHealthFrames(opts.server, opts.server.connected, [healthFrame(hitId, next.hp, next.dead)]);
+              killed = next.hp === 0;
+            }
           }
+          audit.pawnHit(killed);
         }
       } catch (err) {
         log.thrown("fire", err);
         throw err;
+      } finally {
+        if (noted) publishAudit(opts.server, audit);
       }
     },
   };
+}
+
+function publishAudit(server: EngineWsServer, audit: Audit): void {
+  try {
+    deliverAuditFrame(server, audit.frame());
+  } catch (err) {
+    console.error("audit send failed", err);
+  }
 }
 
 const WATCH = Symbol.for("arena.fireDebug.watch");

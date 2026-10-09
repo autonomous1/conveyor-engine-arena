@@ -1,5 +1,6 @@
 import { EngineClient, type IncomingSnapshot } from "conveyor-engine-client";
 import { fireShotFrame, summarizeInbound } from "../shared/fire-debug.js";
+import { parseAudit, type AuditCounters } from "../shared/audit.js";
 import { parseHealth } from "../shared/health.js";
 
 const TOKEN_KEY = "ce-arena-token";
@@ -95,6 +96,7 @@ export function connectLive(opts: {
   onApplied: () => void;
   onLaser?: (laser: LaserNotice) => void;
   onHealth?: (health: HealthNotice) => void;
+  onAudit?: (audit: AuditCounters) => void;
   /** Read when a shot is sent. The host logs only when this is on. */
   fireDebug?: () => boolean;
   /** One inbound frame, after it parses and before it is applied. */
@@ -173,6 +175,8 @@ export function connectLive(opts: {
       if (laser) opts.onLaser?.(laser);
       const health = asHealth(msg);
       if (health) opts.onHealth?.(health);
+      const audit = parseAudit(msg);
+      if (audit) opts.onAudit?.(audit);
       return;
     }
     try {
