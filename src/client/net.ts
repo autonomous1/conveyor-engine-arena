@@ -1,4 +1,5 @@
 import { EngineClient, type IncomingSnapshot } from "conveyor-engine-client";
+import { fireShotFrame, summarizeInbound } from "../shared/fire-debug.js";
 
 const TOKEN_KEY = "ce-arena-token";
 
@@ -11,8 +12,21 @@ export type LiveStatus = {
   resyncs: number;
 };
 
+export type LaserNotice = {
+  shooter: number;
+  from: { x: number; y: number; z: number };
+  to: { x: number; y: number; z: number };
+  until: number;
+};
+
 export type LiveLink = {
   sendInput(moveX: number, moveZ: number, yaw: number): void;
+  /** Arena frame. Returns false when the socket has no owned pawn yet. */
+  sendFire(seq: number, yaw: number, pitch: number): boolean;
+  /** True after the socket has closed. Closing does not open another socket. */
+  socketClosed(): boolean;
+  /** connecting, open, closing, or closed. */
+  socketState(): string;
   close(): void;
 };
 
@@ -26,6 +40,24 @@ function revive(value: unknown): unknown {
     return out;
   }
   return value;
+}
+
+function asVec(value: unknown): { x: number; y: number; z: number } | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const rec = value as { x?: unknown; y?: unknown; z?: unknown };
+  if (typeof rec.x !== "number" || typeof rec.y !== "number" || typeof rec.z !== "number") return undefined;
+  if (!Number.isFinite(rec.x) || !Number.isFinite(rec.y) || !Number.isFinite(rec.z)) return undefined;
+  return { x: rec.x, y: rec.y, z: rec.z };
+}
+
+function asLaser(msg: Record<string, unknown>): LaserNotice | undefined {
+  if (msg.t !== "laser") return undefined;
+  const shooter = Number(msg.shooter);
+  const from = asVec(msg.from);
+  const to = asVec(msg.to);
+  const until = Number(msg.until);
+  if (!Number.isFinite(shooter) || !from || !to || !Number.isFinite(until)) return undefined;
+  return { shooter, from, to, until };
 }
 
 function asSnapshot(envelope: Record<string, unknown>): IncomingSnapshot {
@@ -48,6 +80,13 @@ export function connectLive(opts: {
   client: EngineClient;
   onStatus: (status: LiveStatus) => void;
   onApplied: () => void;
+  onLaser?: (laser: LaserNotice) => void;
+  /** Read when a shot is sent. The host logs only when this is on. */
+  fireDebug?: () => boolean;
+  /** One inbound frame, after it parses and before it is applied. */
+  onInbound?: (summary: string) => void;
+  /** Parse or apply threw. The caller pins the message. This does not resync. */
+  onFault?: (err: unknown) => void;
 }): LiveLink {
   const ws = new WebSocket(`${location.origin.replace(/^http/, "ws")}/`);
   let lastSeq = 0;
@@ -55,6 +94,8 @@ export function connectLive(opts: {
   let inputSeq = 1;
   let ownedId: number | undefined;
   let resyncs = 0;
+  let closed = false;
+  let welcomed = false;
   const requestResync = () => {
     if (ws.readyState !== WebSocket.OPEN) return;
     resyncs += 1;
@@ -87,19 +128,53 @@ export function connectLive(opts: {
     opts.onStatus({ phase: "hello", text: "hello sent", resyncs });
   });
   ws.addEventListener("error", () => opts.onStatus({ phase: "error", text: "socket error", ownedEntityId: ownedId, resyncs }));
+  ws.addEventListener("close", () => {
+    closed = true;
+    console.log("socket closed");
+    opts.onStatus({ phase: "error", text: "socket closed", ownedEntityId: ownedId, resyncs });
+  });
   ws.addEventListener("message", (ev) => {
+    let msg: Record<string, unknown>;
     try {
       const text = typeof ev.data === "string" ? ev.data : new TextDecoder().decode(ev.data as ArrayBuffer);
-      const msg = revive(JSON.parse(text)) as Record<string, unknown>;
+      msg = revive(JSON.parse(text)) as Record<string, unknown>;
+    } catch (err) {
+      console.error(err);
+      opts.onFault?.(err);
+      opts.onStatus({
+        phase: "error",
+        text: `frame error ${err instanceof Error ? err.message : String(err)}`,
+        ownedEntityId: ownedId,
+        resyncs,
+      });
+      return;
+    }
+    try {
+      opts.onInbound?.(summarizeInbound(msg));
+    } catch (err) {
+      opts.onFault?.(err);
+    }
+    if (typeof msg.t === "string") {
+      const laser = asLaser(msg);
+      if (laser) opts.onLaser?.(laser);
+      return;
+    }
+    try {
       if (msg.type === "welcome") {
         const token = typeof msg.reconnectToken === "string" ? msg.reconnectToken : undefined;
         if (token) sessionStorage.setItem(TOKEN_KEY, token);
         const owned = Number(msg.ownedEntityId);
         const clientId = Number(msg.clientId) || 1;
-        ownedId = Number.isFinite(owned) ? owned : undefined;
-        inputSeq = 1;
-        if (ownedId !== undefined) opts.client.connect(ownedId, clientId);
-        lastSeq = 0;
+        const nextOwned = Number.isFinite(owned) ? owned : undefined;
+        // A second welcome clears interpolation and would snap the view onto
+        // whatever pawn the host named. Stay on the pawn we already have.
+        if (!welcomed && nextOwned !== undefined) {
+          ownedId = nextOwned;
+          inputSeq = 1;
+          opts.client.connect(ownedId, clientId);
+          welcomed = true;
+          lastSeq = 0;
+        }
         opts.onStatus({
           phase: "welcome",
           text: `welcome client ${clientId} owned ${ownedId ?? "none"}`,
@@ -137,6 +212,7 @@ export function connectLive(opts: {
       });
       opts.onApplied();
     } catch (err) {
+      opts.onFault?.(err);
       opts.onStatus({
         phase: "error",
         text: `apply failed ${err instanceof Error ? err.message : String(err)}`,
@@ -159,6 +235,20 @@ export function connectLive(opts: {
         buttons: 0,
         entity: ownedId,
       }));
+    },
+    sendFire(seq, yaw, pitch) {
+      if (ownedId === undefined || ws.readyState !== WebSocket.OPEN) return false;
+      ws.send(JSON.stringify(fireShotFrame(seq, yaw, pitch, opts.fireDebug?.() ?? false)));
+      return true;
+    },
+    socketClosed() {
+      return closed || ws.readyState === WebSocket.CLOSED;
+    },
+    socketState() {
+      if (closed || ws.readyState === WebSocket.CLOSED) return "closed";
+      if (ws.readyState === WebSocket.OPEN) return "open";
+      if (ws.readyState === WebSocket.CLOSING) return "closing";
+      return "connecting";
     },
     close() {
       document.removeEventListener("visibilitychange", onVisibility);

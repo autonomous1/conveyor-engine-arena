@@ -1,29 +1,43 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { EngineWsClient, memoryPair } from "conveyor-engine-transport-ws";
-import { ExampleApp, arenaStaticWorld } from "../dist/index.js";
+import { ARENA_PAWN_HEIGHT, ExampleApp, arenaStaticWorld } from "../dist/index.js";
 
 const PAWN_RADIUS = 0.5;
 
-type XzBox = { minX: number; maxX: number; minZ: number; maxZ: number };
+type XzBox = { minX: number; maxX: number; minZ: number; maxZ: number; minY?: number; maxY?: number };
 
-/** An obstacle whose west and east faces can be walked into without hitting another box or the room edge. */
+/** Feet are y=0. A span above the head, or a slab at or below the feet, does not stop a walk. */
+function blocksPawn(box: XzBox, height: number): boolean {
+  if (box.minY === undefined || box.maxY === undefined) return true;
+  return !(0 >= box.maxY || height <= box.minY);
+}
+
+/** An obstacle whose west and east faces can be walked into, with room to slide north along the west face. */
 function approachBox(): XzBox {
   const world = arenaStaticWorld().definition;
   const { bounds, aabbs } = world;
   const radius = PAWN_RADIUS;
-  const found = aabbs.find((box) => {
+  const height = ARENA_PAWN_HEIGHT;
+  const solid = aabbs.filter((box) => blocksPawn(box, height));
+  const found = solid.find((box) => {
     const z = (box.minZ + box.maxZ) / 2;
     const westStart = box.minX - radius - 2;
     const eastStart = box.maxX + radius + 2;
     if (box.maxX - box.minX < 0.05 || box.maxZ - box.minZ < 0.3) return false;
     if (westStart <= bounds.minX + radius || eastStart >= bounds.maxX - radius) return false;
     if (z <= bounds.minZ + radius || z >= bounds.maxZ - radius) return false;
-    const blocked = (from: number, to: number) => aabbs.some((other) =>
+    const blocked = (from: number, to: number) => solid.some((other) =>
       other !== box
       && z > other.minZ - radius && z < other.maxZ + radius
       && other.maxX + radius > Math.min(from, to) && other.minX - radius < Math.max(from, to));
-    return !blocked(westStart, box.minX - radius) && !blocked(box.maxX + radius, eastStart);
+    if (blocked(westStart, box.minX - radius) || blocked(box.maxX + radius, eastStart)) return false;
+    const west = box.minX - radius;
+    const slideClear = (dz: number) => z + dz < box.maxZ && !solid.some((other) =>
+      other !== box
+      && west + 0.05 > other.minX - radius && west + 0.05 < other.maxX + radius
+      && z + dz > other.minZ - radius && z + dz < other.maxZ + radius);
+    return slideClear(0.25) && slideClear(0.5);
   });
   if (!found) throw new Error("no isolated obstacle inside the room");
   return found;

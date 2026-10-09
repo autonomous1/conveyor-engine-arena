@@ -20,6 +20,16 @@ export function hostFrameKind(frame: unknown): string | undefined {
   return WIRE_KIND[type] ?? type;
 }
 
+/**
+ * Arena frames use `t` and have no kernel `type`. `parseWire` would reject
+ * them, so the inbound path hands them to the arena and does not forward them.
+ */
+export function isArenaFrame(frame: unknown): frame is { t: string } {
+  if (!frame || typeof frame !== "object") return false;
+  const rec = frame as { t?: unknown; type?: unknown };
+  return typeof rec.t === "string" && rec.t.length > 0 && rec.type === undefined;
+}
+
 export function hostSnapPath(
   write: (clientId: ClientId, envelope: SnapshotEnvelope) => void,
 ): DirectNetPath<HostSnapFrame> {
@@ -49,6 +59,7 @@ export type HostSocketPaths = {
 export function createHostSocketPaths(io: {
   writeWire: (text: string) => void;
   onEngineText: (text: string) => void;
+  onArenaFrame?: (frame: unknown) => void;
 }): HostSocketPaths {
   const outbound = new DirectNetPath<unknown>((frame) => {
     io.writeWire(encodeFrame(frame));
@@ -71,7 +82,18 @@ export function createHostSocketPaths(io: {
       accept(outbound, text, io.writeWire);
     },
     deliverEncoded(text) {
-      accept(inbound, text, io.onEngineText);
+      let frame: unknown;
+      try {
+        frame = decodeFrame(text);
+      } catch {
+        io.onEngineText(text);
+        return;
+      }
+      if (isArenaFrame(frame)) {
+        io.onArenaFrame?.(frame);
+        return;
+      }
+      dispatchHostFrame(inbound, frame, { kind: hostFrameKind(frame) });
     },
     close() {
       outbound.close();

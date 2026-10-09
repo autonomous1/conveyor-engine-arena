@@ -5,17 +5,24 @@ import { ARENA_INTEREST_RADIUS, noteArenaInterest } from "../dist/server/game.js
 import { startArenaServer } from "../dist/server/main.js";
 import { loadArena } from "../dist/server/world-loader.js";
 
-type XzBox = { minX: number; maxX: number; minZ: number; maxZ: number };
+type XzBox = { minX: number; maxX: number; minZ: number; maxZ: number; minY?: number; maxY?: number };
 
-/** An obstacle the pawn can walk into from the west without meeting another box first. */
-function westFace(aabbs: readonly XzBox[], bounds: XzBox, radius: number): XzBox {
-  const found = aabbs.find((box) => {
+/** Feet are y=0. A span above the head, or a slab at or below the feet, does not stop a walk. */
+function blocksPawn(box: XzBox, height: number): boolean {
+  if (box.minY === undefined || box.maxY === undefined) return true;
+  return !(0 >= box.maxY || height <= box.minY);
+}
+
+/** An obstacle the pawn can walk into from the west without meeting another blocking box first. */
+function westFace(aabbs: readonly XzBox[], bounds: XzBox, radius: number, height: number): XzBox {
+  const solid = aabbs.filter((box) => blocksPawn(box, height));
+  const found = solid.find((box) => {
     const z = (box.minZ + box.maxZ) / 2;
     const start = box.minX - radius - 3;
     if (box.maxX - box.minX < 0.05 || box.maxZ - box.minZ < 0.3) return false;
     if (start <= bounds.minX + radius || z <= bounds.minZ + radius || z >= bounds.maxZ - radius) return false;
     if (box.minX - radius >= bounds.maxX - radius) return false;
-    return !aabbs.some((other) =>
+    return !solid.some((other) =>
       other !== box
       && z > other.minZ - radius && z < other.maxZ + radius
       && other.maxX + radius > start && other.minX - radius < box.minX - radius);
@@ -116,7 +123,7 @@ test("arena interest override is wider than the room diagonal", () => {
 test("full walk input stops on an obstacle and stays inside the room", () => {
   const loaded = loadArena();
   const radius = loaded.view.pawnRadius;
-  const crate = westFace(loaded.view.aabbs, loaded.view.bounds, radius);
+  const crate = westFace(loaded.view.aabbs, loaded.view.bounds, radius, loaded.view.pawnHeight);
   const face = crate.minX - radius;
   const z0 = (crate.minZ + crate.maxZ) / 2;
   const pawn = loaded.agents[0]!.id;

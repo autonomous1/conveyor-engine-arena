@@ -2,10 +2,11 @@
  * Options dialog. F2 or the Options button toggles the panel.
  * The button is not the canvas click, so it does not request pointer lock.
  * Escape is not handled here; the browser still unlocks the pointer.
- * Show collision stays in localStorage and is not part of the input message.
+ * Show collision and Fire debug stay in localStorage and are not part of the input message.
  */
 
 export const SHOW_COLLISION_STORAGE_KEY = "arena.showCollision.v1";
+export const FIRE_DEBUG_STORAGE_KEY = "arena.fireDebug.v1";
 
 export type KeyValueStorage = {
   getItem(key: string): string | null;
@@ -15,8 +16,10 @@ export type KeyValueStorage = {
 export type OptionsModel = {
   readonly open: boolean;
   readonly showCollision: boolean;
+  readonly fireDebug: boolean;
   toggleDialog(): void;
   toggleShowCollision(): void;
+  toggleFireDebug(): void;
   /** F2 toggles the dialog. Every other key, including Escape, is left alone. */
   onKey(code: string): boolean;
 };
@@ -39,19 +42,43 @@ export function saveShowCollision(storage: KeyValueStorage | null | undefined, o
   }
 }
 
+export function loadFireDebug(storage: KeyValueStorage | null | undefined): boolean {
+  if (!storage) return false;
+  try {
+    return storage.getItem(FIRE_DEBUG_STORAGE_KEY) === "on";
+  } catch {
+    return false;
+  }
+}
+
+export function saveFireDebug(storage: KeyValueStorage | null | undefined, on: boolean): void {
+  if (!storage) return;
+  try {
+    storage.setItem(FIRE_DEBUG_STORAGE_KEY, on ? "on" : "off");
+  } catch {
+    // The in-memory switch still applies for this session.
+  }
+}
+
 export function createOptionsModel(
   storage: KeyValueStorage | null | undefined,
   onShowCollision: (on: boolean) => void,
+  onFireDebug: (on: boolean) => void = () => {},
 ): OptionsModel {
   let open = false;
   let showCollision = loadShowCollision(storage);
+  let fireDebug = loadFireDebug(storage);
   onShowCollision(showCollision);
+  onFireDebug(fireDebug);
   return {
     get open() {
       return open;
     },
     get showCollision() {
       return showCollision;
+    },
+    get fireDebug() {
+      return fireDebug;
     },
     toggleDialog() {
       open = !open;
@@ -60,6 +87,11 @@ export function createOptionsModel(
       showCollision = !showCollision;
       saveShowCollision(storage, showCollision);
       onShowCollision(showCollision);
+    },
+    toggleFireDebug() {
+      fireDebug = !fireDebug;
+      saveFireDebug(storage, fireDebug);
+      onFireDebug(fireDebug);
     },
     onKey(code: string) {
       if (code !== "F2") return false;
@@ -116,25 +148,36 @@ export function createOptionsDialog(
   title.textContent = "Options";
   title.style.cssText = "font-weight:600;margin-bottom:10px;";
 
-  const collisionSwitch = document.createElement("button");
-  collisionSwitch.id = "show-collision";
-  collisionSwitch.type = "button";
-  collisionSwitch.setAttribute("role", "switch");
-  collisionSwitch.style.cssText = [
+  const switchStyle = [
     "display:flex", "width:100%", "justify-content:space-between",
     "pointer-events:auto", "padding:6px 8px", "border:1px solid #3c4454",
     "border-radius:4px", "background:#1c2230", "color:inherit", "font:inherit",
     "cursor:pointer", "text-align:left",
   ].join(";");
+  const collisionSwitch = document.createElement("button");
+  collisionSwitch.id = "show-collision";
+  collisionSwitch.type = "button";
+  collisionSwitch.setAttribute("role", "switch");
+  collisionSwitch.style.cssText = switchStyle;
 
-  panel.append(title, collisionSwitch);
+  const fireSwitch = document.createElement("button");
+  fireSwitch.id = "fire-debug";
+  fireSwitch.type = "button";
+  fireSwitch.setAttribute("role", "switch");
+  fireSwitch.style.cssText = `${switchStyle};margin-top:8px`;
 
+  panel.append(title, collisionSwitch, fireSwitch);
+
+  const paintSwitch = (el: HTMLButtonElement, on: boolean, label: string) => {
+    el.setAttribute("aria-checked", on ? "true" : "false");
+    el.textContent = on ? `${label}: on` : `${label}: off`;
+    el.style.borderColor = on ? "#3dff9a" : "#3c4454";
+  };
   const paint = () => {
     panel.hidden = !model.open;
     button.setAttribute("aria-expanded", model.open ? "true" : "false");
-    collisionSwitch.setAttribute("aria-checked", model.showCollision ? "true" : "false");
-    collisionSwitch.textContent = model.showCollision ? "Show collision: on" : "Show collision: off";
-    collisionSwitch.style.borderColor = model.showCollision ? "#3dff9a" : "#3c4454";
+    paintSwitch(collisionSwitch, model.showCollision, "Show collision");
+    paintSwitch(fireSwitch, model.fireDebug, "Fire debug");
   };
   paint();
 
@@ -151,12 +194,16 @@ export function createOptionsDialog(
   });
   panel.addEventListener("pointerdown", stop);
   panel.addEventListener("click", stop);
-  collisionSwitch.addEventListener("click", (ev) => {
-    ev.preventDefault();
-    ev.stopPropagation();
-    model.toggleShowCollision();
-    paint();
-  });
+  const onSwitch = (el: HTMLButtonElement, toggle: () => void) => {
+    el.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      toggle();
+      paint();
+    });
+  };
+  onSwitch(collisionSwitch, () => model.toggleShowCollision());
+  onSwitch(fireSwitch, () => model.toggleFireDebug());
 
   const onKeyDown = (ev: KeyboardEvent) => {
     if (ev.repeat) return;

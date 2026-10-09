@@ -8,10 +8,10 @@ import type { WanderAgent } from "./world-loader.js";
 export const TICK_MS = 50;
 
 /**
- * Floor is 48 m on a side, so opposite corners are about 68 m apart.
- * Kernel default interest is 48. This override stays in the arena host.
+ * Kernel default interest is 48. The authored floor's opposite corners are
+ * about 168 m apart. This host override covers that diagonal.
  */
-export const ARENA_INTEREST_RADIUS = 96;
+export const ARENA_INTEREST_RADIUS = 192;
 
 export type HeldInput = {
   moveX: number;

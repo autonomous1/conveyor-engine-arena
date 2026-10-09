@@ -5,6 +5,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { WebSocketServer, type WebSocket } from "ws";
 import { decodeFrame, encodeFrame, EngineWsServer } from "conveyor-engine-transport-ws";
 import type { TransportSocket } from "conveyor-engine-transport-ws";
+import { createArenaFire } from "./fire.js";
 import { createHeldInputs, startWanderLoop } from "./game.js";
 import { createHostSocketPaths } from "./host-path.js";
 import { loadArena } from "./world-loader.js";
@@ -39,11 +40,17 @@ function send(res: ServerResponse, status: number, body: string | Uint8Array, co
   res.end(body);
 }
 
-function socketFromWs(ws: WebSocket, refused: Set<number>, drop: (clientId: number) => void): TransportSocket {
+function socketFromWs(
+  ws: WebSocket,
+  refused: Set<number>,
+  drop: (clientId: number) => void,
+  onArena: (socket: TransportSocket, frame: unknown) => void,
+): TransportSocket {
   const messages: Array<(text: string) => void> = [];
   const closes: Array<() => void> = [];
   const wire = (data: Buffer | ArrayBuffer | Buffer[] | string): string =>
     typeof data === "string" ? data : Buffer.from(data as Buffer).toString("utf8");
+  let self: TransportSocket | undefined;
   const paths = createHostSocketPaths({
     writeWire(text) {
       if (ws.readyState !== ws.OPEN) return;
@@ -59,6 +66,9 @@ function socketFromWs(ws: WebSocket, refused: Set<number>, drop: (clientId: numb
     onEngineText(text) {
       for (const handler of messages) handler(text);
     },
+    onArenaFrame(frame) {
+      if (self) onArena(self, frame);
+    },
   });
   ws.on("message", (data: Buffer | ArrayBuffer | Buffer[]) => {
     paths.deliverEncoded(wire(data));
@@ -67,7 +77,7 @@ function socketFromWs(ws: WebSocket, refused: Set<number>, drop: (clientId: numb
     paths.close();
     for (const handler of closes) handler();
   });
-  return {
+  self = {
     send(text) {
       paths.sendEncoded(text);
     },
@@ -82,6 +92,14 @@ function socketFromWs(ws: WebSocket, refused: Set<number>, drop: (clientId: numb
       closes.push(handler);
     },
   };
+  return self;
+}
+
+function clientIdFor(engine: EngineWsServer, socket: TransportSocket): number | undefined {
+  for (const clientId of engine.connected) {
+    if (engine.session(clientId)?.socket === socket) return clientId;
+  }
+  return undefined;
 }
 
 export type ArenaHost = {
@@ -129,6 +147,13 @@ export async function startArenaServer(port = Number(process.env.PORT ?? 4173)):
     },
   });
   const stopLoop = startWanderLoop(loaded.world, loaded.agents, engine, held, (line) => console.error(line));
+  const fire = createArenaFire({
+    world: loaded.world,
+    server: engine,
+    send(clientId, frame) {
+      engine.session(clientId)?.socket.send(encodeFrame(frame));
+    },
+  });
   const arenaJson = JSON.stringify(loaded.view);
 
   const httpServer = createServer(async (req, res) => {
@@ -158,7 +183,15 @@ export async function startArenaServer(port = Number(process.env.PORT ?? 4173)):
 
   const wss = new WebSocketServer({ server: httpServer });
   wss.on("connection", (ws) => {
-    engine.attach(socketFromWs(ws, refused, (clientId) => engine.disconnect(clientId)));
+    engine.attach(socketFromWs(ws, refused, (clientId) => engine.disconnect(clientId), (socket, frame) => {
+      const clientId = clientIdFor(engine, socket);
+      if (clientId === undefined) return;
+      try {
+        fire.onFrame(clientId, frame);
+      } catch (err) {
+        console.error("fire threw", err);
+      }
+    }));
   });
 
   await new Promise<void>((resolveListen, reject) => {

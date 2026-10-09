@@ -3,6 +3,7 @@ import {
   type GamepadProfileName,
   type ProfileStorage,
   clampPitch,
+  gamepadFireButton,
   gamepadLook,
   isMoveKey,
   loadGamepadProfile,
@@ -10,12 +11,15 @@ import {
   nextGamepadProfile,
   sampleMove,
   saveGamepadProfile,
-} from "../shared/look.js";
+} from "../shared/look.ts";
 
 /**
  * Keyboard, mouse, and one `three-gamepad-controls` `GamepadInput`.
  * The active profile (`standard` or `jumper-t`) is read on each sample.
- * Triggers and face buttons are unbound. Pointer lock is unchanged.
+ * Click requests pointer lock once. It does not fire, and it does not
+ * request the lock again while this element already holds it.
+ * F fires while the pointer is locked. F does not change the gamepad profile.
+ * A gamepad fire button is included only when that profile already binds one.
  */
 
 export type PlaySample = {
@@ -23,6 +27,8 @@ export type PlaySample = {
   strafe: number;
   yaw: number;
   pitch: number;
+  /** F is down while locked, or a tap landed since the previous sample. */
+  firing: boolean;
 };
 
 export type PlayInput = {
@@ -43,11 +49,17 @@ function browserProfileStorage(): ProfileStorage | null {
   }
 }
 
-export function attachPlayInput(dom: HTMLElement, storage: ProfileStorage | null = browserProfileStorage()): PlayInput {
+export function attachPlayInput(
+  dom: HTMLElement,
+  storage: ProfileStorage | null = browserProfileStorage(),
+  onFirePress: () => void = () => {},
+): PlayInput {
   const keys = new Set<string>();
   let yaw = 0;
   let pitch = 0;
   let locked = false;
+  let fireDown = false;
+  let fireQueued = false;
   let profile = loadGamepadProfile(storage);
   const pad = new GamepadInput();
 
@@ -57,6 +69,18 @@ export function attachPlayInput(dom: HTMLElement, storage: ProfileStorage | null
   };
 
   const onKey = (ev: KeyboardEvent, down: boolean) => {
+    if (ev.code === "KeyF") {
+      if (!down) {
+        fireDown = false;
+        return;
+      }
+      // F10 switches profiles. F must not. Repeats are not extra presses.
+      if (ev.repeat || document.pointerLockElement !== dom) return;
+      fireDown = true;
+      fireQueued = true;
+      onFirePress();
+      return;
+    }
     if (ev.repeat) return;
     if (down && ev.code === "F10") {
       ev.preventDefault();
@@ -78,15 +102,25 @@ export function attachPlayInput(dom: HTMLElement, storage: ProfileStorage | null
   };
   const onLock = () => {
     locked = document.pointerLockElement === dom;
+    if (!locked) {
+      fireDown = false;
+      fireQueued = false;
+    }
     document.body.style.cursor = locked ? "none" : "default";
   };
   const onClick = () => {
+    if (document.pointerLockElement === dom) return;
     const pending = dom.requestPointerLock();
     void Promise.resolve(pending).catch(() => {});
+  };
+  const onBlur = () => {
+    fireDown = false;
+    fireQueued = false;
   };
 
   window.addEventListener("keydown", down);
   window.addEventListener("keyup", up);
+  window.addEventListener("blur", onBlur);
   document.addEventListener("mousemove", onMouse);
   document.addEventListener("pointerlockchange", onLock);
   dom.addEventListener("click", onClick);
@@ -116,7 +150,11 @@ export function attachPlayInput(dom: HTMLElement, storage: ProfileStorage | null
         connected: pad.connected,
         axes: pad.connected ? readDeadzonedAxes(pad) : [],
       });
-      return { forward: move.forward, strafe: move.strafe, yaw, pitch };
+      const button = gamepadFireButton(profile);
+      const padFire = button !== undefined && pad.connected && pad.isPressed(button);
+      const firing = (document.pointerLockElement === dom && (fireDown || fireQueued)) || padFire;
+      fireQueued = false;
+      return { forward: move.forward, strafe: move.strafe, yaw, pitch, firing };
     },
   };
 }

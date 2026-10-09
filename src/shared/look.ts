@@ -1,8 +1,8 @@
 /**
  * Engine planar frame. Yaw 0 faces world +Z, matching `integratePlanarMove`
  * (moveZ positive, moveX zero) and the yaw quaternion the server stores.
- * Right is world −X when facing +Z. Pitch is client-only; the input message
- * has no pitch field.
+ * Right is world −X when facing +Z. The kernel input message has no pitch
+ * field. A shot sends pitch on the arena fire frame, using `aimDirection`.
  */
 /**
  * Jumper-T pad. Both sticks and the move pair are reversed relative to the
@@ -69,21 +69,23 @@ export function yawFromQuat(rotation: { y: number; w: number }): number {
   return 2 * Math.atan2(rotation.y, rotation.w);
 }
 
+/** Unit look direction. Yaw 0 pitch 0 is world +Z. Positive pitch looks up. */
+export function aimDirection(yaw: number, pitch: number): { x: number; y: number; z: number } {
+  const cp = Math.cos(pitch);
+  return { x: Math.sin(yaw) * cp, y: Math.sin(pitch), z: Math.cos(yaw) * cp };
+}
+
 export function eyeLook(
   pawn: { x: number; y: number; z: number },
   yaw: number,
   pitch: number,
   eye = EYE_HEIGHT,
 ): { position: { x: number; y: number; z: number }; target: { x: number; y: number; z: number } } {
-  const cp = Math.cos(pitch);
+  const dir = aimDirection(yaw, pitch);
   const y = pawn.y + eye;
   return {
     position: { x: pawn.x, y, z: pawn.z },
-    target: {
-      x: pawn.x + Math.sin(yaw) * cp,
-      y: y + Math.sin(pitch),
-      z: pawn.z + Math.cos(yaw) * cp,
-    },
+    target: { x: pawn.x + dir.x, y: y + dir.y, z: pawn.z + dir.z },
   };
 }
 
@@ -130,6 +132,14 @@ export const LOOK_PITCH_RATE = 1.8;
 const MOVE_KEYS = ["KeyW", "KeyA", "KeyS", "KeyD", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"];
 
 export type GamepadProfileName = "standard" | "jumper-t";
+
+/**
+ * Gamepad button index that fires, or absent when that profile does not bind one.
+ * Neither `standard` nor `jumper-t` binds a face button or a trigger.
+ */
+export function gamepadFireButton(_profile: GamepadProfileName): number | undefined {
+  return undefined;
+}
 
 export type ProfileStorage = {
   getItem(key: string): string | null;
