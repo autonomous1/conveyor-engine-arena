@@ -2,6 +2,7 @@ import type { EngineWsServer } from "conveyor-engine-transport-ws";
 import type { AuthoritativeWorld } from "conveyor-engine-world";
 import { aimDirection, clampPitch, EYE_HEIGHT } from "../shared/look.js";
 import { createFireDebugLog, fireDebugErrorLine, fireDebugLine, fireFrameWantsDebug } from "../shared/fire-debug.js";
+import { healthFrame, type PawnHealth } from "../shared/health.js";
 import {
   admitFire,
   freshFireGate,
@@ -12,6 +13,7 @@ import {
   type LaserFrame,
   type TraceCapsule,
 } from "../shared/hitscan.js";
+import { clientSeesPawn, deliverHealthFrames } from "./health.js";
 
 /**
  * Hitscan for one owned pawn. The eye is inside that pawn's capsule, so the
@@ -23,6 +25,8 @@ export function createArenaFire(opts: {
   server: EngineWsServer;
   now?: () => number;
   send: (clientId: number, frame: LaserFrame) => void;
+  /** Arena-owned pawn health. Absent in tests that only trace. */
+  health?: PawnHealth;
 }) {
   const now = opts.now ?? Date.now;
   const gates = new Map<number, { sessionId: number; gate: FireGate }>();
@@ -56,13 +60,18 @@ export function createArenaFire(opts: {
         const admitted = admitFire(row.gate, fire.seq, now());
         log.dedupe(`${admitted} seq=${fire.seq}`);
         if (admitted !== "accept") return;
+        if (opts.health?.isDead(owned)) {
+          log.trace("dead");
+          return;
+        }
         const pawn = opts.world.store.view(owned);
         if (!pawn) {
           log.trace("no-pawn");
           return;
         }
         const origin = { x: pawn.position.x, y: pawn.position.y + EYE_HEIGHT, z: pawn.position.z };
-        const shot = traceHitscan(origin, aimDirection(fire.yaw, clampPitch(fire.pitch)), opts.world.listObstacles(), pawnCapsules(opts.world, owned));
+        const capsules = pawnCapsules(opts.world, owned);
+        const shot = traceHitscan(origin, aimDirection(fire.yaw, clampPitch(fire.pitch)), opts.world.listObstacles(), capsules);
         const hit = shot.hitId === undefined ? "none" : String(shot.hitId);
         log.trace(`hit=${hit} dist=${shot.distance.toFixed(3)}`);
         console.log(`shot shooter=${owned} eye=${origin.x.toFixed(3)},${origin.y.toFixed(3)},${origin.z.toFixed(3)} hit=${hit} dist=${shot.distance.toFixed(3)}`);
@@ -78,8 +87,16 @@ export function createArenaFire(opts: {
           until: now() + LASER_MS,
         };
         for (const id of opts.server.connected) {
-          if (!seesShooter(opts.server, id, owned)) continue;
+          if (!clientSeesPawn(opts.server, id, owned)) continue;
           opts.send(id, laser);
+        }
+        const hitId = shot.hitId;
+        if (opts.health && hitId !== undefined && hitId !== owned && capsules.some((cap) => cap.id === hitId)) {
+          const next = opts.health.wound(hitId);
+          if (next) {
+            log.writePawn(`health pawn=${hitId} ${next.hp}`);
+            deliverHealthFrames(opts.server, opts.server.connected, [healthFrame(hitId, next.hp, next.dead)]);
+          }
         }
       } catch (err) {
         log.thrown("fire", err);
@@ -173,10 +190,4 @@ function pawnCapsules(world: AuthoritativeWorld, shooter: number): TraceCapsule[
   return out;
 }
 
-/** Owner always sees their pawn. Everyone else needs it in the last interest set. */
-function seesShooter(server: EngineWsServer, clientId: number, shooter: number): boolean {
-  const state = server.replicator.get(clientId);
-  if (!state?.connected) return false;
-  if (state.ownedEntity === shooter) return true;
-  return state.known.has(shooter);
-}
+

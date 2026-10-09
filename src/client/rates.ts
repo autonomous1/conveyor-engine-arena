@@ -65,6 +65,7 @@ export type OverlayStats = {
   pawns: number;
   owned: number | undefined;
   positions: string;
+  hp?: number;
 };
 
 function rateText(value: number | undefined): string {
@@ -99,7 +100,8 @@ export function formatOverlay(stats: OverlayStats): string {
     if (stats.exposure !== undefined) parts.push(`exp ${exposureText(stats.exposure)}`);
     lines.push(parts.join("  "));
   }
-  lines.push(`pawns ${stats.pawns}  owned ${countText(stats.owned)}`);
+  const hpText = stats.hp === undefined ? "" : `  hp ${countText(stats.hp)}`;
+  lines.push(`pawns ${stats.pawns}  owned ${countText(stats.owned)}${hpText}`);
   // TODO: make optional
   //if (stats.positions) lines.push(stats.positions);
   return lines.join("\n");

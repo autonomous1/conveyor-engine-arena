@@ -22,6 +22,7 @@ type Listener = (ev: Record<string, unknown>) => void;
 
 function createTarget() {
   const listeners = new Map<string, Set<Listener>>();
+  let prevented = 0;
   return {
     addEventListener(type: string, fn: Listener) {
       let set = listeners.get(type);
@@ -35,8 +36,22 @@ function createTarget() {
       listeners.get(type)?.delete(fn);
     },
     dispatch(type: string, ev: Record<string, unknown>) {
-      const event = { preventDefault() {}, stopPropagation() {}, repeat: false, button: 0, ...ev };
+      const event = {
+        preventDefault() {
+          prevented += 1;
+        },
+        stopPropagation() {},
+        repeat: false,
+        button: 0,
+        ...ev,
+      };
       for (const fn of [...(listeners.get(type) ?? [])]) fn(event);
+      return prevented;
+    },
+    takePrevented() {
+      const count = prevented;
+      prevented = 0;
+      return count;
     },
   };
 }
@@ -96,9 +111,11 @@ function installDom() {
     },
     cursor: () => body.style.cursor,
     click() {
-      windowTarget.dispatch("mousedown", { button: 0 });
+      dom.dispatch("mousedown", { button: 0 });
+      const downPrevented = dom.takePrevented();
       windowTarget.dispatch("mouseup", { button: 0 });
       dom.dispatch("click", { button: 0 });
+      return downPrevented;
     },
     key(type: "keydown" | "keyup", code: string, repeat = false) {
       windowTarget.dispatch(type, { code, repeat });
@@ -144,7 +161,8 @@ test("click locks the pointer and does not fire; F fires once and a hold stays a
   assert.equal(input.locked, false);
   assert.equal(input.profile, "standard");
 
-  rig.click();
+  const prevented = rig.click();
+  assert.equal(prevented, 1);
   assert.equal(rig.lockRequests, 1);
   assert.equal(input.locked, true);
   assert.equal(rig.cursor(), "none");

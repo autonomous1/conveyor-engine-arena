@@ -16,8 +16,9 @@ import {
 /**
  * Keyboard, mouse, and one `three-gamepad-controls` `GamepadInput`.
  * The active profile (`standard` or `jumper-t`) is read on each sample.
- * Click requests pointer lock once. It does not fire, and it does not
- * request the lock again while this element already holds it.
+ * Primary mousedown requests pointer lock once and cancels that gesture so
+ * the click cannot navigate or submit a form. It does not fire, and it does
+ * not request the lock again while this element already holds it.
  * F fires while the pointer is locked. F does not change the gamepad profile.
  * A gamepad fire button is included only when that profile already binds one.
  */
@@ -108,10 +109,18 @@ export function attachPlayInput(
     }
     document.body.style.cursor = locked ? "none" : "default";
   };
-  const onClick = () => {
+  const onMouseDown = (ev: MouseEvent) => {
+    // Primary only. This gesture locks the pointer. It is not fire.
+    if (ev.button !== 0) return;
+    // Cancel the click default before it can follow a link or submit a form.
+    ev.preventDefault();
     if (document.pointerLockElement === dom) return;
     const pending = dom.requestPointerLock();
     void Promise.resolve(pending).catch(() => {});
+  };
+  const onClick = (ev: MouseEvent) => {
+    if (ev.button !== 0) return;
+    ev.preventDefault();
   };
   const onBlur = () => {
     fireDown = false;
@@ -123,6 +132,7 @@ export function attachPlayInput(
   window.addEventListener("blur", onBlur);
   document.addEventListener("mousemove", onMouse);
   document.addEventListener("pointerlockchange", onLock);
+  dom.addEventListener("mousedown", onMouseDown);
   dom.addEventListener("click", onClick);
 
   return {

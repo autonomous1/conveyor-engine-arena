@@ -4,6 +4,7 @@ import { clone as cloneWithSkeleton } from "three/addons/utils/SkeletonUtils.js"
 import type { ArenaView, BackdropShape } from "../shared/arena-view.js";
 import type { Movement } from "../shared/movements.js";
 import { shadowSettings, type ShadowQuality } from "../shared/shadows.ts";
+import { prepareCharacter } from "./pawn-feet.ts";
 
 export type ArenaScene = {
   renderer: THREE.WebGLRenderer;
@@ -726,17 +727,18 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
       continue;
     }
     // Skinned pawns are cloned per spawn. `"instance": "static"` does not apply.
-    // Scale the spawned copy from the asset's scale. The cached scene stays at 1.
-    // Drop position tracks so a clip cannot carry the pawn away from the snapshot.
-    const template = cloneWithSkeleton(source.scene);
-    template.scale.multiplyScalar(character.scale);
-    markShadowCasters(template, castsShadow);
-    const clips = source.clips.map((clip) => new THREE.AnimationClip(
-      clip.name,
-      clip.duration,
-      clip.tracks.filter((track) => !track.name.endsWith(".position")),
-    ));
-    templates.set(character.id, { object: template, clips, animations: character.animations });
+    // Scale, the idle foot drop, and fall root motion live on this copy.
+    // The cached scene stays at 1 and is not retargeted.
+    const prepared = prepareCharacter(source.scene, source.clips, character.scale, {
+      idle: character.animations.idle.clip,
+      fall: character.animations.fall.clip,
+    });
+    markShadowCasters(prepared.object, castsShadow);
+    templates.set(character.id, {
+      object: prepared.object,
+      clips: prepared.clips,
+      animations: character.animations,
+    });
   }
   return { templates, fallbacks };
 }

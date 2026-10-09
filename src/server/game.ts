@@ -1,6 +1,8 @@
 import type { AuthoritativeWorld } from "conveyor-engine-world";
 import type { EngineWsServer } from "conveyor-engine-transport-ws";
+import { pickRespawnSpawn, type PawnHealth } from "../shared/health.js";
 import { MOVEMENTS, movementIntent } from "../shared/movements.js";
+import { deliverHealthFrames } from "./health.js";
 import { dispatchHostFrame, hostSnapPath } from "./host-path.js";
 import type { WanderAgent } from "./world-loader.js";
 
@@ -72,6 +74,7 @@ export function startWanderLoop(
   server: EngineWsServer,
   held: HeldInputs,
   log: (line: string) => void = () => {},
+  health?: PawnHealth,
 ): () => void {
   const rng = splitMix(20260917);
   const snaps = hostSnapPath((clientId, envelope) => {
@@ -98,6 +101,16 @@ export function startWanderLoop(
     noteArenaInterest(server);
     for (const agent of agents) {
       if (timedOut.has(agent.id)) continue;
+      if (health?.isDead(agent.id)) {
+        if (agent.gait !== "fall") {
+          agent.gait = "fall";
+          // clearInput bumps the replication version. setClip alone does not,
+          // so the fall clip would never leave this process.
+          world.enqueue({ kind: "setClip", entity: agent.id, clip: "fall", speed: 0 });
+          world.enqueue({ kind: "clearInput", entity: agent.id });
+        }
+        continue;
+      }
       if (owned.has(agent.id)) {
         const cmd = held.get(agent.id);
         const moveX = cmd?.moveX ?? 0;
@@ -154,13 +167,18 @@ export function startWanderLoop(
         yaw: agent.heading
       });
     }
+    if (health) {
+      for (const id of health.takeRespawns()) respawnPawn(world, agents, id);
+    }
     const snap = world.commit(BigInt(tick));
     server.setTick(BigInt(tick));
     const envelopes = server.replicator.publish(world, snap);
+    const healthFrames = health?.frames() ?? [];
     for (const clientId of server.connected) {
       const env = envelopes.get(clientId);
       if (!env) continue;
       dispatchHostFrame(snaps, { type: "snap", clientId, envelope: env }, { to: `client:${clientId}`, kind: "snap" });
+      if (healthFrames.length > 0) deliverHealthFrames(server, [clientId], healthFrames);
     }
     if (tick <= 3 || tick % 40 === 0) {
       log(`[live] ${JSON.stringify({
@@ -176,4 +194,43 @@ export function startWanderLoop(
     snaps.close();
     clearInterval(timer);
   };
+}
+
+/** Move a pawn that just became alive onto a free spawn. The shot itself does not write a transform. */
+function respawnPawn(world: AuthoritativeWorld, agents: WanderAgent[], id: number): void {
+  const view = world.store.view(id);
+  const radius = view && view.radius > 0 ? view.radius : 0.5;
+  const height = Number.isFinite(world.pawnHeight) ? world.pawnHeight : 1.8;
+  const pawns = world.query().filter((entity) => entity.radius > 0).map((entity) => ({
+    id: entity.id,
+    x: entity.position.x,
+    y: entity.position.y,
+    z: entity.position.z,
+    radius: entity.radius,
+  }));
+  const spawn = pickRespawnSpawn(world.listSpawnPoints(), {
+    self: id,
+    radius,
+    height,
+    aabbs: world.listObstacles(),
+    pawns,
+  });
+  const agent = agents.find((item) => item.id === id);
+  if (agent) agent.gait = "idle";
+  if (!view || !spawn) {
+    world.enqueue({ kind: "setClip", entity: id, clip: "idle", speed: 0 });
+    return;
+  }
+  if (agent) agent.heading = spawn.yaw;
+  // Yaw quaternion, the same half-angle the initial spawn uses.
+  const half = spawn.yaw * 0.5;
+  world.enqueue({ kind: "clearInput", entity: id });
+  world.enqueue({
+    kind: "setTransform",
+    entity: id,
+    position: { x: spawn.x, y: spawn.y, z: spawn.z },
+    rotation: { x: 0, y: Math.sin(half), z: 0, w: Math.cos(half) },
+    scale: { x: view.scale.x, y: view.scale.y, z: view.scale.z },
+  });
+  world.enqueue({ kind: "setClip", entity: id, clip: "idle", speed: 0 });
 }

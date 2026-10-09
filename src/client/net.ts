@@ -1,5 +1,6 @@
 import { EngineClient, type IncomingSnapshot } from "conveyor-engine-client";
 import { fireShotFrame, summarizeInbound } from "../shared/fire-debug.js";
+import { parseHealth } from "../shared/health.js";
 
 const TOKEN_KEY = "ce-arena-token";
 
@@ -17,6 +18,12 @@ export type LaserNotice = {
   from: { x: number; y: number; z: number };
   to: { x: number; y: number; z: number };
   until: number;
+};
+
+export type HealthNotice = {
+  entity: number;
+  hp: number;
+  dead: boolean;
 };
 
 export type LiveLink = {
@@ -60,6 +67,12 @@ function asLaser(msg: Record<string, unknown>): LaserNotice | undefined {
   return { shooter, from, to, until };
 }
 
+function asHealth(msg: Record<string, unknown>): HealthNotice | undefined {
+  const frame = parseHealth(msg);
+  if (!frame) return undefined;
+  return { entity: frame.entity, hp: frame.hp, dead: frame.dead };
+}
+
 function asSnapshot(envelope: Record<string, unknown>): IncomingSnapshot {
   const tick = envelope.tick;
   return {
@@ -81,6 +94,7 @@ export function connectLive(opts: {
   onStatus: (status: LiveStatus) => void;
   onApplied: () => void;
   onLaser?: (laser: LaserNotice) => void;
+  onHealth?: (health: HealthNotice) => void;
   /** Read when a shot is sent. The host logs only when this is on. */
   fireDebug?: () => boolean;
   /** One inbound frame, after it parses and before it is applied. */
@@ -157,6 +171,8 @@ export function connectLive(opts: {
     if (typeof msg.t === "string") {
       const laser = asLaser(msg);
       if (laser) opts.onLaser?.(laser);
+      const health = asHealth(msg);
+      if (health) opts.onHealth?.(health);
       return;
     }
     try {

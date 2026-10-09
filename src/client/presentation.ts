@@ -2,7 +2,19 @@ import * as THREE from "three";
 import { clone as cloneWithSkeleton } from "three/addons/utils/SkeletonUtils.js";
 import type { RenderSnapshot } from "conveyor-engine-client";
 import type { CharacterTemplates, CharacterVisual } from "./arena-scene.js";
-import { findClip, MOVEMENTS } from "../shared/movements.js";
+import { findClip, MOVEMENTS } from "../shared/movements.ts";
+import { lowerRootToFeet, skinnedSoleGap } from "./pawn-feet.ts";
+
+/** Fall holds its last frame. Every other gait repeats. */
+export function configureClip(action: THREE.AnimationAction, movement: string): void {
+  if (movement === "fall") {
+    action.setLoop(THREE.LoopOnce, 1);
+    action.clampWhenFinished = true;
+    return;
+  }
+  action.setLoop(THREE.LoopRepeat, Infinity);
+  action.clampWhenFinished = false;
+}
 
 type Pawn = {
   root: THREE.Object3D;
@@ -14,7 +26,18 @@ type Pawn = {
   movement?: string;
   clips: Map<string, THREE.AnimationClip>;
   assetKey?: string;
+  /** Fall root-motion bone. Its Y is not driven by the mixer. */
+  motionBone?: THREE.Object3D;
+  restRootY?: number;
+  planted: boolean;
 };
+
+function motionBoneOf(model: THREE.Object3D, clips: Map<string, THREE.AnimationClip>): THREE.Object3D | undefined {
+  const track = clips.get("fall")?.tracks.find((item) => item.name.endsWith(".position[x]"));
+  if (!track) return undefined;
+  const name = track.name.slice(0, -".position[x]".length);
+  return model.getObjectByName(name) ?? undefined;
+}
 
 export function createPawnLayer(parent: THREE.Object3D, templates: CharacterTemplates, pawnHeight: number) {
   const pawns = new Map<number, Pawn>();
@@ -47,7 +70,9 @@ export function createPawnLayer(parent: THREE.Object3D, templates: CharacterTemp
     //console.log("id:", pawn.assetKey, "movement:", movement, "clip:", clip?.name);
     if (!clip) return;
     const next = pawn.mixer.clipAction(clip);
-    next.reset().fadeIn(0.15).play();
+    next.reset();
+    configureClip(next, movement);
+    next.fadeIn(0.15).play();
     pawn.action?.fadeOut(0.15);
     pawn.action = next;
     pawn.movement = movement;
@@ -63,17 +88,21 @@ export function createPawnLayer(parent: THREE.Object3D, templates: CharacterTemp
     let clips = new Map<string, THREE.AnimationClip>();
     // Object3D.clone shares the source skeleton, so a skinned mesh keeps the
     // unloaded template's bones and draws at the world origin.
+    let motionBone: THREE.Object3D | undefined;
+    let restRootY: number | undefined;
     if (visual) {
       const model = cloneWithSkeleton(visual.object);
       root.add(model);
       mixer = new THREE.AnimationMixer(model);
       clips = clipMap(visual);
+      motionBone = motionBoneOf(model, clips);
+      restRootY = motionBone?.position.y;
     } else {
       fallback = true;
       root.add(capsule(id));
     }
     parent.add(root);
-    const pawn = { root, px: 0, pz: 0, fallback, mixer, clips, assetKey };
+    const pawn = { root, px: 0, pz: 0, fallback, mixer, clips, assetKey, motionBone, restRootY, planted: false };
     pawns.set(id, pawn);
     return pawn;
   }
@@ -100,11 +129,21 @@ export function createPawnLayer(parent: THREE.Object3D, templates: CharacterTemp
         // TODO: spammy log
         //console.log(`pawn ${id} movement:${movement} speed:${entity.animation?.speed}`);
         play(pawn, movement);
+        if (movement !== "fall" && pawn.planted && pawn.motionBone && pawn.restRootY !== undefined) {
+          pawn.motionBone.position.y = pawn.restRootY;
+          pawn.planted = false;
+        }
         pawn.mixer?.update(dt);
         pawn.px = entity.position.x;
         pawn.pz = entity.position.z;
+        // The snapshot owns the pawn transform. The mixer does not write position.y.
         pawn.root.position.set(pawn.px, entity.position.y, pawn.pz);
         pawn.root.quaternion.set(entity.rotation.x, entity.rotation.y, entity.rotation.z, entity.rotation.w);
+        if (movement === "fall" && pawn.action && !pawn.action.isRunning() && !pawn.planted && pawn.motionBone) {
+          // The clip has finished. Hold that pose with the root lowered onto the feet.
+          lowerRootToFeet(pawn.motionBone, skinnedSoleGap(pawn.root));
+          pawn.planted = true;
+        }
         pawn.root.visible = ownedId === undefined || id !== ownedId;
       }
       for (const [id, pawn] of pawns) {
@@ -129,6 +168,8 @@ export function createPawnLayer(parent: THREE.Object3D, templates: CharacterTemp
         clips: [...pawn.clips.keys()],
         time: pawn.mixer?.time ?? 0,
         running: pawn.action?.isRunning() ?? false,
+        loop: pawn.action?.loop,
+        clamp: pawn.action?.clampWhenFinished === true,
       }));
       (globalThis as { __pawnAnim?: unknown }).__pawnAnim = report;
     },

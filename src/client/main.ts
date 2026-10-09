@@ -5,6 +5,7 @@ import { clientFaultText, createFireDebugLog } from "../shared/fire-debug.js";
 import { advanceFireClock, LASER_MS, traceHitscan, type TraceCapsule } from "../shared/hitscan.js";
 import { createAabbDebug } from "./aabb-debug.js";
 import { createArenaScene, loadArenaVisuals } from "./arena-scene.js";
+import { createHitMarker } from "./hit-marker.js";
 import { createHud } from "./hud.js";
 import { attachPlayInput } from "./input.js";
 import { createLaserBeams } from "./laser.js";
@@ -20,6 +21,7 @@ const view = await fetch("/arena.json").then((res) => {
 });
 
 const hud = createHud();
+const hitMarker = createHitMarker();
 hud.setStatus("loading arena");
 const arena = createArenaScene(view.shadows?.quality ?? "off");
 const collisionDebug = createAabbDebug(view.aabbs);
@@ -47,6 +49,7 @@ let debugPawn: number | undefined;
 let debugPawnWatch = false;
 let sawFiniteCamera = true;
 const laserQueue: LaserNotice[] = [];
+const pawnHp = new Map<number, number>();
 
 const link = connectLive({
   bundleId: view.bundleId,
@@ -61,6 +64,9 @@ const link = connectLive({
   onApplied: () => {},
   onLaser: (laser) => {
     laserQueue.push(laser);
+  },
+  onHealth: (health) => {
+    pawnHp.set(health.entity, health.hp);
   },
   onInbound(summary) {
     if (!options.fireDebug || !awaitFireReply) return;
@@ -112,6 +118,7 @@ function frame(now: number) {
       console.error(renderErr);
     }
   }
+  hitMarker.tick(now);
   if (pendingFireLog) {
     if (options.fireDebug) {
       const camera = arena.camera.position;
@@ -152,7 +159,9 @@ function drawFrame(now: number) {
         camBefore: { x: arena.camera.position.x, y: arena.camera.position.y, z: arena.camera.position.z },
       };
       const seq = fireSeq + 1;
-      if (link.sendFire(seq, sample.yaw, sample.pitch)) {
+      const sent = link.sendFire(seq, sample.yaw, sample.pitch);
+      hitMarker.note({ kind: "fire", sent }, now);
+      if (sent) {
         fireSeq = seq;
         if (options.fireDebug) {
           fireDebug.frameSent(seq, sample.yaw, sample.pitch);
@@ -196,6 +205,7 @@ function drawFrame(now: number) {
     }
   }
   for (const laser of laserQueue) {
+    hitMarker.note({ kind: "laser", shooter: laser.shooter, ownedId }, now);
     const remain = laser.until - Date.now();
     if (!(remain > 0)) continue;
     lasers.show(laser.shooter, laser.from, laser.to, now + remain);
@@ -225,8 +235,10 @@ function drawFrame(now: number) {
   }
   sawFiniteCamera = camOk;
   const look = input.locked ? "look locked" : "click to look";
+  const mine = ownedId === undefined ? undefined : pawnHp.get(ownedId);
+  const hpText = mine === undefined ? "" : ` · hp ${mine}`;
   if (!pinnedError) {
-    hud.setStatus(`${statusText} · ${look} · meshes ${pawns.count} models ${pawns.count - pawns.fallbacks} fallback ${pawns.fallbacks + visuals.fallbacks}`);
+    hud.setStatus(`${statusText} · ${look}${hpText} · meshes ${pawns.count} models ${pawns.count - pawns.fallbacks} fallback ${pawns.fallbacks + visuals.fallbacks}`);
   }
   hud.setProfile(input.profile);
   arena.renderer.render(arena.scene, arena.camera);
@@ -259,6 +271,7 @@ function drawFrame(now: number) {
       pawns: pawns.count,
       owned: client.ownedEntity,
       positions: pawns.positionLine(),
+      hp: ownedId === undefined ? undefined : pawnHp.get(ownedId),
     }));
   }
 }
