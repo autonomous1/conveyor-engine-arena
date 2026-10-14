@@ -51,6 +51,7 @@ type AssetRec = {
   shape?: "cylinder" | "dome";
   radius?: number;
   height?: number;
+  animation?: string | undefined;
   animations?: Record<Movement, CharacterAnimation>;
   /** `"static"` placements share one InstancedMesh per source mesh. Omitted means clone. */
   instance?: "static";
@@ -686,8 +687,10 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
       const asset = assets.get(model);
       props.push({
         id,
+        idNum: 0,
         model: asset?.uri ?? "",
         minX: box.minX, maxX: box.maxX, minY: box.minY, maxY: box.maxY, minZ: box.minZ, maxZ: box.maxZ,
+        animation: asset?.animation ?? undefined,
       });
     }
   }
