@@ -7,6 +7,7 @@ import { deliverAuditFrame } from "./audit.js";
 import { deliverHealthFrames } from "./health.js";
 import { dispatchHostFrame, hostSnapPath } from "./host-path.js";
 import type { WanderAgent } from "./world-loader.js";
+import type { Prop } from "../shared/arena-view.js";
 
 /** 20 Hz. Measured later; not a competitive tick rate. */
 export const TICK_MS = 50;
@@ -70,12 +71,24 @@ export function splitMix(seed: number): () => number {
   };
 }
 
+export function startPropAnimation(
+  world: AuthoritativeWorld,
+  props: Array<Prop>,
+): () => void {
+  for (const prop of props) {
+    if (prop.animation) {
+      world.enqueue({ kind: "setClip", entity: prop.idNum, clip: prop.animation, speed: 0 });
+    }
+  }
+  return () => "";
+}
+
 export function startWanderLoop(
   world: AuthoritativeWorld,
   agents: WanderAgent[],
   server: EngineWsServer,
   held: HeldInputs,
-  log: (line: string) => void = () => {},
+  log: (line: string) => void = () => { },
   health?: PawnHealth,
   audit?: Audit,
 ): () => void {
@@ -130,7 +143,7 @@ export function startWanderLoop(
             kind: "setClip",
             entity: agent.id,
             clip: gait,
-            speed:speed
+            speed: speed
           });
         }
         world.enqueue({
@@ -145,7 +158,8 @@ export function startWanderLoop(
       }
       if (tick >= agent.nextTurn) {
         agent.heading += (unit01(rng) - 0.5) * Math.PI;
-        const gait = MOVEMENTS[Math.floor(unit01(rng) * MOVEMENTS.length)] ?? "idle";
+        let gait = MOVEMENTS[Math.floor(unit01(rng) * MOVEMENTS.length)] ?? "idle";
+        if (gait == "fall") gait = "idle";
         if (agent.gait !== gait) {
           agent.gait = gait;
           world.enqueue({
