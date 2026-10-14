@@ -40,9 +40,12 @@ export function createArenaScene(quality: ShadowQuality): ArenaScene {
   document.body.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
-  scene.add(new THREE.HemisphereLight(0xc8d8ff, 0x3a3228, 0.85));
-  const key = new THREE.DirectionalLight(0xfff2d6, 1.6);
-  key.position.set(12, 18, 8);
+  scene.add(new THREE.HemisphereLight(0xc8d8ff, 0x3a3228, 1.3));
+  const key = new THREE.DirectionalLight(0xfff2d6, 2.3);
+  // TODO: configure camera position from json
+  key.position.set(120, 180, 80);
+  key.target.position.set(0, 0, 0);
+  //key.position.set(12, 18, 8);
   key.castShadow = shadows.enabled;
   if (shadows.enabled) {
     key.shadow.mapSize.set(shadows.mapSize, shadows.mapSize);
@@ -51,7 +54,7 @@ export function createArenaScene(quality: ShadowQuality): ArenaScene {
     key.shadow.normalBias = shadows.normalBias;
     const camera = key.shadow.camera;
     camera.near = 1;
-    camera.far = 90;
+    camera.far = 300;
     camera.left = camera.bottom = -60;
     camera.right = camera.top = 60;
     camera.updateProjectionMatrix();
@@ -496,11 +499,11 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
   if (view.floor) {
     const floorMap = await texture(view.floor.texture);
     if (!floorMap) fallbacks += 1;
-    if (floorMap) floorMap.repeat.set(36, 36);
+    if (floorMap) floorMap.repeat.set(12, 12);
     const width = view.bounds.maxX - view.bounds.minX;
     const depth = view.bounds.maxZ - view.bounds.minZ;
     const floor = new THREE.Mesh(
-      new THREE.PlaneGeometry(width*2, depth*2, 1, 1),
+      new THREE.PlaneGeometry(width * 2, depth * 2, 1, 1),
       new THREE.MeshStandardMaterial({ map: floorMap, color: floorMap ? 0xffffff : 0x2a303a, roughness: 0.95 }),
     );
     floor.rotation.x = -Math.PI / 2;
@@ -518,7 +521,7 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
       const loaded = { scene: gltf.scene, clips: gltf.animations ?? [] };
       modelCache.set(url, loaded);
       return loaded;
-    } catch(e) {
+    } catch (e) {
       console.warn(`Failed to load model ${url}:`, e);
       modelCache.set(url, undefined);
       return undefined;
@@ -607,6 +610,17 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
   }
 
   if (view.sky) {
+    const sky = new THREE.TextureLoader().load(
+      view.sky.texture,
+      (texture) => {
+        // For a conventional color JPG/PNG sky texture.
+        texture.colorSpace = THREE.SRGBColorSpace;
+        texture.mapping = THREE.EquirectangularReflectionMapping;
+        arena.scene.background = texture;
+      }
+    );
+    /*
+    // TODO: cleanup
     const skyMap = await texture(view.sky.texture);
     if (!skyMap) fallbacks += 1;
     arena.scene.add(backdropMesh(
@@ -616,6 +630,7 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
       view.sky.height,
       new THREE.MeshBasicMaterial({ color: skyMap ? 0xffffff : 0x8eb8d4, side: THREE.BackSide, depthWrite: false }),
     ));
+    */
   }
 
   if (view.cityscape) {
