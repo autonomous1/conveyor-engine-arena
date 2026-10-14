@@ -22,7 +22,8 @@
       "material": "cityscape-pano"
     },
     "shadows": {
-      "quality": "soft"
+      "quality": "soft",
+      "radius": "80"
     },
     "spawnPoints": "./web/game/spawn-points.json",
     "placements": [
@@ -35,8 +36,8 @@
     {
       "id": "floor-stone",
       "kind": "texture",
-      "uri": "/assets/textures/floor-stone.png",
-      "instance":"static",
+      "uri": "/assets/textures/floor-tile-2.png",
+      "instance": "static",
       "mediaType": "image/png",
       "license": {
         "id": "CC0-1.0",
@@ -47,11 +48,10 @@
         "notes": "Original procedural placeholder made for this arena. No third-party art."
       }
     },
-
     {
       "id": "brutalist-building-1-a",
       "kind": "model",
-      "instance":"static",
+      "instance": "static",
       "uri": "/assets/models/brutalist-building-1-a.glb",
       "mediaType": "model/gltf-binary",
       "license": {
@@ -64,10 +64,10 @@
       }
     },
     {
-      "id": "brutalist-building-2",
+      "id": "brutalist-building-1-cbake",
       "kind": "model",
-      "instance":"static",
-      "uri": "/assets/models/brutalist-building-2.glb",
+      "instance": "static",
+      "uri": "/assets/models/brutalist-building-1-cbake.glb",
       "mediaType": "model/gltf-binary",
       "license": {
         "id": "unspecified",
@@ -79,10 +79,25 @@
       }
     },
     {
-      "id": "brutalist-building-3-a",
+      "id": "brutalist-building-2-cbake",
       "kind": "model",
-      "instance":"static",
-      "uri": "/assets/models/brutalist-building-3-a.glb",
+      "instance": "static",
+      "uri": "/assets/models/brutalist-building-2-cbake.glb",
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
+      "provenance": {
+        "origin": "manual",
+        "notes": "East facade model supplied for this arena."
+      }
+    },
+    {
+      "id": "brutalist-building-3-bake",
+      "kind": "model",
+      "instance": "static",
+      "uri": "/assets/models/brutalist-building-3-bake.glb",
       "mediaType": "model/gltf-binary",
       "license": {
         "id": "unspecified",
@@ -96,7 +111,7 @@
     {
       "id": "cityscape-pano",
       "kind": "texture",
-      "uri": "/assets/textures/cityscape-pano-4.png",
+      "uri": "/assets/textures/cityscape-pano-6.png",
       "shape": "cylinder",
       "radius": 80,
       "height": 80.534,
@@ -113,7 +128,7 @@
     {
       "id": "cloudy-sky",
       "kind": "texture",
-      "uri": "/assets/textures/dark-sky-pano-4-sm.png",
+      "uri": "/assets/textures/equi-sky-map.png",
       "shape": "dome",
       "radius": 160,
       "height": 320,
@@ -131,10 +146,10 @@
       "id": "player-a",
       "kind": "model",
       "uri": "/assets/models/mechi-rider.glb",
-      "scale": 3,
+      "scale": 4,
       "animations": {
         "idle": {
-          "clip": "idle",
+          "clip": "zombie walk",
           "speed": 0
         },
         "walk": {
@@ -142,11 +157,11 @@
           "speed": 1
         },
         "run": {
-          "clip": "run.001",
+          "clip": "surf",
           "speed": 2
         },
         "fall": {
-          "clip": "run_upstairs.001",
+          "clip": "fall",
           "speed": 0
         },
         "angry": {
@@ -239,6 +254,80 @@
       }
     },
     {
+      "id": "ratty",
+      "kind": "model",
+      "uri": "/assets/models/ratty.glb",
+      "scale": 1.5,
+      "animations": {
+        "idle": {
+          "clip": "zombie reaching down and grabbing an object.001",
+          "speed": 0
+        },
+        "walk": {
+          "clip": "hunch-back zombie walk.001",
+          "speed": 1
+        },
+        "run": {
+          "clip": "rat-like running away, fast motion.001",
+          "speed": 3
+        },
+        "fall": {
+          "clip": "fall.001",
+          "speed": 0
+        },
+        "angry": {
+          "clip": "hunched over rat-like shuffle walk arms gyrating.001",
+          "speed": 3
+        }
+      },
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "CC0-1.0",
+        "status": "spdx"
+      },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Original procedural placeholder made for this arena. No third-party art."
+      }
+    },
+    {
+      "id": "cyborg-endoskeleton",
+      "kind": "model",
+      "uri": "/assets/models/cyborg-endoskeleton.glb",
+      "scale": 2,
+      "animations": {
+        "idle": {
+          "clip": "fold_arms",
+          "speed": 0
+        },
+        "walk": {
+          "clip": "walk",
+          "speed": 1
+        },
+        "run": {
+          "clip": "run",
+          "speed": 3
+        },
+        "fall": {
+          "clip": "fall",
+          "speed": 0
+        },
+        "angry": {
+          "clip": "front_kick_02",
+          "speed": 0
+        }
+      },
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "CC0-1.0",
+        "status": "spdx"
+      },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Original procedural placeholder made for this arena. No third-party art."
+      }
+    },
+    {
       "id": "player-1",
       "kind": "model",
       "uri": "/assets/models/player-2.glb",
@@ -278,7 +367,7 @@
     {
       "id": "door-1",
       "kind": "model",
-      "instance":"static",
+      "instance": "static",
       "uri": "/assets/models/door1.glb",
       "mediaType": "model/gltf-binary",
       "license": {
@@ -293,7 +382,7 @@
     {
       "id": "door-2",
       "kind": "model",
-      "instance":"static",
+      "instance": "static",
       "uri": "/assets/models/door2.glb",
       "mediaType": "model/gltf-binary",
       "license": {
@@ -308,7 +397,7 @@
     {
       "id": "ammo-box",
       "kind": "model",
-      "instance":"static",
+      "instance": "static",
       "uri": "/assets/models/ammo-box.glb",
       "mediaType": "model/gltf-binary",
       "license": {
@@ -323,7 +412,7 @@
     {
       "id": "med-kit",
       "kind": "model",
-      "instance":"static",
+      "instance": "static",
       "uri": "/assets/models/med-kit.glb",
       "mediaType": "model/gltf-binary",
       "license": {
@@ -338,9 +427,48 @@
     {
       "id": "cover-crate",
       "kind": "model",
-      "instance":"static",
+      "instance": "static",
       "uri": "/assets/models/ammo-crate.glb",
       "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "CC0-1.0",
+        "status": "spdx"
+      },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Original procedural placeholder made for this arena. No third-party art."
+      }
+    },
+    {
+      "id": "alien-weapon-enh",
+      "kind": "model",
+      "scale": 1.5,
+      "instance": "static",
+      "animation": "idle",
+      "uri": "/assets/models/alien-weapon-enh.glb",
+      "mediaType": "model/gltf-binary",
+      "animations": {
+        "idle": {
+          "clip": "rotate",
+          "speed": 0
+        },
+        "walk": {
+          "clip": "rotate",
+          "speed": 0
+        },
+        "run": {
+          "clip": "rotate",
+          "speed": 0
+        },
+        "fall": {
+          "clip": "rotate",
+          "speed": 0
+        },
+        "angry": {
+          "clip": "rotate",
+          "speed": 0
+        }
+      },
       "license": {
         "id": "CC0-1.0",
         "status": "spdx"
@@ -355,7 +483,8 @@
     "radius": 0.5,
     "height": 1.8,
     "modelChoices": [
-      "player-1",
+      "ratty",
+      "cyborg-endoskeleton",
       "player-a",
       "player-b",
       "player-d"

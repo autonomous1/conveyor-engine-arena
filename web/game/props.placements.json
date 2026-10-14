@@ -111,6 +111,28 @@
       ],
       "yaw": 270,
       "scale": 1
+    },
+    {
+      "id": "alien-weapon-enh",
+      "model": "alien-weapon-enh",
+      "position": [
+        -5.219855,
+        1,
+        2.080628
+      ],
+      "yaw": 0,
+      "scale": 1
+    },
+    {
+      "id": "alien-weapon-1",
+      "model": "alien-weapon-enh",
+      "position": [
+        -5.219855,
+        1,
+        2.080628
+      ],
+      "yaw": 0,
+      "scale": 1
     }
   ],
   "obstacles": [
@@ -252,6 +274,34 @@
         6.328034,
         0.486602,
         10.592718
+      ]
+    },
+    {
+      "id": "alien-weapon-enh-box",
+      "kind": "aabb",
+      "min": [
+        -5.856956,
+        0.980549,
+        2.000778
+      ],
+      "max": [
+        -4.767261,
+        1.442022,
+        2.160477
+      ]
+    },
+    {
+      "id": "alien-weapon-1-box",
+      "kind": "aabb",
+      "min": [
+        -5.856956,
+        0.980549,
+        2.000778
+      ],
+      "max": [
+        -4.767261,
+        1.442022,
+        2.160477
       ]
     }
   ]
