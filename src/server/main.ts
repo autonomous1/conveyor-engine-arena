@@ -8,9 +8,10 @@ import type { TransportSocket } from "conveyor-engine-transport-ws";
 import { createAudit } from "../shared/audit.js";
 import { createPawnHealth } from "../shared/health.js";
 import { createArenaFire } from "./fire.js";
-import { createHeldInputs, startWanderLoop } from "./game.js";
+import { createHeldInputs, startWanderLoop, startPropAnimation } from "./game.js";
 import { createHostSocketPaths } from "./host-path.js";
 import { loadArena } from "./world-loader.js";
+import { Prop } from "../shared/arena-view.js";
 
 const webRoot = fileURLToPath(new URL("../../dist/web/", import.meta.url));
 
@@ -152,6 +153,7 @@ export async function startArenaServer(port = Number(process.env.PORT ?? 4173)):
     },
   });
   const stopLoop = startWanderLoop(loaded.world, loaded.agents, engine, held, (line) => console.error(line), health, audit);
+  const stopPropAnimation = startPropAnimation(loaded.world, loaded.view.props);
   const fire = createArenaFire({
     world: loaded.world,
     server: engine,
