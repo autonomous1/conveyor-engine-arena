@@ -14,6 +14,18 @@ import type { ShadowQuality } from "./shadows.js";
 export type BackdropShape = "cylinder" | "dome";
 
 export type CharacterAnimation = { clip: string; speed: number };
+export type Prop = {
+  id: string;
+  idNum: number;
+  model: string;
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+  minZ: number;
+  maxZ: number;
+  animation: string | undefined;
+};
 
 export type ArenaView = {
   bundleId: string;
@@ -54,16 +66,7 @@ export type ArenaView = {
   cityscape?: { texture: string; shape: BackdropShape; radius: number; height: number };
   /** Omitted when the manifest has no shadows block. */
   shadows?: { quality: ShadowQuality };
-  props: Array<{
-    id: string;
-    model: string;
-    minX: number;
-    maxX: number;
-    minY: number;
-    maxY: number;
-    minZ: number;
-    maxZ: number;
-  }>;
+  props: Array<Prop>;
   /**
    * Hinged panels from a doors placements file. `model` is that placement's
    * GLB uri, the same lookup a prop uses. The file faces out on +Z with the
