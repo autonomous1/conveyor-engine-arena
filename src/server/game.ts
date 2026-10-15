@@ -7,7 +7,7 @@ import { deliverAuditFrame } from "./audit.js";
 import { deliverHealthFrames } from "./health.js";
 import { dispatchHostFrame, hostSnapPath } from "./host-path.js";
 import type { WanderAgent } from "./world-loader.js";
-import type { Prop } from "../shared/arena-view.js";
+import { propClipName, type Prop } from "../shared/arena-view.js";
 
 /** 20 Hz. Measured later; not a competitive tick rate. */
 export const TICK_MS = 50;
@@ -71,16 +71,20 @@ export function splitMix(seed: number): () => number {
   };
 }
 
-export function startPropAnimation(
-  world: AuthoritativeWorld,
-  props: Array<Prop>,
-): () => void {
+export type PropClip = { id: string; clip: string };
+
+/**
+ * Props are string ids, not entities. The clip name is `animations[animation].clip`.
+ * The host does not enqueue a world command and does not run the mixer.
+ */
+export function startPropAnimation(props: readonly Prop[]): PropClip[] {
+  const clips: PropClip[] = [];
   for (const prop of props) {
-    if (prop.animation) {
-      world.enqueue({ kind: "setClip", entity: prop.idNum, clip: prop.animation, speed: 0 });
-    }
+    const clip = propClipName(prop);
+    if (!clip) continue;
+    clips.push({ id: prop.id, clip });
   }
-  return () => "";
+  return clips;
 }
 
 export function startWanderLoop(

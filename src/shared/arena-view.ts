@@ -24,8 +24,27 @@ export type Prop = {
   maxY: number;
   minZ: number;
   maxZ: number;
+  /** Asset animation key, such as `"idle"`. Absent when the prop does not play a clip. */
   animation: string | undefined;
+  /** Asset clip table. The client plays `animations[animation].clip`. */
+  animations?: Record<Movement, CharacterAnimation>;
+  /** Placement position. Set when the prop comes from a placements file. */
+  position?: [number, number, number];
+  /** Degrees about +Y, the same quarter turn as a baked placement. */
+  yaw?: number;
+  /** Uniform scale: asset.scale * placement.scale. */
+  scale?: number;
 };
+
+/** Clip name for a prop, from `animations[animation].clip`. Absent when the prop is still. */
+export function propClipName(prop: {
+  animation: string | undefined;
+  animations?: Partial<Record<string, { clip: string }>>;
+}): string | undefined {
+  if (!prop.animation || !prop.animations) return undefined;
+  const clip = prop.animations[prop.animation]?.clip;
+  return clip || undefined;
+}
 
 export type ArenaView = {
   bundleId: string;
@@ -67,6 +86,11 @@ export type ArenaView = {
   /** Omitted when the manifest has no shadows block. */
   shadows?: { quality: ShadowQuality };
   props: Array<Prop>;
+  /**
+   * Local prop clips. Props are string ids, not entities, so this is not a world command.
+   * The host does not run the mixer. Each client plays the same clip.
+   */
+  propClips?: Array<{ id: string; clip: string }>;
   /**
    * Hinged panels from a doors placements file. `model` is that placement's
    * GLB uri, the same lookup a prop uses. The file faces out on +Z with the

@@ -23,7 +23,6 @@ import { startArenaServer } from "../dist/server/main.js";
 import { loadArena } from "../dist/server/world-loader.js";
 
 const CRATE = { minX: -7.858424, maxX: -7.340151, minY: 0, maxY: 0.481728, minZ: 11.883036, maxZ: 12.364764 };
-const WALL = { minX: -34.066729, maxX: -30.066729, minY: 0, maxY: 14.5, minZ: -41.21908, maxZ: -40.65492 };
 
 test("a repeated seq is ignored and a faster repeat is dropped", () => {
   const gate = freshFireGate();
@@ -104,21 +103,20 @@ test("a trace into a crate stops on the crate", () => {
 });
 
 test("a wall stops the ray and a door gap does not", () => {
-  const obstacles = loadArena().world.listObstacles();
-  const wall = obstacles.find((box) =>
-    near(box.minX, WALL.minX) && near(box.maxX, WALL.maxX) && near(box.minZ, WALL.minZ) && near(box.maxZ, WALL.maxZ));
-  assert.ok(wall, "wall slab is missing");
+  // A baked building is a stack of cells, so carving one of them still hits the next cell.
+  // This slab is the wall under test. It does not depend on one bake.
+  const wall: TraceAabb = { id: 10, minX: -2, maxX: 2, minY: 0, maxY: 3, minZ: -0.3, maxZ: 0 };
   const face = wall.maxZ;
   const midX = (wall.minX + wall.maxX) / 2;
   const originZ = face + 2;
   const dir = { x: 0, y: 0, z: -1 };
-  const into = traceHitscan({ x: midX, y: EYE_HEIGHT, z: originZ }, dir, obstacles, []);
+  const into = traceHitscan({ x: midX, y: EYE_HEIGHT, z: originZ }, dir, [wall], []);
   assert.ok(Math.abs(into.to.z - face) < 1e-4, `wall hit z ${into.to.z}`);
   assert.ok(Math.abs(into.distance - 2) < 1e-4);
 
   const left: TraceAabb = { ...wall, maxX: midX - 0.5 };
   const right: TraceAabb = { ...wall, minX: midX + 0.5 };
-  const carved = obstacles.filter((box) => box !== wall).concat([left, right]);
+  const carved = [left, right];
   const gap = traceHitscan({ x: midX, y: EYE_HEIGHT, z: originZ }, dir, carved, []);
   assert.ok(gap.distance > into.distance + 4, `door gap stopped at ${gap.distance}`);
   const jamb = traceHitscan({ x: (wall.minX + left.maxX) / 2, y: EYE_HEIGHT, z: originZ }, dir, carved, []);

@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
+import * as THREE from "three";
+import { placeStaticInstances, propInstancePose } from "../src/client/arena-scene.ts";
 import { arenaStaticWorld } from "../dist/arena-assets.js";
 import { compileGame, GameManifestError, type CompileSources } from "../dist/server/game-manifest.js";
 import { loadInstalledGame, projectRoot, readManifestSources, readPlacementFiles } from "../dist/server/load-game.js";
@@ -21,10 +23,16 @@ function document(): Record<string, unknown> {
 }
 
 type PlacementDoc = {
-  placements?: Array<{ id?: string; hinge?: unknown }>;
+  placements?: Array<{ id?: string; model?: string; hinge?: unknown; position?: number[]; yaw?: number; scale?: number }>;
   obstacles?: unknown[];
   scene?: { props?: unknown[] };
 };
+
+function assetScale(id: string): number {
+  const assets = document().assets as Array<{ id?: string; scale?: number }> | undefined;
+  const asset = assets?.find((item) => item.id === id);
+  return typeof asset?.scale === "number" ? asset.scale : 1;
+}
 
 function sceneRecord(): Record<string, unknown> {
   const scene = document().scene;
@@ -41,11 +49,28 @@ function placementDocs(): PlacementDoc[] {
   return placementRefs().map((ref) => JSON.parse(readFileSync(`${projectRoot()}/${ref}`, "utf8")) as PlacementDoc);
 }
 
-/** Building ids in the baked files. A hinged placement is a door, not a building. */
+/** Building ids in the baked files. A hinged placement is a door. An asset scale other than 1 is a prop. */
 function bakedBuildingIds(): string[] {
   return placementDocs().flatMap((file) =>
-    (file.placements ?? []).flatMap((item) => item.hinge == null && typeof item.id === "string" ? [item.id] : []),
+    (file.placements ?? []).flatMap((item) => {
+      if (item.hinge != null || typeof item.id !== "string") return [];
+      if (typeof item.model === "string" && assetScale(item.model) !== 1) return [];
+      return [item.id];
+    }),
   );
+}
+
+/** Placement props after coincident stamps of the same model collapse. */
+function placementPropCount(): number {
+  const stamps = new Set<string>();
+  for (const file of placementDocs()) {
+    for (const item of file.placements ?? []) {
+      if (item.hinge != null || typeof item.model !== "string" || assetScale(item.model) === 1) continue;
+      const position = Array.isArray(item.position) ? item.position.join(",") : "";
+      stamps.add(`${item.model}|${position}|${item.yaw}|${item.scale}`);
+    }
+  }
+  return stamps.size;
 }
 
 function compile(doc: unknown, read: (uri: string) => Uint8Array | undefined, sources?: CompileSources) {
@@ -63,7 +88,7 @@ test("installed manifest matches the authoritative world and keeps spawns clear"
   assert.deepEqual(game.view.buildings.map((building) => building.id).sort(), bakedBuildingIds().sort());
   const inlineProps = Array.isArray(scene.props) ? scene.props.length : 0;
   const fileProps = placementDocs().reduce((count, file) => count + (Array.isArray(file.scene?.props) ? file.scene.props.length : 0), 0);
-  assert.equal(game.view.props.length, inlineProps + fileProps);
+  assert.equal(game.view.props.length, inlineProps + fileProps + placementPropCount());
   assert.equal(game.view.shadows?.quality, scene.shadows && typeof scene.shadows === "object" ? (scene.shadows as { quality?: string }).quality : undefined);
   assert.equal(game.view.cityscape === undefined, scene.cityscape === undefined);
   assert.equal(game.view.sky === undefined, scene.sky === undefined);
@@ -169,8 +194,8 @@ test("optional scene blocks and a placements list", () => {
     collision: true,
     faces: {
       south: "brutalist-building-1-a",
-      west: "brutalist-building-2",
-      north: "brutalist-building-3-a",
+      west: "brutalist-building-2-cbake",
+      north: "brutalist-building-3-bake",
       east: "brutalist-building-1-a",
     },
   };
@@ -178,8 +203,8 @@ test("optional scene blocks and a placements list", () => {
   const faceModel = Object.fromEntries(faced.view.walls.map((wall) => [wall.face, wall.model]));
   assert.deepEqual(faceModel, {
     south: "/assets/models/brutalist-building-1-a.glb",
-    west: "/assets/models/brutalist-building-2.glb",
-    north: "/assets/models/brutalist-building-3-a.glb",
+    west: "/assets/models/brutalist-building-2-cbake.glb",
+    north: "/assets/models/brutalist-building-3-bake.glb",
     east: "/assets/models/brutalist-building-1-a.glb",
   });
 
@@ -372,6 +397,80 @@ test("a prop AABB is not inflated, so a spawn 0.6 m from the face is accepted", 
   assert.throws(() => compile(scene, read, sources), (err: unknown) => {
     assert.ok(err instanceof GameManifestError);
     assert.match(err.message, /tight/);
+    return true;
+  });
+});
+
+test("props.placements.json yields alien-weapon-1 at asset scale times placement scale", () => {
+  const files = filesFromDisk();
+  const read = (uri: string) => files.get(uri);
+  const scene = structuredClone(document()) as { scene: Record<string, unknown> };
+  scene.scene.placements = ["./web/game/props.placements.json"];
+  scene.scene.bounds = { minX: -80, maxX: 80, minY: -2, maxY: 12, minZ: -80, maxZ: 80 };
+  scene.scene.spawnPoints = [];
+  const game = compile(scene, read);
+  const weapons = game.view.props.filter((prop) => prop.model.endsWith("/alien-weapon-enh.glb"));
+  assert.equal(weapons.length, 1);
+  const weapon = weapons[0]!;
+  assert.equal(weapon.id, "alien-weapon-1");
+  assert.equal(weapon.scale, 1.5);
+  assert.equal(weapon.animation, "idle");
+  assert.equal(weapon.animations?.idle.clip, "rotate");
+  assert.equal(game.view.buildings.some((building) => building.id === "alien-weapon-1"), false);
+  const pose = propInstancePose(weapon);
+  assert.equal(pose.scale, 1.5);
+  assert.equal(pose.yaw, 0);
+  const template = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial());
+  const instanced = placeStaticInstances(template, [pose]);
+  assert.equal(instanced.length, 1);
+  const matrix = new THREE.Matrix4();
+  instanced[0]!.getMatrixAt(0, matrix);
+  const scale = new THREE.Vector3();
+  matrix.decompose(new THREE.Vector3(), new THREE.Quaternion(), scale);
+  assert.ok(Math.abs(scale.x - 1.5) < 1e-6 && Math.abs(scale.y - 1.5) < 1e-6 && Math.abs(scale.z - 1.5) < 1e-6);
+
+  const doubled = {
+    formatVersion: 1,
+    units: "meters",
+    placements: [{ id: "alien-weapon-1", model: "alien-weapon-enh", position: [0, 1, 0], yaw: 0, scale: 2 }],
+    obstacles: [{ id: "alien-weapon-1-box", kind: "aabb", min: [-1, 0, -1], max: [1, 2, 1] }],
+    spawnPoints: [{ id: "pad", x: 6, y: 0, z: 6, yaw: 0 }],
+  };
+  const wrapped = {
+    formatVersion: 1,
+    units: "meters",
+    placements: [],
+    obstacles: [],
+    scene: { spawnPoints: [{ id: "from-scene", x: -6, y: 0, z: -6, yaw: 90 }] },
+  };
+  const both = structuredClone(scene);
+  both.scene.placements = ["./doubled.json", "./wrapped.json"];
+  const merged = compile(both, read, {
+    placementFiles: [
+      { path: "./doubled.json", text: JSON.stringify(doubled) },
+      { path: "./wrapped.json", text: JSON.stringify(wrapped) },
+    ],
+  });
+  const grown = merged.view.props.find((prop) => prop.id === "alien-weapon-1");
+  assert.ok(grown);
+  assert.equal(grown.scale, 3);
+  assert.equal(grown.animation, "idle");
+  assert.equal(grown.animations?.idle.clip, "rotate");
+  assert.ok(merged.definition.spawnPoints.some((spawn) => spawn.id === "pad" && spawn.x === 6));
+  assert.ok(merged.definition.spawnPoints.some((spawn) => spawn.id === "from-scene" && spawn.x === -6 && spawn.yaw === 90));
+
+  assert.throws(() => readPlacementFiles(projectRoot(), {
+    scene: { placements: ["./web/game/missing.placements.json"] },
+  }), (err: unknown) => {
+    assert.ok(err instanceof GameManifestError);
+    assert.match(err.message, /missing\.placements\.json/);
+    return true;
+  });
+  const missing = structuredClone(scene);
+  missing.scene.placements = ["./web/game/missing.placements.json"];
+  assert.throws(() => compile(missing, read, { placementFiles: [] }), (err: unknown) => {
+    assert.ok(err instanceof GameManifestError);
+    assert.match(err.message, /file was not loaded/);
     return true;
   });
 });

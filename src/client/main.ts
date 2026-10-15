@@ -140,6 +140,7 @@ function frame(now: number) {
 function drawFrame(now: number) {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
+  for (const mixer of visuals.propMixers) mixer.update(dt);
   let debugShot = false;
   input.update(dt);
   const sample = input.sample();

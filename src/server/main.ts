@@ -153,7 +153,7 @@ export async function startArenaServer(port = Number(process.env.PORT ?? 4173)):
     },
   });
   const stopLoop = startWanderLoop(loaded.world, loaded.agents, engine, held, (line) => console.error(line), health, audit);
-  const stopPropAnimation = startPropAnimation(loaded.world, loaded.view.props);
+  const propClips = startPropAnimation(loaded.view.props);
   const fire = createArenaFire({
     world: loaded.world,
     server: engine,
@@ -163,7 +163,7 @@ export async function startArenaServer(port = Number(process.env.PORT ?? 4173)):
       engine.session(clientId)?.socket.send(encodeFrame(frame));
     },
   });
-  const arenaJson = JSON.stringify(loaded.view);
+  const arenaJson = JSON.stringify({ ...loaded.view, propClips });
 
   const httpServer = createServer(async (req, res) => {
     const url = new URL(req.url ?? "/", "http://127.0.0.1");

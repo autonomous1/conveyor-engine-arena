@@ -1,8 +1,8 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { clone as cloneWithSkeleton } from "three/addons/utils/SkeletonUtils.js";
-import type { ArenaView, BackdropShape } from "../shared/arena-view.js";
-import type { Movement } from "../shared/movements.js";
+import { propClipName, type ArenaView, type BackdropShape } from "../shared/arena-view.ts";
+import { findClip, type Movement } from "../shared/movements.ts";
 import { shadowSettings, type ShadowQuality } from "../shared/shadows.ts";
 import { prepareCharacter } from "./pawn-feet.ts";
 
@@ -371,8 +371,34 @@ export function wallInstancePose(wall: ArenaView["walls"][number], bounds: Arena
   };
 }
 
-/** A prop sits on its AABB bottom. Yaw is 0. Scale is the box size, not a uniform asset scale. */
+/**
+ * Play `clipName` on this prop's cloned mesh and loop it.
+ * No clip name means no mixer. The host does not run this.
+ */
+export function playPropClip(
+  root: THREE.Object3D,
+  clips: readonly THREE.AnimationClip[],
+  clipName: string | undefined,
+): THREE.AnimationMixer | undefined {
+  if (!clipName) return undefined;
+  const clip = findClip(clips, clipName);
+  if (!clip) return undefined;
+  const mixer = new THREE.AnimationMixer(root);
+  const action = mixer.clipAction(clip);
+  action.setLoop(THREE.LoopRepeat, Infinity);
+  action.clampWhenFinished = false;
+  action.play();
+  return mixer;
+}
+
+/**
+ * A placement prop uses its position, yaw, and uniform scale.
+ * An AABB prop sits on the box bottom. Yaw is 0. Scale is the box size.
+ */
 export function propInstancePose(prop: ArenaView["props"][number]): InstancePose {
+  if (prop.position && typeof prop.scale === "number") {
+    return { position: prop.position, yaw: prop.yaw ?? 0, scale: prop.scale };
+  }
   const w = Math.max(0.1, prop.maxX - prop.minX);
   const h = Math.max(0.1, prop.maxY - prop.minY);
   const d = Math.max(0.1, prop.maxZ - prop.minZ);
@@ -493,8 +519,9 @@ export function placeWallModel(template: THREE.Object3D, wall: ArenaView["walls"
   return group;
 }
 
-export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Promise<{ templates: CharacterTemplates; fallbacks: number }> {
+export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Promise<{ templates: CharacterTemplates; fallbacks: number; propMixers: THREE.AnimationMixer[] }> {
   let fallbacks = 0;
+  const propMixers: THREE.AnimationMixer[] = [];
   const castsShadow = view.shadows !== undefined && view.shadows.quality !== "off";
   if (view.floor) {
     const floorMap = await texture(view.floor.texture);
@@ -684,8 +711,14 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
   }
 
   const cloneProps: ArenaView["props"] = [];
+  const animatedProps: ArenaView["props"] = [];
   const propBatches = new Map<string, ArenaView["props"]>();
   for (const prop of view.props) {
+    // A spinning prop is a clone. An InstancedMesh cannot play the node clip.
+    if (propClipName(prop)) {
+      animatedProps.push(prop);
+      continue;
+    }
     if (!staticUris.has(prop.model)) {
       cloneProps.push(prop);
       continue;
@@ -711,8 +744,25 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
     }
   }
   for (const prop of cloneProps) addProp((await model(prop.model))?.scene, prop);
+  for (const prop of animatedProps) {
+    const loaded = await model(prop.model);
+    addProp(loaded?.scene, prop, loaded?.clips);
+  }
 
-  function addProp(template: THREE.Object3D | undefined, prop: ArenaView["props"][number]) {
+  function addProp(template: THREE.Object3D | undefined, prop: ArenaView["props"][number], clips?: readonly THREE.AnimationClip[]) {
+    if (template && prop.position && typeof prop.scale === "number") {
+      const group = new THREE.Group();
+      group.position.set(prop.position[0], prop.position[1], prop.position[2]);
+      group.rotation.y = yawToRadians(prop.yaw ?? 0);
+      const mesh = template.clone(true);
+      mesh.scale.setScalar(prop.scale);
+      mesh.position.set(0, 0, 0);
+      group.add(mesh);
+      rememberPropClip(mesh, prop, clips);
+      markShadowCasters(group, castsShadow);
+      arena.content.add(group);
+      return;
+    }
     const w = Math.max(0.1, prop.maxX - prop.minX);
     const h = Math.max(0.1, prop.maxY - prop.minY);
     const d = Math.max(0.1, prop.maxZ - prop.minZ);
@@ -730,8 +780,14 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
     const mesh = template.clone(true);
     mesh.scale.set(w, h, d);
     mesh.position.set((prop.minX + prop.maxX) / 2, prop.minY, (prop.minZ + prop.maxZ) / 2);
+    rememberPropClip(mesh, prop, clips);
     markShadowCasters(mesh, castsShadow);
     arena.content.add(mesh);
+  }
+
+  function rememberPropClip(root: THREE.Object3D, prop: ArenaView["props"][number], clips?: readonly THREE.AnimationClip[]) {
+    const mixer = playPropClip(root, clips ?? [], propClipName(prop));
+    if (mixer) propMixers.push(mixer);
   }
 
   const templates: CharacterTemplates = new Map();
@@ -755,5 +811,5 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
       animations: character.animations,
     });
   }
-  return { templates, fallbacks };
+  return { templates, fallbacks, propMixers };
 }

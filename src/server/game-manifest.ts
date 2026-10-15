@@ -135,6 +135,25 @@ function parseInstance(value: unknown, path: string, issues: GameIssue[]): "stat
   return undefined;
 }
 
+/** Asset field `animation` names a key in `animations`, such as `"idle"`. The clip is that entry's `clip`. */
+function optionalAnimation(
+  value: unknown,
+  path: string,
+  animations: Record<Movement, CharacterAnimation> | undefined,
+  issues: GameIssue[],
+): string | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== "string" || !value) {
+    issues.push({ path, message: "required string" });
+    return undefined;
+  }
+  if (!(MOVEMENTS as readonly string[]).includes(value) || !animations?.[value as Movement]?.clip) {
+    issues.push({ path, message: `unknown animation ${value}` });
+    return undefined;
+  }
+  return value;
+}
+
 function modelScale(value: unknown, path: string, issues: GameIssue[]): number {
   if (value === undefined) return 1;
   if (typeof value !== "number" || !Number.isFinite(value)) {
@@ -523,6 +542,7 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
       const animations = kind === "model" && item.animations !== undefined
         ? parseCharacterAnimations(item.animations, `${path}.animations`, issues)
         : undefined;
+      const animation = kind === "model" ? optionalAnimation(item.animation, `${path}.animation`, animations, issues) : undefined;
       const backdrop = id === skyMaterial || id === cityscapeMaterial;
       let shape: AssetRec["shape"];
       let radius: number | undefined;
@@ -537,7 +557,7 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
         if (height !== undefined && height <= 0) issues.push({ path: `${path}.height`, message: "must be > 0" });
       }
       if (id && kind && uri && mediaType && licenseId && origin) {
-        assets.set(id, { id, kind, uri, mediaType, licenseId, origin, notes, scale, shape, radius, height, animations, instance });
+        assets.set(id, { id, kind, uri, mediaType, licenseId, origin, notes, scale, shape, radius, height, animation, animations, instance });
       }
     });
   }
@@ -557,6 +577,7 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
   }
 
   const collisionBoxes: CollisionBox[] = [];
+  const boxBySource = new Map<string, CollisionBox>();
   const seenCollision = new Set<number>();
   /** Prop obstacles are named `<id>-box` and bound one mesh. Wall runs are not. */
   const meshObstacleIds = new Set<number>();
@@ -592,10 +613,35 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
       issues.push({ path: ref.path, message: `invalid json: ${err instanceof Error ? err.message : String(err)}` });
       return;
     }
-    const partial = partialScene(parsed, ref.file, issues);
-    if (partial.collision) pushCollision(partial.collision, (entry) => `${ref.file} scene.collision[${entry}]`, issues, seenCollision, collisionBoxes);
-    partial.spawns?.forEach((item, entry) => spawnEntries.push({ item, path: `${ref.file} scene.spawnPoints[${entry}]` }));
-    partial.props?.forEach((item, entry) => propEntries.push({ item, path: `${ref.file} scene.props[${entry}]` }));
+    if (isObject(parsed)) {
+      if (Array.isArray(parsed.placements)) {
+        parsed.placements.forEach((item, entry) => {
+          propEntries.push({ item, path: `${ref.file} placements[${entry}]` });
+        });
+      }
+      // Bake obstacles use string ids and are numbered by interpretPlacements.
+      // Numeric ids are scene-collision boxes and go through the same checker.
+      if (Array.isArray(parsed.obstacles)) {
+        pushCollision(
+          parsed.obstacles.filter((item) => isObject(item) && typeof item.id === "number"),
+          (entry) => `${ref.file} obstacles[${entry}]`,
+          issues,
+          seenCollision,
+          collisionBoxes,
+        );
+      }
+      if (Array.isArray(parsed.spawnPoints)) {
+        parsed.spawnPoints.forEach((item, entry) => {
+          spawnEntries.push({ item, path: `${ref.file} spawnPoints[${entry}]` });
+        });
+      }
+      if (isObject(parsed.scene)) {
+        const partial = partialScene(parsed, ref.file, issues);
+        if (partial.collision) pushCollision(partial.collision, (entry) => `${ref.file} scene.collision[${entry}]`, issues, seenCollision, collisionBoxes);
+        partial.spawns?.forEach((item, entry) => spawnEntries.push({ item, path: `${ref.file} scene.spawnPoints[${entry}]` }));
+        partial.props?.forEach((item, entry) => propEntries.push({ item, path: `${ref.file} scene.props[${entry}]` }));
+      }
+    }
 
     const used = new Set<number>([...collisionBoxes.map((box) => box.id), ...WALL_IDS]);
     const baked = interpretPlacements(parsed, knownModels, used);
@@ -634,6 +680,8 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
     for (const building of baked.buildings) {
       const asset = assets.get(building.model);
       if (!asset) continue;
+      // Asset scale other than 1 is drawn as a prop, not a second building.
+      if ((asset.scale ?? 1) !== 1) continue;
       bakedBuildings.push({
         id: building.id,
         model: asset.uri,
@@ -657,22 +705,76 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
     }
     for (const box of baked.boxes) {
       seenCollision.add(box.id);
-      collisionBoxes.push({
+      const stored: CollisionBox = {
         id: box.id,
         minX: box.minX, maxX: box.maxX,
         minY: box.minY, maxY: box.maxY,
         minZ: box.minZ, maxZ: box.maxZ,
-      });
+      };
+      collisionBoxes.push(stored);
+      boxBySource.set(box.sourceId, stored);
       if (box.sourceId.endsWith("-box")) meshObstacleIds.add(box.id);
     }
   });
 
   const props: ArenaView["props"] = [];
   const seenProps = new Set<string>();
+  /** Same model, pose, and placement scale: the later stamp replaces the earlier one. */
+  const placementPropAt = new Map<string, number>();
+  /** Placement files have no collision id. Asset scale 1 stays a building. */
+  const pushPlacementProp = (item: Record<string, unknown>, path: string): void => {
+    if (Object.prototype.hasOwnProperty.call(item, "hinge")) return;
+    const modelId = typeof item.model === "string" ? item.model : undefined;
+    const asset = modelId ? assets.get(modelId) : undefined;
+    if (!asset || asset.kind !== "model" || (asset.scale ?? 1) === 1) return;
+    const id = str(item.id, `${path}.id`, issues);
+    const model = str(item.model, `${path}.model`, issues);
+    const position = vec3(item.position, `${path}.position`, issues);
+    const yaw = cardinalYaw(item.yaw, `${path}.yaw`, issues);
+    const placementScale = modelScale(item.scale, `${path}.scale`, issues);
+    if (!id || !model || !position || yaw === undefined) return;
+    refAsset(model, `${path}.model`, "model");
+    const bounds = boxBySource.get(`${id}-box`);
+    const [x, y, z] = position;
+    const next: ArenaView["props"][number] = {
+      id,
+      idNum: 0,
+      model: asset.uri,
+      minX: bounds?.minX ?? x,
+      maxX: bounds?.maxX ?? x,
+      minY: bounds?.minY ?? y,
+      maxY: bounds?.maxY ?? y,
+      minZ: bounds?.minZ ?? z,
+      maxZ: bounds?.maxZ ?? z,
+      animation: asset.animation,
+      ...(asset.animation && asset.animations ? { animations: asset.animations } : {}),
+      position,
+      yaw,
+      scale: (asset.scale ?? 1) * placementScale,
+    };
+    const stamp = `${model}\0${position.join("\0")}\0${yaw}\0${placementScale}`;
+    const prior = placementPropAt.get(stamp);
+    if (prior !== undefined) {
+      const previous = props[prior];
+      if (previous) seenProps.delete(previous.id);
+      if (seenProps.has(id)) issues.push({ path: `${path}.id`, message: `duplicate id ${id}` });
+      seenProps.add(id);
+      props[prior] = next;
+      return;
+    }
+    if (seenProps.has(id)) issues.push({ path: `${path}.id`, message: `duplicate id ${id}` });
+    seenProps.add(id);
+    placementPropAt.set(stamp, props.length);
+    props.push(next);
+  };
   for (const entry of propEntries) {
     const { item, path } = entry;
     if (!isObject(item)) {
       issues.push({ path, message: "must be an object" });
+      continue;
+    }
+    if (Array.isArray(item.position)) {
+      pushPlacementProp(item, path);
       continue;
     }
     const id = str(item.id, `${path}.id`, issues);
@@ -690,7 +792,8 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
         idNum: 0,
         model: asset?.uri ?? "",
         minX: box.minX, maxX: box.maxX, minY: box.minY, maxY: box.maxY, minZ: box.minZ, maxZ: box.maxZ,
-        animation: asset?.animation ?? undefined,
+        animation: asset?.animation,
+        ...(asset?.animation && asset.animations ? { animations: asset.animations } : {}),
       });
     }
   }
