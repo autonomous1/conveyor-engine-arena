@@ -9,6 +9,7 @@
  * `authoritativeHash` and does force a reconnect.
  */
 import type { Movement } from "./movements.js";
+import type { PickupKind, PickupPlacement } from "./pickups.js";
 import type { ShadowQuality } from "./shadows.js";
 
 export type BackdropShape = "cylinder" | "dome";
@@ -34,6 +35,10 @@ export type Prop = {
   yaw?: number;
   /** Uniform scale: asset.scale * placement.scale. */
   scale?: number;
+  /** Placement type when this prop is consumed: ammo, health, or weapon. Scenery omits it. */
+  type?: PickupKind;
+  /** Asset id equipped when `type` is weapon. */
+  weapon?: string;
 };
 
 /** Clip name for a prop, from `animations[animation].clip`. Absent when the prop is still. */
@@ -87,6 +92,11 @@ export type ArenaView = {
   shadows?: { quality: ShadowQuality };
   props: Array<Prop>;
   /**
+   * Placements the host can remove. Ids are strings. Decorative props are absent.
+   * The bounds are the prop AABB already drawn for that placement.
+   */
+  pickups?: PickupPlacement[];
+  /**
    * Local prop clips. Props are string ids, not entities, so this is not a world command.
    * The host does not run the mixer. Each client plays the same clip.
    */
@@ -117,8 +127,10 @@ export type ArenaView = {
    * `minY` / `maxY` are present when the obstacle has a vertical span.
    * `mesh` is set for a prop obstacle (`<id>-box`). The host min/max stay the
    * mesh bounds. The debug wireframe draws that box slightly larger.
+   * `source` is that obstacle's placement id, such as `cover-crate-2-9-box`.
+   * It is not part of the collision hash. A taken pickup removes its box.
    */
-  aabbs: Array<{ id: number; minX: number; maxX: number; minZ: number; maxZ: number; minY?: number; maxY?: number; mesh?: boolean }>;
+  aabbs: Array<{ id: number; minX: number; maxX: number; minZ: number; maxZ: number; minY?: number; maxY?: number; mesh?: boolean; source?: string }>;
   pawnRadius: number;
   pawnHeight: number;
 };

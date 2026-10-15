@@ -5,6 +5,7 @@ import { propClipName, type ArenaView, type BackdropShape } from "../shared/aren
 import { findClip, type Movement } from "../shared/movements.ts";
 import { shadowSettings, type ShadowQuality } from "../shared/shadows.ts";
 import { prepareCharacter } from "./pawn-feet.ts";
+import { createPlacementVisibility, type PlacementVisibility } from "./placements.ts";
 
 export type ArenaScene = {
   renderer: THREE.WebGLRenderer;
@@ -519,9 +520,10 @@ export function placeWallModel(template: THREE.Object3D, wall: ArenaView["walls"
   return group;
 }
 
-export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Promise<{ templates: CharacterTemplates; fallbacks: number; propMixers: THREE.AnimationMixer[] }> {
+export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Promise<{ templates: CharacterTemplates; fallbacks: number; propMixers: THREE.AnimationMixer[]; placements: PlacementVisibility }> {
   let fallbacks = 0;
   const propMixers: THREE.AnimationMixer[] = [];
+  const placements = createPlacementVisibility();
   const castsShadow = view.shadows !== undefined && view.shadows.quality !== "off";
   if (view.floor) {
     const floorMap = await texture(view.floor.texture);
@@ -557,10 +559,10 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
 
   const staticUris = new Set(view.staticModels ?? []);
   // World-space batches. Walls and buildings share a parent, so one model is one InstancedMesh.
-  const sceneBatches = new Map<string, Array<{ pose: InstancePose; clone: (template: THREE.Object3D) => void }>>();
-  function pushScene(url: string, pose: InstancePose, clone: (template: THREE.Object3D) => void) {
+  const sceneBatches = new Map<string, Array<{ pose: InstancePose; id?: string; clone: (template: THREE.Object3D) => void }>>();
+  function pushScene(url: string, pose: InstancePose, clone: (template: THREE.Object3D) => void, id?: string) {
     const list = sceneBatches.get(url) ?? [];
-    list.push({ pose, clone });
+    list.push({ pose, id, clone });
     sceneBatches.set(url, list);
   }
 
@@ -590,8 +592,9 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
     }, (template) => {
       const mesh = placeBuildingModel(template, building);
       markShadowCasters(mesh, castsShadow);
+      placements.addClone(building.id, mesh);
       arena.scene.add(mesh);
-    });
+    }, building.id);
   }
 
   for (const [url, entries] of sceneBatches) {
@@ -609,6 +612,10 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
       markShadowCasters(mesh, castsShadow);
       arena.scene.add(mesh);
     }
+    entries.forEach((entry, index) => {
+      if (!entry.id) return;
+      for (const mesh of meshes) placements.addInstance(entry.id, mesh, index);
+    });
   }
 
   for (const wall of cloneWalls) {
@@ -633,6 +640,7 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
     }
     const mesh = placeBuildingModel(template, building);
     markShadowCasters(mesh, castsShadow);
+    placements.addClone(building.id, mesh);
     arena.scene.add(mesh);
   }
 
@@ -742,6 +750,9 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
       markShadowCasters(mesh, castsShadow);
       arena.content.add(mesh);
     }
+    props.forEach((prop, index) => {
+      for (const mesh of meshes) placements.addInstance(prop.id, mesh, index);
+    });
   }
   for (const prop of cloneProps) addProp((await model(prop.model))?.scene, prop);
   for (const prop of animatedProps) {
@@ -760,6 +771,7 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
       group.add(mesh);
       rememberPropClip(mesh, prop, clips);
       markShadowCasters(group, castsShadow);
+      placements.addClone(prop.id, group);
       arena.content.add(group);
       return;
     }
@@ -774,6 +786,7 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
       );
       box.position.set((prop.minX + prop.maxX) / 2, prop.minY + h / 2, (prop.minZ + prop.maxZ) / 2);
       markShadowCasters(box, castsShadow);
+      placements.addClone(prop.id, box);
       arena.content.add(box);
       return;
     }
@@ -782,6 +795,7 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
     mesh.position.set((prop.minX + prop.maxX) / 2, prop.minY, (prop.minZ + prop.maxZ) / 2);
     rememberPropClip(mesh, prop, clips);
     markShadowCasters(mesh, castsShadow);
+    placements.addClone(prop.id, mesh);
     arena.content.add(mesh);
   }
 
@@ -811,5 +825,5 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
       animations: character.animations,
     });
   }
-  return { templates, fallbacks, propMixers };
+  return { templates, fallbacks, propMixers, placements };
 }

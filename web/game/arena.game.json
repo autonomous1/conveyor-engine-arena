@@ -36,6 +36,7 @@
     {
       "id": "floor-stone",
       "kind": "texture",
+      "type": "floor",
       "uri": "/assets/textures/floor-tile-2.png",
       "instance": "static",
       "mediaType": "image/png",
@@ -51,6 +52,7 @@
     {
       "id": "brutalist-building-1-a",
       "kind": "model",
+      "type": "building",
       "instance": "static",
       "uri": "/assets/models/brutalist-building-1-a.glb",
       "mediaType": "model/gltf-binary",
@@ -81,6 +83,7 @@
     {
       "id": "brutalist-building-2-cbake",
       "kind": "model",
+      "type": "building",
       "instance": "static",
       "uri": "/assets/models/brutalist-building-2-cbake.glb",
       "mediaType": "model/gltf-binary",
@@ -96,6 +99,7 @@
     {
       "id": "brutalist-building-3-bake",
       "kind": "model",
+      "type": "building",
       "instance": "static",
       "uri": "/assets/models/brutalist-building-3-bake.glb",
       "mediaType": "model/gltf-binary",
@@ -111,6 +115,7 @@
     {
       "id": "cityscape-pano",
       "kind": "texture",
+      "type": "background",
       "uri": "/assets/textures/cityscape-pano-6.png",
       "shape": "cylinder",
       "radius": 80,
@@ -128,6 +133,7 @@
     {
       "id": "cloudy-sky",
       "kind": "texture",
+      "type": "sky",
       "uri": "/assets/textures/equi-sky-map.png",
       "shape": "dome",
       "radius": 160,
@@ -145,6 +151,7 @@
     {
       "id": "player-a",
       "kind": "model",
+      "type": "character",
       "uri": "/assets/models/mechi-rider.glb",
       "scale": 4,
       "animations": {
@@ -182,6 +189,7 @@
     {
       "id": "player-b",
       "kind": "model",
+      "type": "character",
       "uri": "/assets/models/anatomical-skeleton-cross-3d-model.glb",
       "scale": 2,
       "animations": {
@@ -219,6 +227,7 @@
     {
       "id": "player-d",
       "kind": "model",
+      "type": "character",
       "uri": "/assets/models/quad-skeleton-3.glb",
       "scale": 2,
       "animations": {
@@ -256,6 +265,7 @@
     {
       "id": "ratty",
       "kind": "model",
+      "type": "character",
       "uri": "/assets/models/ratty.glb",
       "scale": 1.5,
       "animations": {
@@ -293,6 +303,7 @@
     {
       "id": "cyborg-endoskeleton",
       "kind": "model",
+      "type": "character",
       "uri": "/assets/models/fantasy-monster-3d-model.glb",
       "scale": 2,
       "animations": {
@@ -330,6 +341,7 @@
     {
       "id": "player-1",
       "kind": "model",
+      "type": "character",
       "uri": "/assets/models/player-2.glb",
       "scale": 2,
       "animations": {
@@ -367,6 +379,7 @@
     {
       "id": "door-1",
       "kind": "model",
+      "type": "door",
       "instance": "static",
       "uri": "/assets/models/door1.glb",
       "mediaType": "model/gltf-binary",
@@ -382,6 +395,7 @@
     {
       "id": "door-2",
       "kind": "model",
+      "type": "door",
       "instance": "static",
       "uri": "/assets/models/door2.glb",
       "mediaType": "model/gltf-binary",
@@ -397,6 +411,7 @@
     {
       "id": "ammo-box",
       "kind": "model",
+      "type": "ammo",
       "instance": "static",
       "uri": "/assets/models/ammo-box.glb",
       "mediaType": "model/gltf-binary",
@@ -412,6 +427,7 @@
     {
       "id": "med-kit",
       "kind": "model",
+      "type": "health",
       "instance": "static",
       "uri": "/assets/models/med-kit.glb",
       "mediaType": "model/gltf-binary",
@@ -427,6 +443,7 @@
     {
       "id": "cover-crate",
       "kind": "model",
+      "type": "crate",
       "instance": "static",
       "uri": "/assets/models/ammo-crate.glb",
       "mediaType": "model/gltf-binary",
@@ -443,6 +460,7 @@
       "id": "alien-weapon-enh",
       "kind": "model",
       "scale": 1.5,
+      "type": "weapon",
       "instance": "static",
       "animation": "idle",
       "uri": "/assets/models/alien-weapon-enh.glb",

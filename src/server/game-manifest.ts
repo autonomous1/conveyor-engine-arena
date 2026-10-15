@@ -13,6 +13,7 @@ import {
 } from "conveyor-engine-assets";
 import type { ArenaView, CharacterAnimation } from "../shared/arena-view.js";
 import { DEFAULT_MOVEMENT_SPEED, MOVEMENTS, type Movement } from "../shared/movements.js";
+import { AMMO_PICKUP, HEALTH_PICKUP, parsePickupKind, type PickupPlacement } from "../shared/pickups.js";
 import { interpretPlacements } from "./placements-file.js";
 import { SHADOW_QUALITIES, type ShadowQuality } from "../shared/shadows.js";
 
@@ -150,6 +151,15 @@ function optionalAnimation(
   if (!(MOVEMENTS as readonly string[]).includes(value) || !animations?.[value as Movement]?.clip) {
     issues.push({ path, message: `unknown animation ${value}` });
     return undefined;
+  }
+  return value;
+}
+
+function takePickupAmount(value: unknown, path: string, issues: GameIssue[], fallback: number): number {
+  if (value === undefined) return fallback;
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+    issues.push({ path, message: "must be > 0" });
+    return fallback;
   }
   return value;
 }
@@ -798,6 +808,54 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
     }
   }
 
+  const pickups: PickupPlacement[] = [];
+  const seenPickups = new Set<string>();
+  for (const entry of propEntries) {
+    const { item, path } = entry;
+    if (!isObject(item) || Object.prototype.hasOwnProperty.call(item, "hinge")) continue;
+    // Type is copied from the asset. crate, door, building, and character stay.
+    // A leftover placement kind is not a pickup.
+    const kind = parsePickupKind(item.type);
+    if (!kind) continue;
+    const id = typeof item.id === "string" ? item.id : undefined;
+    const modelId = typeof item.model === "string" ? item.model : undefined;
+    if (!id || !modelId) continue;
+    if (seenPickups.has(id)) {
+      issues.push({ path: `${path}.id`, message: `duplicate pickup ${id}` });
+      continue;
+    }
+    const asset = assets.get(modelId);
+    if (!asset || asset.kind !== "model") continue;
+    const named = boxBySource.get(`${id}-box`);
+    const collisionId = typeof item.collision === "number" ? item.collision : undefined;
+    const box = named ?? (collisionId === undefined ? undefined : collisionBoxes.find((candidate) => candidate.id === collisionId));
+    if (!box || (box.maxX <= box.minX && box.maxY <= box.minY && box.maxZ <= box.minZ)) {
+      issues.push({ path: `${path}.type`, message: "pickup needs an aabb" });
+      continue;
+    }
+    const amount = kind === "weapon" ? 0 : takePickupAmount(item.amount, `${path}.amount`, issues, kind === "health" ? HEALTH_PICKUP : AMMO_PICKUP);
+    const weapon = kind === "weapon" ? modelId : undefined;
+    seenPickups.add(id);
+    pickups.push({
+      id,
+      kind,
+      model: asset.uri,
+      ...(weapon ? { weapon } : {}),
+      amount,
+      minX: box.minX,
+      maxX: box.maxX,
+      minY: box.minY,
+      maxY: box.maxY,
+      minZ: box.minZ,
+      maxZ: box.maxZ,
+    });
+    const drawn = props.find((prop) => prop.id === id);
+    if (drawn) {
+      drawn.type = kind;
+      if (weapon) drawn.weapon = weapon;
+    }
+  }
+
   const player = isObject(doc.player) ? doc.player : undefined;
   if (!player) issues.push({ path: "player", message: "required object" });
   const pawnRadius = player ? num(player.radius, "player.radius", issues) : undefined;
@@ -973,6 +1031,8 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
     throw new GameManifestError(messages.map((message) => ({ path: "scene", message })));
   }
 
+  const sourceOf = new Map<number, string>();
+  for (const [sourceId, box] of boxBySource) sourceOf.set(box.id, sourceId);
   const floorTexture = floorMaterial ? assets.get(floorMaterial)?.uri : undefined;
   const skyAsset = skyMaterial ? assets.get(skyMaterial) : undefined;
   const cityAsset = cityscapeMaterial ? assets.get(cityscapeMaterial) : undefined;
@@ -1011,20 +1071,25 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
       : {}),
     ...(shadowQuality ? { shadows: { quality: shadowQuality } } : {}),
     props,
+    pickups,
     characters,
     staticModels: [...assets.values()]
       .filter((asset) => asset.kind === "model" && asset.instance === "static")
       .map((asset) => asset.uri)
       .sort((a, b) => a.localeCompare(b)),
-    aabbs: resolved.definition.aabbs.map((box) => ({
-      id: box.id,
-      minX: box.minX,
-      maxX: box.maxX,
-      minZ: box.minZ,
-      maxZ: box.maxZ,
-      ...(typeof box.minY === "number" && typeof box.maxY === "number" ? { minY: box.minY, maxY: box.maxY } : {}),
-      ...(meshObstacleIds.has(box.id) ? { mesh: true as const } : {}),
-    })),
+    aabbs: resolved.definition.aabbs.map((box) => {
+      const source = sourceOf.get(box.id);
+      return {
+        id: box.id,
+        minX: box.minX,
+        maxX: box.maxX,
+        minZ: box.minZ,
+        maxZ: box.maxZ,
+        ...(typeof box.minY === "number" && typeof box.maxY === "number" ? { minY: box.minY, maxY: box.maxY } : {}),
+        ...(meshObstacleIds.has(box.id) ? { mesh: true as const } : {}),
+        ...(source ? { source } : {}),
+      };
+    }),
     pawnRadius,
     pawnHeight,
   };

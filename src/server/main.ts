@@ -7,11 +7,12 @@ import { decodeFrame, encodeFrame, EngineWsServer } from "conveyor-engine-transp
 import type { TransportSocket } from "conveyor-engine-transport-ws";
 import { createAudit } from "../shared/audit.js";
 import { createPawnHealth } from "../shared/health.js";
+import { createPawnKit, createPickupHost } from "../shared/pickups.js";
 import { createArenaFire } from "./fire.js";
 import { createHeldInputs, startWanderLoop, startPropAnimation } from "./game.js";
 import { createHostSocketPaths } from "./host-path.js";
+import { pawnBodies, releasePickupObstacle } from "./pickups.js";
 import { loadArena } from "./world-loader.js";
-import { Prop } from "../shared/arena-view.js";
 
 const webRoot = fileURLToPath(new URL("../../dist/web/", import.meta.url));
 
@@ -48,6 +49,7 @@ function socketFromWs(
   refused: Set<number>,
   drop: (clientId: number) => void,
   onArena: (socket: TransportSocket, frame: unknown) => void,
+  stamp: (text: string) => string,
 ): TransportSocket {
   const messages: Array<(text: string) => void> = [];
   const closes: Array<() => void> = [];
@@ -59,7 +61,7 @@ function socketFromWs(
       if (ws.readyState !== ws.OPEN) return;
       const clientId = refusedWelcome(text, refused);
       if (clientId === undefined) {
-        ws.send(text);
+        ws.send(stamp(text));
         return;
       }
       refused.delete(clientId);
@@ -125,8 +127,30 @@ export async function startArenaServer(port = Number(process.env.PORT ?? 4173)):
   const loaded = loadArena();
   const held = createHeldInputs();
   const health = createPawnHealth();
+  const kit = createPawnKit();
+  const pickupHost = createPickupHost(loaded.view.pickups ?? []);
   const audit = createAudit();
   for (const agent of loaded.agents) health.note(agent.id);
+  const attachPickupWelcome = (text: string): string => {
+    let frame: unknown;
+    try {
+      frame = JSON.parse(text);
+    } catch {
+      return text;
+    }
+    if (!frame || typeof frame !== "object" || Array.isArray(frame)) return text;
+    const welcome = frame as Record<string, unknown>;
+    if (welcome.type !== "welcome") return text;
+    welcome.pickups = pickupHost.remainingIds();
+    const owned = welcome.ownedEntityId;
+    if (typeof owned === "number") {
+      const weapon = kit.weaponOf(owned);
+      const ammo = kit.ammoOf(owned);
+      if (weapon) welcome.weapon = weapon;
+      if (ammo > 0) welcome.ammo = ammo;
+    }
+    return JSON.stringify(welcome);
+  };
   const refused = new Set<number>();
   const engine: EngineWsServer = new EngineWsServer({
     compatibility: { protocol: 1, world: loaded.view.world },
@@ -152,7 +176,22 @@ export async function startArenaServer(port = Number(process.env.PORT ?? 4173)):
       held.admit(owned, { moveX: input.moveX, moveZ: input.moveZ, yaw: input.yaw, seq: input.seq, clip:"" });
     },
   });
-  const stopLoop = startWanderLoop(loaded.world, loaded.agents, engine, held, (line) => console.error(line), health, audit);
+  const stopLoop = startWanderLoop(loaded.world, loaded.agents, engine, held, (line) => console.error(line), health, audit, () => {
+    const grants = pickupHost.take(pawnBodies(loaded.world, health), health, kit);
+    for (const grant of grants) {
+      releasePickupObstacle(loaded.world, loaded.view.aabbs, grant.id);
+      const gone = encodeFrame(grant.gone);
+      for (const clientId of engine.connected) {
+        engine.session(clientId)?.socket.send(gone);
+      }
+      if (!grant.loadout) continue;
+      const loadout = encodeFrame(grant.loadout);
+      for (const clientId of engine.connected) {
+        if (engine.replicator.get(clientId)?.ownedEntity !== grant.pawnId) continue;
+        engine.session(clientId)?.socket.send(loadout);
+      }
+    }
+  });
   const propClips = startPropAnimation(loaded.view.props);
   const fire = createArenaFire({
     world: loaded.world,
@@ -200,7 +239,7 @@ export async function startArenaServer(port = Number(process.env.PORT ?? 4173)):
       } catch (err) {
         console.error("fire threw", err);
       }
-    }));
+    }, attachPickupWelcome));
   });
 
   await new Promise<void>((resolveListen, reject) => {

@@ -82,6 +82,14 @@ export function createPawnHealth(now: () => number = Date.now) {
       row.respawnAt = row.dead ? now() + RESPAWN_MS : undefined;
       return { hp: row.hp, dead: row.dead };
     },
+    /** Add health and stay inside [0, 100]. A dead pawn is unchanged. */
+    heal(id: number, amount: number): PawnHealthState | undefined {
+      const row = ensure(id);
+      if (row.dead) return undefined;
+      if (!Number.isFinite(amount) || amount <= 0) return { hp: row.hp, dead: false };
+      row.hp = clampHealth(row.hp + amount);
+      return { hp: row.hp, dead: false };
+    },
     /** Pawns whose respawn time has arrived. They come back at full health. */
     takeRespawns(): number[] {
       const at = now();

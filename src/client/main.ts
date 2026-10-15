@@ -1,6 +1,7 @@
 import { EngineClient } from "conveyor-engine-client";
 import type { ArenaView } from "../shared/arena-view.js";
 import { aimDirection, eyeLook, INPUT_HZ, moveIntent, yawFromQuat } from "../shared/look.js";
+import { dropPickupAabb } from "../shared/pickups.js";
 import { clientFaultText, createFireDebugLog } from "../shared/fire-debug.js";
 import { advanceFireClock, LASER_MS, traceHitscan, type TraceCapsule } from "../shared/hitscan.js";
 import { createAabbDebug } from "./aabb-debug.js";
@@ -10,6 +11,7 @@ import { createHud, localHealthLabel } from "./hud.js";
 import { attachPlayInput } from "./input.js";
 import { createLaserBeams } from "./laser.js";
 import { connectLive, type LaserNotice } from "./net.js";
+import { createViewModel } from "./viewmodel.js";
 import { createOptionsDialog } from "./options.js";
 import { createPawnLayer } from "./presentation.js";
 import { createRateWindow, formatOverlay } from "./rates.js";
@@ -29,6 +31,29 @@ arena.scene.add(collisionDebug.group);
 const options = createOptionsDialog((on) => collisionDebug.setVisible(on));
 const fireDebug = createFireDebugLog(() => options.fireDebug);
 const visuals = await loadArenaVisuals(view, arena);
+const pickupIds = new Set((view.pickups ?? []).map((pickup) => pickup.id));
+for (const id of pickupIds) visuals.placements.setVisible(id, false);
+const viewmodel = createViewModel(arena.camera, arena.scene);
+function dropBox(id: string) {
+  dropPickupAabb(view.aabbs, id);
+  collisionDebug.remove(id);
+}
+function showRemaining(ids: readonly string[]) {
+  const left = new Set(ids);
+  for (const id of pickupIds) {
+    const visible = left.has(id);
+    visuals.placements.setVisible(id, visible);
+    if (!visible) dropBox(id);
+  }
+}
+function showWeapon(weaponId: string | undefined) {
+  if (!weaponId) {
+    viewmodel.clear();
+    return;
+  }
+  const model = view.pickups?.find((pickup) => pickup.weapon === weaponId)?.model;
+  if (model) void viewmodel.show(weaponId, model);
+}
 const pawns = createPawnLayer(arena.content, visuals.templates, view.pawnHeight);
 const input = attachPlayInput(arena.renderer.domElement, undefined, () => {
   fireDebug.keydown();
@@ -70,6 +95,16 @@ const link = connectLive({
   },
   onAudit: (audit) => {
     options.setAudit(audit);
+  },
+  onPickupSet: (ids) => {
+    showRemaining(ids);
+  },
+  onPickup: (pickup) => {
+    visuals.placements.setVisible(pickup.id, false);
+    dropBox(pickup.id);
+  },
+  onLoadout: (loadout) => {
+    showWeapon(loadout.weapon);
   },
   onInbound(summary) {
     if (!options.fireDebug || !awaitFireReply) return;

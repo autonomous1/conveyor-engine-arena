@@ -2,6 +2,7 @@ import { EngineClient, type IncomingSnapshot } from "conveyor-engine-client";
 import { fireShotFrame, summarizeInbound } from "../shared/fire-debug.js";
 import { parseAudit, type AuditCounters } from "../shared/audit.js";
 import { parseHealth } from "../shared/health.js";
+import { parseLoadout, parsePickup, parsePickupSet, type LoadoutFrame, type PickupFrame } from "../shared/pickups.js";
 
 const TOKEN_KEY = "ce-arena-token";
 
@@ -97,6 +98,11 @@ export function connectLive(opts: {
   onLaser?: (laser: LaserNotice) => void;
   onHealth?: (health: HealthNotice) => void;
   onAudit?: (audit: AuditCounters) => void;
+  /** Remaining pickup ids from welcome. Taken placements are absent. */
+  onPickupSet?: (ids: readonly string[]) => void;
+  onPickup?: (pickup: PickupFrame) => void;
+  /** This client only. Other clients do not receive a viewmodel. */
+  onLoadout?: (loadout: LoadoutFrame) => void;
   /** Read when a shot is sent. The host logs only when this is on. */
   fireDebug?: () => boolean;
   /** One inbound frame, after it parses and before it is applied. */
@@ -177,6 +183,10 @@ export function connectLive(opts: {
       if (health) opts.onHealth?.(health);
       const audit = parseAudit(msg);
       if (audit) opts.onAudit?.(audit);
+      const pickup = parsePickup(msg);
+      if (pickup) opts.onPickup?.(pickup);
+      const loadout = parseLoadout(msg);
+      if (loadout) opts.onLoadout?.(loadout);
       return;
     }
     try {
@@ -194,6 +204,13 @@ export function connectLive(opts: {
           opts.client.connect(ownedId, clientId);
           welcomed = true;
           lastSeq = 0;
+        }
+        const ids = parsePickupSet(msg.pickups);
+        if (ids) opts.onPickupSet?.(ids);
+        if (typeof msg.weapon === "string" || typeof msg.ammo === "number") {
+          const ammo = typeof msg.ammo === "number" && Number.isFinite(msg.ammo) ? msg.ammo : 0;
+          const weapon = typeof msg.weapon === "string" && msg.weapon.length > 0 ? msg.weapon : undefined;
+          opts.onLoadout?.({ t: "loadout", ammo, ...(weapon ? { weapon } : {}) });
         }
         opts.onStatus({
           phase: "welcome",

@@ -44,6 +44,8 @@ export type WorldAabb = {
   maxZ?: number;
   /** Set for a prop mesh box. The wireframe is drawn outside the obstacle. */
   mesh?: boolean;
+  /** Placement obstacle id, such as `cover-crate-2-9-box`. */
+  source?: string;
 };
 
 type Extents = {
@@ -61,6 +63,8 @@ export type AabbDebug = {
   rebuild(obstacles: readonly WorldAabb[]): void;
   /** Hide or show the group. Does not rebuild meshes. */
   setVisible(on: boolean): void;
+  /** Remove the wireframe for a placement id. The other boxes stay. */
+  remove(id: string): void;
 };
 
 export function createAabbDebug(obstacles: readonly WorldAabb[]): AabbDebug {
@@ -92,6 +96,14 @@ export function createAabbDebug(obstacles: readonly WorldAabb[]): AabbDebug {
     setVisible(on: boolean) {
       group.visible = on;
     },
+    remove(id: string) {
+      const source = `${id}-box`;
+      for (const child of [...group.children]) {
+        if (child.name !== id && child.name !== source) continue;
+        (child as THREE.LineSegments).geometry?.dispose();
+        group.remove(child);
+      }
+    },
   };
 }
 
@@ -117,7 +129,7 @@ function meshFor(obstacle: WorldAabb, material: THREE.Material): THREE.LineSegme
   const edges = new THREE.EdgesGeometry(solid);
   solid.dispose();
   const mesh = new THREE.LineSegments(edges, material);
-  mesh.name = "aabb";
+  mesh.name = typeof obstacle.source === "string" && obstacle.source.length > 0 ? obstacle.source : "aabb";
   mesh.position.set(
     (box.minX + box.maxX) / 2,
     (box.minY + box.maxY) / 2,

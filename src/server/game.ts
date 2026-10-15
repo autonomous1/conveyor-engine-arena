@@ -95,6 +95,7 @@ export function startWanderLoop(
   log: (line: string) => void = () => { },
   health?: PawnHealth,
   audit?: Audit,
+  onTick?: () => void,
 ): () => void {
   const rng = splitMix(20260917);
   const snaps = hostSnapPath((clientId, envelope) => {
@@ -192,6 +193,11 @@ export function startWanderLoop(
       for (const id of health.takeRespawns()) respawnPawn(world, agents, id);
     }
     const snap = world.commit(BigInt(tick));
+    try {
+      onTick?.();
+    } catch (err) {
+      log(`[live] pickup ${err instanceof Error ? err.message : String(err)}`);
+    }
     server.setTick(BigInt(tick));
     const envelopes = server.replicator.publish(world, snap);
     const healthFrames = health?.frames() ?? [];
