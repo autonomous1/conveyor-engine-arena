@@ -293,7 +293,7 @@
     {
       "id": "cyborg-endoskeleton",
       "kind": "model",
-      "uri": "/assets/models/cyborg-endoskeleton.glb",
+      "uri": "/assets/models/fantasy-monster-3d-model.glb",
       "scale": 2,
       "animations": {
         "idle": {
