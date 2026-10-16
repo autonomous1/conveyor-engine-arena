@@ -2,6 +2,7 @@ import { EngineClient, type IncomingSnapshot } from "conveyor-engine-client";
 import { fireShotFrame, summarizeInbound } from "../shared/fire-debug.js";
 import { parseAudit, type AuditCounters } from "../shared/audit.js";
 import { parseHealth } from "../shared/health.js";
+import { parseGrenadePose, grenadeFrame, type GrenadePose } from "../shared/grenade.js";
 import { parseLoadout, parsePickup, parsePickupSet, type LoadoutFrame, type PickupFrame } from "../shared/pickups.js";
 
 const TOKEN_KEY = "ce-arena-token";
@@ -32,6 +33,8 @@ export type LiveLink = {
   sendInput(moveX: number, moveZ: number, yaw: number): void;
   /** Arena frame. Returns false when the socket has no owned pawn yet. */
   sendFire(seq: number, yaw: number, pitch: number): boolean;
+  /** Arena frame. Returns false when the socket has no owned pawn yet. Does not fire. */
+  sendGrenade(seq: number, yaw: number, pitch: number): boolean;
   /** True after the socket has closed. Closing does not open another socket. */
   socketClosed(): boolean;
   /** connecting, open, closing, or closed. */
@@ -96,6 +99,7 @@ export function connectLive(opts: {
   onStatus: (status: LiveStatus) => void;
   onApplied: () => void;
   onLaser?: (laser: LaserNotice) => void;
+  onGrenade?: (grenade: GrenadePose) => void;
   onHealth?: (health: HealthNotice) => void;
   onAudit?: (audit: AuditCounters) => void;
   /** Remaining pickup ids from welcome. Taken placements are absent. */
@@ -179,6 +183,8 @@ export function connectLive(opts: {
     if (typeof msg.t === "string") {
       const laser = asLaser(msg);
       if (laser) opts.onLaser?.(laser);
+      const grenade = parseGrenadePose(msg);
+      if (grenade) opts.onGrenade?.(grenade);
       const health = asHealth(msg);
       if (health) opts.onHealth?.(health);
       const audit = parseAudit(msg);
@@ -276,6 +282,11 @@ export function connectLive(opts: {
     sendFire(seq, yaw, pitch) {
       if (ownedId === undefined || ws.readyState !== WebSocket.OPEN) return false;
       ws.send(JSON.stringify(fireShotFrame(seq, yaw, pitch, opts.fireDebug?.() ?? false)));
+      return true;
+    },
+    sendGrenade(seq, yaw, pitch) {
+      if (ownedId === undefined || ws.readyState !== WebSocket.OPEN) return false;
+      ws.send(JSON.stringify(grenadeFrame(seq, yaw, pitch)));
       return true;
     },
     socketClosed() {

@@ -164,6 +164,21 @@ function takePickupAmount(value: unknown, path: string, issues: GameIssue[], fal
   return value;
 }
 
+/**
+ * Scale other than 1 is a prop. A clip is a prop at scale 1 too, so the client
+ * can play it. Type is not consulted. A crate with no clip stays a building.
+ */
+function drawsAsProp(asset: AssetRec): boolean {
+  if (asset.kind !== "model") return false;
+  if ((asset.scale ?? 1) !== 1) return true;
+  return typeof asset.animation === "string" && asset.animation.length > 0;
+}
+
+function logBuiltProp(id: string, model: string, item: Record<string, unknown>): void {
+  const type = typeof item.type === "string" ? item.type : "";
+  console.log(`prop ${id} model=${model} type=${type}`);
+}
+
 function modelScale(value: unknown, path: string, issues: GameIssue[]): number {
   if (value === undefined) return 1;
   if (typeof value !== "number" || !Number.isFinite(value)) {
@@ -689,9 +704,7 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
     if (!fileOk) return;
     for (const building of baked.buildings) {
       const asset = assets.get(building.model);
-      if (!asset) continue;
-      // Asset scale other than 1 is drawn as a prop, not a second building.
-      if ((asset.scale ?? 1) !== 1) continue;
+      if (!asset || drawsAsProp(asset)) continue;
       bakedBuildings.push({
         id: building.id,
         model: asset.uri,
@@ -731,12 +744,16 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
   const seenProps = new Set<string>();
   /** Same model, pose, and placement scale: the later stamp replaces the earlier one. */
   const placementPropAt = new Map<string, number>();
-  /** Placement files have no collision id. Asset scale 1 stays a building. */
+  /**
+   * Placement files have no collision id. Scale 1 with no clip stays a building.
+   * An animation is a prop at any scale, so a key is not dropped for failing a weapon scale.
+   * Placement type is not a render filter. crate and key both draw. key is not a pickup.
+   */
   const pushPlacementProp = (item: Record<string, unknown>, path: string): void => {
     if (Object.prototype.hasOwnProperty.call(item, "hinge")) return;
     const modelId = typeof item.model === "string" ? item.model : undefined;
     const asset = modelId ? assets.get(modelId) : undefined;
-    if (!asset || asset.kind !== "model" || (asset.scale ?? 1) === 1) return;
+    if (!asset || !drawsAsProp(asset)) return;
     const id = str(item.id, `${path}.id`, issues);
     const model = str(item.model, `${path}.model`, issues);
     const position = vec3(item.position, `${path}.position`, issues);
@@ -744,6 +761,7 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
     const placementScale = modelScale(item.scale, `${path}.scale`, issues);
     if (!id || !model || !position || yaw === undefined) return;
     refAsset(model, `${path}.model`, "model");
+    logBuiltProp(id, model, item);
     const bounds = boxBySource.get(`${id}-box`);
     const [x, y, z] = position;
     const next: ArenaView["props"][number] = {
@@ -797,6 +815,7 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
     if (collisionId !== undefined && !box) issues.push({ path: `${path}.collision`, message: `unknown collision ${collisionId}` });
     if (id && model && box) {
       const asset = assets.get(model);
+      logBuiltProp(id, model, item);
       props.push({
         id,
         idNum: 0,
@@ -1034,6 +1053,8 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
   const sourceOf = new Map<number, string>();
   for (const [sourceId, box] of boxBySource) sourceOf.set(box.id, sourceId);
   const floorTexture = floorMaterial ? assets.get(floorMaterial)?.uri : undefined;
+  const grenadeAsset = assets.get("grenade");
+  const grenadeModel = grenadeAsset?.kind === "model" ? grenadeAsset.uri : undefined;
   const skyAsset = skyMaterial ? assets.get(skyMaterial) : undefined;
   const cityAsset = cityscapeMaterial ? assets.get(cityscapeMaterial) : undefined;
   const view: ArenaView = {
@@ -1092,6 +1113,7 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
     }),
     pawnRadius,
     pawnHeight,
+    ...(grenadeModel ? { grenade: grenadeModel } : {}),
   };
 
   return {

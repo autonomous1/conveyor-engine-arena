@@ -9,6 +9,7 @@ import { createAudit } from "../shared/audit.js";
 import { createPawnHealth } from "../shared/health.js";
 import { createPawnKit, createPickupHost } from "../shared/pickups.js";
 import { createArenaFire } from "./fire.js";
+import { createArenaGrenades } from "./grenade.js";
 import { createHeldInputs, startWanderLoop, startPropAnimation } from "./game.js";
 import { createHostSocketPaths } from "./host-path.js";
 import { pawnBodies, releasePickupObstacle } from "./pickups.js";
@@ -173,7 +174,15 @@ export async function startArenaServer(port = Number(process.env.PORT ?? 4173)):
     onAdmit: (input) => {
       const owned = engine.gateway.get(input.clientId)?.ownedEntity;
       if (owned === undefined) return;
-      held.admit(owned, { moveX: input.moveX, moveZ: input.moveZ, yaw: input.yaw, seq: input.seq, clip:"" });
+      held.admit(owned, { moveX: input.moveX, moveZ: input.moveZ, yaw: input.yaw, seq: input.seq });
+    },
+  });
+  const grenades = createArenaGrenades({
+    world: loaded.world,
+    server: engine,
+    health,
+    send(clientId, frame) {
+      engine.session(clientId)?.socket.send(encodeFrame(frame));
     },
   });
   const stopLoop = startWanderLoop(loaded.world, loaded.agents, engine, held, (line) => console.error(line), health, audit, () => {
@@ -191,6 +200,7 @@ export async function startArenaServer(port = Number(process.env.PORT ?? 4173)):
         engine.session(clientId)?.socket.send(loadout);
       }
     }
+    grenades.tick();
   });
   const propClips = startPropAnimation(loaded.view.props);
   const fire = createArenaFire({
@@ -238,6 +248,11 @@ export async function startArenaServer(port = Number(process.env.PORT ?? 4173)):
         fire.onFrame(clientId, frame);
       } catch (err) {
         console.error("fire threw", err);
+      }
+      try {
+        grenades.onFrame(clientId, frame);
+      } catch (err) {
+        console.error("grenade threw", err);
       }
     }, attachPickupWelcome));
   });

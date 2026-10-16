@@ -133,4 +133,6 @@ export type ArenaView = {
   aabbs: Array<{ id: number; minX: number; maxX: number; minZ: number; maxZ: number; minY?: number; maxY?: number; mesh?: boolean; source?: string }>;
   pawnRadius: number;
   pawnHeight: number;
+  /** Thrown grenade mesh. Absent when the manifest has no `grenade` model. */
+  grenade?: string;
 };

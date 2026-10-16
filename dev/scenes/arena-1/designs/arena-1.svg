@@ -25,15 +25,15 @@
      borderopacity="1.0"
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
-     inkscape:zoom="3.7218054"
-     inkscape:cx="3.2339309"
-     inkscape:cy="3.3760323"
+     inkscape:zoom="51.976494"
+     inkscape:cx="-73.263888"
+     inkscape:cy="60.873671"
      inkscape:document-units="mm"
      inkscape:current-layer="layer4"
      showgrid="false"
-     inkscape:window-width="2812"
+     inkscape:window-width="2807"
      inkscape:window-height="1549"
-     inkscape:window-x="68"
+     inkscape:window-x="73"
      inkscape:window-y="34"
      inkscape:window-maximized="1" />
   <metadata
@@ -272,6 +272,15 @@
        inkscape:label="model:step"
        z="2.75"
        transform="rotate(90,-22.472710,280.75327)" />
+    <rect
+       style="color:#000000;display:inline;overflow:visible;opacity:1;vector-effect:none;fill:#e7ed5d;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:0.00484699;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
+       id="key"
+       width="0.31569594"
+       height="0.30141628"
+       x="-22.628725"
+       y="280.62271"
+       inkscape:label="model:key-1"
+       z="3.5" />
   </g>
   <g
      inkscape:groupmode="layer"

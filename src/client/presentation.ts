@@ -136,7 +136,7 @@ export function createPawnLayer(parent: THREE.Object3D, templates: CharacterTemp
         pawn.mixer?.update(dt);
         pawn.px = entity.position.x;
         pawn.pz = entity.position.z;
-        // The snapshot owns the pawn transform. The mixer does not write position.y.
+        // The snapshot owns the pawn transform. The mixer does not write position.
         pawn.root.position.set(pawn.px, entity.position.y, pawn.pz);
         pawn.root.quaternion.set(entity.rotation.x, entity.rotation.y, entity.rotation.z, entity.rotation.w);
         if (movement === "fall" && pawn.action && !pawn.action.isRunning() && !pawn.planted && pawn.motionBone) {

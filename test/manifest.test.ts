@@ -28,10 +28,21 @@ type PlacementDoc = {
   scene?: { props?: unknown[] };
 };
 
+function assetRow(id: string): { id?: string; scale?: number; animation?: unknown } | undefined {
+  const assets = document().assets as Array<{ id?: string; scale?: number; animation?: unknown }> | undefined;
+  return assets?.find((item) => item.id === id);
+}
+
 function assetScale(id: string): number {
-  const assets = document().assets as Array<{ id?: string; scale?: number }> | undefined;
-  const asset = assets?.find((item) => item.id === id);
-  return typeof asset?.scale === "number" ? asset.scale : 1;
+  const scale = assetRow(id)?.scale;
+  return typeof scale === "number" ? scale : 1;
+}
+
+/** Scale other than 1, or a clip, is a prop. A crate with no clip stays a building. */
+function drawsAsProp(model: string): boolean {
+  if (assetScale(model) !== 1) return true;
+  const animation = assetRow(model)?.animation;
+  return typeof animation === "string" && animation.length > 0;
 }
 
 function sceneRecord(): Record<string, unknown> {
@@ -49,12 +60,12 @@ function placementDocs(): PlacementDoc[] {
   return placementRefs().map((ref) => JSON.parse(readFileSync(`${projectRoot()}/${ref}`, "utf8")) as PlacementDoc);
 }
 
-/** Building ids in the baked files. A hinged placement is a door. An asset scale other than 1 is a prop. */
+/** Building ids in the baked files. A hinged placement is a door. A prop scale or a clip is not a building. */
 function bakedBuildingIds(): string[] {
   return placementDocs().flatMap((file) =>
     (file.placements ?? []).flatMap((item) => {
       if (item.hinge != null || typeof item.id !== "string") return [];
-      if (typeof item.model === "string" && assetScale(item.model) !== 1) return [];
+      if (typeof item.model === "string" && drawsAsProp(item.model)) return [];
       return [item.id];
     }),
   );
@@ -65,7 +76,7 @@ function placementPropCount(): number {
   const stamps = new Set<string>();
   for (const file of placementDocs()) {
     for (const item of file.placements ?? []) {
-      if (item.hinge != null || typeof item.model !== "string" || assetScale(item.model) === 1) continue;
+      if (item.hinge != null || typeof item.model !== "string" || !drawsAsProp(item.model)) continue;
       const position = Array.isArray(item.position) ? item.position.join(",") : "";
       stamps.add(`${item.model}|${position}|${item.yaw}|${item.scale}`);
     }

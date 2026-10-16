@@ -20,7 +20,9 @@ import {
  * the click cannot navigate or submit a form. It does not fire, and it does
  * not request the lock again while this element already holds it.
  * F fires while the pointer is locked. F does not change the gamepad profile.
+ * P throws a grenade on the same lock. P does not fire. F does not throw.
  * A gamepad fire button is included only when that profile already binds one.
+ * Neither profile binds a grenade button.
  */
 
 export type PlaySample = {
@@ -30,6 +32,8 @@ export type PlaySample = {
   pitch: number;
   /** F is down while locked, or a tap landed since the previous sample. */
   firing: boolean;
+  /** P is down while locked, or a tap landed since the previous sample. */
+  grenade: boolean;
 };
 
 export type PlayInput = {
@@ -61,6 +65,8 @@ export function attachPlayInput(
   let locked = false;
   let fireDown = false;
   let fireQueued = false;
+  let grenadeDown = false;
+  let grenadeQueued = false;
   let profile = loadGamepadProfile(storage);
   const pad = new GamepadInput();
 
@@ -80,6 +86,16 @@ export function attachPlayInput(
       fireDown = true;
       fireQueued = true;
       onFirePress();
+      return;
+    }
+    if (ev.code === "KeyP") {
+      if (!down) {
+        grenadeDown = false;
+        return;
+      }
+      if (ev.repeat || document.pointerLockElement !== dom) return;
+      grenadeDown = true;
+      grenadeQueued = true;
       return;
     }
     if (ev.repeat) return;
@@ -106,6 +122,8 @@ export function attachPlayInput(
     if (!locked) {
       fireDown = false;
       fireQueued = false;
+      grenadeDown = false;
+      grenadeQueued = false;
     }
     document.body.style.cursor = locked ? "none" : "default";
   };
@@ -125,6 +143,8 @@ export function attachPlayInput(
   const onBlur = () => {
     fireDown = false;
     fireQueued = false;
+    grenadeDown = false;
+    grenadeQueued = false;
   };
 
   window.addEventListener("keydown", down);
@@ -163,8 +183,10 @@ export function attachPlayInput(
       const button = gamepadFireButton(profile);
       const padFire = button !== undefined && pad.connected && pad.isPressed(button);
       const firing = (document.pointerLockElement === dom && (fireDown || fireQueued)) || padFire;
+      const grenade = document.pointerLockElement === dom && (grenadeDown || grenadeQueued);
       fireQueued = false;
-      return { forward: move.forward, strafe: move.strafe, yaw, pitch, firing };
+      grenadeQueued = false;
+      return { forward: move.forward, strafe: move.strafe, yaw, pitch, firing, grenade };
     },
   };
 }

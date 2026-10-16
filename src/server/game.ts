@@ -2,7 +2,8 @@ import type { AuthoritativeWorld } from "conveyor-engine-world";
 import type { EngineWsServer } from "conveyor-engine-transport-ws";
 import type { Audit } from "../shared/audit.js";
 import { pickRespawnSpawn, type PawnHealth } from "../shared/health.js";
-import { MOVEMENTS, movementIntent } from "../shared/movements.js";
+import { moveIntent, yawFromQuat } from "../shared/look.js";
+import { approachYaw, enqueueOwnedMove, MOVE_DT, MOVEMENTS, movementIntent, yawQuaternion } from "../shared/movements.js";
 import { deliverAuditFrame } from "./audit.js";
 import { deliverHealthFrames } from "./health.js";
 import { dispatchHostFrame, hostSnapPath } from "./host-path.js";
@@ -11,6 +12,10 @@ import { propClipName, type Prop } from "../shared/arena-view.js";
 
 /** 20 Hz. Measured later; not a competitive tick rate. */
 export const TICK_MS = 50;
+
+if (MOVE_DT !== TICK_MS / 1000) {
+  throw new Error(`MOVE_DT ${MOVE_DT} is not the ${TICK_MS} ms host tick`);
+}
 
 /**
  * Kernel default interest is 48. The authored floor's opposite corners are
@@ -23,7 +28,6 @@ export type HeldInput = {
   moveZ: number;
   yaw: number;
   seq: number;
-  clip: string;
 };
 
 export function createHeldInputs() {
@@ -87,6 +91,21 @@ export function startPropAnimation(props: readonly Prop[]): PropClip[] {
   return clips;
 }
 
+/**
+ * One unowned wander or hostile step. `agent.heading` is the wished heading
+ * and may jump. The body turns toward it by at most one `PAWN_YAW_STEP`.
+ * The velocity wish uses that capped yaw, then eases. The clip follows planar
+ * speed and carries no position. Player input does not call this.
+ */
+export function stepUnownedWander(world: AuthoritativeWorld, agent: WanderAgent) {
+  const scale = movementIntent(agent.speeds[agent.gait] ?? 0, Object.values(agent.speeds));
+  const view = world.store.view(agent.id);
+  const facing = view ? yawFromQuat(view.rotation) : agent.heading;
+  const yaw = approachYaw(facing, agent.heading);
+  const wish = moveIntent(yaw, scale, 0);
+  return enqueueOwnedMove(world, agent.id, wish.moveX, wish.moveZ, yaw, MOVE_DT);
+}
+
 export function startWanderLoop(
   world: AuthoritativeWorld,
   agents: WanderAgent[],
@@ -136,58 +155,25 @@ export function startWanderLoop(
         const cmd = held.get(agent.id);
         const moveX = cmd?.moveX ?? 0;
         const moveZ = cmd?.moveZ ?? 0;
+        // Owned look is the input yaw on this tick. Bots turn in stepUnownedWander.
         const yaw = cmd?.yaw ?? agent.heading;
         if (cmd) agent.heading = yaw;
-        const speed = Math.hypot(moveX, moveZ);
-        // TODO: fix
-        //const gait = speed > 1 ? "run" : speed > 0.05 ? "walk" : "idle";
-        const gait = cmd?.clip ?? (speed > 1 ? "run" : speed > 0.05 ? "walk" : "idle");
-        if (agent.gait !== gait) {
-          agent.gait = gait;
-          world.enqueue({
-            kind: "setClip",
-            entity: agent.id,
-            clip: gait,
-            speed: speed
-          });
-        }
-        world.enqueue({
-          kind: "applyInput",
-          entity: agent.id,
-          seq: cmd?.seq ?? tick,
-          moveX,
-          moveZ,
-          yaw
-        });
+        const moved = enqueueOwnedMove(world, agent.id, moveX, moveZ, yaw, MOVE_DT);
+        if (moved) agent.gait = moved.gait;
         continue;
       }
       if (tick >= agent.nextTurn) {
         agent.heading += (unit01(rng) - 0.5) * Math.PI;
         let gait = MOVEMENTS[Math.floor(unit01(rng) * MOVEMENTS.length)] ?? "idle";
         if (gait == "fall") gait = "idle";
-        if (agent.gait !== gait) {
-          agent.gait = gait;
-          world.enqueue({
-            kind: "setClip",
-            entity: agent.id,
-            clip: gait,
-            speed: agent.speeds[gait] ?? 0
-          });
-        }
+        agent.gait = gait;
         // TODO: remove this log, it is spammy
         //console.log("agent:",agent.id,gait);
         //world.triggerAction(agent.id, gait);
         agent.nextTurn = tick + 20 + Math.floor(unit01(rng) * 30);
       }
-      const scale = movementIntent(agent.speeds[agent.gait] ?? 0, Object.values(agent.speeds));
-      world.enqueue({
-        kind: "applyInput",
-        entity: agent.id,
-        seq: tick,
-        moveX: Math.sin(agent.heading) * scale,
-        moveZ: Math.cos(agent.heading) * scale,
-        yaw: agent.heading
-      });
+      // The picked gait only scales the wish. The clip follows the eased speed.
+      stepUnownedWander(world, agent);
     }
     if (health) {
       for (const id of health.takeRespawns()) respawnPawn(world, agents, id);
@@ -250,14 +236,12 @@ function respawnPawn(world: AuthoritativeWorld, agents: WanderAgent[], id: numbe
     return;
   }
   if (agent) agent.heading = spawn.yaw;
-  // Yaw quaternion, the same half-angle the initial spawn uses.
-  const half = spawn.yaw * 0.5;
   world.enqueue({ kind: "clearInput", entity: id });
   world.enqueue({
     kind: "setTransform",
     entity: id,
     position: { x: spawn.x, y: spawn.y, z: spawn.z },
-    rotation: { x: 0, y: Math.sin(half), z: 0, w: Math.cos(half) },
+    rotation: yawQuaternion(spawn.yaw),
     scale: { x: view.scale.x, y: view.scale.y, z: view.scale.z },
   });
   world.enqueue({ kind: "setClip", entity: id, clip: "idle", speed: 0 });

@@ -3,9 +3,11 @@ import type { ArenaView } from "../shared/arena-view.js";
 import { aimDirection, eyeLook, INPUT_HZ, moveIntent, yawFromQuat } from "../shared/look.js";
 import { dropPickupAabb } from "../shared/pickups.js";
 import { clientFaultText, createFireDebugLog } from "../shared/fire-debug.js";
+import { advanceGrenadeClock, type GrenadePose } from "../shared/grenade.js";
 import { advanceFireClock, LASER_MS, traceHitscan, type TraceCapsule } from "../shared/hitscan.js";
 import { createAabbDebug } from "./aabb-debug.js";
 import { createArenaScene, loadArenaVisuals } from "./arena-scene.js";
+import { createGrenadeProps } from "./grenade.js";
 import { createHitMarker } from "./hit-marker.js";
 import { createHud, localHealthLabel } from "./hud.js";
 import { attachPlayInput } from "./input.js";
@@ -61,11 +63,24 @@ const input = attachPlayInput(arena.renderer.domElement, undefined, () => {
 hud.onProfileToggle(() => input.toggleProfile());
 hud.setProfile(input.profile);
 const lasers = createLaserBeams(arena.scene);
+const grenades = createGrenadeProps(arena.scene, async () => {
+  const url = view.grenade ?? "/assets/models/grenade-launched.glb";
+  const { GLTFLoader } = await import("three/addons/loaders/GLTFLoader.js");
+  try {
+    const gltf = await new GLTFLoader().loadAsync(url);
+    return gltf.scene;
+  } catch (err) {
+    console.warn("grenade", err);
+    return undefined;
+  }
+});
 const client = new EngineClient(1, { delayMs: 80, extraMs: 0, predictOwned: false });
 let statusText = "connecting";
 let aimedPawn: number | undefined;
 let fireSeq = 0;
 let nextFireAt = 0;
+let grenadeSeq = 0;
+let nextGrenadeAt = 0;
 let pinnedError: string | undefined;
 let pendingFireLog: { socketClosed: boolean; camBefore: { x: number; y: number; z: number } } | undefined;
 let awaitFireReply = false;
@@ -74,6 +89,7 @@ let debugPawn: number | undefined;
 let debugPawnWatch = false;
 let sawFiniteCamera = true;
 const laserQueue: LaserNotice[] = [];
+const grenadeQueue: GrenadePose[] = [];
 const pawnVital = new Map<number, { hp: number; dead: boolean }>();
 
 const link = connectLive({
@@ -89,6 +105,9 @@ const link = connectLive({
   onApplied: () => {},
   onLaser: (laser) => {
     laserQueue.push(laser);
+  },
+  onGrenade: (grenade) => {
+    grenadeQueue.push(grenade);
   },
   onHealth: (health) => {
     pawnVital.set(health.entity, { hp: health.hp, dead: health.dead });
@@ -150,6 +169,8 @@ function frame(now: number) {
     hud.setStatus(`frame error ${pinnedError}`);
     laserQueue.length = 0;
     lasers.drop();
+    grenadeQueue.length = 0;
+    grenades.drop();
     try {
       arena.renderer.render(arena.scene, arena.camera);
     } catch (renderErr) {
@@ -192,6 +213,12 @@ function drawFrame(now: number) {
     let shotTo: { x: number; y: number; z: number } | undefined;
     const clock = advanceFireClock(sample.firing, now, nextFireAt);
     nextFireAt = clock.nextAt;
+    const thrown = advanceGrenadeClock(sample.grenade, now, nextGrenadeAt);
+    nextGrenadeAt = thrown.nextAt;
+    if (thrown.due) {
+      const seq = grenadeSeq + 1;
+      if (link.sendGrenade(seq, sample.yaw, sample.pitch)) grenadeSeq = seq;
+    }
     if (clock.due) {
       pendingFireLog = {
         socketClosed: link.socketClosed(),
@@ -251,6 +278,9 @@ function drawFrame(now: number) {
   }
   laserQueue.length = 0;
   lasers.expire(now);
+  for (const pose of grenadeQueue) grenades.place(pose, now);
+  grenadeQueue.length = 0;
+  grenades.expire(now);
   pawns.apply(render, dt, (id) => client.authoritative(id)?.action, ownedId);
   sendAcc += dt;
   if (sendAcc >= sendDt) {

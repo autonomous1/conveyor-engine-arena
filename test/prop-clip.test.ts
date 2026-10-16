@@ -80,6 +80,80 @@ test("alien-weapon-1 plays rotate and a still prop gets no mixer", async () => {
   assert.match(client, /for \(const mixer of visuals\.propMixers\) mixer\.update\(dt\)/);
 });
 
+test("the key on the top step draws, and a missing rotate clip keeps the mesh", async () => {
+  const root = projectRoot();
+  const doc = JSON.parse(readFileSync(path.join(root, "web/game/arena.game.json"), "utf8")) as {
+    assets?: Array<{ uri?: unknown }>;
+    scene: Record<string, unknown>;
+  };
+  const files = new Map<string, Uint8Array>();
+  for (const asset of doc.assets ?? []) {
+    if (typeof asset.uri !== "string") continue;
+    files.set(asset.uri, new Uint8Array(readFileSync(path.join(root, "web", asset.uri))));
+  }
+  const scene = structuredClone(doc);
+  scene.scene.placements = ["./web/game/props.placements.json"];
+  scene.scene.bounds = { minX: -80, maxX: 80, minY: -2, maxY: 12, minZ: -80, maxZ: 80 };
+  scene.scene.spawnPoints = [];
+  const game = compileGame(scene, (uri) => files.get(uri), readManifestSources(root, scene));
+  const placed = JSON.parse(readFileSync(path.join(root, "web/game/props.placements.json"), "utf8")) as {
+    placements: Array<{ id: string; type?: string }>;
+  };
+  const stamp = placed.placements.find((item) => item.id === "key");
+  assert.equal(stamp?.type, "key");
+  const key = game.view.props.find((prop) => prop.id === "key");
+  assert.ok(key);
+  assert.equal(key.model.endsWith("/key-1.glb"), true);
+  assert.equal(key.type, undefined);
+  assert.equal(game.view.pickups?.some((pickup) => pickup.id === "key"), false);
+  assert.equal(game.view.buildings.some((building) => building.id === "key"), false);
+  const steps = game.view.buildings.filter((building) => building.model.endsWith("/step.glb"));
+  assert.ok(steps.length >= 1);
+  const top = steps.reduce((best, step) => step.position[1] > best.position[1] ? step : best);
+  assert.ok(key.position);
+  assert.ok(key.position[1] > top.position[1]);
+  assert.ok(Math.abs(key.position[0] - top.position[0]) < 0.5);
+  assert.ok(Math.abs(key.position[2] - top.position[2]) < 0.5);
+  const crate = placed.placements.find((item) => item.type === "crate");
+  assert.ok(crate);
+  assert.equal(game.view.buildings.some((building) => building.id === crate.id), true);
+  assert.equal(propClipName(key), "rotate");
+
+  const loaded = await loadGlb("key-1.glb");
+  const spinning = loaded.scene.clone(true);
+  const mixer = playPropClip(spinning, loaded.clips, propClipName(key));
+  assert.ok(mixer);
+  const before = quaternions(spinning);
+  mixer.update(0.5);
+  assert.ok(moved(before, quaternions(spinning)), "rotate clip turns the key");
+
+  const quiet = loaded.scene.clone(true);
+  const hold = new THREE.Group();
+  hold.add(quiet);
+  let meshes = 0;
+  quiet.traverse((object) => {
+    if ((object as THREE.Mesh).isMesh) meshes += 1;
+  });
+  assert.ok(meshes > 0);
+  const warnings: string[] = [];
+  const orig = console.warn;
+  console.warn = (...args: unknown[]) => {
+    warnings.push(args.map((item) => String(item)).join(" "));
+  };
+  try {
+    assert.equal(playPropClip(quiet, [], "rotate"), undefined);
+  } finally {
+    console.warn = orig;
+  }
+  assert.match(warnings.join("\n"), /rotate/);
+  assert.equal(quiet.parent, hold);
+  let kept = 0;
+  quiet.traverse((object) => {
+    if ((object as THREE.Mesh).isMesh) kept += 1;
+  });
+  assert.equal(kept, meshes);
+});
+
 function quaternions(root: THREE.Object3D): Map<string, THREE.Quaternion> {
   const out = new Map<string, THREE.Quaternion>();
   root.traverse((object) => {

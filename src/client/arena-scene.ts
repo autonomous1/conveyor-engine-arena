@@ -383,13 +383,21 @@ export function playPropClip(
 ): THREE.AnimationMixer | undefined {
   if (!clipName) return undefined;
   const clip = findClip(clips, clipName);
-  if (!clip) return undefined;
-  const mixer = new THREE.AnimationMixer(root);
-  const action = mixer.clipAction(clip);
-  action.setLoop(THREE.LoopRepeat, Infinity);
-  action.clampWhenFinished = false;
-  action.play();
-  return mixer;
+  if (!clip) {
+    console.warn(`prop clip ${clipName} is missing`);
+    return undefined;
+  }
+  try {
+    const mixer = new THREE.AnimationMixer(root);
+    const action = mixer.clipAction(clip);
+    action.setLoop(THREE.LoopRepeat, Infinity);
+    action.clampWhenFinished = false;
+    action.play();
+    return mixer;
+  } catch (err) {
+    console.warn(`prop clip ${clipName} failed`, err);
+    return undefined;
+  }
 }
 
 /**
@@ -769,10 +777,10 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
       mesh.scale.setScalar(prop.scale);
       mesh.position.set(0, 0, 0);
       group.add(mesh);
-      rememberPropClip(mesh, prop, clips);
       markShadowCasters(group, castsShadow);
       placements.addClone(prop.id, group);
       arena.content.add(group);
+      rememberPropClip(mesh, prop, clips);
       return;
     }
     const w = Math.max(0.1, prop.maxX - prop.minX);
@@ -793,15 +801,19 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
     const mesh = template.clone(true);
     mesh.scale.set(w, h, d);
     mesh.position.set((prop.minX + prop.maxX) / 2, prop.minY, (prop.minZ + prop.maxZ) / 2);
-    rememberPropClip(mesh, prop, clips);
     markShadowCasters(mesh, castsShadow);
     placements.addClone(prop.id, mesh);
     arena.content.add(mesh);
+    rememberPropClip(mesh, prop, clips);
   }
 
   function rememberPropClip(root: THREE.Object3D, prop: ArenaView["props"][number], clips?: readonly THREE.AnimationClip[]) {
-    const mixer = playPropClip(root, clips ?? [], propClipName(prop));
-    if (mixer) propMixers.push(mixer);
+    try {
+      const mixer = playPropClip(root, clips ?? [], propClipName(prop));
+      if (mixer) propMixers.push(mixer);
+    } catch (err) {
+      console.warn(`prop ${prop.id} clip failed`, err);
+    }
   }
 
   const templates: CharacterTemplates = new Map();

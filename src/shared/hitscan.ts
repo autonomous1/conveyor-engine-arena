@@ -205,6 +205,161 @@ function rayCapsule(origin: Vec3, dir: Vec3, cap: TraceCapsule, maxT: number): n
   return best;
 }
 
+export type SweepHit = {
+  /** Meters along the segment from `from` toward `to`. */
+  distance: number;
+  point: Vec3;
+  /** Unit normal pointing back toward the side the segment came from. */
+  normal: Vec3;
+  id?: number;
+  /** True when the closest volume is a pawn capsule. */
+  pawn: boolean;
+};
+
+/**
+ * Closest hit of the finite segment `from` → `to` against the same volumes
+ * `traceHitscan` uses. A start on a surface (t at or below the ray epsilon)
+ * is not a hit, so a point that just left a face does not stick to it.
+ * The first accepted hit wins. This does not apply {@link MIN_HIT_DISTANCE}.
+ */
+export function sweepSegment(
+  from: Vec3,
+  to: Vec3,
+  aabbs: readonly TraceAabb[],
+  capsules: readonly TraceCapsule[],
+): SweepHit | undefined {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const dz = to.z - from.z;
+  const length = Math.hypot(dx, dy, dz);
+  if (!(length > HIT_EPS)) return undefined;
+  const dir = { x: dx / length, y: dy / length, z: dz / length };
+  let best = length;
+  let normal: Vec3 | undefined;
+  let hitId: number | undefined;
+  let pawn = false;
+  const take = (hit: FaceHit | undefined, id: number | undefined, isPawn: boolean) => {
+    if (!hit || !(hit.t < best)) return;
+    best = hit.t;
+    normal = hit.normal;
+    hitId = id;
+    pawn = isPawn;
+  };
+  for (const box of aabbs) take(segmentAabb(from, dir, box, best), box.id, false);
+  for (const cap of capsules) take(segmentCapsule(from, dir, cap, best), cap.id, true);
+  if (!normal) return undefined;
+  const face = normal;
+  const shot: SweepHit = {
+    distance: best,
+    point: { x: from.x + dir.x * best, y: from.y + dir.y * best, z: from.z + dir.z * best },
+    normal: face,
+    pawn,
+  };
+  if (hitId !== undefined) shot.id = hitId;
+  return shot;
+}
+
+type FaceHit = { t: number; normal: Vec3 };
+
+/** Entry face of a finite ray. `dir` is unit. A point already inside is a miss. */
+function segmentAabb(origin: Vec3, dir: Vec3, box: TraceAabb, maxT: number): FaceHit | undefined {
+  const minY = box.minY ?? Number.NEGATIVE_INFINITY;
+  const maxY = box.maxY ?? Number.POSITIVE_INFINITY;
+  let tmin = 0;
+  let tmax = maxT;
+  let normal: Vec3 = { x: 0, y: 0, z: 0 };
+  let entered = false;
+  const axes: Array<[number, number, number, number, "x" | "y" | "z"]> = [
+    [origin.x, box.minX, box.maxX, dir.x, "x"],
+    [origin.y, minY, maxY, dir.y, "y"],
+    [origin.z, box.minZ, box.maxZ, dir.z, "z"],
+  ];
+  for (const [o, min, max, d, axis] of axes) {
+    if (Math.abs(d) < 1e-12) {
+      if (o < min || o > max) return undefined;
+      continue;
+    }
+    let t1 = (min - o) / d;
+    let t2 = (max - o) / d;
+    // t1 starts as the min face. Its outward normal is −axis. A swap makes t1 the max face.
+    let sign: -1 | 1 = -1;
+    if (t1 > t2) {
+      const swap = t1;
+      t1 = t2;
+      t2 = swap;
+      sign = 1;
+    }
+    if (t1 > tmin) {
+      tmin = t1;
+      normal = { x: 0, y: 0, z: 0 };
+      normal[axis] = sign;
+      entered = true;
+    }
+    if (t2 < tmax) tmax = t2;
+    if (tmin > tmax) return undefined;
+  }
+  if (tmax < HIT_EPS || !entered || !(tmin > HIT_EPS) || tmin > maxT) return undefined;
+  return { t: tmin, normal };
+}
+
+function segmentCapsule(origin: Vec3, dir: Vec3, cap: TraceCapsule, maxT: number): FaceHit | undefined {
+  if (!(cap.radius > 0) || !(cap.height > 0)) return undefined;
+  if (!(cap.height > cap.radius * 2)) {
+    return segmentSphere(origin, dir, { x: cap.x, y: cap.y + cap.height / 2, z: cap.z }, Math.min(cap.radius, cap.height / 2), maxT);
+  }
+  const y0 = cap.y + cap.radius;
+  const y1 = cap.y + cap.height - cap.radius;
+  let best: FaceHit | undefined;
+  const consider = (hit: FaceHit | undefined) => {
+    if (!hit) return;
+    if (!best || hit.t < best.t) best = hit;
+  };
+  const ox = origin.x - cap.x;
+  const oz = origin.z - cap.z;
+  const a = dir.x * dir.x + dir.z * dir.z;
+  const b = 2 * (ox * dir.x + oz * dir.z);
+  const c = ox * ox + oz * oz - cap.radius * cap.radius;
+  if (a > 1e-12) {
+    const disc = b * b - 4 * a * c;
+    if (disc >= 0) {
+      const s = Math.sqrt(disc);
+      for (const t of [(-b - s) / (2 * a), (-b + s) / (2 * a)]) {
+        if (t <= HIT_EPS || t > maxT) continue;
+        const y = origin.y + t * dir.y;
+        if (y < y0 || y > y1) continue;
+        const nx = origin.x + t * dir.x - cap.x;
+        const nz = origin.z + t * dir.z - cap.z;
+        const len = Math.hypot(nx, nz);
+        if (!(len > 1e-8)) continue;
+        consider({ t, normal: { x: nx / len, y: 0, z: nz / len } });
+      }
+    }
+  }
+  consider(segmentSphere(origin, dir, { x: cap.x, y: y0, z: cap.z }, cap.radius, maxT));
+  consider(segmentSphere(origin, dir, { x: cap.x, y: y1, z: cap.z }, cap.radius, maxT));
+  return best;
+}
+
+function segmentSphere(origin: Vec3, dir: Vec3, center: Vec3, radius: number, maxT: number): FaceHit | undefined {
+  const ox = origin.x - center.x;
+  const oy = origin.y - center.y;
+  const oz = origin.z - center.z;
+  const b = ox * dir.x + oy * dir.y + oz * dir.z;
+  const c = ox * ox + oy * oy + oz * oz - radius * radius;
+  const disc = b * b - c;
+  if (disc < 0) return undefined;
+  const s = Math.sqrt(disc);
+  const t0 = -b - s;
+  const t = t0 > HIT_EPS && t0 <= maxT ? t0 : -b + s;
+  if (!(t > HIT_EPS) || t > maxT) return undefined;
+  const nx = origin.x + dir.x * t - center.x;
+  const ny = origin.y + dir.y * t - center.y;
+  const nz = origin.z + dir.z * t - center.z;
+  const len = Math.hypot(nx, ny, nz);
+  if (!(len > 1e-8)) return undefined;
+  return { t, normal: { x: nx / len, y: ny / len, z: nz / len } };
+}
+
 /** `dir` is unit. Quadratic is t² + 2 b t + c = 0. */
 function raySphere(origin: Vec3, dir: Vec3, center: Vec3, radius: number, maxT: number): number | undefined {
   const ox = origin.x - center.x;
