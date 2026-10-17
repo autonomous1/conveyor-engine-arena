@@ -8,16 +8,9 @@ The server ticks at 20 Hz. Each spawn point gets a pawn. The wander loop picks `
 
 ## Prerequisites
 
-Node.js 22 or newer. This repo expects three sibling checkouts, because `package.json` uses `file:` dependencies:
+Node.js 22 or newer.
 
-```text
-../conveyor-engine-arena/          this repo
-../conveyor-engine-packages/       kernel (dependencies)
-../conveyor-graph/                 devDependency
-../conveyor-graph-simulator/       devDependency
-```
-
-Those packages publish from `dist/`. Build them before `npm install` here when that output is missing. The live server publishes snapshots on its own. `conveyor-graph-simulator` is used by the headless runners, the bench, and `record:arena`.
+The kernel packages (`conveyor-engine-core`, `conveyor-engine-world`, `conveyor-engine-replication`, `conveyor-engine-client`, `conveyor-engine-three`, and related packages) and `conveyor-graph` are published on npm. `npm install` pulls them from the registry. No sibling checkouts or local `file:` links are required.
 
 ## Run
 
@@ -40,12 +33,14 @@ Open that URL. The host binds to `127.0.0.1`. Set `PORT` to use another port. Af
 
 The camera uses Three.js first-person fly controls:
 
-| Input | Action |
-| --- | --- |
-| W / Up, S / Down | Forward, back |
-| A / Left, D / Right | Strafe |
-| R, F | Up, down |
-| Drag | Look |
+```
+| Input               | Action        |
+| ------------------- | ------------- |
+| W / Up, S / Down    | Forward, back |
+| A / Left, D / Right | Strafe        |
+| R, F                | Up, down      |
+| Drag                | Look          |
+```
 
 A gamepad flies the same camera. The right stick is inverted relative to the `three-gamepad-controls` default. Pawn intent is still driven on the server.
 
@@ -74,36 +69,38 @@ Each asset keeps its own license id and provenance origin.
 
 ## Scripts
 
-| Script | What it does |
-| --- | --- |
-| `npm run dev` | Build, then start the live host |
-| `npm start` | Start `dist/server/main.js` |
-| `npm run build` | Clean `dist/`, compile the server with `tsc`, bundle the client with esbuild |
-| `npm run typecheck` | Typecheck server and client without emitting |
-| `npm test` | Node’s test runner. Requires a prior `npm run build` |
-| `npm run start:arena` | Headless arena for 8 ticks (pass a count: `npm run start:arena-wall` runs 40) |
-| `npm run start:arena-miss` | Same path with presentation assets marked missing |
-| `npm run run:lossless` | Headless runner, clean delivery |
-| `npm run run:lossy` | Headless runner, loss and jitter |
-| `npm run run:partition` | Headless runner, a temporary partition |
-| `npm run bench` | Headless bench, default 200 entities and 30 ticks (`npm run bench -- 1000 120`) |
-| `npm run record:arena` | Record a wander trace with the simulator to `viewer/replay/arena-wander.jsonl` |
+```
+| Script                     | What it does                                                                    |
+| -------------------------- | ------------------------------------------------------------------------------- |
+| `npm run dev`              | Build, then start the live host                                                 |
+| `npm start`                | Start `dist/server/main.js`                                                     |
+| `npm run build`            | Clean `dist/`, compile the server with `tsc`, bundle the client with esbuild    |
+| `npm run typecheck`        | Typecheck server and client without emitting                                    |
+| `npm test`                 | Node’s test runner. Requires a prior `npm run build`                            |
+| `npm run start:arena`      | Headless arena for 8 ticks (pass a count: `npm run start:arena-wall` runs 40)   |
+| `npm run start:arena-miss` | Same path with presentation assets marked missing                               |
+| `npm run run:lossless`     | Headless runner, clean delivery                                                 |
+| `npm run run:lossy`        | Headless runner, loss and jitter                                                |
+| `npm run run:partition`    | Headless runner, a temporary partition                                          |
+| `npm run bench`            | Headless bench, default 200 entities and 30 ticks (`npm run bench -- 1000 120`) |
+| `npm run record:arena`     | Record a wander trace to `viewer/replay/arena-wander.jsonl`                     |
+```
 
 `node scripts/make-placeholders.mjs` writes original procedural stand-ins under `web/assets` (stone floor, cloudy sky, crate and player GLBs). The game file is what the server loads; point an asset `uri` at a new file for it to appear in the room.
 
 ## Layout
 
 ```text
-src/server/     HTTP host, manifest compile, world load, wander tick
-src/client/     Browser bootstrap, scene, pawn presentation, camera, HUD
-src/shared/     Arena view, movement names, shadow settings
-src/            Headless ExampleApp, runners, bench, wander recording
-web/game/       arena.game.json
-web/assets/     Models and textures copied into dist/web
-web/index.html  Page shell
-scripts/        Client bundle and placeholder art
-test/           Manifest, host, movement, shadows, wall mount, static world
-dist/           Build output. The host serves dist/web and runs dist/server
+src/server/ HTTP host, manifest compile, world load, wander tick
+src/client/ Browser bootstrap, scene, pawn presentation, camera, HUD
+src/shared/ Arena view, movement names, shadow settings
+src/ Headless ExampleApp, runners, bench, wander recording
+web/game/ arena.game.json
+web/assets/ Models and textures copied into dist/web
+web/index.html Page shell
+scripts/ Client bundle and placeholder art
+test/ Manifest, host, movement, shadows, wall mount, static world
+dist/ Build output. The host serves dist/web and runs dist/server
 ```
 
 ## Tests

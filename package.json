@@ -49,7 +49,7 @@
   "devDependencies": {
     "@types/node": "^22.10.0",
     "@types/ws": "^8.5.14",
-    "blueprint-scene": "^0.1.0",
+    "blueprint-scene": "^0.1.1",
     "esbuild": "^0.25.0",
     "typescript": "^5.8.2"
   }
