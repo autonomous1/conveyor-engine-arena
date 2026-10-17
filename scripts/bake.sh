@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-./node_modules/blueprint-scene/bin/blueprint-scene bake \
+../blueprint-scene/bin/blueprint-scene bake \
 --svg ./dev/scenes/arena-1/designs/arena-1.svg \
 --models ./web/assets/models \
 --game ./web/game/arena.game.json \

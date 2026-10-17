@@ -50,22 +50,6 @@
       }
     },
     {
-      "id": "brutalist-building-1-a",
-      "kind": "model",
-      "type": "building",
-      "instance": "static",
-      "uri": "/assets/models/brutalist-building-1-a.glb",
-      "mediaType": "model/gltf-binary",
-      "license": {
-        "id": "unspecified",
-        "status": "unknown"
-      },
-      "provenance": {
-        "origin": "manual",
-        "notes": "East facade model supplied for this arena."
-      }
-    },
-    {
       "id": "brutalist-building-1-cbake",
       "kind": "model",
       "instance": "static",
@@ -77,7 +61,7 @@
       },
       "provenance": {
         "origin": "manual",
-        "notes": "East facade model supplied for this arena."
+        "notes": "Original rebaked onto simpler cube model for this arena."
       }
     },
     {
@@ -93,7 +77,7 @@
       },
       "provenance": {
         "origin": "manual",
-        "notes": "East facade model supplied for this arena."
+        "notes": "Original rebaked onto simpler cube model for this arena."
       }
     },
     {
@@ -109,7 +93,7 @@
       },
       "provenance": {
         "origin": "manual",
-        "notes": "East facade model supplied for this arena."
+        "notes": "Original rebaked onto simpler cube model for this arena."
       }
     },
     {
@@ -145,7 +129,7 @@
       },
       "provenance": {
         "origin": "procedural",
-        "notes": "Original procedural placeholder made for this arena. No third-party art."
+        "notes": "Cubic sky texture map"
       }
     },
     {
@@ -389,7 +373,7 @@
       },
       "provenance": {
         "origin": "procedural",
-        "notes": "Original procedural placeholder made for this arena. No third-party art."
+        "notes": "Generated with blueprint-sceen prop --shape door"
       }
     },
     {
@@ -405,7 +389,7 @@
       },
       "provenance": {
         "origin": "procedural",
-        "notes": "Original procedural placeholder made for this arena. No third-party art."
+        "notes": "Generated with blueprint-sceen prop --shape door"
       }
     },
     {
@@ -421,7 +405,7 @@
       },
       "provenance": {
         "origin": "procedural",
-        "notes": "Original procedural placeholder made for this arena. No third-party art."
+        "notes": "Generated with blueprint-sceen prop --shape crate"
       }
     },
     {
@@ -437,7 +421,7 @@
       },
       "provenance": {
         "origin": "procedural",
-        "notes": "Original procedural placeholder made for this arena. No third-party art."
+        "notes": "Generated with blueprint-sceen prop --shape crate"
       }
     },
     {
@@ -453,23 +437,7 @@
       },
       "provenance": {
         "origin": "procedural",
-        "notes": "Original procedural placeholder made for this arena. No third-party art."
-      }
-    },
-    {
-      "id": "cover-crate",
-      "kind": "model",
-      "type": "crate",
-      "instance": "static",
-      "uri": "/assets/models/ammo-crate.glb",
-      "mediaType": "model/gltf-binary",
-      "license": {
-        "id": "CC0-1.0",
-        "status": "spdx"
-      },
-      "provenance": {
-        "origin": "procedural",
-        "notes": "Original procedural placeholder made for this arena. No third-party art."
+        "notes": "Generated with blueprint-sceen prop --shape crate"
       }
     },
     {
@@ -508,7 +476,7 @@
       },
       "provenance": {
         "origin": "procedural",
-        "notes": "Original procedural placeholder made for this arena. No third-party art."
+        "notes": "Created with blender extrude 2d curve"
       }
     },
     {
@@ -564,7 +532,7 @@
       },
       "provenance": {
         "origin": "procedural",
-        "notes": "Original procedural placeholder made for this arena. No third-party art."
+        "notes": "Created with blender"
       }
     }
   ],

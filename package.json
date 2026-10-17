@@ -35,13 +35,13 @@
   },
   "license": "ISC",
   "dependencies": {
-    "conveyor-engine-assets": "file:../conveyor-engine-packages/conveyor-engine-assets",
-    "conveyor-engine-client": "file:../conveyor-engine-packages/conveyor-engine-client",
-    "conveyor-engine-core": "file:../conveyor-engine-packages/conveyor-engine-core",
-    "conveyor-engine-replication": "file:../conveyor-engine-packages/conveyor-engine-replication",
-    "conveyor-engine-three": "file:../conveyor-engine-packages/conveyor-engine-three",
-    "conveyor-engine-transport-ws": "file:../conveyor-engine-packages/conveyor-engine-transport-ws",
-    "conveyor-engine-world": "file:../conveyor-engine-packages/conveyor-engine-world",
+    "conveyor-engine-assets": "^0.1.0",
+    "conveyor-engine-client":"^0.1.0",
+    "conveyor-engine-core": "^0.1.0",
+    "conveyor-engine-replication": "^0.1.0",
+    "conveyor-engine-three": "^0.1.0",
+    "conveyor-engine-transport-ws": "^0.1.0",
+    "conveyor-engine-world": "^0.1.0",
     "three": "~0.186.0",
     "three-gamepad-controls": "^0.24.0",
     "ws": "^8.18.0"
@@ -49,9 +49,7 @@
   "devDependencies": {
     "@types/node": "^22.10.0",
     "@types/ws": "^8.5.14",
-    "conveyor-graph": "file:../conveyor-graph",
-    "blueprint-scene": "file:../blueprint-scene",
-    "conveyor-graph-simulator": "file:../conveyor-graph-simulator",
+    "blueprint-scene": "^0.1.0",
     "esbuild": "^0.25.0",
     "typescript": "^5.8.2"
   }

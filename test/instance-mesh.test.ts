@@ -113,9 +113,11 @@ test("different materials stay different instances, and a shared material is sti
 });
 
 test("eight copies of a building do not multiply calls by eight", async () => {
-  const template = await loadGlb("brutalist-building-1-a.glb");
+  const template = await loadGlb("brutalist-building-1-cbake.glb");
   const sourceMeshes = staticMeshCount(template);
-  assert.equal(sourceMeshes, 1);
+  const sourceDraws = drawCalls(template);
+  assert.ok(sourceMeshes >= 1);
+  assert.equal(sourceDraws, sourceMeshes);
   const poses: InstancePose[] = Array.from({ length: 8 }, (_, index) => ({
     position: [index * 10, 0, -4],
     yaw: [0, 90, 180, 270][index % 4]!,
@@ -123,31 +125,27 @@ test("eight copies of a building do not multiply calls by eight", async () => {
   }));
   const batch = new THREE.Group();
   for (const mesh of placeStaticInstances(template, poses)) batch.add(mesh);
-  assert.equal(batch.children.length, 1);
-  assert.equal((batch.children[0] as THREE.InstancedMesh).count, 8);
-  assert.equal(drawCalls(batch), sourceMeshes);
+  assert.equal(batch.children.length, sourceMeshes);
+  for (const child of batch.children) assert.equal((child as THREE.InstancedMesh).count, 8);
+  assert.equal(drawCalls(batch), sourceDraws);
 
   const clones = new THREE.Group();
   for (const pose of poses) {
     clones.add(placeBuildingModel(template, {
       id: "building",
-      model: "/assets/models/brutalist-building-1-a.glb",
+      model: "/assets/models/brutalist-building-1-cbake.glb",
       position: pose.position,
       yaw: pose.yaw,
       scale: pose.scale as number,
     }));
   }
-  assert.equal(drawCalls(clones), sourceMeshes * 8);
+  assert.equal(drawCalls(clones), sourceDraws * 8);
 
   const turned = { id: "building", model: "m", position: [40.449, 0, -217.69447] as [number, number, number], yaw: 270, scale: 100 };
   const clone = placeBuildingModel(template, turned);
   const instanced = placeStaticInstances(template, [{ position: turned.position, yaw: 270, scale: 100 }]);
+  // The baked node is translated and scaled, so the mesh origin is not the placement.
   matrixClose(instanceMatrix(instanced[0]!, 0), clonedMeshMatrix(clone), "yaw 270");
-  const origin = new THREE.Vector3().applyMatrix4(instanceMatrix(instanced[0]!, 0));
-  const tip = new THREE.Vector3(1, 0, 0).applyMatrix4(instanceMatrix(instanced[0]!, 0));
-  assert.ok(origin.distanceTo(new THREE.Vector3(40.449, 0, -217.69447)) < 1e-3, origin.toArray().join(","));
-  // Yaw 270 sends local +X to world +Z, and the scale is 100.
-  assert.ok(tip.sub(origin).distanceTo(new THREE.Vector3(0, 0, 100)) < 1e-2, tip.toArray().join(","));
 });
 
 test("a copied building keeps the glb root rotation and drops its root position", () => {

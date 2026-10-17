@@ -157,12 +157,19 @@ test("a hit on obstacle 188 does not damage a pawn", () => {
   assert.equal(Object.prototype.hasOwnProperty.call(world.store.view(shooter), "health"), false);
 });
 
-test("the baked obstacle 188 does not damage the shooter", () => {
+test("a baked obstacle hit does not damage the shooter", () => {
   const loaded = loadArena();
-  const box = loaded.world.listObstacles().find((obstacle) => obstacle.id === 188);
-  assert.ok(box, "obstacle 188 is missing");
-  const shot = shotInto(box, loaded.world.listObstacles());
-  assert.ok(shot, "no clear ray into obstacle 188");
+  const obstacles = loaded.world.listObstacles();
+  let box: (typeof obstacles)[number] | undefined;
+  let shot: { x: number; z: number; yaw: number } | undefined;
+  for (const candidate of obstacles) {
+    const aim = shotInto(candidate, obstacles);
+    if (!aim) continue;
+    box = candidate;
+    shot = aim;
+    break;
+  }
+  assert.ok(box && shot, "no baked obstacle has a clear ray");
   const shooter = loaded.agents[0]!.id;
   loaded.world.enqueue({
     kind: "setTransform",
@@ -186,7 +193,7 @@ test("the baked obstacle 188 does not damage the shooter", () => {
   } finally {
     console.log = previous;
   }
-  assert.match(logs[0] ?? "", /hit=188/);
+  assert.match(logs[0] ?? "", new RegExp(`hit=${box.id}(?:\\s|$)`));
   for (const agent of loaded.agents) assert.equal(health.get(agent.id).hp, MAX_HP);
   assert.equal(rig.healthFrames.length, 0);
   assert.deepEqual(position(loaded.world, shooter), stood);
@@ -323,7 +330,7 @@ function animReport(): AnimRow[] {
 }
 
 function shotInto(
-  box: { minX: number; maxX: number; minZ: number; maxZ: number },
+  box: { id: number; minX: number; maxX: number; minZ: number; maxZ: number },
   obstacles: readonly TraceAabb[],
 ): { x: number; z: number; yaw: number } | undefined {
   for (let i = 0; i <= 8; i++) {
@@ -337,7 +344,7 @@ function shotInto(
     ];
     for (const aim of tries) {
       const shot = traceHitscan({ x: aim.x, y: EYE_HEIGHT, z: aim.z }, aimDirection(aim.yaw, 0), obstacles, []);
-      if (shot.hitId === 188) return aim;
+      if (shot.hitId === box.id) return aim;
     }
   }
   return undefined;

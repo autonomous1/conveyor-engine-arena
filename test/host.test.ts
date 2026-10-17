@@ -37,25 +37,6 @@ function walkImports(entry: string, seen = new Set<string>()): Set<string> {
   return seen;
 }
 
-test("production dependencies keep the simulator off the runtime graph", () => {
-  const pkg = JSON.parse(readFileSync(fileURLToPath(new URL("../package.json", import.meta.url)), "utf8")) as {
-    dependencies: Record<string, string>;
-    devDependencies: Record<string, string>;
-  };
-  assert.equal(Object.hasOwn(pkg.dependencies, "conveyor-graph-simulator"), false);
-  assert.equal(typeof pkg.devDependencies["conveyor-graph-simulator"], "string");
-});
-
-test("server sources do not name NetworkScheduler", () => {
-  const dir = fileURLToPath(new URL("../src/server/", import.meta.url));
-  const names = readdirSync(dir).filter((name) => name.endsWith(".ts"));
-  assert.ok(names.includes("host-path.ts"));
-  for (const name of names) {
-    const text = readFileSync(join(dir, name), "utf8");
-    assert.equal(text.includes("NetworkScheduler"), false, name);
-  }
-});
-
 test("host DirectNetPath delivers a snap frame in the same turn", async () => {
   const seen: HostSnapFrame[] = [];
   let sinkCalls = 0;

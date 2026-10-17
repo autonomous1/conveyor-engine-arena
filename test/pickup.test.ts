@@ -203,7 +203,7 @@ test("installed placements consume ammo, health, and weapon, and a crate type st
     units: "meters",
     placements: [
       { id: "rounds", model: "ammo-box", type: "ammo", position: [20, 0, 20], yaw: 0, scale: 1 },
-      { id: "box", model: "cover-crate", type: "crate", position: [24, 0, 20], yaw: 0, scale: 1 },
+      { id: "box", model: "step", type: "crate", position: [24, 0, 20], yaw: 0, scale: 1 },
       { id: "facade", model: "brutalist-building-2-cbake", type: "building", position: [28, 0, 20], yaw: 0, scale: 1 },
       { id: "gate", model: "door-1", type: "door", position: [32, 0, 20], yaw: 0, hinge: "left", size: [1, 2.1, 0.08], open: false },
       { id: "pawn", model: "player-a", type: "character", position: [36, 0, 20], yaw: 0, scale: 1 },

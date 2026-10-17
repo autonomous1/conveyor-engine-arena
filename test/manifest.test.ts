@@ -105,10 +105,10 @@ test("installed manifest matches the authoritative world and keeps spawns clear"
   assert.equal(game.view.sky === undefined, scene.sky === undefined);
   assert.ok(game.view.characters.length >= 2);
   for (const character of game.view.characters) assert.ok(character.scale > 0, character.id);
-  assert.ok(game.view.staticModels.includes("/assets/models/brutalist-building-1-a.glb"));
+  assert.ok(game.view.staticModels.includes("/assets/models/brutalist-building-1-cbake.glb"));
   assert.ok(game.view.staticModels.includes("/assets/models/med-kit.glb"));
   assert.ok(game.view.staticModels.includes("/assets/models/ammo-box.glb"));
-  assert.ok(game.view.staticModels.includes("/assets/models/ammo-crate.glb"));
+  assert.ok(game.view.staticModels.includes("/assets/models/step.glb"));
   assert.ok(game.view.staticModels.includes("/assets/models/door1.glb"));
   assert.ok(game.view.staticModels.includes("/assets/models/door2.glb"));
   for (const character of game.view.characters) {
@@ -153,7 +153,7 @@ test("invalid manifest names the field", () => {
   assert.equal(compiled.view.characters.find((character) => character.id === "player-a")!.scale, 4);
 
   const instanced = structuredClone(doc) as { assets: Array<Record<string, unknown>> };
-  const crate = instanced.assets.find((asset) => asset.id === "cover-crate");
+  const crate = instanced.assets.find((asset) => asset.id === "step");
   assert.ok(crate);
   crate.instance = "clone";
   assert.throws(() => compile(instanced, read), (err: unknown) => {
@@ -204,19 +204,19 @@ test("optional scene blocks and a placements list", () => {
     thickness: 2,
     collision: true,
     faces: {
-      south: "brutalist-building-1-a",
+      south: "brutalist-building-1-cbake",
       west: "brutalist-building-2-cbake",
       north: "brutalist-building-3-bake",
-      east: "brutalist-building-1-a",
+      east: "brutalist-building-1-cbake",
     },
   };
   const faced = compile(withWalls, read);
   const faceModel = Object.fromEntries(faced.view.walls.map((wall) => [wall.face, wall.model]));
   assert.deepEqual(faceModel, {
-    south: "/assets/models/brutalist-building-1-a.glb",
+    south: "/assets/models/brutalist-building-1-cbake.glb",
     west: "/assets/models/brutalist-building-2-cbake.glb",
     north: "/assets/models/brutalist-building-3-bake.glb",
-    east: "/assets/models/brutalist-building-1-a.glb",
+    east: "/assets/models/brutalist-building-1-cbake.glb",
   });
 
   delete base.scene.walls;
@@ -270,10 +270,10 @@ test("optional scene blocks and a placements list", () => {
   const b = {
     formatVersion: 1,
     units: "meters",
-    placements: [{ id: "prop-b", model: "brutalist-building-1-a", position: [12, 0, 18], yaw: 0, scale: 1 }],
+    placements: [{ id: "prop-b", model: "brutalist-building-1-cbake", position: [12, 0, 18], yaw: 0, scale: 1 }],
     obstacles: [{ id: "box-b", kind: "aabb", min: [20, 0, 16], max: [21, 1, 17] }],
     scene: {
-      props: [{ id: "from-b", model: "cover-crate", collision: 50 }],
+      props: [{ id: "from-b", model: "step", collision: 50 }],
     },
   };
   const overlay = structuredClone(base) as { scene: Record<string, unknown> };
