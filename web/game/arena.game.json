@@ -156,11 +156,11 @@
       "scale": 4,
       "animations": {
         "idle": {
-          "clip": "zombie walk",
+          "clip": "zombie run",
           "speed": 0
         },
         "walk": {
-          "clip": "walk",
+          "clip": "zombie walk",
           "speed": 1
         },
         "run": {
@@ -172,7 +172,7 @@
           "speed": 0
         },
         "angry": {
-          "clip": "angry_02.001",
+          "clip": "angry",
           "speed": 3
         }
       },
@@ -210,7 +210,7 @@
           "speed": 0
         },
         "angry": {
-          "clip": "angry_01",
+          "clip": "run",
           "speed": 0
         }
       },
