@@ -84,6 +84,7 @@ Each asset keeps its own license id and provenance origin.
 | `npm run run:partition`    | Headless runner, a temporary partition                                          |
 | `npm run bench`            | Headless bench, default 200 entities and 30 ticks (`npm run bench -- 1000 120`) |
 | `npm run record:arena`     | Record a wander trace to `viewer/replay/arena-wander.jsonl`                     |
+| `npm run bake:map`         | Top-down PNG of the arena into `web/assets/map-bake.png` (needs `build:server`) |
 ```
 
 `node scripts/make-placeholders.mjs` writes original procedural stand-ins under `web/assets` (stone floor, cloudy sky, crate and player GLBs). The game file is what the server loads; point an asset `uri` at a new file for it to appear in the room.
@@ -93,6 +94,7 @@ Each asset keeps its own license id and provenance origin.
 ```text
 src/server/ HTTP host, manifest compile, world load, wander tick
 src/client/ Browser bootstrap, scene, pawn presentation, camera, HUD
+src/util/   Map bake. Not part of the client or the server build
 src/shared/ Arena view, movement names, shadow settings
 src/ Headless ExampleApp, runners, bench, wander recording
 web/game/ arena.game.json

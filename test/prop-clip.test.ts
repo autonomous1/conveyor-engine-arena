@@ -104,16 +104,19 @@ test("the key on the top step draws, and a missing rotate clip keeps the mesh", 
   const key = game.view.props.find((prop) => prop.id === "key");
   assert.ok(key);
   assert.equal(key.model.endsWith("/key-1.glb"), true);
-  assert.equal(key.type, undefined);
-  assert.equal(game.view.pickups?.some((pickup) => pickup.id === "key"), false);
+  assert.equal(key.type, "key");
+  assert.equal(game.view.pickups?.some((pickup) => pickup.id === "key" && pickup.kind === "key"), true);
   assert.equal(game.view.buildings.some((building) => building.id === "key"), false);
   const steps = game.view.buildings.filter((building) => building.model.endsWith("/step.glb"));
   assert.ok(steps.length >= 1);
-  const top = steps.reduce((best, step) => step.position[1] > best.position[1] ? step : best);
   assert.ok(key.position);
+  const under = steps.filter((step) =>
+    step.position
+    && Math.abs(step.position[0] - key.position![0]) < 0.5
+    && Math.abs(step.position[2] - key.position![2]) < 0.5);
+  assert.ok(under.length >= 1, "key is not on a step");
+  const top = under.reduce((best, step) => step.position[1] > best.position[1] ? step : best);
   assert.ok(key.position[1] > top.position[1]);
-  assert.ok(Math.abs(key.position[0] - top.position[0]) < 0.5);
-  assert.ok(Math.abs(key.position[2] - top.position[2]) < 0.5);
   const crate = placed.placements.find((item) => item.type === "crate");
   assert.ok(crate);
   assert.equal(game.view.buildings.some((building) => building.id === crate.id), true);

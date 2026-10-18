@@ -428,9 +428,15 @@ test("props.placements.json yields alien-weapon-1 at asset scale times placement
   assert.equal(weapon.animation, "idle");
   assert.equal(weapon.animations?.idle.clip, "rotate");
   assert.equal(game.view.buildings.some((building) => building.id === "alien-weapon-1"), false);
+  const propsFile = JSON.parse(readFileSync(`${projectRoot()}/web/game/props.placements.json`, "utf8")) as {
+    placements: Array<{ id?: string; yaw?: number }>;
+  };
+  const stampYaw = propsFile.placements.find((item) => item.id === "alien-weapon-1")?.yaw;
+  assert.equal(typeof stampYaw, "number");
+  assert.equal(weapon.yaw, stampYaw);
   const pose = propInstancePose(weapon);
   assert.equal(pose.scale, 1.5);
-  assert.equal(pose.yaw, 0);
+  assert.equal(pose.yaw, stampYaw);
   const template = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial());
   const instanced = placeStaticInstances(template, [pose]);
   assert.equal(instanced.length, 1);

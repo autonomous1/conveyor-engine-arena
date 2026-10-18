@@ -343,11 +343,23 @@ function shotInto(
       { x: u, z: box.minZ - 1.5, yaw: 0 },
     ];
     for (const aim of tries) {
+      if (!standIsClear(aim.x, aim.z, box.id, obstacles)) continue;
       const shot = traceHitscan({ x: aim.x, y: EYE_HEIGHT, z: aim.z }, aimDirection(aim.yaw, 0), obstacles, []);
       if (shot.hitId === box.id) return aim;
     }
   }
   return undefined;
+}
+
+/** A stand the capsule resolver will not shove into a neighbor. The shot yaw is only valid there. */
+function standIsClear(x: number, z: number, selfId: number, obstacles: readonly TraceAabb[]): boolean {
+  const radius = 0.5;
+  const height = 1.8;
+  return !obstacles.some((other) => {
+    if (other.id === selfId) return false;
+    if (other.minY !== undefined && other.maxY !== undefined && (0 >= other.maxY || height <= other.minY)) return false;
+    return x > other.minX - radius && x < other.maxX + radius && z > other.minZ - radius && z < other.maxZ + radius;
+  });
 }
 
 function pawnWorld() {

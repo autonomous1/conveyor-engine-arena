@@ -6,6 +6,7 @@ import { findClip, type Movement } from "../shared/movements.ts";
 import { shadowSettings, type ShadowQuality } from "../shared/shadows.ts";
 import { prepareCharacter } from "./pawn-feet.ts";
 import { createPlacementVisibility, type PlacementVisibility } from "./placements.ts";
+import { collectInstanceSamples, collectObjectSamples, type MapAnchor, type MapSample, type SampleMeta } from "./scene-map.ts";
 
 export type ArenaScene = {
   renderer: THREE.WebGLRenderer;
@@ -528,10 +529,24 @@ export function placeWallModel(template: THREE.Object3D, wall: ArenaView["walls"
   return group;
 }
 
-export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Promise<{ templates: CharacterTemplates; fallbacks: number; propMixers: THREE.AnimationMixer[]; placements: PlacementVisibility }> {
+export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Promise<{ templates: CharacterTemplates; fallbacks: number; propMixers: THREE.AnimationMixer[]; placements: PlacementVisibility; mapSamples: MapSample[] }> {
   let fallbacks = 0;
   const propMixers: THREE.AnimationMixer[] = [];
   const placements = createPlacementVisibility();
+  const mapSamples: MapSample[] = [];
+  const noteObject = (
+    id: string,
+    kind: MapSample["kind"],
+    object: THREE.Object3D,
+    expectedYaw?: number,
+    skipNames: readonly string[] = [],
+    outline?: Pick<SampleMeta, "profile" | "anchor" | "authorYaw">,
+  ) => {
+    collectObjectSamples(mapSamples, { id, kind, expectedYaw, ...outline }, object, skipNames);
+  };
+  const noteInstances = (meshes: readonly THREE.InstancedMesh[], entries: readonly SampleMeta[]) => {
+    collectInstanceSamples(mapSamples, meshes, entries);
+  };
   const castsShadow = view.shadows !== undefined && view.shadows.quality !== "off";
   if (view.floor) {
     const floorMap = await texture(view.floor.texture);
@@ -567,23 +582,48 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
 
   const staticUris = new Set(view.staticModels ?? []);
   // World-space batches. Walls and buildings share a parent, so one model is one InstancedMesh.
-  const sceneBatches = new Map<string, Array<{ pose: InstancePose; id?: string; clone: (template: THREE.Object3D) => void }>>();
-  function pushScene(url: string, pose: InstancePose, clone: (template: THREE.Object3D) => void, id?: string) {
+  const sceneBatches = new Map<string, Array<{
+    pose: InstancePose;
+    id: string;
+    kind: MapSample["kind"];
+    expectedYaw?: number;
+    profile?: SampleMeta["profile"];
+    anchor?: MapAnchor;
+    authorYaw?: number;
+    clone: (template: THREE.Object3D) => void;
+  }>>();
+  function pushScene(
+    url: string,
+    pose: InstancePose,
+    id: string,
+    kind: MapSample["kind"],
+    expectedYaw: number | undefined,
+    clone: (template: THREE.Object3D) => void,
+    outline?: Pick<SampleMeta, "profile" | "anchor" | "authorYaw">,
+  ) {
     const list = sceneBatches.get(url) ?? [];
-    list.push({ pose, id, clone });
+    list.push({ pose, id, kind, expectedYaw, clone, ...outline });
     sceneBatches.set(url, list);
   }
+  const buildingOutline = (building: ArenaView["buildings"][number]): Pick<SampleMeta, "profile" | "anchor" | "authorYaw"> => ({
+    profile: building.profile,
+    authorYaw: building.authorYaw,
+    anchor: { x: building.position[0], z: building.position[2], scale: building.scale },
+  });
 
   const cloneWalls: ArenaView["walls"] = [];
   for (const wall of view.walls) {
+    const pose = wallInstancePose(wall, view.bounds);
+    const id = `wall-${wall.face}`;
     if (!staticUris.has(wall.model)) {
       cloneWalls.push(wall);
       continue;
     }
-    pushScene(wall.model, wallInstancePose(wall, view.bounds), (template) => {
+    pushScene(wall.model, pose, id, "wall", pose.yaw, (template) => {
       const facade = placeWallModel(template, wall, view.bounds);
       markShadowCasters(facade, castsShadow);
       arena.scene.add(facade);
+      noteObject(id, "wall", facade, pose.yaw);
     });
   }
 
@@ -593,16 +633,18 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
       cloneBuildings.push(building);
       continue;
     }
+    const outline = buildingOutline(building);
     pushScene(building.model, {
       position: building.position,
       yaw: building.yaw,
       scale: building.scale,
-    }, (template) => {
+    }, building.id, "building", building.yaw, (template) => {
       const mesh = placeBuildingModel(template, building);
       markShadowCasters(mesh, castsShadow);
       placements.addClone(building.id, mesh);
       arena.scene.add(mesh);
-    }, building.id);
+      noteObject(building.id, "building", mesh, building.yaw, [], outline);
+    }, outline);
   }
 
   for (const [url, entries] of sceneBatches) {
@@ -621,9 +663,11 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
       arena.scene.add(mesh);
     }
     entries.forEach((entry, index) => {
-      if (!entry.id) return;
+      if (entry.kind !== "building") return;
       for (const mesh of meshes) placements.addInstance(entry.id, mesh, index);
     });
+    // Taken before any pickup hide, so the instance matrix is still the placed one.
+    noteInstances(meshes, entries);
   }
 
   for (const wall of cloneWalls) {
@@ -637,6 +681,8 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
     const facade = placeWallModel(template, wall, view.bounds);
     markShadowCasters(facade, castsShadow);
     arena.scene.add(facade);
+    const pose = wallInstancePose(wall, view.bounds);
+    noteObject(`wall-${wall.face}`, "wall", facade, pose.yaw);
   }
 
   for (const building of cloneBuildings) {
@@ -650,6 +696,7 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
     markShadowCasters(mesh, castsShadow);
     placements.addClone(building.id, mesh);
     arena.scene.add(mesh);
+    noteObject(building.id, "building", mesh, building.yaw, [], buildingOutline(building));
   }
 
   if (view.sky) {
@@ -711,12 +758,15 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
       markShadowCasters(frame, castsShadow);
       arena.content.add(frame);
     }
+    noteInstances(frames, doors.map((door) => ({ id: door.id, kind: "door" as const, expectedYaw: door.yaw })));
     for (const door of doors) {
       // No static frame meshes (a skinned file): clone the whole door.
       // Otherwise the leaf is the only clone. The frame draw is the InstancedMesh above.
       const group = placeDoorModel(template, door, frames.length === 0 ? undefined : { frameMeshes: false });
       markShadowCasters(group, castsShadow);
       arena.content.add(group);
+      // The hinge swings the leaf. The map keeps the frame yaw, not the open angle.
+      if (frames.length === 0) noteObject(door.id, "door", group, door.yaw, ["hinge", "door"]);
     }
   }
   const doorGroups = await placeDoorPlacements(cloneDoors, async (url) => (await model(url))?.scene);
@@ -724,6 +774,8 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
   for (const panel of doorGroups) {
     markShadowCasters(panel, castsShadow);
     arena.content.add(panel);
+    const door = cloneDoors.find((item) => item.id === panel.name);
+    noteObject(panel.name, "door", panel, door?.yaw, ["hinge", "door"]);
   }
 
   const cloneProps: ArenaView["props"] = [];
@@ -761,6 +813,7 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
     props.forEach((prop, index) => {
       for (const mesh of meshes) placements.addInstance(prop.id, mesh, index);
     });
+    noteInstances(meshes, props.map((prop) => ({ id: prop.id, kind: "prop" as const, expectedYaw: prop.yaw ?? 0 })));
   }
   for (const prop of cloneProps) addProp((await model(prop.model))?.scene, prop);
   for (const prop of animatedProps) {
@@ -780,6 +833,7 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
       markShadowCasters(group, castsShadow);
       placements.addClone(prop.id, group);
       arena.content.add(group);
+      noteObject(prop.id, "prop", group, prop.yaw ?? 0);
       rememberPropClip(mesh, prop, clips);
       return;
     }
@@ -796,6 +850,7 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
       markShadowCasters(box, castsShadow);
       placements.addClone(prop.id, box);
       arena.content.add(box);
+      noteObject(prop.id, "prop", box, prop.yaw ?? 0);
       return;
     }
     const mesh = template.clone(true);
@@ -804,6 +859,7 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
     markShadowCasters(mesh, castsShadow);
     placements.addClone(prop.id, mesh);
     arena.content.add(mesh);
+    noteObject(prop.id, "prop", mesh, prop.yaw ?? 0);
     rememberPropClip(mesh, prop, clips);
   }
 
@@ -837,5 +893,5 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
       animations: character.animations,
     });
   }
-  return { templates, fallbacks, propMixers, placements };
+  return { templates, fallbacks, propMixers, placements, mapSamples };
 }

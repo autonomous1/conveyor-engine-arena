@@ -11,6 +11,7 @@ import {
   type OriginCategory,
   type StaticWorldDefinition,
 } from "conveyor-engine-assets";
+import { attachBuildingProfiles } from "../shared/building-profile.js";
 import type { ArenaView, CharacterAnimation } from "../shared/arena-view.js";
 import { DEFAULT_MOVEMENT_SPEED, MOVEMENTS, type Movement } from "../shared/movements.js";
 import { AMMO_PICKUP, HEALTH_PICKUP, parsePickupKind, type PickupPlacement } from "../shared/pickups.js";
@@ -283,6 +284,11 @@ export type CompileSources = {
   boundsFile?: PlacementFileSource;
   /** Set when `scene.spawnPoints` is a path. The text is the spawn array. */
   spawnPointsFile?: PlacementFileSource;
+  /**
+   * `web/game/building-profiles.json`. Outlines for the scene map.
+   * Absent when that file was not loaded. Not part of either content hash.
+   */
+  buildingProfiles?: string;
 };
 
 type CollisionBox = {
@@ -967,6 +973,11 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
   };
 
   const visualBytes = visualLayoutBytes();
+  try {
+    attachBuildingProfiles(bakedBuildings, sources?.buildingProfiles);
+  } catch (err) {
+    throw new GameManifestError([{ path: "building-profiles", message: err instanceof Error ? err.message : "invalid profiles" }]);
+  }
   const collisionJson = JSON.stringify(collision);
   const collisionHash = hashBytes(new TextEncoder().encode(collisionJson));
   const visualHash = hashBytes(visualBytes);
@@ -1113,6 +1124,7 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
     }),
     pawnRadius,
     pawnHeight,
+    spawns: spawns.map((spawn) => ({ id: spawn.id, x: spawn.x, z: spawn.z, yaw: spawn.yaw })),
     ...(grenadeModel ? { grenade: grenadeModel } : {}),
   };
 

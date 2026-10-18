@@ -142,13 +142,29 @@ function placedSteps(): StepObstacle[] {
   const ids = new Set(props.placements.filter((placement) => placement.model === "step").map((placement) => `${placement.id}-box`));
   const steps = props.obstacles.filter((obstacle) => ids.has(obstacle.id));
   assert.ok(steps.length >= 2, "arena-1 step props are missing");
-  const ordered = [...steps].sort((a, b) => a.max[1] - b.max[1] || b.max[0] - a.max[0]);
-  assert.ok(ordered[0].max[1] > 0 && ordered[0].max[1] <= STEP_HEIGHT);
-  for (let i = 1; i < ordered.length; i++) {
-    const rise = ordered[i].max[1] - ordered[i - 1].max[1];
-    assert.ok(rise > 0 && rise <= STEP_HEIGHT, `${ordered[i].id} rises ${rise}`);
+  // Two stairs share the same riser heights. Walk the one whose treads advance west.
+  const overlapsZ = (a: StepObstacle, b: StepObstacle) => a.max[2] > b.min[2] && b.max[2] > a.min[2];
+  const ground = steps.filter((step) => step.min[1] <= 1e-6 && step.max[1] > 0 && step.max[1] <= STEP_HEIGHT);
+  let best: StepObstacle[] = [];
+  for (const start of ground) {
+    const run = [start];
+    let current = start;
+    for (;;) {
+      const next = steps.find((step) =>
+        !run.includes(step)
+        && step.max[0] <= current.min[0] + 0.05
+        && step.max[0] > current.min[0] - 0.5
+        && overlapsZ(step, current)
+        && step.max[1] - current.max[1] > 1e-6
+        && step.max[1] - current.max[1] <= STEP_HEIGHT + 1e-6);
+      if (!next) break;
+      run.push(next);
+      current = next;
+    }
+    if (run.length > best.length) best = run;
   }
-  return ordered;
+  assert.ok(best.length >= 2, "arena-1 has no stair the pawn can climb by walking west");
+  return best;
 }
 
 function corridorBoxes(steps: StepObstacle[]): StepObstacle[] {

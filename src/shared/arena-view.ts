@@ -8,6 +8,7 @@
  * Changing collision, spawns, bounds, or which asset id a surface uses changes
  * `authoritativeHash` and does force a reconnect.
  */
+import type { ProfileRing } from "./building-profile.js";
 import type { Movement } from "./movements.js";
 import type { PickupKind, PickupPlacement } from "./pickups.js";
 import type { ShadowQuality } from "./shadows.js";
@@ -83,6 +84,14 @@ export type ArenaView = {
     position: [number, number, number];
     yaw: number;
     scale: number;
+    /**
+     * SVG outline in model space, unscaled, around the model origin.
+     * Model +X and +Z. Absent when this placement has no path.
+     * Not part of either content hash.
+     */
+    profile?: ProfileRing[];
+    /** Degrees. The SVG group yaw, before the mesh quaternion. */
+    authorYaw?: number;
   }>;
   /** Omitted when the manifest has no sky block. */
   sky?: { kind: "sky-dome"; texture: string; shape: BackdropShape; radius: number; height: number };
@@ -133,6 +142,12 @@ export type ArenaView = {
   aabbs: Array<{ id: number; minX: number; maxX: number; minZ: number; maxZ: number; minY?: number; maxY?: number; mesh?: boolean; source?: string }>;
   pawnRadius: number;
   pawnHeight: number;
+  /**
+   * Spawn marks for the scene map. `yaw` is degrees about +Y, the same number
+   * the placements file stores. Omitted on a host that predates the map.
+   * Not part of either content hash.
+   */
+  spawns?: Array<{ id: string; x: number; z: number; yaw: number }>;
   /** Thrown grenade mesh. Absent when the manifest has no `grenade` model. */
   grenade?: string;
 };

@@ -2,7 +2,7 @@
  * Options dialog. F2 or the Options button toggles the panel.
  * The button is not the canvas click, so it does not request pointer lock.
  * Escape is not handled here; the browser still unlocks the pointer.
- * Show collision and Fire debug stay in localStorage and are not part of the input message.
+ * Show collision, Fire debug, and Scene map stay in localStorage and are not part of the input message.
  * Host fire counters are painted here. They are not part of the crosshair HUD.
  */
 
@@ -10,6 +10,7 @@ import { emptyAudit, formatAudit, type AuditCounters } from "../shared/audit.ts"
 
 export const SHOW_COLLISION_STORAGE_KEY = "arena.showCollision.v1";
 export const FIRE_DEBUG_STORAGE_KEY = "arena.fireDebug.v1";
+export const SHOW_SCENE_MAP_STORAGE_KEY = "arena.showSceneMap.v1";
 
 export type KeyValueStorage = {
   getItem(key: string): string | null;
@@ -20,9 +21,11 @@ export type OptionsModel = {
   readonly open: boolean;
   readonly showCollision: boolean;
   readonly fireDebug: boolean;
+  readonly showSceneMap: boolean;
   toggleDialog(): void;
   toggleShowCollision(): void;
   toggleFireDebug(): void;
+  toggleShowSceneMap(): void;
   /** F2 toggles the dialog. Every other key, including Escape, is left alone. */
   onKey(code: string): boolean;
 };
@@ -67,16 +70,37 @@ export function saveFireDebug(storage: KeyValueStorage | null | undefined, on: b
   }
 }
 
+export function loadShowSceneMap(storage: KeyValueStorage | null | undefined): boolean {
+  if (!storage) return false;
+  try {
+    return storage.getItem(SHOW_SCENE_MAP_STORAGE_KEY) === "on";
+  } catch {
+    return false;
+  }
+}
+
+export function saveShowSceneMap(storage: KeyValueStorage | null | undefined, on: boolean): void {
+  if (!storage) return;
+  try {
+    storage.setItem(SHOW_SCENE_MAP_STORAGE_KEY, on ? "on" : "off");
+  } catch {
+    // The in-memory switch still applies for this session.
+  }
+}
+
 export function createOptionsModel(
   storage: KeyValueStorage | null | undefined,
   onShowCollision: (on: boolean) => void,
   onFireDebug: (on: boolean) => void = () => {},
+  onShowMap: (on: boolean) => void = () => {},
 ): OptionsModel {
   let open = false;
   let showCollision = loadShowCollision(storage);
   let fireDebug = loadFireDebug(storage);
+  let showSceneMap = loadShowSceneMap(storage);
   onShowCollision(showCollision);
   onFireDebug(fireDebug);
+  onShowMap(showSceneMap);
   return {
     get open() {
       return open;
@@ -86,6 +110,9 @@ export function createOptionsModel(
     },
     get fireDebug() {
       return fireDebug;
+    },
+    get showSceneMap() {
+      return showSceneMap;
     },
     toggleDialog() {
       open = !open;
@@ -99,6 +126,11 @@ export function createOptionsModel(
       fireDebug = !fireDebug;
       saveFireDebug(storage, fireDebug);
       onFireDebug(fireDebug);
+    },
+    toggleShowSceneMap() {
+      showSceneMap = !showSceneMap;
+      saveShowSceneMap(storage, showSceneMap);
+      onShowMap(showSceneMap);
     },
     onKey(code: string) {
       if (code !== "F2") return false;
@@ -124,8 +156,9 @@ function browserStorage(): KeyValueStorage | null {
 export function createOptionsDialog(
   onShowCollision: (on: boolean) => void,
   storage: KeyValueStorage | null = browserStorage(),
+  onShowMap: (on: boolean) => void = () => {},
 ): OptionsDialog {
-  const model = createOptionsModel(storage, onShowCollision);
+  const model = createOptionsModel(storage, onShowCollision, () => {}, onShowMap);
   let audit = emptyAudit();
 
   const button = document.createElement("button");
@@ -174,6 +207,12 @@ export function createOptionsDialog(
   fireSwitch.setAttribute("role", "switch");
   fireSwitch.style.cssText = `${switchStyle};margin-top:8px`;
 
+  const mapSwitch = document.createElement("button");
+  mapSwitch.id = "scene-map-toggle";
+  mapSwitch.type = "button";
+  mapSwitch.setAttribute("role", "switch");
+  mapSwitch.style.cssText = `${switchStyle};margin-top:8px`;
+
   const auditView = document.createElement("pre");
   auditView.id = "audit-counters";
   auditView.style.cssText = [
@@ -184,7 +223,7 @@ export function createOptionsDialog(
     "font:12px/1.45 ui-monospace, monospace",
   ].join(";");
 
-  panel.append(title, collisionSwitch, fireSwitch, auditView);
+  panel.append(title, collisionSwitch, fireSwitch, mapSwitch, auditView);
 
   const paintSwitch = (el: HTMLButtonElement, on: boolean, label: string) => {
     el.setAttribute("aria-checked", on ? "true" : "false");
@@ -196,6 +235,7 @@ export function createOptionsDialog(
     button.setAttribute("aria-expanded", model.open ? "true" : "false");
     paintSwitch(collisionSwitch, model.showCollision, "Show collision");
     paintSwitch(fireSwitch, model.fireDebug, "Fire debug");
+    paintSwitch(mapSwitch, model.showSceneMap, "Scene map");
     auditView.textContent = formatAudit(audit);
   };
   paint();
@@ -223,6 +263,7 @@ export function createOptionsDialog(
   };
   onSwitch(collisionSwitch, () => model.toggleShowCollision());
   onSwitch(fireSwitch, () => model.toggleFireDebug());
+  onSwitch(mapSwitch, () => model.toggleShowSceneMap());
 
   const onKeyDown = (ev: KeyboardEvent) => {
     if (ev.repeat) return;

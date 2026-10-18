@@ -16,6 +16,9 @@
   },
   "include": [
     "src/client",
-    "src/shared"
+    "src/shared",
+    "src/util/bake-map-page.ts",
+    "src/util/bake-scene.ts",
+    "src/util/map-camera.ts"
   ]
 }

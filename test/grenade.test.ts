@@ -391,24 +391,37 @@ test("the other client sees the grenade travel and P does not send a laser", asy
       }));
     }
     assert.ok(owned.length >= 2, `owned ${owned.length}`);
-    const a = owned[0]!.client;
-    const b = owned[1]!.client;
-    const shooter = owned[0]!.id;
-    assert.notEqual(shooter, owned[1]!.id);
     await waitFor(2000, () => {
-      if (a.poses.size < owned.length || !b.poses.get(shooter)) return undefined;
-      return a.poses.get(shooter);
+      for (const seat of owned) {
+        if (seat.client.poses.size < owned.length || !seat.client.poses.get(seat.id)) return undefined;
+      }
+      return true;
     });
     await delay(400);
-    const settled = a.poses.get(shooter);
-    assert.ok(settled, "shooter pose");
-    const origin = { x: settled.x, y: settled.y + EYE_HEIGHT, z: settled.z };
-    const others: TraceCapsule[] = [];
-    for (const [id, pawn] of a.poses) {
-      if (id === shooter) continue;
-      others.push({ id, x: pawn.x, y: pawn.y, z: pawn.z, radius: view.pawnRadius, height: view.pawnHeight });
+    let aim: { yaw: number; pitch: number; laser: { x: number; y: number; z: number }; contact: { x: number; y: number; z: number } } | undefined;
+    let thrower = owned[0]!;
+    let watcher = owned[1]!;
+    for (const seat of owned) {
+      const settled = seat.client.poses.get(seat.id);
+      if (!settled) continue;
+      const origin = { x: settled.x, y: settled.y + EYE_HEIGHT, z: settled.z };
+      const others: TraceCapsule[] = [];
+      for (const [id, pawn] of seat.client.poses) {
+        if (id === seat.id) continue;
+        others.push({ id, x: pawn.x, y: pawn.y, z: pawn.z, radius: view.pawnRadius, height: view.pawnHeight });
+      }
+      const found = sharedWall(origin, view.aabbs, others);
+      if (!found) continue;
+      aim = found;
+      thrower = seat;
+      watcher = owned.find((item) => item.id !== seat.id) ?? owned[1]!;
+      break;
     }
-    const aim = sharedWall(origin, view.aabbs, others);
+    assert.ok(aim, "no wall the grenade and the laser share");
+    const a = thrower.client;
+    const b = watcher.client;
+    const shooter = thrower.id;
+    assert.notEqual(shooter, watcher.id);
     const before = b.grenades.length;
     assert.equal(a.lasers.length, 0);
     assert.equal(b.lasers.length, 0);
@@ -516,7 +529,7 @@ function sharedWall(
       return { yaw, pitch: 0, laser: blocks.to, contact: step.hit.point };
     }
   }
-  throw new Error("no wall the grenade and the laser share");
+  return undefined;
 }
 
 /** The grenade contact sits on the laser face. A lower cell of that wall still counts. */

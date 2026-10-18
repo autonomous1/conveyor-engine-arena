@@ -48,6 +48,7 @@ export function loadInstalledGame(): CompiledGame {
  * Read placements, and bounds or spawnPoints when those fields are paths.
  * Inline bounds and spawn points are left for `compileGame`. Absent placements
  * is `undefined`. An empty placements list is `{ placementFiles: [] }`.
+ * `web/game/building-profiles.json` is included when that file exists.
  */
 export function readManifestSources(root: string, doc: unknown): CompileSources | undefined {
   if (!doc || typeof doc !== "object") return undefined;
@@ -64,6 +65,8 @@ export function readManifestSources(root: string, doc: unknown): CompileSources 
   if (typeof record.spawnPoints === "string") {
     sources.spawnPointsFile = readSceneText(root, record.spawnPoints, "scene.spawnPoints");
   }
+  const profiles = join(root, "web", "game", "building-profiles.json");
+  if (existsSync(profiles)) sources.buildingProfiles = readFileSync(profiles, "utf8");
   if (!sources.placementFiles && !sources.boundsFile && !sources.spawnPointsFile) return undefined;
   return sources;
 }

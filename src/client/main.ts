@@ -15,6 +15,7 @@ import { createLaserBeams } from "./laser.js";
 import { connectLive, type LaserNotice } from "./net.js";
 import { createViewModel } from "./viewmodel.js";
 import { createOptionsDialog } from "./options.js";
+import { createSceneMap } from "./scene-map.js";
 import { createPawnLayer } from "./presentation.js";
 import { createRateWindow, formatOverlay } from "./rates.js";
 import { formatFireLog, presentShot } from "./shot-view.js";
@@ -30,9 +31,19 @@ hud.setStatus("loading arena");
 const arena = createArenaScene(view.shadows?.quality ?? "off");
 const collisionDebug = createAabbDebug(view.aabbs);
 arena.scene.add(collisionDebug.group);
-const options = createOptionsDialog((on) => collisionDebug.setVisible(on));
+const sceneMap = createSceneMap();
+const options = createOptionsDialog(
+  (on) => collisionDebug.setVisible(on),
+  undefined,
+  (on) => sceneMap.setVisible(on),
+);
 const fireDebug = createFireDebugLog(() => options.fireDebug);
 const visuals = await loadArenaVisuals(view, arena);
+sceneMap.setWorld({
+  bounds: view.bounds,
+  samples: visuals.mapSamples,
+  spawns: view.spawns,
+});
 const pickupIds = new Set((view.pickups ?? []).map((pickup) => pickup.id));
 for (const id of pickupIds) visuals.placements.setVisible(id, false);
 const viewmodel = createViewModel(arena.camera, arena.scene);

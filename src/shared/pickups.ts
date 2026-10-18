@@ -11,7 +11,7 @@ export const AMMO_PICKUP = 30;
 /** The resolver can sit a fraction of a millimeter off the expanded face. */
 const TOUCH_SLOP_M = 1e-3;
 
-export type PickupKind = "ammo" | "health" | "weapon";
+export type PickupKind = "ammo" | "health" | "weapon" | "key";
 
 export type PickupPlacement = {
   id: string;
@@ -79,7 +79,7 @@ export function dropPickupAabb<T extends { source?: string }>(boxes: T[], placem
 }
 
 export function parsePickupKind(value: unknown): PickupKind | undefined {
-  if (value === "ammo" || value === "health" || value === "weapon") return value;
+  if (value === "ammo" || value === "health" || value === "weapon" || value === "key" ) return value;
   return undefined;
 }
 
@@ -195,21 +195,32 @@ export type PawnKit = ReturnType<typeof createPawnKit>;
 /**
  * Remaining pickup ids. Seeded from placements. Taking one deletes the id.
  * Health already at 100, ammo that does not rise, and a weapon the pawn
- * already holds still consume the placement.
+ * already holds still consume the placement. A taken key is recorded.
+ * Touching an id that is already held grants nothing.
  */
 export function createPickupHost(list: readonly PickupPlacement[]) {
   const placements = list.filter((pickup) => typeof pickup.id === "string" && pickup.id.length > 0);
   const remaining = new Set(placements.map((pickup) => pickup.id));
   const byId = new Map(placements.map((pickup) => [pickup.id, pickup]));
+  const heldKeys = new Set<string>();
   return {
     remainingIds(): string[] {
       return [...remaining].sort();
     },
+    /** True after a key pickup has been stored. */
+    hasKey(): boolean {
+      return heldKeys.size > 0;
+    },
+    /** Key placement ids the player is holding. */
+    getHeldItems(): string[] {
+      return [...heldKeys].sort();
+    },
     take(pawns: readonly PawnBody[], health: HealthSink, kit: PawnKit): PickupGrant[] {
       const grants: PickupGrant[] = [];
       for (const touch of collectTouches(remaining, placements, pawns)) {
-        remaining.delete(touch.id);
         const pickup = byId.get(touch.id);
+        if (pickup?.kind === "key" && heldKeys.has(pickup.id)) continue;
+        remaining.delete(touch.id);
         if (!pickup) continue;
         let loadout: LoadoutFrame | undefined;
         if (pickup.kind === "health") {
@@ -220,6 +231,8 @@ export function createPickupHost(list: readonly PickupPlacement[]) {
         } else if (pickup.kind === "weapon" && pickup.weapon) {
           kit.setWeapon(touch.pawnId, pickup.weapon);
           loadout = loadoutFrame(kit.ammoOf(touch.pawnId), pickup.weapon);
+        } else if (pickup.kind === "key") {
+          heldKeys.add(pickup.id);
         }
         grants.push({
           id: pickup.id,

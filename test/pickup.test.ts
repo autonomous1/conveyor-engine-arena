@@ -13,6 +13,7 @@ import { startArenaServer } from "../dist/server/main.js";
 import { releasePickupObstacle } from "../dist/server/pickups.js";
 import { loadArena } from "../dist/server/world-loader.js";
 import { createPawnHealth, MAX_HP } from "../src/shared/health.ts";
+import { STEP_HEIGHT } from "../src/shared/movements.ts";
 import {
   AMMO_PICKUP,
   capsuleOverlapsAabb,
@@ -153,6 +154,44 @@ test("the host removes a string id and the first living pawn takes it", () => {
   assert.deepEqual(parsePickupSet(["alien-weapon-1", 3, ""]), ["alien-weapon-1"]);
 });
 
+test("picking up the key stores it and removes it from the world", () => {
+  const health = createPawnHealth();
+  health.note(1);
+  const kit = createPawnKit();
+  const ammoBox = placement("rounds", "ammo", AMMO_PICKUP);
+  ammoBox.minX = 10;
+  ammoBox.maxX = 12;
+  const host = createPickupHost([placement("key", "key", 0), ammoBox]);
+  assert.equal(host.hasKey(), false);
+  assert.deepEqual(host.getHeldItems(), []);
+
+  const taken = host.take([pawn(1)], health, kit);
+  assert.deepEqual(taken.map((grant) => grant.id), ["key"]);
+  assert.equal(taken[0]?.kind, "key");
+  assert.equal(taken[0]?.loadout, undefined);
+  assert.deepEqual(taken[0]?.gone, { t: "pickup", id: "key", gone: true });
+  assert.equal(host.hasKey(), true);
+  assert.deepEqual(host.getHeldItems(), ["key"]);
+  assert.deepEqual(host.remainingIds(), ["rounds"]);
+  assert.equal(kit.ammoOf(1), 0);
+  assert.equal(kit.weaponOf(1), undefined);
+  assert.equal(health.get(1).hp, MAX_HP);
+
+  assert.deepEqual(host.take([pawn(1)], health, kit), []);
+  assert.equal(host.hasKey(), true);
+  assert.deepEqual(host.getHeldItems(), ["key"]);
+  assert.deepEqual(host.remainingIds(), ["rounds"]);
+
+  const body = pawn(1);
+  body.x = 11;
+  const ammo = host.take([body], health, kit);
+  assert.deepEqual(ammo.map((grant) => grant.id), ["rounds"]);
+  assert.deepEqual(ammo[0]?.loadout, { t: "loadout", ammo: AMMO_PICKUP });
+  assert.equal(host.hasKey(), true);
+  assert.deepEqual(host.getHeldItems(), ["key"]);
+  assert.deepEqual(host.remainingIds(), []);
+});
+
 test("installed placements consume ammo, health, and weapon, and a crate type stays", () => {
   const game = loadInstalledGame();
   const pickups = game.view.pickups ?? [];
@@ -167,14 +206,15 @@ test("installed placements consume ammo, health, and weapon, and a crate type st
   assert.equal(byId.get("cover-crate-2-6-1")?.kind, "health");
   assert.equal(byId.get("cover-crate-2-6-1")?.amount, HEALTH_PICKUP);
   assert.equal(byId.get("cover-crate-2-9")?.kind, "health");
-  assert.equal(byId.get("alien-weapon-enh")?.kind, "weapon");
+  assert.equal(byId.has("alien-weapon-enh"), false);
   const drawn = game.view.props.find((prop) => prop.id === "alien-weapon-1");
   assert.equal(drawn?.type, "weapon");
   assert.equal(drawn?.weapon, "alien-weapon-enh");
   assert.equal("kind" in (drawn ?? {}), false);
   assert.equal(game.view.buildings.some((building) => building.id === "cover-crate-2-9"), true);
-  assert.equal(game.view.buildings.some((building) => building.id === "brutalist-building-2"), true);
-  assert.equal(byId.has("brutalist-building-2"), false);
+  const facade = game.view.buildings.find((building) => building.model.endsWith("/brutalist-building-2-cbake.glb"));
+  assert.ok(facade);
+  assert.equal(byId.has(facade.id), false);
   assert.equal(game.view.aabbs.some((box) => box.source === "cover-crate-2-6-1-box"), true);
   assert.equal(game.view.aabbs.some((box) => box.source === "cover-crate-2-1-box"), true);
   assert.equal(game.view.aabbs.some((box) => box.source === "cover-crate-2-9-box"), true);
@@ -342,7 +382,7 @@ test("a full pawn still clears the next crate, and a building box stays", () => 
   const clientBoxes = loaded.view.aabbs.map((box) => ({ ...box }));
   const healthBox = clientBoxes.find((box) => box.source === "cover-crate-2-6-1-box");
   const ammoBox = clientBoxes.find((box) => box.source === "cover-crate-2-1-box");
-  const scenery = clientBoxes.find((box) => box.source?.startsWith("brutalist-building-2-wall-"));
+  const scenery = clientBoxes.find((box) => box.source?.includes("-wall-"));
   assert.ok(healthBox && ammoBox && scenery && scenery.source);
   const debug = createAabbDebug(clientBoxes);
   debug.setVisible(true);
@@ -551,7 +591,52 @@ function loadGlb(name: string): Promise<{ scene: THREE.Object3D }> {
   });
 }
 
-test("one client takes alien-weapon-1 and the other sees it gone", { timeout: 20_000 }, async () => {
+type StairBox = { minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number };
+
+/** West-advancing treads whose top step is the one under the weapon. */
+function westStairToward(
+  weapon: { minX: number; maxX: number; minZ: number; maxZ: number },
+  buildings: readonly { id: string; model: string }[],
+  aabbs: readonly { source?: string; minX: number; maxX: number; minY?: number; maxY?: number; minZ: number; maxZ: number }[],
+): StairBox[] {
+  const stepIds = new Set(
+    buildings.filter((building) => building.model.endsWith("/step.glb")).map((building) => `${building.id}-box`),
+  );
+  const steps: StairBox[] = [];
+  for (const box of aabbs) {
+    if (!box.source || !stepIds.has(box.source)) continue;
+    if (typeof box.minY !== "number" || typeof box.maxY !== "number") continue;
+    steps.push({ minX: box.minX, maxX: box.maxX, minY: box.minY, maxY: box.maxY, minZ: box.minZ, maxZ: box.maxZ });
+  }
+  const overlapsZ = (a: StairBox, b: StairBox) => a.maxZ > b.minZ && b.maxZ > a.minZ;
+  const ground = steps.filter((step) => step.minY <= 1e-6 && step.maxY > 0 && step.maxY <= STEP_HEIGHT);
+  const cx = (weapon.minX + weapon.maxX) / 2;
+  const cz = (weapon.minZ + weapon.maxZ) / 2;
+  let best: StairBox[] = [];
+  for (const start of ground) {
+    const run = [start];
+    let current = start;
+    for (;;) {
+      const next = steps.find((step) =>
+        !run.includes(step)
+        && step.maxX <= current.minX + 0.05
+        && step.maxX > current.minX - 0.5
+        && overlapsZ(step, current)
+        && step.maxY - current.maxY > 1e-6
+        && step.maxY - current.maxY <= STEP_HEIGHT + 1e-6);
+      if (!next) break;
+      run.push(next);
+      current = next;
+    }
+    const top = run[run.length - 1];
+    if (!top) continue;
+    const under = cx >= top.minX - 1 && cx <= top.maxX + 1 && cz >= top.minZ - 1 && cz <= top.maxZ + 1;
+    if (under && run.length > best.length) best = run;
+  }
+  return best;
+}
+
+test("one client takes alien-weapon-1 and the other sees it gone", { timeout: 40_000 }, async () => {
   const host = await startArenaServer(0);
   const open: WebSocket[] = [];
   try {
@@ -561,8 +646,9 @@ test("one client takes alien-weapon-1 and the other sees it gone", { timeout: 20
       bundleId: string;
       authoritativeHash: string;
       pickups?: PickupPlacement[];
-      buildings?: Array<{ id: string }>;
+      buildings?: Array<{ id: string; model: string }>;
       props?: Array<{ id: string }>;
+      aabbs?: Array<{ source?: string; minX: number; maxX: number; minY?: number; maxY?: number; minZ: number; maxZ: number }>;
     };
     const pickups = view.pickups ?? [];
     const weapon = pickups.find((item) => item.id === "alien-weapon-1");
@@ -570,7 +656,7 @@ test("one client takes alien-weapon-1 and the other sees it gone", { timeout: 20
     assert.equal(weapon.kind, "weapon");
     assert.equal(weapon.weapon, "alien-weapon-enh");
     assert.equal(pickups.some((item) => item.id === "cover-crate-2-9"), true);
-    assert.equal(pickups.some((item) => item.id === "alien-weapon-enh"), true);
+    assert.equal(pickups.some((item) => item.id === "alien-weapon-enh"), false);
     assert.equal(
       (view.buildings ?? []).some((item) => item.id === "cover-crate-2-9")
         || (view.props ?? []).some((item) => item.id === "cover-crate-2-9"),
@@ -589,26 +675,56 @@ test("one client takes alien-weapon-1 and the other sees it gone", { timeout: 20
       assert.equal(welcome.pickups.includes("cover-crate-2-1"), true);
       assert.equal(welcome.pickups.includes("cover-crate-2-6-1"), true);
       assert.equal(welcome.pickups.includes("cover-crate-2-9"), true);
-      assert.equal(welcome.pickups.includes("alien-weapon-enh"), true);
+      assert.equal(welcome.pickups.includes("alien-weapon-enh"), false);
       assert.equal(welcome.pickups.every((id) => typeof id === "string"), true);
     }
     await waitFor(2000, () => a.poses.get(aw.ownedEntityId));
     await delay(200);
+    const start = a.poses.get(aw.ownedEntityId);
+    assert.ok(start);
     const before = [...a.entities].sort((left, right) => left - right);
     assert.ok(before.length > 0);
 
-    const target = {
-      x: (weapon.minX + weapon.maxX) / 2,
-      z: (weapon.minZ + weapon.maxZ) / 2,
-    };
-    const deadline = Date.now() + 6000;
+    // Own every other seat so wanderers stay off the stair during the climb.
+    const seats = loadArena().agents.length;
+    for (let n = 2; n < seats; n++) {
+      const extra = openClient(host.url, view);
+      open.push(extra.ws);
+      const welcome = await extra.welcome;
+      extra.ws.send(JSON.stringify({
+        v: 1,
+        type: "input",
+        seq: 1,
+        moveX: 0,
+        moveZ: 0,
+        yaw: 0,
+        buttons: 0,
+        entity: welcome.ownedEntityId,
+      }));
+    }
+
+    const stairs = westStairToward(weapon, view.buildings ?? [], view.aabbs ?? []);
+    assert.ok(stairs.length >= 2, "no west stair reaches the weapon");
+    const first = stairs[0]!;
+    const top = stairs[stairs.length - 1]!;
+    const centerZ = (first.minZ + first.maxZ) / 2;
+    const goals = [
+      { x: start.x, z: centerZ },
+      { x: first.maxX + 0.9, z: centerZ },
+      { x: (top.minX + top.maxX) / 2, z: centerZ },
+      { x: (weapon.minX + weapon.maxX) / 2, z: (weapon.minZ + weapon.maxZ) / 2 },
+    ];
+    const deadline = Date.now() + 15000;
     let seq = 1;
+    let goal = 0;
     while (Date.now() < deadline) {
       const takenA = a.gone.some((frame) => frame.id === "alien-weapon-1");
       const takenB = b.gone.some((frame) => frame.id === "alien-weapon-1");
       if (takenA && takenB) break;
       const pose = a.poses.get(aw.ownedEntityId);
       if (pose && a.ws.readyState === WebSocket.OPEN) {
+        while (goal < goals.length - 1 && Math.hypot(pose.x - goals[goal]!.x, pose.z - goals[goal]!.z) < 0.45) goal += 1;
+        const target = goals[goal]!;
         const dx = target.x - pose.x;
         const dz = target.z - pose.z;
         const len = Math.hypot(dx, dz) || 1;
@@ -626,8 +742,9 @@ test("one client takes alien-weapon-1 and the other sees it gone", { timeout: 20
       await delay(50);
     }
     const pose = a.poses.get(aw.ownedEntityId);
-    const dist = pose ? Math.hypot(pose.x - target.x, pose.z - target.z) : Number.NaN;
-    const where = `pose ${JSON.stringify(pose)} dist ${dist.toFixed(3)}`;
+    const aim = goals[goals.length - 1]!;
+    const dist = pose ? Math.hypot(pose.x - aim.x, pose.z - aim.z) : Number.NaN;
+    const where = `pose ${JSON.stringify(pose)} goal ${goal} dist ${dist.toFixed(3)}`;
     const goneA = a.gone.find((frame) => frame.id === "alien-weapon-1");
     const goneB = b.gone.find((frame) => frame.id === "alien-weapon-1");
     assert.ok(goneA, `A did not see the weapon vanish ${where}`);
