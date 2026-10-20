@@ -4,6 +4,7 @@ generated/
 node_modules/
 dist/
 *.log
+*.blend1
 .env
 .env.*
 .vscode
