@@ -4,6 +4,9 @@
   "private": true,
   "description": "Browser arena client and authoritative host for Conveyor Engine",
   "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
