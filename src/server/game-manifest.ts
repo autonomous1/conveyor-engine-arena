@@ -730,6 +730,8 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
         hinge: door.hinge,
         size: door.size,
         open: door.open,
+        ...(door.locked ? { locked: true } : {}),
+        ...(door.key ? { key: door.key } : {}),
       });
     }
     for (const box of baked.boxes) {
@@ -753,7 +755,8 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
   /**
    * Placement files have no collision id. Scale 1 with no clip stays a building.
    * An animation is a prop at any scale, so a key is not dropped for failing a weapon scale.
-   * Placement type is not a render filter. crate and key both draw. key is not a pickup.
+   * Placement type is not a render filter. crate and key both draw.
+   * type "key" is a pickup. The pawn who walks into it holds that placement id.
    */
   const pushPlacementProp = (item: Record<string, unknown>, path: string): void => {
     if (Object.prototype.hasOwnProperty.call(item, "hinge")) return;
@@ -858,7 +861,7 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
       issues.push({ path: `${path}.type`, message: "pickup needs an aabb" });
       continue;
     }
-    const amount = kind === "weapon" ? 0 : takePickupAmount(item.amount, `${path}.amount`, issues, kind === "health" ? HEALTH_PICKUP : AMMO_PICKUP);
+    const amount = kind === "weapon" || kind === "key" ? 0 : takePickupAmount(item.amount, `${path}.amount`, issues, kind === "health" ? HEALTH_PICKUP : AMMO_PICKUP);
     const weapon = kind === "weapon" ? modelId : undefined;
     seenPickups.add(id);
     pickups.push({

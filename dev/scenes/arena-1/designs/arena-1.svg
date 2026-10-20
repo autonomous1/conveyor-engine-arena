@@ -25,11 +25,11 @@
      borderopacity="1.0"
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
-     inkscape:zoom="15.951875"
-     inkscape:cx="-51.634932"
-     inkscape:cy="95.742521"
+     inkscape:zoom="22.724017"
+     inkscape:cx="-29.310535"
+     inkscape:cy="131.63571"
      inkscape:document-units="mm"
-     inkscape:current-layer="layer4"
+     inkscape:current-layer="layer7"
      showgrid="false"
      inkscape:window-width="2812"
      inkscape:window-height="1549"
@@ -771,19 +771,18 @@
   <g
      inkscape:groupmode="layer"
      id="layer2"
-     inkscape:label="buildings"
-     sodipodi:insensitive="true">
+     inkscape:label="buildings">
     <g
        id="brutalist-building-3-bake"
        data-model="brutalist-building-3-bake"
        inkscape:label="model:brutalist-building-3-bake"
        transform="matrix(0,29.999998,-29.999998,0,0.70265041,269.90783)"
-       style="opacity:1;vector-effect:none;fill:none;fill-opacity:1;stroke:#303030;stroke-width:0.01666667;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1">
+       style="opacity:1;vector-effect:none;fill:none;fill-opacity:1;stroke:#303030;stroke-width:0.00088194;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1">
       <path
          d="M -0.499176,0.330688 H 0.2 V 0.15 H 0.2883 V 0.137909 H 0.3 V -0.15 H 0.499634 V -0.331238 H 0 V 0.15 h -0.499176 z"
          id="path2"
          inkscape:connector-curvature="0"
-         style="vector-effect:none;fill:none;fill-opacity:1;fill-rule:evenodd;stroke:#303030;stroke-width:0.01666667;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1" />
+         style="vector-effect:none;fill:none;fill-opacity:1;fill-rule:evenodd;stroke:#303030;stroke-width:0.00088194;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1" />
     </g>
     <g
        id="brutalist-building-3-bake-1"
@@ -909,7 +908,58 @@
   <g
      inkscape:groupmode="layer"
      id="layer7"
-     inkscape:label="doors" />
+     inkscape:label="doors">
+    <rect
+       style="color:#000000;display:inline;overflow:visible;opacity:1;vector-effect:none;fill:#3edbf2;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:0.12959428;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:0.51837709, 0.12959427;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
+       id="door-1-1-9"
+       width="0.49405965"
+       height="1.8900341"
+       x="-9.3650703"
+       y="258.60059"
+       data-building="brutalist-building-3-bake"
+       model="door1.glb"
+       inkscape:label="model:door-1" />
+    <rect
+       style="color:#000000;display:inline;overflow:visible;opacity:1;vector-effect:none;fill:#3edbf2;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:0.06975012;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:0.27900046, 0.06975012;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
+       id="door-1-1-9-2"
+       width="0.25"
+       height="1.082"
+       x="281.50327"
+       y="24.146978"
+       data-building="brutalist-building-2-cbake"
+       transform="rotate(90)"
+       model="door2.glb"
+       inkscape:label="model:door-2"
+       data-locked="true"
+       data-key="key" />
+    <rect
+       style="color:#000000;display:inline;overflow:visible;opacity:1;vector-effect:none;fill:#3edbf2;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:0.06975012;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:0.27900047, 0.06975012;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
+       id="door-1-1-9-2-4"
+       width="0.25"
+       height="1.082"
+       x="281.50327"
+       y="22.67271"
+       data-building="brutalist-building-2-cbake"
+       transform="rotate(90)"
+       model="door2.glb"
+       inkscape:label="model:door-2"
+       z="2.75"
+       data-locked="true"
+       data-key="key" />
+    <rect
+       style="color:#000000;display:inline;overflow:visible;opacity:1;vector-effect:none;fill:#3edbf2;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:0.12959428;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:0.5183771, 0.12959427;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
+       id="door-1-1-9-22"
+       width="0.49405965"
+       height="1.8900341"
+       x="-9.2811813"
+       y="261.85687"
+       data-building="brutalist-building-3-bake"
+       model="door1.glb"
+       inkscape:label="model:door-1"
+       z="2.75"
+       data-key="key"
+       data-locked="true" />
+  </g>
   <g
      inkscape:groupmode="layer"
      id="layer3"

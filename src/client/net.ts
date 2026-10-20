@@ -2,6 +2,7 @@ import { EngineClient, type IncomingSnapshot } from "conveyor-engine-client";
 import { fireShotFrame, summarizeInbound } from "../shared/fire-debug.js";
 import { parseAudit, type AuditCounters } from "../shared/audit.js";
 import { parseHealth } from "../shared/health.js";
+import { parseDoor, parseDoorSet, useFrame, type DoorFrame } from "../shared/doors.js";
 import { parseGrenadePose, grenadeFrame, type GrenadePose } from "../shared/grenade.js";
 import { parseLoadout, parsePickup, parsePickupSet, type LoadoutFrame, type PickupFrame } from "../shared/pickups.js";
 
@@ -35,6 +36,8 @@ export type LiveLink = {
   sendFire(seq: number, yaw: number, pitch: number): boolean;
   /** Arena frame. Returns false when the socket has no owned pawn yet. Does not fire. */
   sendGrenade(seq: number, yaw: number, pitch: number): boolean;
+  /** Arena frame. One press of E. Returns false when the socket has no owned pawn yet. */
+  sendUse(seq: number): boolean;
   /** True after the socket has closed. Closing does not open another socket. */
   socketClosed(): boolean;
   /** connecting, open, closing, or closed. */
@@ -105,6 +108,10 @@ export function connectLive(opts: {
   /** Remaining pickup ids from welcome. Taken placements are absent. */
   onPickupSet?: (ids: readonly string[]) => void;
   onPickup?: (pickup: PickupFrame) => void;
+  /** One door changed. Both tabs receive the same open and locked. */
+  onDoor?: (door: DoorFrame) => void;
+  /** Full door list from welcome, so a late joiner matches. */
+  onDoors?: (doors: readonly DoorFrame[]) => void;
   /** This client only. Other clients do not receive a viewmodel. */
   onLoadout?: (loadout: LoadoutFrame) => void;
   /** Read when a shot is sent. The host logs only when this is on. */
@@ -191,6 +198,8 @@ export function connectLive(opts: {
       if (audit) opts.onAudit?.(audit);
       const pickup = parsePickup(msg);
       if (pickup) opts.onPickup?.(pickup);
+      const door = parseDoor(msg);
+      if (door) opts.onDoor?.(door);
       const loadout = parseLoadout(msg);
       if (loadout) opts.onLoadout?.(loadout);
       return;
@@ -213,6 +222,8 @@ export function connectLive(opts: {
         }
         const ids = parsePickupSet(msg.pickups);
         if (ids) opts.onPickupSet?.(ids);
+        const doors = parseDoorSet(msg.doors);
+        if (doors) opts.onDoors?.(doors);
         if (typeof msg.weapon === "string" || typeof msg.ammo === "number") {
           const ammo = typeof msg.ammo === "number" && Number.isFinite(msg.ammo) ? msg.ammo : 0;
           const weapon = typeof msg.weapon === "string" && msg.weapon.length > 0 ? msg.weapon : undefined;
@@ -287,6 +298,11 @@ export function connectLive(opts: {
     sendGrenade(seq, yaw, pitch) {
       if (ownedId === undefined || ws.readyState !== WebSocket.OPEN) return false;
       ws.send(JSON.stringify(grenadeFrame(seq, yaw, pitch)));
+      return true;
+    },
+    sendUse(seq) {
+      if (ownedId === undefined || ws.readyState !== WebSocket.OPEN) return false;
+      ws.send(JSON.stringify(useFrame(seq)));
       return true;
     },
     socketClosed() {

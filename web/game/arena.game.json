@@ -52,6 +52,7 @@
     {
       "id": "brutalist-building-1-cbake",
       "kind": "model",
+      "type": "building",
       "instance": "static",
       "uri": "/assets/models/brutalist-building-1-cbake.glb",
       "mediaType": "model/gltf-binary",

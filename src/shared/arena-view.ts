@@ -115,6 +115,7 @@ export type ArenaView = {
    * GLB uri, the same lookup a prop uses. The file faces out on +Z with the
    * hinge at the mesh origin. Placement yaw is the wall face, applied once.
    * `open` yaws only the hinge node. The frame stays on that yaw. There is no AABB.
+   * `locked` starts the leaf shut until the pawn uses `key`. Neither field is a collider.
    */
   doors: Array<{
     id: string;
@@ -124,6 +125,10 @@ export type ArenaView = {
     hinge: "left" | "right";
     size: [number, number, number];
     open: boolean;
+    /** Absent or false: `open` toggles. True: the host starts the leaf shut. */
+    locked?: boolean;
+    /** Pickup placement id. The host reads it only while `locked` is true. */
+    key?: string;
   }>;
   characters: Array<{ id: string; model: string; scale: number; animations: Record<Movement, CharacterAnimation> }>;
   /**

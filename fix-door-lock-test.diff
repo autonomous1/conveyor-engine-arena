@@ -1,0 +1,113 @@
+diff --git a/test/door-lock.test.ts b/test/door-lock.test.ts
+index 113e3a4..d1590a0 100644
+--- a/test/door-lock.test.ts
++++ b/test/door-lock.test.ts
+@@ -6,13 +6,15 @@ import * as THREE from "three";
+ import { WebSocket } from "ws";
+ import { applyDoorSwing, doorSwingRadians, placeDoorModel } from "../src/client/arena-scene.ts";
+ import { interpretPlacements } from "../src/server/placements-file.ts";
+-import { createArenaDoors } from "../dist/server/doors.js";
++import { createArenaDoors, createDoorBlockers } from "../dist/server/doors.js";
+ import { startArenaServer } from "../dist/server/main.js";
++import { loadArena } from "../dist/server/world-loader.js";
+ import type { ArenaView } from "../src/shared/arena-view.ts";
+ import {
+   DOOR_GAP_DEPTH_M,
+   DOOR_USE_OUTWARD_M,
+   doorFrame,
++  doorLeafBox,
+   doorUseVolume,
+   parseDoor,
+   parseDoorSet,
+@@ -309,7 +311,21 @@ test("the use volume matches the door frame and the top-step key can reach the l
+   assert.equal(alone.locked, true);
+ });
+ 
+-test("door and use frames parse, and the host does not seal the gap", () => {
++type Box = { id: number; minX: number; maxX: number; minY?: number; maxY?: number; minZ: number; maxZ: number };
++
++/** Mid-height point in the middle of the shut leaf: inside the stamped doorway gap. */
++function gapProbe(door: ArenaView["doors"][number]): { x: number; y: number; z: number } {
++  const leaf = doorLeafBox(door);
++  return { x: (leaf.minX + leaf.maxX) / 2, y: door.position[1] + door.size[1] / 2, z: (leaf.minZ + leaf.maxZ) / 2 };
++}
++
++function sealing(boxes: readonly Box[], p: { x: number; y: number; z: number }): Box[] {
++  return boxes.filter((box) =>
++    p.x >= box.minX && p.x <= box.maxX && p.z >= box.minZ && p.z <= box.maxZ &&
++    (box.minY === undefined || p.y >= box.minY) && (box.maxY === undefined || p.y <= box.maxY));
++}
++
++test("door and use frames parse, and only a shut leaf seals the gap", () => {
+   assert.deepEqual(parseUse(useFrame(3)), useFrame(3));
+   assert.equal(parseUse({ t: "use", v: 2, seq: 1 }), undefined);
+   assert.equal(parseUse({ t: "fire", v: 1, seq: 1, yaw: 0, pitch: 0 }), undefined);
+@@ -318,14 +334,67 @@ test("door and use frames parse, and the host does not seal the gap", () => {
+   assert.deepEqual(parseDoorSet([{ id: "a", open: false, locked: true }]), [doorFrame("a", false, true)]);
+   assert.equal(parseDoorSet("nope"), undefined);
+ 
++  // The blocker adds one box per door through the public kernel API and rewrites it in place:
++  // no splice (ARENA-02), no kernel import, no snap envelopes.
+   const doors = readFileSync(path.join(root, "src/server/doors.ts"), "utf8");
+   const shared = readFileSync(path.join(root, "src/shared/doors.ts"), "utf8");
+   const main = readFileSync(path.join(root, "src/server/main.ts"), "utf8");
+-  assert.equal(/listObstacles|\.splice\(/.test(doors), false);
++  assert.equal(/\.splice\(/.test(doors), false);
+   assert.equal(/conveyor-engine-world|setClip|enqueue/.test(doors + shared), false);
++  assert.match(main, /blockers: createDoorBlockers\(loaded\.world\)/);
+   assert.match(main, /welcome\.doors = doorHost\.snapshot\(\)/);
+   assert.match(main, /doorHost\.drop\(clientId\)/);
+   assert.equal(/envelopes\.get/.test(doors + main), false);
++
++  // The installed arena: baked static boxes leave every doorway open.
++  const loaded = loadArena();
++  const world = loaded.world;
++  const placed = loaded.view.doors;
++  assert.ok(placed.length > 0);
++  for (const door of placed) {
++    assert.deepEqual(sealing(world.listObstacles(), gapProbe(door)).map((box) => box.id), [], `${door.id}: a baked box seals the gap`);
++  }
++
++  // Seeding the host shuts every leaf (locked ones start shut whatever the file says).
++  const count = world.listObstacles().length;
++  const blockers = createDoorBlockers(world);
++  const at = new Map<number, PawnBody>();
++  const host = createArenaDoors({
++    doors: placed,
++    pawnOf: (id) => at.get(id),
++    keys: { hasKey: () => true, consumeKey: () => true },
++    sendAll() {},
++    ownedPawn: () => 7,
++    sessionId: () => 1,
++    blockers,
++  });
++  assert.equal(world.listObstacles().length, count + placed.length, "one blocker per door");
++  const shut = new Map(host.snapshot().map((row) => [row.id, !row.open]));
++  let seq = 0;
++  for (const door of placed) {
++    const id = blockers.obstacleId(door.id);
++    assert.ok(id !== undefined, door.id);
++    const probe = gapProbe(door);
++    const seal = () => sealing(world.listObstacles(), probe).map((box) => box.id);
++    const use = () => {
++      const reach = doorUseVolume(door);
++      at.set(7, pawn(7, (reach.minX + reach.maxX) / 2, door.position[1], (reach.minZ + reach.maxZ) / 2));
++      host.onFrame(1, useFrame(++seq));
++    };
++    if (!shut.get(door.id)) use();
++    assert.deepEqual(seal(), [id], `${door.id}: the shut leaf seals the gap`);
++    const live = world.listObstacles().find((box) => box.id === id)!;
++    const leaf = doorLeafBox(door);
++    for (const k of ["minX", "maxX", "minY", "maxY", "minZ", "maxZ"] as const) {
++      assert.ok(Math.abs((live[k] ?? NaN) - leaf[k]) < 1e-9, `${door.id} ${k}`);
++    }
++    use();
++    assert.equal(host.snapshot().find((row) => row.id === door.id)?.open, true, door.id);
++    assert.deepEqual(seal(), [], `${door.id}: opening unseals the gap`);
++    use();
++    assert.deepEqual(seal(), [id], `${door.id}: closing seals it again`);
++  }
++  assert.equal(world.listObstacles().length, count + placed.length, "toggling never adds or removes a box");
+ });
+ 
+ test("two sockets share the door snapshot and a use away from the door changes nothing", { timeout: 20_000 }, async () => {

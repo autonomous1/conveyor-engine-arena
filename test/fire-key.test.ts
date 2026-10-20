@@ -338,6 +338,39 @@ test("the other client sees the laser only after F, not after a click", async ()
   }
 });
 
+test("E asks to use once and does not fire or throw", () => {
+  // A second installDom replaces the global document. Sample the unlocked
+  // case before the locked rig, so that rig still reads its own lock.
+  const bare = installDom();
+  const lockedOff = attachPlayInput(bare.dom, bare.storage);
+  bare.key("keydown", "KeyE");
+  bare.key("keyup", "KeyE");
+  assert.equal(lockedOff.sample().using, false);
+
+  const rig = installDom();
+  const input = attachPlayInput(rig.dom, rig.storage);
+  rig.click();
+  input.update(1 / 60);
+  rig.key("keydown", "KeyE");
+  rig.key("keydown", "KeyE", true);
+  rig.key("keyup", "KeyE");
+  const sample = input.sample();
+  assert.equal(sample.using, true);
+  assert.equal(sample.firing, false);
+  assert.equal(sample.grenade, false);
+  assert.equal(input.sample().using, false);
+
+  rig.key("keydown", "KeyE");
+  rig.unlock();
+  assert.equal(input.sample().using, false);
+  rig.click();
+  rig.key("keydown", "KeyF");
+  rig.key("keyup", "KeyF");
+  const fired = input.sample();
+  assert.equal(fired.firing, true);
+  assert.equal(fired.using, false);
+});
+
 type Pose = { x: number; y: number; z: number };
 type LaserMsg = { shooter: number; from: Pose; to: Pose; until: number };
 

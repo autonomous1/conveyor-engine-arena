@@ -21,8 +21,9 @@ import {
  * not request the lock again while this element already holds it.
  * F fires while the pointer is locked. F does not change the gamepad profile.
  * P throws a grenade on the same lock. P does not fire. F does not throw.
+ * E uses the door the pawn is overlapping. E does not fire and does not throw.
  * A gamepad fire button is included only when that profile already binds one.
- * Neither profile binds a grenade button.
+ * Neither profile binds a grenade button or a use button.
  */
 
 export type PlaySample = {
@@ -34,6 +35,8 @@ export type PlaySample = {
   firing: boolean;
   /** P is down while locked, or a tap landed since the previous sample. */
   grenade: boolean;
+  /** E was pressed once while locked. A hold does not repeat. */
+  using: boolean;
 };
 
 export type PlayInput = {
@@ -67,6 +70,7 @@ export function attachPlayInput(
   let fireQueued = false;
   let grenadeDown = false;
   let grenadeQueued = false;
+  let useQueued = false;
   let profile = loadGamepadProfile(storage);
   const pad = new GamepadInput();
 
@@ -98,6 +102,12 @@ export function attachPlayInput(
       grenadeQueued = true;
       return;
     }
+    if (ev.code === "KeyE") {
+      if (!down) return;
+      if (ev.repeat || document.pointerLockElement !== dom) return;
+      useQueued = true;
+      return;
+    }
     if (ev.repeat) return;
     if (down && ev.code === "F10") {
       ev.preventDefault();
@@ -124,6 +134,7 @@ export function attachPlayInput(
       fireQueued = false;
       grenadeDown = false;
       grenadeQueued = false;
+      useQueued = false;
     }
     document.body.style.cursor = locked ? "none" : "default";
   };
@@ -145,6 +156,7 @@ export function attachPlayInput(
     fireQueued = false;
     grenadeDown = false;
     grenadeQueued = false;
+    useQueued = false;
   };
 
   window.addEventListener("keydown", down);
@@ -184,9 +196,11 @@ export function attachPlayInput(
       const padFire = button !== undefined && pad.connected && pad.isPressed(button);
       const firing = (document.pointerLockElement === dom && (fireDown || fireQueued)) || padFire;
       const grenade = document.pointerLockElement === dom && (grenadeDown || grenadeQueued);
+      const using = document.pointerLockElement === dom && useQueued;
       fireQueued = false;
       grenadeQueued = false;
-      return { forward: move.forward, strafe: move.strafe, yaw, pitch, firing, grenade };
+      useQueued = false;
+      return { forward: move.forward, strafe: move.strafe, yaw, pitch, firing, grenade, using };
     },
   };
 }

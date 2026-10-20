@@ -1,6 +1,85 @@
 {
   "formatVersion": 1,
   "units": "meters",
-  "placements": [],
+  "placements": [
+    {
+      "id": "door-1-1-9",
+      "model": "door-1",
+      "type": "door",
+      "position": [
+        -9.287584,
+        0,
+        36.509376
+      ],
+      "yaw": 270,
+      "hinge": "left",
+      "size": [
+        1.047216,
+        2.1,
+        0.08
+      ],
+      "open": false
+    },
+    {
+      "id": "door-1-1-9-22",
+      "model": "door-1",
+      "type": "door",
+      "position": [
+        -9.287584,
+        2.75,
+        33.253096
+      ],
+      "yaw": 270,
+      "hinge": "left",
+      "size": [
+        1.047216,
+        2.1,
+        0.08
+      ],
+      "open": false,
+      "locked": true,
+      "key": "key"
+    },
+    {
+      "id": "door-1-1-9-2",
+      "model": "door-2",
+      "type": "door",
+      "position": [
+        -25.228978,
+        0,
+        15.259191
+      ],
+      "yaw": 0,
+      "hinge": "left",
+      "size": [
+        1.055523,
+        2.1,
+        0.08
+      ],
+      "open": false,
+      "locked": true,
+      "key": "key"
+    },
+    {
+      "id": "door-1-1-9-2-4",
+      "model": "door-2",
+      "type": "door",
+      "position": [
+        -23.75471,
+        2.75,
+        15.259191
+      ],
+      "yaw": 0,
+      "hinge": "left",
+      "size": [
+        1.055523,
+        2.1,
+        0.08
+      ],
+      "open": false,
+      "locked": true,
+      "key": "key"
+    }
+  ],
   "obstacles": []
 }

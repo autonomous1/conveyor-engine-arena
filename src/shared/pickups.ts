@@ -195,31 +195,51 @@ export type PawnKit = ReturnType<typeof createPawnKit>;
 /**
  * Remaining pickup ids. Seeded from placements. Taking one deletes the id.
  * Health already at 100, ammo that does not rise, and a weapon the pawn
- * already holds still consume the placement. A taken key is recorded.
- * Touching an id that is already held grants nothing.
+ * already holds still consume the placement. A taken key is recorded on
+ * that pawn only. Another pawn does not hold it. Touching an id that this
+ * pawn already holds grants nothing.
  */
 export function createPickupHost(list: readonly PickupPlacement[]) {
   const placements = list.filter((pickup) => typeof pickup.id === "string" && pickup.id.length > 0);
   const remaining = new Set(placements.map((pickup) => pickup.id));
   const byId = new Map(placements.map((pickup) => [pickup.id, pickup]));
-  const heldKeys = new Set<string>();
+  const heldKeys = new Map<number, Set<string>>();
+  const bag = (pawnId: number): Set<string> => {
+    let set = heldKeys.get(pawnId);
+    if (!set) {
+      set = new Set();
+      heldKeys.set(pawnId, set);
+    }
+    return set;
+  };
   return {
     remainingIds(): string[] {
       return [...remaining].sort();
     },
-    /** True after a key pickup has been stored. */
-    hasKey(): boolean {
-      return heldKeys.size > 0;
+    /** True when this pawn holds `keyId`, or any key when `keyId` is omitted. */
+    hasKey(pawnId: number, keyId?: string): boolean {
+      const set = heldKeys.get(pawnId);
+      if (!set) return false;
+      if (keyId === undefined) return set.size > 0;
+      return set.has(keyId);
     },
-    /** Key placement ids the player is holding. */
-    getHeldItems(): string[] {
-      return [...heldKeys].sort();
+    /** Key placement ids this pawn is holding. */
+    getHeldItems(pawnId: number): string[] {
+      return [...(heldKeys.get(pawnId) ?? [])].sort();
+    },
+    /** Drop one key id from this pawn. False when that pawn does not hold it. */
+    consumeKey(pawnId: number, keyId: string): boolean {
+      const set = heldKeys.get(pawnId);
+      if (!set || !set.has(keyId)) return false;
+      set.delete(keyId);
+      if (set.size === 0) heldKeys.delete(pawnId);
+      return true;
     },
     take(pawns: readonly PawnBody[], health: HealthSink, kit: PawnKit): PickupGrant[] {
       const grants: PickupGrant[] = [];
       for (const touch of collectTouches(remaining, placements, pawns)) {
         const pickup = byId.get(touch.id);
-        if (pickup?.kind === "key" && heldKeys.has(pickup.id)) continue;
+        if (pickup?.kind === "key" && bag(touch.pawnId).has(pickup.id)) continue;
         remaining.delete(touch.id);
         if (!pickup) continue;
         let loadout: LoadoutFrame | undefined;
@@ -232,7 +252,7 @@ export function createPickupHost(list: readonly PickupPlacement[]) {
           kit.setWeapon(touch.pawnId, pickup.weapon);
           loadout = loadoutFrame(kit.ammoOf(touch.pawnId), pickup.weapon);
         } else if (pickup.kind === "key") {
-          heldKeys.add(pickup.id);
+          bag(touch.pawnId).add(pickup.id);
         }
         grants.push({
           id: pickup.id,

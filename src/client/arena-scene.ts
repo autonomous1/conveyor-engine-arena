@@ -186,6 +186,34 @@ export function doorSwingRadians(hinge: "left" | "right", open: boolean): number
   return hinge === "left" ? radians : -radians;
 }
 
+const DOOR_SWING_SECONDS = 0.4;
+
+/** Retarget the hinge only. With `animate`, `tickDoorSwing` eases it there. */
+export function applyDoorSwing(group: THREE.Object3D, hinge: "left" | "right", open: boolean, animate = false): void {
+  const node = group.getObjectByName("hinge");
+  if (!node) return;
+  const to = doorSwingRadians(hinge, open);
+  if (!animate) {
+    node.rotation.y = to;
+    delete node.userData.swing;
+    return;
+  }
+  node.userData.swing = { from: node.rotation.y, to, t: 0 };
+}
+
+/** Advance an eased swing by `dt` seconds (smoothstep). */
+export function tickDoorSwing(group: THREE.Object3D, dt: number): void {
+  const node = group.getObjectByName("hinge");
+  const swing = node?.userData.swing as { from: number; to: number; t: number } | undefined;
+  if (!node || !swing) return;
+  swing.t = Math.min(1, swing.t + dt / DOOR_SWING_SECONDS);
+  const e = swing.t * swing.t * (3 - 2 * swing.t);
+  node.rotation.y = swing.from + (swing.to - swing.from) * e;
+  if (swing.t === 1) delete node.userData.swing;
+}
+
+export type DoorRig = { hinge: "left" | "right"; group: THREE.Object3D };
+
 /**
  * Mount one door GLB. The default clones the frame and the leaf. Pass
  * `{ frameMeshes: false }` when the frame is drawn with InstancedMesh: the
@@ -529,7 +557,7 @@ export function placeWallModel(template: THREE.Object3D, wall: ArenaView["walls"
   return group;
 }
 
-export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Promise<{ templates: CharacterTemplates; fallbacks: number; propMixers: THREE.AnimationMixer[]; placements: PlacementVisibility; mapSamples: MapSample[] }> {
+export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Promise<{ templates: CharacterTemplates; fallbacks: number; propMixers: THREE.AnimationMixer[]; placements: PlacementVisibility; mapSamples: MapSample[]; doors: Map<string, DoorRig> }> {
   let fallbacks = 0;
   const propMixers: THREE.AnimationMixer[] = [];
   const placements = createPlacementVisibility();
@@ -735,6 +763,7 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
     ));
   }
 
+  const doorRigs = new Map<string, DoorRig>();
   const doorList = view.doors ?? [];
   const staticDoors = new Map<string, ArenaView["doors"]>();
   const cloneDoors: ArenaView["doors"] = [];
@@ -765,6 +794,7 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
       const group = placeDoorModel(template, door, frames.length === 0 ? undefined : { frameMeshes: false });
       markShadowCasters(group, castsShadow);
       arena.content.add(group);
+      doorRigs.set(door.id, { hinge: door.hinge, group });
       // The hinge swings the leaf. The map keeps the frame yaw, not the open angle.
       if (frames.length === 0) noteObject(door.id, "door", group, door.yaw, ["hinge", "door"]);
     }
@@ -775,6 +805,7 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
     markShadowCasters(panel, castsShadow);
     arena.content.add(panel);
     const door = cloneDoors.find((item) => item.id === panel.name);
+    if (door) doorRigs.set(door.id, { hinge: door.hinge, group: panel });
     noteObject(panel.name, "door", panel, door?.yaw, ["hinge", "door"]);
   }
 
@@ -893,5 +924,5 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
       animations: character.animations,
     });
   }
-  return { templates, fallbacks, propMixers, placements, mapSamples };
+  return { templates, fallbacks, propMixers, placements, mapSamples, doors: doorRigs };
 }

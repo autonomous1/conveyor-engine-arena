@@ -3,10 +3,11 @@ import type { ArenaView } from "../shared/arena-view.js";
 import { aimDirection, eyeLook, INPUT_HZ, moveIntent, yawFromQuat } from "../shared/look.js";
 import { dropPickupAabb } from "../shared/pickups.js";
 import { clientFaultText, createFireDebugLog } from "../shared/fire-debug.js";
+import { doorLeafBox } from "../shared/doors.js";
 import { advanceGrenadeClock, type GrenadePose } from "../shared/grenade.js";
 import { advanceFireClock, LASER_MS, traceHitscan, type TraceCapsule } from "../shared/hitscan.js";
 import { createAabbDebug } from "./aabb-debug.js";
-import { createArenaScene, loadArenaVisuals } from "./arena-scene.js";
+import { applyDoorSwing, createArenaScene, loadArenaVisuals, tickDoorSwing } from "./arena-scene.js";
 import { createGrenadeProps } from "./grenade.js";
 import { createHitMarker } from "./hit-marker.js";
 import { createHud, localHealthLabel } from "./hud.js";
@@ -39,6 +40,9 @@ const options = createOptionsDialog(
 );
 const fireDebug = createFireDebugLog(() => options.fireDebug);
 const visuals = await loadArenaVisuals(view, arena);
+/** Open state per door, from the file then from host frames. A shut leaf stops the predicted beam like the host shot. */
+const doorOpen = new Map((view.doors ?? []).map((door) => [door.id, door.open === true && door.locked !== true]));
+
 sceneMap.setWorld({
   bounds: view.bounds,
   samples: visuals.mapSamples,
@@ -92,6 +96,7 @@ let fireSeq = 0;
 let nextFireAt = 0;
 let grenadeSeq = 0;
 let nextGrenadeAt = 0;
+let useSeq = 0;
 let pinnedError: string | undefined;
 let pendingFireLog: { socketClosed: boolean; camBefore: { x: number; y: number; z: number } } | undefined;
 let awaitFireReply = false;
@@ -113,7 +118,7 @@ const link = connectLive({
     statusText = status.text;
     resyncs = status.resyncs;
   },
-  onApplied: () => {},
+  onApplied: () => { },
   onLaser: (laser) => {
     laserQueue.push(laser);
   },
@@ -132,6 +137,10 @@ const link = connectLive({
   onPickup: (pickup) => {
     visuals.placements.setVisible(pickup.id, false);
     dropBox(pickup.id);
+  },
+  onDoor: (door) => swingDoor(door.id, door.open),
+  onDoors: (doors) => {
+    for (const door of doors) swingDoor(door.id, door.open);
   },
   onLoadout: (loadout) => {
     showWeapon(loadout.weapon);
@@ -163,6 +172,8 @@ let seenSnaps = 0;
 let resyncs = 0;
 const rates = createRateWindow(500);
 const sendDt = 1 / INPUT_HZ;
+let lastDoorTick = 0;
+
 function frame(now: number) {
   let threw = false;
   try {
@@ -189,6 +200,9 @@ function frame(now: number) {
     }
   }
   hitMarker.tick(now);
+  const doorDt = lastDoorTick ? Math.min(0.1, (now - lastDoorTick) / 1000) : 0;
+  lastDoorTick = now;
+  for (const rig of visuals.doors.values()) tickDoorSwing(rig.group, doorDt);
   if (pendingFireLog) {
     if (options.fireDebug) {
       const camera = arena.camera.position;
@@ -230,6 +244,10 @@ function drawFrame(now: number) {
       const seq = grenadeSeq + 1;
       if (link.sendGrenade(seq, sample.yaw, sample.pitch)) grenadeSeq = seq;
     }
+    if (sample.using) {
+      const seq = useSeq + 1;
+      if (link.sendUse(seq)) useSeq = seq;
+    }
     if (clock.due) {
       pendingFireLog = {
         socketClosed: link.socketClosed(),
@@ -252,7 +270,7 @@ function drawFrame(now: number) {
         const predicted = traceHitscan(
           aim.position,
           aimDirection(sample.yaw, sample.pitch),
-          view.aabbs,
+          [...view.aabbs, ...shutLeafBoxes()],
           shotCapsules(render.entities, ownedId, view.pawnRadius, view.pawnHeight),
         );
         shotFrom = predicted.from;
@@ -357,6 +375,22 @@ function drawFrame(now: number) {
   }
 }
 requestAnimationFrame(frame);
+
+function shutLeafBoxes(): Array<{ id: number; minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number }> {
+  const out: Array<{ id: number; minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number }> = [];
+  (view.doors ?? []).forEach((door, index) => {
+    if (doorOpen.get(door.id)) return;
+    out.push({ id: -1 - index, ...doorLeafBox(door) });
+  });
+  return out;
+}
+
+function swingDoor(id: string, open: boolean): void {
+  doorOpen.set(id, open);
+  const rig = visuals.doors.get(id);
+  if (!rig) return;
+  applyDoorSwing(rig.group, rig.hinge, open, true);
+}
 
 /** The eye sits inside the shooter's capsule, so that pawn is not a target. */
 function shotCapsules(

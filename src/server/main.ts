@@ -8,6 +8,7 @@ import type { TransportSocket } from "conveyor-engine-transport-ws";
 import { createAudit } from "../shared/audit.js";
 import { createPawnHealth } from "../shared/health.js";
 import { createPawnKit, createPickupHost } from "../shared/pickups.js";
+import { createArenaDoors, createDoorBlockers } from "./doors.js";
 import { createArenaFire } from "./fire.js";
 import { createArenaGrenades } from "./grenade.js";
 import { createHeldInputs, startWanderLoop, startPropAnimation } from "./game.js";
@@ -143,6 +144,7 @@ export async function startArenaServer(port = Number(process.env.PORT ?? 4173)):
     const welcome = frame as Record<string, unknown>;
     if (welcome.type !== "welcome") return text;
     welcome.pickups = pickupHost.remainingIds();
+    welcome.doors = doorHost.snapshot();
     const owned = welcome.ownedEntityId;
     if (typeof owned === "number") {
       const weapon = kit.weaponOf(owned);
@@ -176,6 +178,30 @@ export async function startArenaServer(port = Number(process.env.PORT ?? 4173)):
       if (owned === undefined) return;
       held.admit(owned, { moveX: input.moveX, moveZ: input.moveZ, yaw: input.yaw, seq: input.seq });
     },
+  });
+  const doorHost = createArenaDoors({
+    doors: loaded.view.doors,
+    pawnOf(pawnId) {
+      return pawnBodies(loaded.world, health).find((pawn) => pawn.id === pawnId);
+    },
+    keys: pickupHost,
+    sendAll(frame) {
+      const text = encodeFrame(frame);
+      for (const clientId of engine.connected) {
+        engine.session(clientId)?.socket.send(text);
+      }
+    },
+    ownedPawn(clientId) {
+      return engine.replicator.get(clientId)?.ownedEntity;
+    },
+    sessionId(clientId) {
+      return engine.session(clientId)?.sessionId;
+    },
+    alive(pawnId) {
+      return !health.isDead(pawnId);
+    },
+    blockers: createDoorBlockers(loaded.world),
+    log: (line) => console.log(line),
   });
   const grenades = createArenaGrenades({
     world: loaded.world,
@@ -241,8 +267,8 @@ export async function startArenaServer(port = Number(process.env.PORT ?? 4173)):
 
   const wss = new WebSocketServer({ server: httpServer });
   wss.on("connection", (ws) => {
-    engine.attach(socketFromWs(ws, refused, (clientId) => engine.disconnect(clientId), (socket, frame) => {
-      const clientId = clientIdFor(engine, socket);
+    const socket = socketFromWs(ws, refused, (clientId) => engine.disconnect(clientId), (sock, frame) => {
+      const clientId = clientIdFor(engine, sock);
       if (clientId === undefined) return;
       try {
         fire.onFrame(clientId, frame);
@@ -254,7 +280,17 @@ export async function startArenaServer(port = Number(process.env.PORT ?? 4173)):
       } catch (err) {
         console.error("grenade threw", err);
       }
-    }, attachPickupWelcome));
+      try {
+        doorHost.onFrame(clientId, frame);
+      } catch (err) {
+        console.error("door threw", err);
+      }
+    }, attachPickupWelcome);
+    socket.onClose(() => {
+      const clientId = clientIdFor(engine, socket);
+      if (clientId !== undefined) doorHost.drop(clientId);
+    });
+    engine.attach(socket);
   });
 
   await new Promise<void>((resolveListen, reject) => {

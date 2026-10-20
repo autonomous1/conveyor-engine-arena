@@ -162,24 +162,28 @@ test("picking up the key stores it and removes it from the world", () => {
   ammoBox.minX = 10;
   ammoBox.maxX = 12;
   const host = createPickupHost([placement("key", "key", 0), ammoBox]);
-  assert.equal(host.hasKey(), false);
-  assert.deepEqual(host.getHeldItems(), []);
+  assert.equal(host.hasKey(1), false);
+  assert.equal(host.hasKey(2, "key"), false);
+  assert.deepEqual(host.getHeldItems(1), []);
 
   const taken = host.take([pawn(1)], health, kit);
   assert.deepEqual(taken.map((grant) => grant.id), ["key"]);
   assert.equal(taken[0]?.kind, "key");
   assert.equal(taken[0]?.loadout, undefined);
   assert.deepEqual(taken[0]?.gone, { t: "pickup", id: "key", gone: true });
-  assert.equal(host.hasKey(), true);
-  assert.deepEqual(host.getHeldItems(), ["key"]);
+  assert.equal(host.hasKey(1), true);
+  assert.equal(host.hasKey(1, "key"), true);
+  assert.equal(host.hasKey(2, "key"), false);
+  assert.deepEqual(host.getHeldItems(1), ["key"]);
+  assert.deepEqual(host.getHeldItems(2), []);
   assert.deepEqual(host.remainingIds(), ["rounds"]);
   assert.equal(kit.ammoOf(1), 0);
   assert.equal(kit.weaponOf(1), undefined);
   assert.equal(health.get(1).hp, MAX_HP);
 
   assert.deepEqual(host.take([pawn(1)], health, kit), []);
-  assert.equal(host.hasKey(), true);
-  assert.deepEqual(host.getHeldItems(), ["key"]);
+  assert.equal(host.hasKey(1), true);
+  assert.deepEqual(host.getHeldItems(1), ["key"]);
   assert.deepEqual(host.remainingIds(), ["rounds"]);
 
   const body = pawn(1);
@@ -187,8 +191,11 @@ test("picking up the key stores it and removes it from the world", () => {
   const ammo = host.take([body], health, kit);
   assert.deepEqual(ammo.map((grant) => grant.id), ["rounds"]);
   assert.deepEqual(ammo[0]?.loadout, { t: "loadout", ammo: AMMO_PICKUP });
-  assert.equal(host.hasKey(), true);
-  assert.deepEqual(host.getHeldItems(), ["key"]);
+  assert.equal(host.hasKey(1), true);
+  assert.equal(host.consumeKey(1, "key"), true);
+  assert.equal(host.hasKey(1, "key"), false);
+  assert.equal(host.consumeKey(1, "key"), false);
+  assert.deepEqual(host.getHeldItems(1), []);
   assert.deepEqual(host.remainingIds(), []);
 });
 

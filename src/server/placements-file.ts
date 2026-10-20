@@ -37,6 +37,10 @@ export type BakedDoor = {
   hinge: "left" | "right";
   size: [number, number, number];
   open: boolean;
+  /** True: the host starts this leaf shut until `key` is used. */
+  locked?: boolean;
+  /** Pickup placement id. Read when `locked` is true. */
+  key?: string;
 };
 
 /**
@@ -188,13 +192,23 @@ function takeDoor(
     issues.push({ path: `${path}.open`, message: "must be true or false" });
     open = false;
   } else if (item.open === true) open = true;
+  let locked = false;
+  if (item.locked !== undefined && typeof item.locked !== "boolean") {
+    issues.push({ path: `${path}.locked`, message: "must be true or false" });
+  } else if (item.locked === true) locked = true;
+  let key: string | undefined;
+  if (item.key !== undefined) key = str(item.key, `${path}.key`, issues);
   if (model && !knownModels.has(model)) issues.push({ path: `${path}.model`, message: `unknown asset ${model}` });
   if (!id || !model || !position || yaw === undefined || !hinge || !size || size[0] <= 0 || size[1] <= 0 || size[2] <= 0) {
     return undefined;
   }
   if (!knownModels.has(model)) return undefined;
   if (issues.some((issue) => issue.path.startsWith(path))) return undefined;
-  return { id, model, position, yaw, hinge, size, open };
+  // A lock starts the leaf shut. The authored `open` is kept only when it is not locked.
+  const door: BakedDoor = { id, model, position, yaw, hinge, size, open: locked ? false : open };
+  if (locked) door.locked = true;
+  if (key) door.key = key;
+  return door;
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
