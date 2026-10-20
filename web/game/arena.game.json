@@ -146,6 +146,7 @@
         },
         "walk": {
           "clip": "zombie walk",
+          "referenceSpeed": 0.425933865,
           "speed": 1
         },
         "run": {
@@ -184,11 +185,13 @@
         },
         "walk": {
           "clip": "zombie walk",
-          "speed": 1
+          "referenceSpeed": 0.425933865,
+          "speed": 0.5
         },
         "run": {
           "clip": "zombie run",
-          "speed": 2
+          "referenceSpeed":0.65238566,
+          "speed": 1.5
         },
         "fall": {
           "clip": "fall",
@@ -222,10 +225,12 @@
         },
         "walk": {
           "clip": "zombie walk",
+          "referenceSpeed": 0.425933865,
           "speed": 1
         },
         "run": {
           "clip": "zombie run",
+          "referenceSpeed":0.65238566,
           "speed": 2
         },
         "fall": {
@@ -298,11 +303,13 @@
         },
         "walk": {
           "clip": "walk",
-          "speed": 1
+          "speed": 1,
+          "referenceSpeed": 0.897262531
         },
         "run": {
           "clip": "run",
-          "speed": 3
+          "speed": 3,
+          "referenceSpeed": 3.220485679
         },
         "fall": {
           "clip": "fall",

@@ -1,0 +1,12 @@
+{
+  "_comment": "Excerpt of web/game/arena.game.json assets[]. Only referenceSpeed / minTimeScale / maxTimeScale are new; all optional. referenceSpeed = m/s the feet travel at 1x on the UNSCALED model (Blender scene meters); the client multiplies by the asset scale. Values below are from anim-probe/probe.py (stance-foot speed, root motion where present); confirm in Blender.",
+  "id": "cyborg-endoskeleton",
+  "scale": 2,
+  "animations": {
+    "idle": { "clip": "fold_arms", "speed": 0 },
+    "walk": { "clip": "walk", "speed": 1, "referenceSpeed": 0.7 },
+    "run": { "clip": "run", "speed": 3, "referenceSpeed": 2.6, "minTimeScale": 0.5, "maxTimeScale": 2 },
+    "fall": { "clip": "fall", "speed": 0 },
+    "angry": { "clip": "front_kick_02", "speed": 0 }
+  }
+}

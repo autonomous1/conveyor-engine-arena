@@ -124,9 +124,37 @@ function parseCharacterAnimations(raw: unknown, path: string, issues: GameIssue[
       }
       speed = value.speed;
     }
-    out[movement] = { clip, speed };
+    const rate = parseClipRate(value, field, issues);
+    if (!rate) {
+      ok = false;
+      continue;
+    }
+    out[movement] = { clip, speed, ...rate };
   }
   return ok ? out : undefined;
+}
+
+/** Optional client playback fields. Absent fields stay absent. `undefined` on an issue. */
+function parseClipRate(
+  value: Record<string, unknown>,
+  field: string,
+  issues: GameIssue[],
+): { referenceSpeed?: number; minTimeScale?: number; maxTimeScale?: number } | undefined {
+  const out: { referenceSpeed?: number; minTimeScale?: number; maxTimeScale?: number } = {};
+  for (const key of ["referenceSpeed", "minTimeScale", "maxTimeScale"] as const) {
+    const raw = value[key];
+    if (raw === undefined) continue;
+    if (typeof raw !== "number" || !Number.isFinite(raw) || raw <= 0) {
+      issues.push({ path: `${field}.${key}`, message: "must be a finite number > 0" });
+      return undefined;
+    }
+    out[key] = raw;
+  }
+  if (out.minTimeScale !== undefined && out.maxTimeScale !== undefined && out.minTimeScale > out.maxTimeScale) {
+    issues.push({ path: `${field}.minTimeScale`, message: "must be <= maxTimeScale" });
+    return undefined;
+  }
+  return out;
 }
 
 /** Only `"static"` is instanced. Anything else is a manifest error, not a silent clone. */

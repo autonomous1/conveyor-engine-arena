@@ -15,7 +15,17 @@ import type { ShadowQuality } from "./shadows.js";
 
 export type BackdropShape = "cylinder" | "dome";
 
-export type CharacterAnimation = { clip: string; speed: number };
+/**
+ * `speed` is the wander gait ratio on the host. `referenceSpeed` (m/s the feet
+ * travel at 1x on the unscaled model) and the time-scale clamp are client-only.
+ */
+export type CharacterAnimation = {
+  clip: string;
+  speed: number;
+  referenceSpeed?: number;
+  minTimeScale?: number;
+  maxTimeScale?: number;
+};
 export type Prop = {
   id: string;
   idNum: number;

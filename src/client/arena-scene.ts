@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { clone as cloneWithSkeleton } from "three/addons/utils/SkeletonUtils.js";
-import { propClipName, type ArenaView, type BackdropShape } from "../shared/arena-view.ts";
+import { propClipName, type ArenaView, type BackdropShape, type CharacterAnimation } from "../shared/arena-view.ts";
 import { findClip, type Movement } from "../shared/movements.ts";
 import { shadowSettings, type ShadowQuality } from "../shared/shadows.ts";
 import { prepareCharacter } from "./pawn-feet.ts";
@@ -19,7 +19,9 @@ export type ArenaScene = {
 export type CharacterVisual = {
   object: THREE.Object3D;
   clips: THREE.AnimationClip[];
-  animations: Record<Movement, { clip: string; speed: number }>;
+  animations: Record<Movement, CharacterAnimation>;
+  /** Asset `scale` already applied to `object`. Stretches `referenceSpeed`. Default 1. */
+  scale?: number;
 };
 
 export type CharacterTemplates = Map<string, CharacterVisual>;
@@ -922,6 +924,7 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
       object: prepared.object,
       clips: prepared.clips,
       animations: character.animations,
+      scale: character.scale,
     });
   }
   return { templates, fallbacks, propMixers, placements, mapSamples, doors: doorRigs };

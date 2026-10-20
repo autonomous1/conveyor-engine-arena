@@ -1,21 +1,6 @@
 import { ExampleApp } from "./app.js";
-import { runNamed, type RunnerName } from "./dev/runners.js";
 
 const arg = process.argv[2];
-
-if (arg === "lossless" || arg === "lossy" || arg === "partition") {
-  const result = await runNamed(arg as RunnerName);
-  console.log(JSON.stringify({
-    runner: result.name,
-    ticks: result.hashes.length,
-    deliveries: result.deliveries,
-    sends: result.sends,
-    rejects: result.rejects,
-    mirrors: result.mirrorCounts,
-    hash: result.worldHash.slice(0, 80),
-  }, null, 2));
-  process.exit(0);
-}
 
 const useArena = arg === "arena" || arg === "arena-miss";
 const ticks = Math.max(1, Number.parseInt(process.argv[3] ?? "8", 10) || 8);

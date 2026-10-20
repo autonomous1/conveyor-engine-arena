@@ -2,8 +2,9 @@ import * as THREE from "three";
 import { clone as cloneWithSkeleton } from "three/addons/utils/SkeletonUtils.js";
 import type { RenderSnapshot } from "conveyor-engine-client";
 import type { CharacterTemplates, CharacterVisual } from "./arena-scene.js";
-import { findClip, MOVEMENTS } from "../shared/movements.ts";
+import { findClip, MOVE_IDLE, MOVEMENTS } from "../shared/movements.ts";
 import { lowerRootToFeet, skinnedSoleGap } from "./pawn-feet.ts";
+import { clipTimeScale, freshGroundSpeed, noteGroundSpeed, noteVelocitySpeed, pickLocomotion, type ClipRate, type GroundSpeed } from "../shared/anim-speed.ts";
 
 /** Fall holds its last frame. Every other gait repeats. */
 export function configureClip(action: THREE.AnimationAction, movement: string): void {
@@ -30,6 +31,12 @@ type Pawn = {
   motionBone?: THREE.Object3D;
   restRootY?: number;
   planted: boolean;
+  /** Per-movement playback fields from the asset. Only `referenceSpeed` entries retime. */
+  rates: Map<string, ClipRate>;
+  /** Asset scale applied to the model. */
+  scale: number;
+  /** Smoothed rendered horizontal speed, m/s. */
+  ground: GroundSpeed;
 };
 
 function motionBoneOf(model: THREE.Object3D, clips: Map<string, THREE.AnimationClip>): THREE.Object3D | undefined {
@@ -70,12 +77,31 @@ export function createPawnLayer(parent: THREE.Object3D, templates: CharacterTemp
     //console.log("id:", pawn.assetKey, "movement:", movement, "clip:", clip?.name);
     if (!clip) return;
     const next = pawn.mixer.clipAction(clip);
+    if (next === pawn.action) {
+      // Two movements name the same clip (e.g. idle and run both "zombie run").
+      // Keep it playing; fading it out here would fade the action just faded in.
+      configureClip(next, movement);
+      pawn.movement = movement;
+      return;
+    }
     next.reset();
     configureClip(next, movement);
     next.fadeIn(0.15).play();
     pawn.action?.fadeOut(0.15);
     pawn.action = next;
     pawn.movement = movement;
+  }
+
+  function locomotionFor(pawn: Pawn, movement: string, groundSpeed: number): string {
+    if (movement !== "walk" && movement !== "run") return movement;
+    const walk = pawn.rates.get("walk")?.referenceSpeed;
+    const run = pawn.rates.get("run")?.referenceSpeed;
+    // The host keeps "walk" on a pawn pushed against a wall: its velocity is 0 but the
+    // label is the wished gait. A measured clip would crawl in place at minTimeScale.
+    if (groundSpeed <= MOVE_IDLE && pawn.rates.get(movement)?.referenceSpeed !== undefined && pawn.clips.has("idle")) return "idle";
+    if (walk === undefined || run === undefined || !pawn.clips.has("run") || !pawn.clips.has("walk")) return movement;
+    const current = pawn.movement === "walk" || pawn.movement === "run" ? pawn.movement : undefined;
+    return pickLocomotion(current, groundSpeed, walk * pawn.scale, run * pawn.scale);
   }
 
   function ensure(id: number, assetKey: string | undefined): Pawn {
@@ -90,7 +116,12 @@ export function createPawnLayer(parent: THREE.Object3D, templates: CharacterTemp
     // unloaded template's bones and draws at the world origin.
     let motionBone: THREE.Object3D | undefined;
     let restRootY: number | undefined;
+    const rates = new Map<string, ClipRate>();
     if (visual) {
+      for (const movement of MOVEMENTS) {
+        const entry = visual.animations[movement];
+        if (entry?.referenceSpeed !== undefined) rates.set(movement, entry);
+      }
       const model = cloneWithSkeleton(visual.object);
       root.add(model);
       mixer = new THREE.AnimationMixer(model);
@@ -102,7 +133,10 @@ export function createPawnLayer(parent: THREE.Object3D, templates: CharacterTemp
       root.add(capsule(id));
     }
     parent.add(root);
-    const pawn = { root, px: 0, pz: 0, fallback, mixer, clips, assetKey, motionBone, restRootY, planted: false };
+    const pawn: Pawn = {
+      root, px: 0, pz: 0, fallback, mixer, clips, assetKey, motionBone, restRootY, planted: false,
+      rates, scale: visual?.scale ?? 1, ground: freshGroundSpeed(),
+    };
     pawns.set(id, pawn);
     return pawn;
   }
@@ -128,7 +162,19 @@ export function createPawnLayer(parent: THREE.Object3D, templates: CharacterTemp
         const speed = entity.speed;
         // TODO: spammy log
         //console.log(`pawn ${id} movement:${movement} speed:${entity.animation?.speed}`);
-        play(pawn, movement);
+        // Feet match the ground: rate = rendered speed / (referenceSpeed * scale). Others play at 1x.
+        // Speed source: the snapshot velocity (|v.xz| from the host), as is. The mixer advances by
+        // the same frame dt as the positions. The rendered position delta is only a fallback.
+        const groundSpeed = Number.isFinite(entity.speed)
+          ? noteVelocitySpeed(pawn.ground, entity.speed, entity.position.x, entity.position.z)
+          : noteGroundSpeed(pawn.ground, entity.position.x, entity.position.z, dt);
+        // The host labels every full-speed mover "walk" (run only above MOVE_SPEED). When both
+        // gaits are measured, the client picks the one whose stride fits the ground speed.
+        const shown = locomotionFor(pawn, movement, groundSpeed);
+        play(pawn, shown);
+        const rate = pawn.rates.get(shown);
+        if (pawn.action && rate) pawn.action.setEffectiveTimeScale(clipTimeScale(groundSpeed, rate, pawn.scale));
+        else if (pawn.action && pawn.action.getEffectiveTimeScale() !== 1) pawn.action.setEffectiveTimeScale(1);
         if (movement !== "fall" && pawn.planted && pawn.motionBone && pawn.restRootY !== undefined) {
           pawn.motionBone.position.y = pawn.restRootY;
           pawn.planted = false;
@@ -170,6 +216,8 @@ export function createPawnLayer(parent: THREE.Object3D, templates: CharacterTemp
         running: pawn.action?.isRunning() ?? false,
         loop: pawn.action?.loop,
         clamp: pawn.action?.clampWhenFinished === true,
+        groundSpeed: pawn.ground.speed,
+        timeScale: pawn.action?.getEffectiveTimeScale() ?? 1,
       }));
       (globalThis as { __pawnAnim?: unknown }).__pawnAnim = report;
     },

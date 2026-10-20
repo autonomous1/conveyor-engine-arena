@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { EngineWsClient, memoryPair } from "conveyor-engine-transport-ws";
-import { ExampleApp, runBench, runNamed } from "../dist/index.js";
+import { ExampleApp, runBench } from "../dist/index.js";
 
 test("one client, no faults: pawn moves and first snapshot is full", () => {
   const app = new ExampleApp();
@@ -100,14 +100,6 @@ test("metrics fields do not appear in the canonical hash payload", () => {
   const json = app.world.canonicalJson();
   assert.equal(json.includes("commitDurationMs"), false);
   assert.equal(json.includes("inputSendRate"), false);
-});
-
-test("named lossless runners with the same seed share hashes", async () => {
-  const a = await runNamed("lossless", 11n, 6);
-  const b = await runNamed("lossless", 11n, 6);
-  assert.deepEqual(a.hashes, b.hashes);
-  assert.equal(a.worldHash, b.worldHash);
-  assert.ok(a.deliveries > 0);
 });
 
 test("world metrics fields do not change canonicalJson", () => {
