@@ -189,9 +189,9 @@
           "speed": 0.5
         },
         "run": {
-          "clip": "zombie run",
+          "clip": "zombie walk",
           "referenceSpeed":0.65238566,
-          "speed": 1.5
+          "speed": 2
         },
         "fall": {
           "clip": "fall",
@@ -229,7 +229,7 @@
           "speed": 1
         },
         "run": {
-          "clip": "zombie run",
+          "clip": "zombie walk",
           "referenceSpeed":0.65238566,
           "speed": 2
         },
@@ -355,6 +355,46 @@
         },
         "angry": {
           "clip": "angry_02.001",
+          "speed": 3
+        }
+      },
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "CC0-1.0",
+        "status": "spdx"
+      },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Original procedural placeholder made for this arena. No third-party art."
+      }
+    },
+    {
+      "id": "grok-bot",
+      "kind": "model",
+      "type": "character",
+      "uri": "/assets/models/grok-bot.glb",
+      "scale": 2,
+      "animations": {
+        "idle": {
+          "clip": "idle",
+          "speed": 0
+        },
+        "walk": {
+          "clip": "walk",
+          "speed": 1,
+          "referenceSpeed": 0.897262531
+        },
+        "run": {
+          "clip": "run",
+          "speed": 3,
+          "referenceSpeed": 3.220485679
+        },
+        "fall": {
+          "clip": "fall",
+          "speed": 0
+        },
+        "angry": {
+          "clip": "dance_05",
           "speed": 3
         }
       },
@@ -552,6 +592,7 @@
     "modelChoices": [
       "ratty",
       "cyborg-endoskeleton",
+      "grok-bot",
       "player-a",
       "player-b",
       "player-d"
