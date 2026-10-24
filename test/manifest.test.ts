@@ -222,7 +222,7 @@ test("optional scene blocks and a placements list", () => {
   const faceModel = Object.fromEntries(faced.view.walls.map((wall) => [wall.face, wall.model]));
   assert.deepEqual(faceModel, {
     south: "/assets/models/brutalist-building-1-cbake.glb",
-    west: "/assets/models/brutalist-building-2-cbake.glb",
+    west: "/assets/models/brutalist-building-2-cbake.cut.glb",
     north: "/assets/models/brutalist-building-3-bake.glb",
     east: "/assets/models/brutalist-building-1-cbake.glb",
   });

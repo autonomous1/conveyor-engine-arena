@@ -220,7 +220,7 @@ test("installed placements consume ammo, health, and weapon, and a crate type st
   assert.equal(drawn?.weapon, "alien-weapon-enh");
   assert.equal("kind" in (drawn ?? {}), false);
   assert.equal(game.view.buildings.some((building) => building.id === "cover-crate-2-9"), true);
-  const facade = game.view.buildings.find((building) => building.model.endsWith("/brutalist-building-2-cbake.glb"));
+  const facade = game.view.buildings.find((building) => building.model.endsWith("/brutalist-building-2-cbake.cut.glb"));
   assert.ok(facade);
   assert.equal(byId.has(facade.id), false);
   assert.equal(game.view.aabbs.some((box) => box.source === "cover-crate-2-6-1-box"), true);
