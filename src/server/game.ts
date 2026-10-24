@@ -3,7 +3,7 @@ import type { EngineWsServer } from "conveyor-engine-transport-ws";
 import type { Audit } from "../shared/audit.js";
 import { pickRespawnSpawn, type PawnHealth } from "../shared/health.js";
 import { moveIntent, yawFromQuat } from "../shared/look.js";
-import { approachYaw, enqueueOwnedMove, MOVE_DT, MOVEMENTS, movementIntent, yawQuaternion } from "../shared/movements.js";
+import { approachYaw, commitShielded, enqueueOwnedMove, MOVE_DT, MOVEMENTS, movementIntent, yawQuaternion } from "../shared/movements.js";
 import { deliverAuditFrame } from "./audit.js";
 import { deliverHealthFrames } from "./health.js";
 import { dispatchHostFrame, hostSnapPath } from "./host-path.js";
@@ -28,6 +28,10 @@ export type HeldInput = {
   moveZ: number;
   yaw: number;
   seq: number;
+  /** From input `buttons`. Ignored unless the host was started with `ARENA_NOCLIP=1`. */
+  noclip?: boolean;
+  /** -1, 0, or 1. Applied only on the noclip step. */
+  ascend?: number;
 };
 
 export function createHeldInputs() {
@@ -115,6 +119,7 @@ export function startWanderLoop(
   health?: PawnHealth,
   audit?: Audit,
   onTick?: () => void,
+  hostNoclip = false,
 ): () => void {
   const rng = splitMix(20260917);
   const snaps = hostSnapPath((clientId, envelope) => {
@@ -139,6 +144,7 @@ export function startWanderLoop(
       if (!owned.has(entity)) held.drop(entity);
     }
     noteArenaInterest(server);
+    const noclipIds: number[] = [];
     for (const agent of agents) {
       if (timedOut.has(agent.id)) continue;
       if (health?.isDead(agent.id)) {
@@ -158,7 +164,11 @@ export function startWanderLoop(
         // Owned look is the input yaw on this tick. Bots turn in stepUnownedWander.
         const yaw = cmd?.yaw ?? agent.heading;
         if (cmd) agent.heading = yaw;
-        const moved = enqueueOwnedMove(world, agent.id, moveX, moveZ, yaw, MOVE_DT);
+        const fly = hostNoclip && cmd?.noclip === true;
+        const moved = fly
+          ? enqueueOwnedMove(world, agent.id, moveX, moveZ, yaw, { noclip: true, ascend: cmd?.ascend ?? 0, dt: MOVE_DT })
+          : enqueueOwnedMove(world, agent.id, moveX, moveZ, yaw, MOVE_DT);
+        if (fly) noclipIds.push(agent.id);
         if (moved) agent.gait = moved.gait;
         continue;
       }
@@ -178,7 +188,9 @@ export function startWanderLoop(
     if (health) {
       for (const id of health.takeRespawns()) respawnPawn(world, agents, id);
     }
-    const snap = world.commit(BigInt(tick));
+    const snap = noclipIds.length > 0
+      ? commitShielded(world, BigInt(tick), noclipIds)
+      : world.commit(BigInt(tick));
     try {
       onTick?.();
     } catch (err) {

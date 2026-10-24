@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { applyHostNoclip } from "../shared/movements.js";
 import { compileGame, GameManifestError, placementRefsOf, type CompiledGame, type CompileSources, type PlacementFileSource } from "./game-manifest.js";
 import { resolvePlacementsPath } from "./placements-file.js";
 
@@ -41,6 +42,8 @@ export function loadInstalledGame(): CompiledGame {
   }
   const sources = readManifestSources(root, doc);
   cached = compileGame(doc, (uri) => readUnderWeb(root, uri), sources);
+  // Read once, when this process first loads the manifest. `ARENA_NOCLIP=1 npm start`.
+  applyHostNoclip(cached.view, process.env);
   return cached;
 }
 

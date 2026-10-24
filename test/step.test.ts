@@ -101,7 +101,7 @@ test("a 0.3 m box is climbed and a 0.5 m box stops the pawn", () => {
     if (view.position.x <= curb.minX || view.position.x >= curb.maxX) continue;
     assert.equal(view.position.y, STEP_HEIGHT);
     assert.equal(bodyHits(curb, view.position.x, view.position.y, view.position.z), false);
-    assert.equal(view.clip, "walk");
+    assert.equal(view.clip, gaitForSpeed(view.speed));
     assert.equal(view.speed, Math.hypot(view.velocity.x, view.velocity.z));
     mounted = true;
     break;

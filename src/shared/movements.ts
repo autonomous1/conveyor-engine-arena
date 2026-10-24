@@ -118,10 +118,17 @@ export function approachVelocity(velocity: Planar, wish: Planar, accel = MOVE_AC
   return { x: velocity.x + dx * scale, z: velocity.z + dz * scale };
 }
 
-/** Owned clip from planar speed. A full wish is a walk. Only a faster body runs. */
+/**
+ * Host label only. The client still picks its own clip from ground speed.
+ * 2.69 m/s is the cyborg walk stride times the client's 1.5 walk cap
+ * (referenceSpeed × scale × 1.5). There is no hysteresis on the host.
+ */
+export const RUN_SPEED_M_S = 2.69;
+
+/** Owned clip from planar speed. At or above `RUN_SPEED_M_S` the label is run. */
 export function gaitForSpeed(speed: number): "idle" | "walk" | "run" {
   if (!(speed > MOVE_IDLE)) return "idle";
-  if (speed > MOVE_SPEED) return "run";
+  if (speed >= RUN_SPEED_M_S) return "run";
   return "walk";
 }
 
@@ -254,8 +261,129 @@ export function enqueuePlanarMove(
 }
 
 /**
+ * Same wish and yaw as `enqueuePlanarMove`, with no obstacle or floor query.
+ * `ascend` is -1, 0, or 1. Vertical speed is `MOVE_SPEED`. Yaw is not a second frame.
+ */
+export function enqueueNoclipMove(
+  world: MoveWorld,
+  entity: number,
+  moveX: number,
+  moveZ: number,
+  yaw: number,
+  ascend = 0,
+  dt = MOVE_DT,
+): PlanarStep | undefined {
+  const view = world.store.view(entity);
+  if (!view) return undefined;
+  const next = approachVelocity({ x: view.velocity.x, z: view.velocity.z }, wishPlanar(moveX, moveZ));
+  const rise = Number.isFinite(ascend) ? ascend : 0;
+  world.enqueue({ kind: "setVelocity", entity, linear: { x: next.x, y: 0, z: next.z } });
+  world.enqueue({
+    kind: "setTransform",
+    entity,
+    position: {
+      x: view.position.x + next.x * dt,
+      y: view.position.y + rise * MOVE_SPEED * dt,
+      z: view.position.z + next.z * dt,
+    },
+    rotation: yawQuaternion(yaw),
+    scale: { x: view.scale.x, y: view.scale.y, z: view.scale.z },
+  });
+  return { vx: next.x, vz: next.z, speed: Math.hypot(next.x, next.z) };
+}
+
+/** Bit 0 noclip, bit 1 ascend up, bit 2 ascend down. The kernel input `buttons` field already carries this. */
+const NOCLIP_BIT = 1;
+const ASCEND_UP_BIT = 2;
+const ASCEND_DOWN_BIT = 4;
+
+export function encodeMoveButtons(noclip: boolean, ascend: number): number {
+  let bits = 0;
+  if (noclip) bits |= NOCLIP_BIT;
+  if (ascend > 0) bits |= ASCEND_UP_BIT;
+  else if (ascend < 0) bits |= ASCEND_DOWN_BIT;
+  return bits;
+}
+
+export function decodeMoveButtons(buttons: number | undefined): { noclip: boolean; ascend: -1 | 0 | 1 } {
+  const bits = buttons === undefined || !Number.isFinite(buttons) ? 0 : buttons | 0;
+  const up = (bits & ASCEND_UP_BIT) !== 0;
+  const down = (bits & ASCEND_DOWN_BIT) !== 0;
+  return { noclip: (bits & NOCLIP_BIT) !== 0, ascend: up === down ? 0 : up ? 1 : -1 };
+}
+
+/**
+ * `ARENA_NOCLIP=1` at host start. Any other value leaves the field absent.
+ * Not part of either content hash.
+ */
+export function applyHostNoclip(view: { noclip?: boolean }, env: { ARENA_NOCLIP?: string | undefined }): void {
+  if (env.ARENA_NOCLIP === "1") view.noclip = true;
+  else delete view.noclip;
+}
+
+/**
+ * Kernel `commit` always runs obstacle push-out. A radius of -1e9 makes every
+ * finite AABB and the world bounds miss that pawn for this commit. The store
+ * and the returned snapshot keep the real radius.
+ */
+const NOCLIP_RADIUS = -1e9;
+
+type RadiusSlots = {
+  index: Map<number, number>;
+  radius: Float64Array;
+};
+
+function radiusSlots(store: unknown): RadiusSlots {
+  const record = store as Partial<RadiusSlots>;
+  if (!(record.index instanceof Map) || !(record.radius instanceof Float64Array)) {
+    throw new Error("noclip cannot see pawn radius slots");
+  }
+  return record as RadiusSlots;
+}
+
+export function commitShielded<S extends { entities: ReadonlyArray<{ id: number; radius: number }> }>(
+  world: { store: unknown; commit(tick: bigint): S },
+  tick: bigint,
+  noclipIds: readonly number[],
+): S {
+  const saved = new Map<number, number>();
+  const before = radiusSlots(world.store);
+  for (const id of noclipIds) {
+    const slot = before.index.get(id);
+    if (slot === undefined) continue;
+    saved.set(id, before.radius[slot]!);
+    before.radius[slot] = NOCLIP_RADIUS;
+  }
+  try {
+    const snap = world.commit(tick);
+    if (saved.size === 0) return snap;
+    return {
+      ...snap,
+      entities: snap.entities.map((entity) => {
+        const radius = saved.get(entity.id);
+        return radius === undefined ? entity : { ...entity, radius };
+      }),
+    } as S;
+  } finally {
+    const after = radiusSlots(world.store);
+    for (const [id, radius] of saved) {
+      const slot = after.index.get(id);
+      if (slot !== undefined) after.radius[slot] = radius;
+    }
+  }
+}
+
+export type OwnedMoveOptions = {
+  /** Skip obstacle and floor queries. The caller must `commitShielded` or the kernel push-out still stops the pawn. */
+  noclip?: boolean;
+  /** -1, 0, or 1. Ignored unless `noclip` is set. */
+  ascend?: number;
+  dt?: number;
+};
+
+/**
  * Owned pawn step. `setClip` records the planar speed and the gait it selects.
- * It does not carry a position.
+ * It does not carry a position. A numeric `dt` is the colliding step.
  */
 export function enqueueOwnedMove(
   world: MoveWorld,
@@ -263,11 +391,15 @@ export function enqueueOwnedMove(
   moveX: number,
   moveZ: number,
   yaw: number,
-  dt = MOVE_DT,
+  dt: number | OwnedMoveOptions = MOVE_DT,
 ): { gait: "idle" | "walk" | "run"; speed: number } | undefined {
   const view = world.store.view(entity);
   if (!view) return undefined;
-  const stepped = enqueuePlanarMove(world, entity, moveX, moveZ, yaw, dt);
+  const options = typeof dt === "number" ? undefined : dt;
+  const stepDt = typeof dt === "number" ? dt : dt.dt ?? MOVE_DT;
+  const stepped = options?.noclip
+    ? enqueueNoclipMove(world, entity, moveX, moveZ, yaw, options.ascend ?? 0, stepDt)
+    : enqueuePlanarMove(world, entity, moveX, moveZ, yaw, stepDt);
   if (!stepped) return undefined;
   const gait = gaitForSpeed(stepped.speed);
   if (view.clip !== gait || view.speed !== stepped.speed) {

@@ -3,6 +3,7 @@
  * The button is not the canvas click, so it does not request pointer lock.
  * Escape is not handled here; the browser still unlocks the pointer.
  * Show collision, Fire debug, and Scene map stay in localStorage and are not part of the input message.
+ * Noclip is localStorage too. The client sends it on the existing input `buttons` field, and only when the host set `view.noclip`.
  * Host fire counters are painted here. They are not part of the crosshair HUD.
  */
 
@@ -11,6 +12,7 @@ import { emptyAudit, formatAudit, type AuditCounters } from "../shared/audit.ts"
 export const SHOW_COLLISION_STORAGE_KEY = "arena.showCollision.v1";
 export const FIRE_DEBUG_STORAGE_KEY = "arena.fireDebug.v1";
 export const SHOW_SCENE_MAP_STORAGE_KEY = "arena.showSceneMap.v1";
+export const NOCLIP_STORAGE_KEY = "arena.noclip.v1";
 
 export type KeyValueStorage = {
   getItem(key: string): string | null;
@@ -22,10 +24,13 @@ export type OptionsModel = {
   readonly showCollision: boolean;
   readonly fireDebug: boolean;
   readonly showSceneMap: boolean;
+  /** False when the host did not set `view.noclip`, even if storage says on. */
+  readonly showNoclip: boolean;
   toggleDialog(): void;
   toggleShowCollision(): void;
   toggleFireDebug(): void;
   toggleShowSceneMap(): void;
+  toggleNoclip(): void;
   /** F2 toggles the dialog. Every other key, including Escape, is left alone. */
   onKey(code: string): boolean;
 };
@@ -88,19 +93,41 @@ export function saveShowSceneMap(storage: KeyValueStorage | null | undefined, on
   }
 }
 
+export function loadNoclip(storage: KeyValueStorage | null | undefined): boolean {
+  if (!storage) return false;
+  try {
+    return storage.getItem(NOCLIP_STORAGE_KEY) === "on";
+  } catch {
+    return false;
+  }
+}
+
+export function saveNoclip(storage: KeyValueStorage | null | undefined, on: boolean): void {
+  if (!storage) return;
+  try {
+    storage.setItem(NOCLIP_STORAGE_KEY, on ? "on" : "off");
+  } catch {
+    // The in-memory switch still applies for this session.
+  }
+}
+
 export function createOptionsModel(
   storage: KeyValueStorage | null | undefined,
   onShowCollision: (on: boolean) => void,
   onFireDebug: (on: boolean) => void = () => {},
   onShowMap: (on: boolean) => void = () => {},
+  onNoclip: (on: boolean) => void = () => {},
+  noclipAllowed = false,
 ): OptionsModel {
   let open = false;
   let showCollision = loadShowCollision(storage);
   let fireDebug = loadFireDebug(storage);
   let showSceneMap = loadShowSceneMap(storage);
+  let noclipOn = loadNoclip(storage);
   onShowCollision(showCollision);
   onFireDebug(fireDebug);
   onShowMap(showSceneMap);
+  onNoclip(noclipAllowed && noclipOn);
   return {
     get open() {
       return open;
@@ -113,6 +140,9 @@ export function createOptionsModel(
     },
     get showSceneMap() {
       return showSceneMap;
+    },
+    get showNoclip() {
+      return noclipAllowed && noclipOn;
     },
     toggleDialog() {
       open = !open;
@@ -131,6 +161,12 @@ export function createOptionsModel(
       showSceneMap = !showSceneMap;
       saveShowSceneMap(storage, showSceneMap);
       onShowMap(showSceneMap);
+    },
+    toggleNoclip() {
+      if (!noclipAllowed) return;
+      noclipOn = !noclipOn;
+      saveNoclip(storage, noclipOn);
+      onNoclip(noclipOn);
     },
     onKey(code: string) {
       if (code !== "F2") return false;
@@ -157,8 +193,10 @@ export function createOptionsDialog(
   onShowCollision: (on: boolean) => void,
   storage: KeyValueStorage | null = browserStorage(),
   onShowMap: (on: boolean) => void = () => {},
+  extras: { noclipAllowed?: boolean; onNoclip?: (on: boolean) => void } = {},
 ): OptionsDialog {
-  const model = createOptionsModel(storage, onShowCollision, () => {}, onShowMap);
+  const noclipAllowed = extras.noclipAllowed === true;
+  const model = createOptionsModel(storage, onShowCollision, () => {}, onShowMap, extras.onNoclip ?? (() => {}), noclipAllowed);
   let audit = emptyAudit();
 
   const button = document.createElement("button");
@@ -213,6 +251,14 @@ export function createOptionsDialog(
   mapSwitch.setAttribute("role", "switch");
   mapSwitch.style.cssText = `${switchStyle};margin-top:8px`;
 
+  const noclipSwitch = document.createElement("button");
+  noclipSwitch.id = "noclip";
+  noclipSwitch.type = "button";
+  noclipSwitch.setAttribute("role", "switch");
+  noclipSwitch.style.cssText = `${switchStyle};margin-top:8px`;
+  noclipSwitch.hidden = !noclipAllowed;
+  noclipSwitch.disabled = !noclipAllowed;
+
   const auditView = document.createElement("pre");
   auditView.id = "audit-counters";
   auditView.style.cssText = [
@@ -223,7 +269,7 @@ export function createOptionsDialog(
     "font:12px/1.45 ui-monospace, monospace",
   ].join(";");
 
-  panel.append(title, collisionSwitch, fireSwitch, mapSwitch, auditView);
+  panel.append(title, collisionSwitch, fireSwitch, mapSwitch, noclipSwitch, auditView);
 
   const paintSwitch = (el: HTMLButtonElement, on: boolean, label: string) => {
     el.setAttribute("aria-checked", on ? "true" : "false");
@@ -236,6 +282,9 @@ export function createOptionsDialog(
     paintSwitch(collisionSwitch, model.showCollision, "Show collision");
     paintSwitch(fireSwitch, model.fireDebug, "Fire debug");
     paintSwitch(mapSwitch, model.showSceneMap, "Scene map");
+    paintSwitch(noclipSwitch, model.showNoclip, "Noclip");
+    noclipSwitch.hidden = !noclipAllowed;
+    noclipSwitch.disabled = !noclipAllowed;
     auditView.textContent = formatAudit(audit);
   };
   paint();
@@ -264,6 +313,7 @@ export function createOptionsDialog(
   onSwitch(collisionSwitch, () => model.toggleShowCollision());
   onSwitch(fireSwitch, () => model.toggleFireDebug());
   onSwitch(mapSwitch, () => model.toggleShowSceneMap());
+  if (noclipAllowed) onSwitch(noclipSwitch, () => model.toggleNoclip());
 
   const onKeyDown = (ev: KeyboardEvent) => {
     if (ev.repeat) return;

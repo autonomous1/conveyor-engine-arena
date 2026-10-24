@@ -11,6 +11,7 @@ import { createPawnKit, createPickupHost } from "../shared/pickups.js";
 import { createArenaDoors, createDoorBlockers } from "./doors.js";
 import { createArenaFire } from "./fire.js";
 import { createArenaGrenades } from "./grenade.js";
+import { decodeMoveButtons } from "../shared/movements.js";
 import { createHeldInputs, startWanderLoop, startPropAnimation } from "./game.js";
 import { createHostSocketPaths } from "./host-path.js";
 import { pawnBodies, releasePickupObstacle } from "./pickups.js";
@@ -176,7 +177,15 @@ export async function startArenaServer(port = Number(process.env.PORT ?? 4173)):
     onAdmit: (input) => {
       const owned = engine.gateway.get(input.clientId)?.ownedEntity;
       if (owned === undefined) return;
-      held.admit(owned, { moveX: input.moveX, moveZ: input.moveZ, yaw: input.yaw, seq: input.seq });
+      const fly = decodeMoveButtons(input.buttons);
+      held.admit(owned, {
+        moveX: input.moveX,
+        moveZ: input.moveZ,
+        yaw: input.yaw,
+        seq: input.seq,
+        noclip: fly.noclip,
+        ascend: fly.ascend,
+      });
     },
   });
   const doorHost = createArenaDoors({
@@ -227,7 +236,7 @@ export async function startArenaServer(port = Number(process.env.PORT ?? 4173)):
       }
     }
     grenades.tick();
-  });
+  }, loaded.view.noclip === true);
   const propClips = startPropAnimation(loaded.view.props);
   const fire = createArenaFire({
     world: loaded.world,

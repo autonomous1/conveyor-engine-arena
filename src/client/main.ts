@@ -1,6 +1,7 @@
 import { EngineClient } from "conveyor-engine-client";
 import type { ArenaView } from "../shared/arena-view.js";
 import { aimDirection, eyeLook, INPUT_HZ, moveIntent, yawFromQuat } from "../shared/look.js";
+import { encodeMoveButtons } from "../shared/movements.js";
 import { dropPickupAabb } from "../shared/pickups.js";
 import { clientFaultText, createFireDebugLog } from "../shared/fire-debug.js";
 import { doorLeafBox } from "../shared/doors.js";
@@ -37,6 +38,7 @@ const options = createOptionsDialog(
   (on) => collisionDebug.setVisible(on),
   undefined,
   (on) => sceneMap.setVisible(on),
+  { noclipAllowed: view.noclip === true },
 );
 const fireDebug = createFireDebugLog(() => options.fireDebug);
 const visuals = await loadArenaVisuals(view, arena);
@@ -315,7 +317,10 @@ function drawFrame(now: number) {
   if (sendAcc >= sendDt) {
     sendAcc = Math.min(sendAcc - sendDt, sendDt);
     const move = moveIntent(sample.yaw, sample.forward, sample.strafe);
-    link.sendInput(move.moveX, move.moveZ, sample.yaw);
+    // predictOwned stays false, so this send is the only client move. The host
+    // integrates it with the same noclip step when the switch is on.
+    const fly = view.noclip === true && options.showNoclip;
+    link.sendInput(move.moveX, move.moveZ, sample.yaw, fly ? encodeMoveButtons(true, sample.ascend) : 0);
   }
   if (!debugShot && debugPawnWatch && options.fireDebug && client.ownedEntity !== debugPawn) {
     const camera = arena.camera.position;

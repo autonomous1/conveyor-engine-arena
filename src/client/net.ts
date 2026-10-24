@@ -31,7 +31,7 @@ export type HealthNotice = {
 };
 
 export type LiveLink = {
-  sendInput(moveX: number, moveZ: number, yaw: number): void;
+  sendInput(moveX: number, moveZ: number, yaw: number, buttons?: number): void;
   /** Arena frame. Returns false when the socket has no owned pawn yet. */
   sendFire(seq: number, yaw: number, pitch: number): boolean;
   /** Arena frame. Returns false when the socket has no owned pawn yet. Does not fire. */
@@ -277,7 +277,7 @@ export function connectLive(opts: {
     }
   });
   return {
-    sendInput(moveX, moveZ, yaw) {
+    sendInput(moveX, moveZ, yaw, buttons = 0) {
       if (ownedId === undefined || ws.readyState !== WebSocket.OPEN) return;
       ws.send(JSON.stringify({
         v: 1,
@@ -286,7 +286,8 @@ export function connectLive(opts: {
         moveX,
         moveZ,
         yaw,
-        buttons: 0,
+        // Bits: noclip, ascend up, ascend down. The kernel already forwards `buttons`.
+        buttons,
         entity: ownedId,
       }));
     },

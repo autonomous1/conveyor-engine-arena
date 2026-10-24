@@ -70,7 +70,7 @@ test("a 90° wander change takes several ticks and does not take the new wish", 
   const before = world.store.view(id)!;
   assert.equal(before.velocity.x, 0);
   assert.equal(before.velocity.z, MOVE_SPEED);
-  assert.equal(before.clip, "walk");
+  assert.equal(before.clip, "run");
   assert.equal(before.speed, MOVE_SPEED);
 
   const yaw = Math.PI / 2;
@@ -150,6 +150,19 @@ test("a pawn yaw step takes the short arc and lands inside one step", () => {
   const longWay = yawFromQuat(yawQuaternion(from - PAWN_YAW_STEP));
   assert.ok(Math.abs(wrapped - expected) < 1e-9);
   assert.ok(Math.abs(wrapped - longWay) > 0.1);
+});
+
+test("ten ticks of full input label the owned clip run", () => {
+  const { world, id } = pawn();
+  for (let tick = 1; tick <= 10; tick++) stepPlayer(world, id, 0, 1, 0, tick);
+  const view = world.store.view(id)!;
+  assert.equal(view.speed, MOVE_SPEED);
+  assert.equal(view.clip, "run");
+  assert.equal(gaitForSpeed(MOVE_SPEED), "run");
+  assert.equal(gaitForSpeed(0.04), "idle");
+  assert.equal(gaitForSpeed(1), "walk");
+  assert.equal(gaitForSpeed(2.6), "walk");
+  assert.equal(gaitForSpeed(2.7), "run");
 });
 
 test("releasing a wander wish stops in the same tick count as the player", () => {

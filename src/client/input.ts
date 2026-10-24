@@ -22,6 +22,7 @@ import {
  * F fires while the pointer is locked. F does not change the gamepad profile.
  * P throws a grenade on the same lock. P does not fire. F does not throw.
  * E uses the door the pawn is overlapping. E does not fire and does not throw.
+ * Space ascends and Control descends. Both are held, like WASD, and do not fire.
  * A gamepad fire button is included only when that profile already binds one.
  * Neither profile binds a grenade button or a use button.
  */
@@ -37,7 +38,17 @@ export type PlaySample = {
   grenade: boolean;
   /** E was pressed once while locked. A hold does not repeat. */
   using: boolean;
+  /** Space is +1, ControlLeft or ControlRight is -1, both or neither is 0. */
+  ascend: -1 | 0 | 1;
 };
+
+/** Space up, Control down. Both held cancel. */
+export function ascendFromKeys(held: { has(code: string): boolean }): -1 | 0 | 1 {
+  const up = held.has("Space");
+  const down = held.has("ControlLeft") || held.has("ControlRight");
+  if (up === down) return 0;
+  return up ? 1 : -1;
+}
 
 export type PlayInput = {
   update(dt: number): void;
@@ -106,6 +117,13 @@ export function attachPlayInput(
       if (!down) return;
       if (ev.repeat || document.pointerLockElement !== dom) return;
       useQueued = true;
+      return;
+    }
+    if (ev.code === "Space" || ev.code === "ControlLeft" || ev.code === "ControlRight") {
+      if (ev.repeat) return;
+      ev.preventDefault();
+      if (down) keys.add(ev.code);
+      else keys.delete(ev.code);
       return;
     }
     if (ev.repeat) return;
@@ -200,7 +218,7 @@ export function attachPlayInput(
       fireQueued = false;
       grenadeQueued = false;
       useQueued = false;
-      return { forward: move.forward, strafe: move.strafe, yaw, pitch, firing, grenade, using };
+      return { forward: move.forward, strafe: move.strafe, yaw, pitch, firing, grenade, using, ascend: ascendFromKeys(keys) };
     },
   };
 }

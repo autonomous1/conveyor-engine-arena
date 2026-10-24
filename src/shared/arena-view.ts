@@ -165,4 +165,9 @@ export type ArenaView = {
   spawns?: Array<{ id: string; x: number; z: number; yaw: number }>;
   /** Thrown grenade mesh. Absent when the manifest has no `grenade` model. */
   grenade?: string;
+  /**
+   * Set when the host process was started with `ARENA_NOCLIP=1`.
+   * The client shows the Noclip switch only then. Not part of either content hash.
+   */
+  noclip?: boolean;
 };

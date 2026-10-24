@@ -47,7 +47,7 @@ test("a full forward wish reaches speed in a fixed tick count and a release retu
     assert.equal(view.velocity.z, expected);
     assert.equal(view.position.y, 0);
     assert.equal(view.speed, expected);
-    assert.equal(view.clip, "walk");
+    assert.equal(view.clip, gaitForSpeed(expected));
     assert.ok(view.velocity.z < MOVE_SPEED || tick === MOVE_TICKS);
   }
   const cruising = world.store.view(id)!;
@@ -63,14 +63,14 @@ test("a full forward wish reaches speed in a fixed tick count and a release retu
     assert.equal(view.velocity.z, expected);
     assert.equal(view.position.y, 0);
     assert.equal(view.speed, expected);
-    assert.equal(view.clip, expected > 0 ? "walk" : "idle");
+    assert.equal(view.clip, gaitForSpeed(expected));
   }
   const stopped = world.store.view(id)!;
   assert.equal(stopped.velocity.x, 0);
   assert.equal(stopped.velocity.z, 0);
   assert.equal(stopped.position.y, 0);
   assert.equal(gaitForSpeed(0), "idle");
-  assert.equal(gaitForSpeed(MOVE_SPEED), "walk");
+  assert.equal(gaitForSpeed(MOVE_SPEED), "run");
   assert.equal(gaitForSpeed(MOVE_SPEED + MOVE_ACCEL), "run");
 });
 

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { findClip, movementIntent } from "../src/shared/movements.ts";
+import { findClip, gaitForSpeed, MOVE_SPEED, movementIntent } from "../src/shared/movements.ts";
 
 test("Zombie Walk and Zombie Run match the phrase inside the clip name", () => {
   const clips = [
@@ -26,4 +26,12 @@ test("animation speeds keep their ratio and the fastest movement is full input",
 
 test("a set of zero speeds does not move", () => {
   assert.equal(movementIntent(0, [0, 0]), 0);
+});
+
+test("gaitForSpeed labels a stop as idle, a slow step as walk, and a full wish as run", () => {
+  assert.equal(gaitForSpeed(0.04), "idle");
+  assert.equal(gaitForSpeed(1), "walk");
+  assert.equal(gaitForSpeed(2.6), "walk");
+  assert.equal(gaitForSpeed(2.7), "run");
+  assert.equal(gaitForSpeed(MOVE_SPEED), "run");
 });

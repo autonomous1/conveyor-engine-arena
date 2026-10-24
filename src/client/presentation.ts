@@ -168,8 +168,8 @@ export function createPawnLayer(parent: THREE.Object3D, templates: CharacterTemp
         const groundSpeed = Number.isFinite(entity.speed)
           ? noteVelocitySpeed(pawn.ground, entity.speed, entity.position.x, entity.position.z)
           : noteGroundSpeed(pawn.ground, entity.position.x, entity.position.z, dt);
-        // The host labels every full-speed mover "walk" (run only above MOVE_SPEED). When both
-        // gaits are measured, the client picks the one whose stride fits the ground speed.
+        // The host labels walk or run from planar speed, with no hysteresis. When both
+        // gaits are measured, the client still picks the stride that fits the ground speed.
         const shown = locomotionFor(pawn, movement, groundSpeed);
         play(pawn, shown);
         const rate = pawn.rates.get(shown);
