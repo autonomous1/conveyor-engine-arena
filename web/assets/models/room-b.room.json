@@ -1,0 +1,135 @@
+{
+  "formatVersion": 1,
+  "units": "meters",
+  "id": "room-b",
+  "glb": "room-b.glb",
+  "source": "svg",
+  "footprint": {
+    "minX": -3,
+    "maxX": 3,
+    "minZ": -3,
+    "maxZ": 3
+  },
+  "height": 3,
+  "obstacles": [
+    {
+      "id": "front.0",
+      "minX": -3,
+      "maxX": 3,
+      "minY": 0,
+      "maxY": 3,
+      "minZ": 3,
+      "maxZ": 3.2
+    },
+    {
+      "id": "back.0",
+      "minX": -3,
+      "maxX": 3,
+      "minY": 0,
+      "maxY": 3,
+      "minZ": -3.2,
+      "maxZ": -3
+    },
+    {
+      "id": "left.0",
+      "minX": -3.2,
+      "maxX": -3,
+      "minY": 0,
+      "maxY": 2.1,
+      "minZ": 0.5365,
+      "maxZ": 3
+    },
+    {
+      "id": "left.1",
+      "minX": -3.2,
+      "maxX": -3,
+      "minY": 0,
+      "maxY": 2.1,
+      "minZ": -3,
+      "maxZ": -0.5365
+    },
+    {
+      "id": "left.2",
+      "minX": -3.2,
+      "maxX": -3,
+      "minY": 2.1,
+      "maxY": 3,
+      "minZ": -3,
+      "maxZ": 3
+    },
+    {
+      "id": "right.0",
+      "minX": 3,
+      "maxX": 3.2,
+      "minY": 0,
+      "maxY": 3,
+      "minZ": -3,
+      "maxZ": 3
+    },
+    {
+      "id": "floor.0",
+      "minX": -3,
+      "maxX": 3,
+      "minY": -0.1,
+      "maxY": 0,
+      "minZ": -3,
+      "maxZ": 3
+    }
+  ],
+  "walkable": [
+    {
+      "minX": -3,
+      "maxX": 3,
+      "minZ": -3,
+      "maxZ": 3
+    }
+  ],
+  "holes": [],
+  "doors": [
+    {
+      "id": "door-1-1-9-22",
+      "model": "door-1",
+      "wall": "left",
+      "center": [
+        -3,
+        0,
+        0
+      ],
+      "width": 1.073,
+      "height": 2.1,
+      "hinge": "left",
+      "open": false,
+      "locked": true,
+      "key": "key"
+    }
+  ],
+  "props": [
+    {
+      "id": "cover-crate-2-1",
+      "model": "ammo-box",
+      "position": [
+        -1.009367,
+        0,
+        2.04767
+      ],
+      "yaw": 0,
+      "scale": 1,
+      "drawnWidth": 0.518,
+      "drawnDepth": 0.487
+    },
+    {
+      "id": "cover-crate-2-6",
+      "model": "med-kit",
+      "position": [
+        0.597358,
+        0,
+        -1.60656
+      ],
+      "yaw": 0,
+      "scale": 1,
+      "drawnWidth": 0.678,
+      "drawnDepth": 0.489
+    }
+  ],
+  "lights": []
+}
