@@ -29,7 +29,8 @@
     "placements": [
       "./web/game/buildings.placements.json",
       "./web/game/doors.placements.json",
-      "./web/game/props.placements.json"
+      "./web/game/props.placements.json",
+      "./web/game/rooms.placements.json"
     ]
   },
   "assets": [
@@ -490,6 +491,23 @@
         "notes": "Generated with blueprint-sceen prop --shape crate"
       }
     },
+    {
+      "id": "room-b",
+      "kind": "model",
+      "type": "building",
+      "instance": "static",
+      "scale": 0.9,
+      "uri": "/assets/models/room-b.glb",
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "CC0-1.0",
+        "status": "spdx"
+      },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Generated with blueprint-sceen prop --shape crate"
+      }
+    },    
     {
       "id": "key-1",
       "kind": "model",

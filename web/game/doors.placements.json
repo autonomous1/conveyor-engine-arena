@@ -41,7 +41,7 @@
       "key": "key"
     },
     {
-      "id": "door-1-1-9-2",
+      "id": "brutalist-building-2-cbake.door-1-1-9-2",
       "model": "door-2",
       "type": "door",
       "position": [
@@ -61,15 +61,95 @@
       "key": "key"
     },
     {
-      "id": "door-1-1-9-2-4",
+      "id": "brutalist-building-2-cbake.door-1-1-9-2-4",
       "model": "door-2",
       "type": "door",
       "position": [
-        -23.75471,
+        -23.754711,
         2.75,
         15.259191
       ],
       "yaw": 0,
+      "hinge": "left",
+      "size": [
+        1.055523,
+        2.1,
+        0.08
+      ],
+      "open": false,
+      "locked": true,
+      "key": "key"
+    },
+    {
+      "id": "brutalist-building-2-cbake-0.door-1-1-9-2",
+      "model": "door-2",
+      "type": "door",
+      "position": [
+        26.650781,
+        0,
+        -9.856351
+      ],
+      "yaw": 180,
+      "hinge": "left",
+      "size": [
+        1.055523,
+        2.1,
+        0.08
+      ],
+      "open": false,
+      "locked": true,
+      "key": "key"
+    },
+    {
+      "id": "brutalist-building-2-cbake-0.door-1-1-9-2-4",
+      "model": "door-2",
+      "type": "door",
+      "position": [
+        25.176513,
+        2.75,
+        -9.856351
+      ],
+      "yaw": 180,
+      "hinge": "left",
+      "size": [
+        1.055523,
+        2.1,
+        0.08
+      ],
+      "open": false,
+      "locked": true,
+      "key": "key"
+    },
+    {
+      "id": "brutalist-building-2-cbake-4.door-1-1-9-2",
+      "model": "door-2",
+      "type": "door",
+      "position": [
+        44.477201,
+        0,
+        37.954095
+      ],
+      "yaw": 90,
+      "hinge": "left",
+      "size": [
+        1.055523,
+        2.1,
+        0.08
+      ],
+      "open": false,
+      "locked": true,
+      "key": "key"
+    },
+    {
+      "id": "brutalist-building-2-cbake-4.door-1-1-9-2-4",
+      "model": "door-2",
+      "type": "door",
+      "position": [
+        44.477201,
+        2.75,
+        36.479827
+      ],
+      "yaw": 90,
       "hinge": "left",
       "size": [
         1.055523,
