@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { attachKtx2Loader } from "./arena-scene.ts";
 
 /**
  * alien-weapon-enh's longest bbox axis is local +X (about 1.12 m) and its thin
@@ -35,13 +36,14 @@ export function mountWeaponMesh(root: THREE.Object3D, source: THREE.Object3D): T
  * First-person weapon, parented to this client's camera. Other clients do not
  * get this object. It is not a snapshot entity.
  */
-export function createViewModel(camera: THREE.Camera, scene: THREE.Scene) {
+export function createViewModel(camera: THREE.Camera, scene: THREE.Scene, renderer?: THREE.WebGLRenderer) {
   if (camera.parent !== scene) scene.add(camera);
   const root = new THREE.Group();
   root.name = "viewmodel";
   root.frustumCulled = false;
   camera.add(root);
   const loader = new GLTFLoader();
+  if (renderer) attachKtx2Loader(loader, renderer);
   let shown: string | undefined;
   let ticket = 0;
   return {

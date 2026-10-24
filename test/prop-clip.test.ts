@@ -4,6 +4,7 @@ import path from "node:path";
 import test from "node:test";
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { allowKtx2 } from "./ktx2-stub.ts";
 import { playPropClip } from "../src/client/arena-scene.ts";
 import { startPropAnimation } from "../dist/server/game.js";
 import { compileGame } from "../dist/server/game-manifest.js";
@@ -185,6 +186,7 @@ function loadGlb(name: string): Promise<{ scene: THREE.Object3D; clips: THREE.An
   const bytes = readFileSync(file);
   const data = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
   const loader = new GLTFLoader();
+  allowKtx2(loader);
   return new Promise((resolve, reject) => {
     loader.parse(
       data,

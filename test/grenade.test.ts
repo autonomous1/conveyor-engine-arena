@@ -4,6 +4,7 @@ import { register } from "node:module";
 import test from "node:test";
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { allowKtx2 } from "./ktx2-stub.ts";
 import { attachPlayInput } from "../src/client/input.ts";
 import { createGrenadeProps, GRENADE_DRAW_MS } from "../src/client/grenade.ts";
 import { aimDirection, EYE_HEIGHT } from "../src/shared/look.ts";
@@ -463,6 +464,7 @@ function loadGrenadeGlb(): Promise<THREE.Object3D> {
   const bytes = readFileSync(new URL("../web/assets/models/grenade-launched.glb", import.meta.url));
   const data = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
   const loader = new GLTFLoader();
+  allowKtx2(loader);
   return new Promise((resolve, reject) => {
     loader.parse(
       data,

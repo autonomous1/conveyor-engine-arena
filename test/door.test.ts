@@ -4,6 +4,7 @@ import path from "node:path";
 import test from "node:test";
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { allowKtx2 } from "./ktx2-stub.ts";
 import { DOOR_OPEN_DEGREES, doorSwingRadians, placeDoorModel, placeDoorPlacements } from "../src/client/arena-scene.ts";
 import { interpretPlacements } from "../src/server/placements-file.ts";
 import type { ArenaView } from "../src/shared/arena-view.ts";
@@ -93,6 +94,7 @@ function loadDoorTemplate(): Promise<THREE.Object3D> {
   const bytes = readFileSync(doorGlb);
   const data = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
   const loader = new GLTFLoader();
+  allowKtx2(loader);
   return new Promise((resolve, reject) => {
     loader.parse(data, "", (gltf) => resolve(gltf.scene), (err) => reject(err instanceof Error ? err : new Error(String(err))));
   });

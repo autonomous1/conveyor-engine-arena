@@ -27,6 +27,7 @@ const types: Record<string, string> = {
   ".png": "image/png",
   ".webp": "image/webp",
   ".glb": "model/gltf-binary",
+  ".wasm": "application/wasm",
   ".svg": "image/svg+xml",
   ".ico": "image/x-icon",
   ".woff2": "font/woff2",

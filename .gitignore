@@ -1,5 +1,6 @@
 agents/
 plan/
+web/assets/models/.bake-ktx2.*
 viewer/
 generated/
 node_modules/

@@ -32,15 +32,15 @@ try {
   if (!res.ok) throw new Error(`view.json ${res.status}`);
   const view = await res.json() as ArenaView;
   status("scene");
-  const scene = await buildMapScene(view);
-  const camera = topDownCamera(view.bounds, MAP_BAKE_PX, MAP_BAKE_PX);
-  if (!camera) throw new Error("scene bounds are empty");
   const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
   renderer.setPixelRatio(1);
   renderer.setSize(MAP_BAKE_PX, MAP_BAKE_PX, false);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.setClearColor(0x8eb8d4);
+  const scene = await buildMapScene(view, renderer);
+  const camera = topDownCamera(view.bounds, MAP_BAKE_PX, MAP_BAKE_PX);
+  if (!camera) throw new Error("scene bounds are empty");
   document.body.appendChild(renderer.domElement);
   const gl = renderer.getContext();
   console.log("webgl", gl.getParameter(gl.VERSION));

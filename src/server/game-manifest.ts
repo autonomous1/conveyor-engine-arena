@@ -1,4 +1,5 @@
 import {
+  DEFAULT_CAPABILITIES,
   encodeGlb,
   hashBytes,
   hashCanonicalJson,
@@ -1088,7 +1089,9 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
       if (!png) issues.push({ path, message: "not a png" });
     } else {
       try {
-        const report = sniffGlb(bytes);
+        // The client registers KTX2Loader, so KHR_texture_basisu is playable.
+        // Default capabilities reject that required extension.
+        const report = sniffGlb(bytes, { ...DEFAULT_CAPABILITIES, supportsKtx2: true });
         if (report.errors.length) issues.push({ path, message: report.errors.join("; ") });
       } catch (err) {
         issues.push({ path, message: err instanceof Error ? err.message : "glb decode failed" });

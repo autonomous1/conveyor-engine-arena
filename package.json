@@ -29,6 +29,7 @@
     "start:arena-wall": "node dist/run.js arena 40",
     "start:arena-miss": "node dist/run.js arena-miss",
     "bake:scene": "scripts/bake.sh",
+    "bake:ktx2": "bash scripts/bake-ktx2.sh",
     "bake:map": "node src/util/bake-map.ts",
     "run:lossless": "node dist/run.js lossless",
     "run:lossy": "node dist/run.js lossy",
@@ -52,6 +53,7 @@
     "ws": "^8.18.0"
   },
   "devDependencies": {
+    "@gltf-transform/cli": "4.5.0",
     "@types/node": "^22.10.0",
     "@types/ws": "^8.5.14",
     "blueprint-scene": "^0.1.4",

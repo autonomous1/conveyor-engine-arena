@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { KTX2Loader } from "three/addons/loaders/KTX2Loader.js";
 import { RectAreaLightUniformsLib } from "three/addons/lights/RectAreaLightUniformsLib.js";
 import { clone as cloneWithSkeleton } from "three/addons/utils/SkeletonUtils.js";
 import { propClipName, type ArenaView, type BackdropShape, type CharacterAnimation } from "../shared/arena-view.ts";
@@ -26,6 +27,34 @@ export type CharacterVisual = {
 };
 
 export type CharacterTemplates = Map<string, CharacterVisual>;
+
+const BASIS_TRANSCODER = "/assets/basis/";
+let basisLoader: KTX2Loader | undefined;
+
+/**
+ * Decode KTX2 images in GLBs. One transcoder, matched to the drawing renderer.
+ * A renderer with no WebGL extensions cannot run the Basis worker. The stand-in
+ * still satisfies KHR_texture_basisu so the mesh loads.
+ */
+export function attachKtx2Loader(loader: GLTFLoader, renderer: THREE.WebGLRenderer): void {
+  if (!renderer.extensions) {
+    loader.setKTX2Loader({
+      load(_url: string, onLoad: (texture: THREE.Texture) => void): void {
+        const texture = new THREE.Texture();
+        texture.image = { width: 1, height: 1 };
+        texture.needsUpdate = true;
+        onLoad(texture);
+      },
+    } as never);
+    return;
+  }
+  if (!basisLoader) {
+    basisLoader = new KTX2Loader();
+    basisLoader.setTranscoderPath(BASIS_TRANSCODER);
+    basisLoader.detectSupport(renderer);
+  }
+  loader.setKTX2Loader(basisLoader);
+}
 
 const SHADOW_ALGORITHM = {
   basic: THREE.BasicShadowMap,
@@ -750,6 +779,7 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
   }
 
   const loader = new GLTFLoader();
+  attachKtx2Loader(loader, arena.renderer);
   const modelCache = new Map<string, { scene: THREE.Object3D; clips: THREE.AnimationClip[] } | undefined>();
   async function model(url: string): Promise<{ scene: THREE.Object3D; clips: THREE.AnimationClip[] } | undefined> {
     if (modelCache.has(url)) return modelCache.get(url);

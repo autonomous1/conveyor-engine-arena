@@ -16,3 +16,7 @@ await build({
 await cp("web/index.html", "dist/web/index.html");
 await rm("dist/web/assets", { recursive: true, force: true });
 await cp("web/assets", "dist/web/assets", { recursive: true });
+const basis = "node_modules/three/examples/jsm/libs/basis";
+await mkdir("dist/web/assets/basis", { recursive: true });
+await cp(`${basis}/basis_transcoder.js`, "dist/web/assets/basis/basis_transcoder.js");
+await cp(`${basis}/basis_transcoder.wasm`, "dist/web/assets/basis/basis_transcoder.wasm");

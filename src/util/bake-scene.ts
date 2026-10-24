@@ -10,6 +10,7 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import type { ArenaView } from "../shared/arena-view.ts";
 import { propClipName } from "../shared/arena-view.ts";
 import {
+  attachKtx2Loader,
   placeBuildingModel,
   placeDoorModel,
   placeStaticDoorFrames,
@@ -20,7 +21,7 @@ import {
   type InstancePose,
 } from "../client/arena-scene.ts";
 
-export async function buildMapScene(view: ArenaView): Promise<THREE.Scene> {
+export async function buildMapScene(view: ArenaView, renderer?: THREE.WebGLRenderer): Promise<THREE.Scene> {
   const scene = new THREE.Scene();
   scene.add(new THREE.HemisphereLight(0xc8d8ff, 0x3a3228, 1.3));
   const key = new THREE.DirectionalLight(0xfff2d6, 2.3);
@@ -48,6 +49,7 @@ export async function buildMapScene(view: ArenaView): Promise<THREE.Scene> {
   content.name = "map-content";
   scene.add(content);
   const loader = new GLTFLoader();
+  if (renderer) attachKtx2Loader(loader, renderer);
   const cache = new Map<string, THREE.Object3D>();
   async function model(url: string): Promise<THREE.Object3D> {
     const cached = cache.get(url);

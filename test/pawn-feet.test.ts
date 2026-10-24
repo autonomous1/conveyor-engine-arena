@@ -4,6 +4,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { allowKtx2 } from "./ktx2-stub.ts";
 import { createPawnLayer } from "../src/client/presentation.ts";
 import type { CharacterTemplates, CharacterVisual } from "../src/client/arena-scene.ts";
 import { prepareCharacter, skinnedSoleGap } from "../src/client/pawn-feet.ts";
@@ -121,6 +122,7 @@ function loadGltf(path: string): Promise<{ scene: THREE.Group; animations: THREE
   const bytes = readFileSync(path);
   const data = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
   const loader = new GLTFLoader();
+  allowKtx2(loader);
   return new Promise((resolve, reject) => {
     loader.parse(
       data,

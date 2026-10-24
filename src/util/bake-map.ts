@@ -30,6 +30,7 @@ const TYPES: Record<string, string> = {
   ".webp": "image/webp",
   ".glb": "model/gltf-binary",
   ".svg": "image/svg+xml",
+  ".wasm": "application/wasm",
 };
 
 const root = repoRoot();
@@ -219,9 +220,14 @@ async function handle(
     send(res, 400, "bad path", "text/plain; charset=utf-8");
     return;
   }
-  const file = resolve(web, rel);
+  const basisName = rel.startsWith("assets/basis/") ? rel.slice("assets/basis/".length) : "";
+  const basisFile =
+    basisName === "basis_transcoder.js" || basisName === "basis_transcoder.wasm"
+      ? resolve(root, "node_modules/three/examples/jsm/libs/basis", basisName)
+      : undefined;
+  const file = basisFile ?? resolve(web, rel);
   const fromWeb = relative(web, file);
-  if (fromWeb.startsWith("..") || fromWeb.includes(`..${sep}`) || fromWeb === "") {
+  if (!basisFile && (fromWeb.startsWith("..") || fromWeb.includes(`..${sep}`) || fromWeb === "")) {
     send(res, 403, "forbidden", "text/plain; charset=utf-8");
     return;
   }

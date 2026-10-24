@@ -8,7 +8,7 @@ import { doorLeafBox } from "../shared/doors.js";
 import { advanceGrenadeClock, type GrenadePose } from "../shared/grenade.js";
 import { advanceFireClock, LASER_MS, traceHitscan, type TraceCapsule } from "../shared/hitscan.js";
 import { createAabbDebug } from "./aabb-debug.js";
-import { applyDoorSwing, createArenaScene, loadArenaVisuals, tickDoorSwing } from "./arena-scene.js";
+import { applyDoorSwing, attachKtx2Loader, createArenaScene, loadArenaVisuals, tickDoorSwing } from "./arena-scene.js";
 import { createGrenadeProps } from "./grenade.js";
 import { createHitMarker } from "./hit-marker.js";
 import { createHud, localHealthLabel } from "./hud.js";
@@ -52,7 +52,7 @@ sceneMap.setWorld({
 });
 const pickupIds = new Set((view.pickups ?? []).map((pickup) => pickup.id));
 for (const id of pickupIds) visuals.placements.setVisible(id, false);
-const viewmodel = createViewModel(arena.camera, arena.scene);
+const viewmodel = createViewModel(arena.camera, arena.scene, arena.renderer);
 function dropBox(id: string) {
   dropPickupAabb(view.aabbs, id);
   collisionDebug.remove(id);
@@ -83,8 +83,10 @@ const lasers = createLaserBeams(arena.scene);
 const grenades = createGrenadeProps(arena.scene, async () => {
   const url = view.grenade ?? "/assets/models/grenade-launched.glb";
   const { GLTFLoader } = await import("three/addons/loaders/GLTFLoader.js");
+  const loader = new GLTFLoader();
+  attachKtx2Loader(loader, arena.renderer);
   try {
-    const gltf = await new GLTFLoader().loadAsync(url);
+    const gltf = await loader.loadAsync(url);
     return gltf.scene;
   } catch (err) {
     console.warn("grenade", err);
