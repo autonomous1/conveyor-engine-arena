@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { RectAreaLightUniformsLib } from "three/addons/lights/RectAreaLightUniformsLib.js";
 import { clone as cloneWithSkeleton } from "three/addons/utils/SkeletonUtils.js";
 import { propClipName, type ArenaView, type BackdropShape, type CharacterAnimation } from "../shared/arena-view.ts";
 import { findClip, type Movement } from "../shared/movements.ts";
@@ -31,6 +32,117 @@ const SHADOW_ALGORITHM = {
   pcf: THREE.PCFShadowMap,
   vsm: THREE.VSMShadowMap,
 } as const;
+
+/** Room lamps illuminate only objects that enable this layer; hemi + key stay on layer 0. */
+const ROOM_LIGHT_LAYER = 1;
+
+/**
+ * Direct-only line in MeshStandard / MeshPhysical. Pass 2 swaps in a clone that
+ * writes this so the add is the lamp, not a second copy of hemi + key.
+ */
+const ROOM_LAMP_DIRECT = "vec3 outgoingLight = reflectedLight.directDiffuse + reflectedLight.directSpecular;";
+const ROOM_LAMP_FULL = "vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance;";
+
+const roomLightReceivers: THREE.Object3D[] = [];
+let roomLightCount = 0;
+const roomLampMaterials = new WeakMap<THREE.Material, THREE.Material>();
+
+/** Asset ids `room` and `room-*`. The view stores the GLB uri, not the id. */
+function isRoomModel(model: string): boolean {
+  const file = model.split("/").pop() ?? model;
+  const stem = file.replace(/\.[^./]+$/, "");
+  return stem === "room" || stem.startsWith("room-");
+}
+
+function receiveRoomLights(root: THREE.Object3D, model: string): void {
+  if (!isRoomModel(model)) return;
+  root.traverse((node) => {
+    node.layers.enable(ROOM_LIGHT_LAYER);
+  });
+  if (!roomLightReceivers.includes(root)) roomLightReceivers.push(root);
+}
+
+function roomLampMaterial(source: THREE.Material): THREE.Material {
+  const cached = roomLampMaterials.get(source);
+  if (cached) return cached;
+  const lamp = source.clone();
+  lamp.transparent = true;
+  lamp.blending = THREE.AdditiveBlending;
+  lamp.depthWrite = false;
+  if (lamp instanceof THREE.MeshStandardMaterial) lamp.fog = false;
+  const prior = lamp.onBeforeCompile;
+  lamp.onBeforeCompile = (shader, renderer) => {
+    prior.call(lamp, shader, renderer);
+    if (shader.fragmentShader.includes(ROOM_LAMP_FULL)) {
+      shader.fragmentShader = shader.fragmentShader.replace(ROOM_LAMP_FULL, ROOM_LAMP_DIRECT);
+      return;
+    }
+    shader.fragmentShader = shader.fragmentShader.replace(
+      "gl_FragColor = vec4( outgoingLight, diffuseColor.a );",
+      "gl_FragColor = vec4( 0.0 );",
+    );
+  };
+  roomLampMaterials.set(source, lamp);
+  return lamp;
+}
+
+function drawRoomLamps(roots: readonly THREE.Object3D[], draw: () => void): void {
+  const saved: Array<{ mesh: THREE.Mesh; material: THREE.Material | THREE.Material[] }> = [];
+  for (const root of roots) {
+    root.traverse((node) => {
+      const mesh = node as THREE.Mesh;
+      if (!mesh.isMesh || !mesh.material) return;
+      saved.push({ mesh, material: mesh.material });
+      mesh.material = Array.isArray(mesh.material)
+        ? mesh.material.map((material) => roomLampMaterial(material))
+        : roomLampMaterial(mesh.material);
+    });
+  }
+  try {
+    draw();
+  } finally {
+    for (const slot of saved) slot.mesh.material = slot.material;
+  }
+}
+
+/**
+ * r186 collects every light that shares a layer with the camera into one program.
+ * Pass 1 keeps the camera on layer 0 so outdoor shaders omit room lamps.
+ * Pass 2 draws layer 1 only and adds those lamps onto the room meshes.
+ */
+function renderWithRoomLights(
+  renderer: THREE.WebGLRenderer,
+  baseRender: (scene: THREE.Object3D, camera: THREE.Camera) => void,
+  scene: THREE.Object3D,
+  camera: THREE.Camera,
+): void {
+  if (roomLightCount === 0 || roomLightReceivers.length === 0) {
+    baseRender(scene, camera);
+    return;
+  }
+  const mask = camera.layers.mask;
+  const autoClear = renderer.autoClear;
+  const shadows = renderer.shadowMap.enabled;
+  const autoReset = renderer.info.autoReset;
+  const hasBackground = scene instanceof THREE.Scene;
+  const background = hasBackground ? scene.background : null;
+  try {
+    camera.layers.set(0);
+    baseRender(scene, camera);
+    camera.layers.set(ROOM_LIGHT_LAYER);
+    if (hasBackground) scene.background = null;
+    renderer.autoClear = false;
+    renderer.shadowMap.enabled = false;
+    renderer.info.autoReset = false;
+    drawRoomLamps(roomLightReceivers, () => baseRender(scene, camera));
+  } finally {
+    camera.layers.mask = mask;
+    renderer.autoClear = autoClear;
+    renderer.shadowMap.enabled = shadows;
+    renderer.info.autoReset = autoReset;
+    if (hasBackground) scene.background = background;
+  }
+}
 
 export function createArenaScene(quality: ShadowQuality): ArenaScene {
   const shadows = shadowSettings(quality);
@@ -71,6 +183,9 @@ export function createArenaScene(quality: ShadowQuality): ArenaScene {
   const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 400);
   camera.position.set(16, 10, 16);
   camera.lookAt(0, 1, 0);
+  camera.layers.enable(ROOM_LIGHT_LAYER);
+  const baseRender = renderer.render.bind(renderer);
+  renderer.render = (nextScene, nextCamera) => renderWithRoomLights(renderer, baseRender, nextScene, nextCamera);
 
   const resize = () => {
     camera.aspect = innerWidth / Math.max(1, innerHeight);
@@ -326,6 +441,42 @@ function meshMinY(object: THREE.Object3D): number {
   return minY;
 }
 
+let rectAreaLightsReady = false;
+
+/**
+ * Point lights sit at `position`. A rect's −Z faces world −Y (`rotation.x = -π/2`),
+ * and the parent yaw is `yaw * π / 180` about +Y. Neither casts a shadow.
+ * Each lamp leaves layer 0 and joins the room layer.
+ */
+export function placeRoomLights(lights: readonly ArenaView["lights"][number][], parent: THREE.Object3D): void {
+  for (const light of lights) {
+    if (light.type === "point") {
+      const point = new THREE.PointLight(light.color, light.intensity, light.range ?? 0, 2);
+      point.position.set(light.position[0], light.position[1], light.position[2]);
+      point.castShadow = false;
+      point.layers.disable(0);
+      point.layers.enable(ROOM_LIGHT_LAYER);
+      parent.add(point);
+      continue;
+    }
+    if (!rectAreaLightsReady) {
+      RectAreaLightUniformsLib.init();
+      rectAreaLightsReady = true;
+    }
+    const rect = new THREE.RectAreaLight(light.color, light.intensity, light.width ?? 0, light.height ?? 0);
+    rect.rotation.x = -Math.PI / 2;
+    rect.castShadow = false;
+    rect.layers.disable(0);
+    rect.layers.enable(ROOM_LIGHT_LAYER);
+    const group = new THREE.Group();
+    group.position.set(light.position[0], light.position[1], light.position[2]);
+    group.rotation.y = (light.yaw ?? 0) * (Math.PI / 180);
+    group.add(rect);
+    parent.add(group);
+  }
+  roomLightCount = lights.length;
+}
+
 /** Quarter-turns match `yawConvention: "y-up-90"`. 90° sends model +X to world −Z. */
 function yawToRadians(degrees: number): number {
   const wrapped = ((degrees % 360) + 360) % 360;
@@ -542,6 +693,7 @@ export function placeBuildingModel(template: THREE.Object3D, building: ArenaView
   model.scale.setScalar(building.scale);
   model.position.set(0, 0, 0);
   group.add(model);
+  receiveRoomLights(group, building.model);
   return group;
 }
 
@@ -578,6 +730,9 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
     collectInstanceSamples(mapSamples, meshes, entries);
   };
   const castsShadow = view.shadows !== undefined && view.shadows.quality !== "off";
+  roomLightReceivers.length = 0;
+  arena.camera.layers.enable(ROOM_LIGHT_LAYER);
+  placeRoomLights(view.lights ?? [], arena.scene);
   if (view.floor) {
     const floorMap = await texture(view.floor.texture);
     if (!floorMap) fallbacks += 1;
@@ -690,6 +845,7 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
     }
     for (const mesh of meshes) {
       markShadowCasters(mesh, castsShadow);
+      receiveRoomLights(mesh, url);
       arena.scene.add(mesh);
     }
     entries.forEach((entry, index) => {
@@ -841,6 +997,7 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
     }
     for (const mesh of meshes) {
       markShadowCasters(mesh, castsShadow);
+      receiveRoomLights(mesh, url);
       arena.content.add(mesh);
     }
     props.forEach((prop, index) => {
@@ -864,6 +1021,7 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
       mesh.position.set(0, 0, 0);
       group.add(mesh);
       markShadowCasters(group, castsShadow);
+      receiveRoomLights(group, prop.model);
       placements.addClone(prop.id, group);
       arena.content.add(group);
       noteObject(prop.id, "prop", group, prop.yaw ?? 0);
@@ -881,6 +1039,7 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
       );
       box.position.set((prop.minX + prop.maxX) / 2, prop.minY + h / 2, (prop.minZ + prop.maxZ) / 2);
       markShadowCasters(box, castsShadow);
+      receiveRoomLights(box, prop.model);
       placements.addClone(prop.id, box);
       arena.content.add(box);
       noteObject(prop.id, "prop", box, prop.yaw ?? 0);
@@ -890,6 +1049,7 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
     mesh.scale.set(w, h, d);
     mesh.position.set((prop.minX + prop.maxX) / 2, prop.minY, (prop.minZ + prop.maxZ) / 2);
     markShadowCasters(mesh, castsShadow);
+    receiveRoomLights(mesh, prop.model);
     placements.addClone(prop.id, mesh);
     arena.content.add(mesh);
     noteObject(prop.id, "prop", mesh, prop.yaw ?? 0);

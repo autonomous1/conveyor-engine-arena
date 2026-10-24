@@ -26,6 +26,7 @@
       "radius": "80"
     },
     "spawnPoints": "./web/game/spawn-points.json",
+    "lights": "./web/game/rooms.lights.json",
     "placements": [
       "./web/game/buildings.placements.json",
       "./web/game/doors.placements.json",
@@ -494,9 +495,9 @@
     {
       "id": "room-b",
       "kind": "model",
-      "type": "building",
+      "type": "room",
+      "scale":0.9,
       "instance": "static",
-      "scale": 0.9,
       "uri": "/assets/models/room-b.glb",
       "mediaType": "model/gltf-binary",
       "license": {

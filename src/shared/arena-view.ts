@@ -7,6 +7,7 @@
  * `presentationHash` only, so the handshake does not force a reconnect.
  * Changing collision, spawns, bounds, or which asset id a surface uses changes
  * `authoritativeHash` and does force a reconnect.
+ * Room lights change `presentationHash` only.
  */
 import type { ProfileRing } from "./building-profile.js";
 import type { Movement } from "./movements.js";
@@ -61,6 +62,21 @@ export function propClipName(prop: {
   const clip = prop.animations[prop.animation]?.clip;
   return clip || undefined;
 }
+
+/** One room light. `color` is `#rrggbb`. A rect carries `yaw`, `width`, and `height`. */
+export type ArenaLight = {
+  id: string;
+  type: "point" | "rect";
+  position: [number, number, number];
+  color: string;
+  intensity: number;
+  /** Point distance. Absent is unlimited (`0` on the client). */
+  range?: number;
+  /** Degrees about +Y. 0, 90, 180, or 270. Rect lights set it. */
+  yaw?: number;
+  width?: number;
+  height?: number;
+};
 
 export type ArenaView = {
   bundleId: string;
@@ -163,6 +179,11 @@ export type ArenaView = {
    * Not part of either content hash.
    */
   spawns?: Array<{ id: string; x: number; z: number; yaw: number }>;
+  /**
+   * Room lights from `scene.lights`. Empty when that field is absent.
+   * Part of `presentationHash` only.
+   */
+  lights: ArenaLight[];
   /** Thrown grenade mesh. Absent when the manifest has no `grenade` model. */
   grenade?: string;
   /**

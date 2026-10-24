@@ -46,6 +46,7 @@
     "conveyor-engine-three": "^0.1.0",
     "conveyor-engine-transport-ws": "^0.1.0",
     "conveyor-engine-world": "^0.1.0",
+    "npm": "^11.21.1",
     "three": "~0.186.0",
     "three-gamepad-controls": "^0.24.0",
     "ws": "^8.18.0"

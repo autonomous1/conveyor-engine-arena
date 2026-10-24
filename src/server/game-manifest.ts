@@ -313,6 +313,11 @@ export type CompileSources = {
   /** Set when `scene.spawnPoints` is a path. The text is the spawn array. */
   spawnPointsFile?: PlacementFileSource;
   /**
+   * Set when `scene.lights` is a path. The text is a lights object or a lights array.
+   * Presentation hash only. Absent lights compile to `[]`.
+   */
+  lightsFile?: PlacementFileSource;
+  /**
    * `web/game/building-profiles.json`. Outlines for the scene map.
    * Absent when that file was not loaded. Not part of either content hash.
    */
@@ -445,6 +450,125 @@ function spawnList(
   if (Array.isArray(value)) return value;
   issues.push({ path: "scene.spawnPoints", message: "must be an array or a path" });
   return [];
+}
+
+const MAX_LIGHTS = 32;
+const LIGHT_COLOR = /^#[0-9a-fA-F]{6}$/;
+
+/**
+ * `scene.lights` is an array, or a path to a rooms.lights.json object (or a bare array).
+ * Absent is `[]`. Each failure names the light id.
+ */
+function sceneLights(
+  scene: Record<string, unknown> | undefined,
+  sources: CompileSources | undefined,
+  issues: GameIssue[],
+): ArenaView["lights"] {
+  if (!scene || !Object.prototype.hasOwnProperty.call(scene, "lights")) return [];
+  const value = scene.lights;
+  let items: unknown[] | undefined;
+  if (typeof value === "string") {
+    if (!value.trim()) {
+      issues.push({ path: "scene.lights", message: "must be an array or a path" });
+      return [];
+    }
+    const file = sources?.lightsFile;
+    if (!file || file.path !== value) {
+      issues.push({ path: "scene.lights", message: "file was not loaded" });
+      return [];
+    }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(file.text);
+    } catch (err) {
+      issues.push({ path: "scene.lights", message: `invalid json: ${err instanceof Error ? err.message : String(err)}` });
+      return [];
+    }
+    items = lightItems(parsed, "scene.lights", issues);
+  } else if (Array.isArray(value)) {
+    items = value;
+  } else {
+    issues.push({ path: "scene.lights", message: "must be an array or a path" });
+    return [];
+  }
+  if (!items) return [];
+  if (items.length > MAX_LIGHTS) {
+    const extra = items[MAX_LIGHTS];
+    const id = isObject(extra) && typeof extra.id === "string" && extra.id ? extra.id : String(MAX_LIGHTS);
+    issues.push({ path: `scene.lights.${id}`, message: "at most 32 lights" });
+  }
+  const lights: ArenaView["lights"] = [];
+  items.forEach((item, index) => {
+    const light = parseLight(item, index, issues);
+    if (light) lights.push(light);
+  });
+  return lights;
+}
+
+function lightItems(parsed: unknown, issuePath: string, issues: GameIssue[]): unknown[] | undefined {
+  if (Array.isArray(parsed)) return parsed;
+  if (!isObject(parsed)) {
+    issues.push({ path: issuePath, message: "must be an object" });
+    return undefined;
+  }
+  if (parsed.formatVersion !== undefined && parsed.formatVersion !== 1) {
+    issues.push({ path: `${issuePath}.formatVersion`, message: "must be 1" });
+  }
+  if (parsed.units !== undefined && parsed.units !== "meters") {
+    issues.push({ path: `${issuePath}.units`, message: "must be meters" });
+  }
+  if (!Array.isArray(parsed.lights)) {
+    issues.push({ path: `${issuePath}.lights`, message: "required array" });
+    return undefined;
+  }
+  return parsed.lights;
+}
+
+function parseLight(value: unknown, index: number, issues: GameIssue[]): ArenaView["lights"][number] | undefined {
+  const id = isObject(value) && typeof value.id === "string" && value.id ? value.id : undefined;
+  const path = id ? `scene.lights.${id}` : `scene.lights[${index}]`;
+  if (!isObject(value)) {
+    issues.push({ path, message: "must be an object" });
+    return undefined;
+  }
+  if (!id) issues.push({ path: `${path}.id`, message: "required string" });
+  const position = vec3(value.position, `${path}.position`, issues);
+  const color = str(value.color, `${path}.color`, issues);
+  if (color && !LIGHT_COLOR.test(color)) issues.push({ path: `${path}.color`, message: "must be #rrggbb" });
+  const intensity = num(value.intensity, `${path}.intensity`, issues);
+  if (intensity !== undefined && intensity <= 0) issues.push({ path: `${path}.intensity`, message: "must be > 0" });
+  const type = value.type === "point" || value.type === "rect" ? value.type : undefined;
+  if (!type) issues.push({ path: `${path}.type`, message: "must be point or rect" });
+  const yawGiven = value.yaw !== undefined || type === "rect";
+  const yaw = yawGiven ? cardinalYaw(value.yaw, `${path}.yaw`, issues) : undefined;
+  let width: number | undefined;
+  let height: number | undefined;
+  if (type === "rect") {
+    width = num(value.width, `${path}.width`, issues);
+    height = num(value.height, `${path}.height`, issues);
+    if (width !== undefined && width <= 0) issues.push({ path: `${path}.width`, message: "must be > 0" });
+    if (height !== undefined && height <= 0) issues.push({ path: `${path}.height`, message: "must be > 0" });
+  }
+  let range: number | undefined;
+  if (value.range !== undefined) {
+    range = num(value.range, `${path}.range`, issues);
+    if (range !== undefined && range < 0) issues.push({ path: `${path}.range`, message: "must be >= 0" });
+  }
+  const colorOk = !!color && LIGHT_COLOR.test(color);
+  const intensityOk = intensity !== undefined && intensity > 0;
+  const yawOk = !yawGiven || yaw !== undefined;
+  const sizeOk = type !== "rect" || (width !== undefined && width > 0 && height !== undefined && height > 0);
+  const rangeOk = value.range === undefined || (range !== undefined && range >= 0);
+  if (!id || !position || !type || !colorOk || !intensityOk || !yawOk || !sizeOk || !rangeOk) return undefined;
+  return {
+    id,
+    type,
+    position,
+    color,
+    intensity,
+    ...(type === "rect" ? { yaw: yaw!, width: width!, height: height! } : {}),
+    ...(range !== undefined && range >= 0 ? { range } : {}),
+  };
 }
 
 function sceneArray(scene: Record<string, unknown> | undefined, key: string, path: string, issues: GameIssue[]): unknown[] {
@@ -973,6 +1097,8 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
     fileBytes.set(asset.uri, bytes);
   }
 
+  const lights = sceneLights(scene, sources, issues);
+
   const facesReady = !walls || faceOrder.every((face) => {
     const placed = facePlacements[face];
     return !!placed && assets.get(placed.model)?.kind === "model";
@@ -1015,7 +1141,7 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
   const fileHashes = [...assets.values()]
     .map((asset) => ({ id: asset.id, hash: hashBytes(fileBytes.get(asset.uri) ?? new Uint8Array()) }))
     .sort((a, b) => a.id.localeCompare(b.id));
-  const presentationHash = hashCanonicalJson(fileHashes);
+  const presentationHash = hashCanonicalJson({ files: fileHashes, lights });
 
   const license = { id: "CC0-1.0", status: "spdx" as const };
   const provenance = {
@@ -1156,6 +1282,7 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
     pawnRadius,
     pawnHeight,
     spawns: spawns.map((spawn) => ({ id: spawn.id, x: spawn.x, z: spawn.z, yaw: spawn.yaw })),
+    lights,
     ...(grenadeModel ? { grenade: grenadeModel } : {}),
   };
 

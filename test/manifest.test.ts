@@ -86,6 +86,14 @@ function placementPropCount(): number {
 
 function compile(doc: unknown, read: (uri: string) => Uint8Array | undefined, sources?: CompileSources) {
   const resolved = sources ?? readManifestSources(projectRoot(), doc);
+  // Partial sources still need the installed lights file when the scene keeps that path.
+  if (resolved && !resolved.lightsFile) {
+    const scene = doc && typeof doc === "object" ? (doc as { scene?: { lights?: unknown } }).scene : undefined;
+    if (typeof scene?.lights === "string") {
+      const installed = readManifestSources(projectRoot(), document());
+      if (installed?.lightsFile?.path === scene.lights) resolved.lightsFile = installed.lightsFile;
+    }
+  }
   return compileGame(doc, read, resolved);
 }
 
