@@ -88,7 +88,7 @@
       "kind": "model",
       "type": "building",
       "instance": "static",
-      "uri": "/assets/models/brutalist-building-3-bake.glb",
+      "uri": "/assets/models/brutalist-building-3-bake.cut.glb",
       "mediaType": "model/gltf-binary",
       "license": {
         "id": "unspecified",
@@ -493,10 +493,25 @@
       }
     },
     {
+      "id": "room-a",
+      "kind": "model",
+      "type": "room",
+      "instance": "static",
+      "uri": "/assets/models/room-a.glb",
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "CC0-1.0",
+        "status": "spdx"
+      },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Generated with blueprint-sceen prop --shape crate"
+      }
+    },    
+    {
       "id": "room-b",
       "kind": "model",
       "type": "room",
-      "scale":0.9,
       "instance": "static",
       "uri": "/assets/models/room-b.glb",
       "mediaType": "model/gltf-binary",
@@ -508,7 +523,23 @@
         "origin": "procedural",
         "notes": "Generated with blueprint-sceen prop --shape crate"
       }
-    },    
+    },
+    {
+      "id": "room-b.open",
+      "kind": "model",
+      "type": "room",
+      "instance": "static",
+      "uri": "/assets/models/room-b.open.glb",
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "CC0-1.0",
+        "status": "spdx"
+      },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "room-b with the shared exterior doorway cut out of the facade face"
+      }
+    },
     {
       "id": "key-1",
       "kind": "model",
@@ -551,7 +582,7 @@
     {
       "id": "alien-weapon-enh",
       "kind": "model",
-      "scale": 1.5,
+      "scale": 1.2,
       "type": "weapon",
       "instance": "static",
       "animation": "idle",

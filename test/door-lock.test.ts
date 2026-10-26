@@ -126,14 +126,16 @@ test("a locked door stays shut without the key, and both sessions see the unlock
   assert.equal(inboxes[0]!.length, 1);
   assert.deepEqual(inboxes[0]![0], inboxes[1]![0]);
   assert.deepEqual(inboxes[0]![0], doorFrame("locked", true, false));
-  assert.equal(keys.hasKey(7, "key"), false);
+  assert.equal(keys.hasKey(7, "key"), true);
   assert.equal(keys.consumeKey(8, "key"), false);
 
   pawns.set(7, pawn(7, 41, 0, -1));
   host.onFrame(1, useFrame(3));
-  assert.equal(inboxes[0]!.length, 1, "the same key id does not open a second lock");
-  assert.equal(host.snapshot().find((door) => door.id === "other")?.locked, true);
-  assert.equal(host.snapshot().find((door) => door.id === "other")?.open, false);
+  assert.equal(inboxes[0]!.length, 2, "the same held key opens a second lock");
+  assert.deepEqual(inboxes[0]![1], doorFrame("other", true, false));
+  assert.equal(host.snapshot().find((door) => door.id === "other")?.locked, false);
+  assert.equal(host.snapshot().find((door) => door.id === "other")?.open, true);
+  assert.equal(keys.hasKey(7, "key"), true);
 
   const template = markedDoor();
   const left = placeDoorModel(template, doorView({ id: "tab-a", open: false }));
@@ -148,6 +150,67 @@ test("a locked door stays shut without the key, and both sessions see the unlock
   assert.ok(left.getObjectByName("frame")!.quaternion.angleTo(shut) < 1e-6);
   applyDoorSwing(left, "right", true);
   assert.ok(left.getObjectByName("hinge")!.rotation.y < 0);
+});
+
+test("one held key opens every baked leaf that names that key", () => {
+  const doorsFile = JSON.parse(readFileSync(path.join(root, "web/game/doors.placements.json"), "utf8")) as {
+    placements: Array<ArenaView["doors"][number]>;
+  };
+  const propsFile = JSON.parse(readFileSync(path.join(root, "web/game/props.placements.json"), "utf8")) as {
+    placements: Array<{ id?: string }>;
+  };
+  assert.equal(propsFile.placements.filter((row) => row.id === "key").length, 1);
+  const named = [
+    "brutalist-building-3-bake.door-1-1-9-22",
+    "brutalist-building-3-bake-1.door-1-1-9-22",
+  ];
+  const leaves = doorsFile.placements.filter((door) => door.key === "key");
+  assert.ok(leaves.length >= named.length);
+  for (const id of named) {
+    const door = leaves.find((row) => row.id === id);
+    assert.ok(door, id);
+    assert.equal(door.locked, true, id);
+    assert.equal(door.key, "key", id);
+    assert.equal(door.open, false, id);
+  }
+  let consumed = false;
+  const held = {
+    hasKey: () => true,
+    consumeKey: () => {
+      consumed = true;
+      return true;
+    },
+  };
+  const none = { hasKey: () => false, consumeKey: () => false };
+  for (const door of leaves) {
+    const runtime: DoorRuntime = {
+      id: door.id,
+      hinge: door.hinge,
+      open: false,
+      locked: true,
+      key: door.key,
+      position: door.position,
+      size: door.size,
+      yaw: door.yaw,
+    };
+    assert.equal(tryUseDoor(runtime, 7, none), undefined, door.id);
+    assert.equal(runtime.locked, true, door.id);
+    assert.deepEqual(tryUseDoor(runtime, 7, held), doorFrame(door.id, true, false), door.id);
+  }
+  assert.equal(consumed, false);
+  const free = doorsFile.placements.find((door) => door.id === "brutalist-building-3-bake.door-1-1-9");
+  assert.ok(free);
+  assert.notEqual(free.locked, true);
+  const unlocked: DoorRuntime = {
+    id: free.id,
+    hinge: free.hinge,
+    open: false,
+    locked: false,
+    position: free.position,
+    size: free.size,
+    yaw: free.yaw,
+  };
+  assert.deepEqual(tryUseDoor(unlocked, 7, none), doorFrame(free.id, true, false));
 });
 
 test("a door with no lock toggles, a dead pawn does not, and disconnect clears the seq", () => {
@@ -229,7 +292,7 @@ test("the use volume matches the door frame and the top-step key can reach the l
     obstacles: Array<{ id?: string; min?: number[]; max?: number[] }>;
   };
   assert.deepEqual(doorsFile.obstacles ?? [], []);
-  const locked = doorsFile.placements.find((door) => door.id === "door-1-1-9-22");
+  const locked = doorsFile.placements.find((door) => door.id === "brutalist-building-3-bake.door-1-1-9-22");
   assert.ok(locked);
   assert.equal(locked.locked, true);
   assert.equal(locked.key, "key");
@@ -239,11 +302,11 @@ test("the use volume matches the door frame and the top-step key can reach the l
   assert.deepEqual(baked.issues, []);
   assert.equal(baked.boxes.length, 0);
   assert.equal(baked.buildings.length, 0);
-  const bakedLocked = baked.doors.find((door) => door.id === "door-1-1-9-22");
+  const bakedLocked = baked.doors.find((door) => door.id === "brutalist-building-3-bake.door-1-1-9-22");
   assert.equal(bakedLocked?.locked, true);
   assert.equal(bakedLocked?.key, "key");
   assert.equal(bakedLocked?.open, false);
-  assert.equal(baked.doors.find((door) => door.id === "door-1-1-9")?.locked, undefined);
+  assert.equal(baked.doors.find((door) => door.id === "brutalist-building-3-bake.door-1-1-9")?.locked, undefined);
 
   const shut = interpretPlacements({
     formatVersion: 1,
@@ -302,7 +365,7 @@ test("the use volume matches the door frame and the top-step key can reach the l
     size: locked.size,
     yaw: locked.yaw,
   };
-  assert.equal(pickDoorForUse([runtime], standing)?.id, "door-1-1-9-22");
+  assert.equal(pickDoorForUse([runtime], standing)?.id, "brutalist-building-3-bake.door-1-1-9-22");
   assert.equal(pickDoorForUse([runtime], pawn(7, 0, 0, 0)), undefined);
 
   const alone = { ...runtime, locked: true, key: "key", open: false };
@@ -351,6 +414,18 @@ test("door and use frames parse, and only a shut leaf seals the gap", () => {
   const world = loaded.world;
   const placed = loaded.view.doors;
   assert.ok(placed.length > 0);
+  const interiorId = "brutalist-building-2-cbake.room-b-1-3.door-1-1-9-22-5";
+  const doorsFile = JSON.parse(readFileSync(path.join(root, "web/game/doors.placements.json"), "utf8")) as {
+    placements: Array<{ id: string }>;
+  };
+  assert.equal(doorsFile.placements.some((door) => door.id === interiorId), false);
+  const interior = placed.find((door) => door.id === interiorId);
+  assert.ok(interior, interiorId);
+  assert.deepEqual(
+    sealing(world.listObstacles(), gapProbe(interior)).map((box) => box.id),
+    [],
+    `${interiorId}: a baked box seals the open gap`,
+  );
   for (const door of placed) {
     assert.deepEqual(sealing(world.listObstacles(), gapProbe(door)).map((box) => box.id), [], `${door.id}: a baked box seals the gap`);
   }
@@ -410,7 +485,7 @@ test("two sockets share the door snapshot and a use away from the door changes n
       pickups?: Array<{ id: string; kind: string; minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number }>;
       aabbs?: Array<{ source?: string }>;
     };
-    const listed = view.doors.find((door) => door.id === "door-1-1-9-22");
+    const listed = view.doors.find((door) => door.id === "brutalist-building-3-bake.door-1-1-9-22");
     assert.ok(listed);
     assert.equal(listed.locked, true);
     assert.equal(listed.key, "key");
@@ -418,7 +493,7 @@ test("two sockets share the door snapshot and a use away from the door changes n
     const key = view.pickups?.find((pickup) => pickup.id === "key");
     assert.equal(key?.kind, "key");
     assert.ok(key && key.maxX > key.minX && key.maxY > key.minY && key.maxZ > key.minZ);
-    assert.equal(view.aabbs?.some((box) => box.source === "door-1-1-9-22" || box.source === "door-1-1-9-22-box"), false);
+    assert.equal(view.aabbs?.some((box) => box.source === "brutalist-building-3-bake.door-1-1-9-22" || box.source === "brutalist-building-3-bake.door-1-1-9-22-box"), false);
 
     const a = openClient(host.url, view);
     open.push(a.ws);
@@ -429,10 +504,10 @@ test("two sockets share the door snapshot and a use away from the door changes n
     assert.notEqual(aw.ownedEntityId, bw.ownedEntityId);
     assert.deepEqual(aw.doors, bw.doors);
     assert.deepEqual(
-      aw.doors.find((door) => door.id === "door-1-1-9-22"),
-      { id: "door-1-1-9-22", open: false, locked: true },
+      aw.doors.find((door) => door.id === "brutalist-building-3-bake.door-1-1-9-22"),
+      { id: "brutalist-building-3-bake.door-1-1-9-22", open: false, locked: true },
     );
-    assert.equal(aw.doors.find((door) => door.id === "door-1-1-9")?.locked, false);
+    assert.equal(aw.doors.find((door) => door.id === "brutalist-building-3-bake.door-1-1-9")?.locked, false);
     assert.equal(aw.pickups.includes("key"), true);
     assert.equal(bw.pickups.includes("key"), true);
 

@@ -1,0 +1,182 @@
+{
+  "formatVersion": 1,
+  "units": "meters",
+  "id": "room-a",
+  "glb": "room-a.glb",
+  "source": "svg",
+  "footprint": {
+    "minX": -5,
+    "maxX": 5,
+    "minZ": -3,
+    "maxZ": 3
+  },
+  "height": 4,
+  "obstacles": [
+    {
+      "id": "front.0",
+      "minX": -5,
+      "maxX": 5,
+      "minY": 0,
+      "maxY": 4,
+      "minZ": 3,
+      "maxZ": 3.2
+    },
+    {
+      "id": "back.0",
+      "minX": -5,
+      "maxX": 5,
+      "minY": 0,
+      "maxY": 4,
+      "minZ": -3.2,
+      "maxZ": -3
+    },
+    {
+      "id": "left.0",
+      "minX": -5.2,
+      "maxX": -5,
+      "minY": 0,
+      "maxY": 2.1,
+      "minZ": 0.56177,
+      "maxZ": 3
+    },
+    {
+      "id": "left.1",
+      "minX": -5.2,
+      "maxX": -5,
+      "minY": 0,
+      "maxY": 2.1,
+      "minZ": -3,
+      "maxZ": -0.51123
+    },
+    {
+      "id": "left.2",
+      "minX": -5.2,
+      "maxX": -5,
+      "minY": 2.1,
+      "maxY": 4,
+      "minZ": -3,
+      "maxZ": 3
+    },
+    {
+      "id": "right.0",
+      "minX": 5,
+      "maxX": 5.2,
+      "minY": 0,
+      "maxY": 2.1,
+      "minZ": -3,
+      "maxZ": -0.53128
+    },
+    {
+      "id": "right.1",
+      "minX": 5,
+      "maxX": 5.2,
+      "minY": 0,
+      "maxY": 2.1,
+      "minZ": 0.54172,
+      "maxZ": 3
+    },
+    {
+      "id": "right.2",
+      "minX": 5,
+      "maxX": 5.2,
+      "minY": 2.1,
+      "maxY": 4,
+      "minZ": -3,
+      "maxZ": 3
+    },
+    {
+      "id": "floor.0",
+      "minX": -5,
+      "maxX": 5,
+      "minY": -0.1,
+      "maxY": 0,
+      "minZ": -3,
+      "maxZ": 3
+    }
+  ],
+  "walkable": [
+    {
+      "minX": -5,
+      "maxX": 5,
+      "minZ": -3,
+      "maxZ": 3
+    }
+  ],
+  "holes": [],
+  "doors": [
+    {
+      "id": "door-1-1-9-22",
+      "model": "door-1",
+      "wall": "left",
+      "center": [
+        -5,
+        0,
+        0.02527
+      ],
+      "width": 1.073,
+      "height": 2.1,
+      "hinge": "left",
+      "open": false,
+      "locked": true,
+      "key": "key"
+    },
+    {
+      "id": "door-1-1-9-22-5",
+      "model": "door-2",
+      "wall": "right",
+      "center": [
+        5,
+        0,
+        0.00522
+      ],
+      "width": 1.073,
+      "height": 2.1,
+      "hinge": "left",
+      "open": false,
+      "locked": true,
+      "key": "key"
+    }
+  ],
+  "props": [
+    {
+      "id": "cover-crate-2-1",
+      "model": "ammo-box",
+      "position": [
+        -3.009367,
+        0,
+        2.04767
+      ],
+      "yaw": 0,
+      "scale": 1,
+      "drawnWidth": 0.518,
+      "drawnDepth": 0.487
+    },
+    {
+      "id": "cover-crate-2-6",
+      "model": "med-kit",
+      "position": [
+        -1.402642,
+        0,
+        -1.60656
+      ],
+      "yaw": 0,
+      "scale": 1,
+      "drawnWidth": 0.678,
+      "drawnDepth": 0.489
+    }
+  ],
+  "lights": [
+    {
+      "id": "lamp",
+      "type": "point",
+      "position": [
+        -0.012372,
+        3.75,
+        0.18201
+      ],
+      "color": "#ffd9a0",
+      "intensity": 8,
+      "range": 6
+    }
+  ]
+}

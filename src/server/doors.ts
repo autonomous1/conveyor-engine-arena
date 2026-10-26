@@ -1,6 +1,6 @@
 /**
  * Door state for the arena host. A use frame toggles the overlapping door.
- * Locked doors open only for the pawn who holds `key`, and that id is consumed.
+ * Locked doors open only for the pawn who holds `key`. That id stays held.
  * The clear volume is not a collider. A shut leaf is: `blockers` keeps one
  * obstacle per door in the world and parks it while the door is open.
  * Changes are broadcast by the caller on the socket, not as a snap envelope.

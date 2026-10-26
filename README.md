@@ -2,15 +2,17 @@
 
 ![Arena, eight buildings, door openings](docs/arena-screenshot-10-5-2026.png)
 
-A one-room browser arena for [Conveyor Engine](https://github.com/autonomous1/conveyor-engine-packages). A Node host owns the simulation and publishes snapshots over a same-origin WebSocket. A Three.js client renders those snapshots: floor, four facade walls, cover, a city cylinder, a sky dome, and wandering characters.
+A browser arena for [Conveyor Engine](https://github.com/autonomous1/conveyor-engine-packages). A Node host owns the simulation and publishes snapshots over a same-origin WebSocket. A Three.js client renders those snapshots: a cityscape bounds, sky, static building placements (often Tripo-derived GLBs), floors and rooms from [blueprint-scene](https://github.com/autonomous1/blueprint-scene) bake output, doors, cover props, and wandering characters.
 
-The server ticks at 20 Hz. Each spawn point gets a pawn. The wander loop picks `idle`, `walk`, `run`, `fall`, or `angry`, plays that clip, and scales movement by that gait’s speed relative to the fastest gait on the model. Connecting a browser assigns a free pawn, and the camera stays a free-fly view.
+The server ticks at 20 Hz. Each spawn point gets a pawn. The wander loop picks `idle`, `walk`, `run`, `fall`, or `angry`, plays that clip, and scales movement by that gait’s speed relative to the fastest gait on the model. Connecting a browser assigns a free pawn. The camera is free-fly by default; with pointer lock you can also drive pawn look, fire, and door use.
 
 ## Prerequisites
 
-Node.js 22 or newer.
+Node.js **24** (tested on 24.0.2; 22+ may work but is not the project target).
 
-The kernel packages (`conveyor-engine-core`, `conveyor-engine-world`, `conveyor-engine-replication`, `conveyor-engine-client`, `conveyor-engine-three`, and related packages) and `conveyor-graph` are published on npm. `npm install` pulls them from the registry. No sibling checkouts or local `file:` links are required.
+Conveyor Engine packages (`conveyor-engine-core`, `conveyor-engine-world`, `conveyor-engine-replication`, `conveyor-engine-client`, `conveyor-engine-three`, and related packages) are published on npm. `npm install` pulls them from the registry.
+
+Scene bake uses **blueprint-scene** (`npm run bake:scene` → `scripts/bake.sh`). Prefer a sibling checkout at `../blueprint-scene` when iterating on bake; the package may also be installed from npm as a dependency.
 
 ## Run
 
@@ -27,34 +29,41 @@ npm run dev
 
 Open that URL. The host binds to `127.0.0.1`. Set `PORT` to use another port. After a build, `npm start` launches `dist/server/main.js` without rebuilding.
 
-`viewer/serve.mjs` exits and points at `npm start`. Static files come from `dist/web`. `/arena.json` is generated in memory from the compiled game file. Paths outside that bundle, including source maps, `node_modules`, and `/pkg`, respond with 404.
+Static files come from `dist/web`. `/arena.json` is generated in memory from the compiled game file. Paths outside that bundle, including source maps, `node_modules`, and `/pkg`, respond with 404.
 
 ## Controls
 
-The camera uses Three.js first-person fly controls:
+| Input | Action |
+| --- | --- |
+| W / Up, S / Down | Forward, back |
+| A / Left, D / Right | Strafe |
+| R, F | Up, down (fly) |
+| Drag (pointer locked) | Look |
+| E | Use / open the overlapping door |
+| Primary mouse | Fire (while pointer locked; first click locks the pointer) |
+| Gamepad | Same camera fly; right stick look is inverted vs `three-gamepad-controls` default |
 
+Pawn intent is driven on the server. A status line at the top shows the connection and how many pawn meshes fell back to capsules.
+
+## Scene bake
+
+Authoring lives under `dev/scenes/` (Inkscape scene SVG, per-building floors SVGs, room SVGs, editable source models). Bake writes placements, collision, doors, and cut building meshes into `web/game/` and `web/assets/models/` (including shared `<model>.cut.glb` for exterior openings).
+
+```bash
+npm run bake:scene
 ```
-| Input               | Action        |
-| ------------------- | ------------- |
-| W / Up, S / Down    | Forward, back |
-| A / Left, D / Right | Strafe        |
-| R, F                | Up, down      |
-| Drag                | Look          |
-```
 
-A gamepad flies the same camera. The right stick is inverted relative to the `three-gamepad-controls` default. Pawn intent is still driven on the server.
-
-A status line at the top shows the connection and how many pawn meshes fell back to capsules.
+`scripts/bake.sh` invokes blueprint-scene with `--svg`, `--models`, `--floors`, `--rooms`, `--game`, `--collision-dir`, and `--out`. Re-run bake after changing floors doors, room doors that should affect collision, or building meshes that need facade cuts. Keep editable non-KTX2 sources under `dev/scenes/.../models` and bake KTX2 (or cut) products into `web/assets/models` for the runtime.
 
 ## Game file
 
-`web/game/arena.game.json` is the authored game (`bundleId` `arena.one-room.v1`, `worldVersion` `example-v1`). On startup the server compiles it into the static world and the `/arena.json` view the client renders. A bad manifest stops startup with a field path and a message: invalid version, a path that escapes `web/`, a missing file, a model that is not a GLB, or a spawn that intersects an obstacle.
+`web/game/arena.game.json` is the authored game (`worldVersion` `example-v1`). On startup the server compiles it into the static world and the `/arena.json` view the client renders. A bad manifest stops startup with a field path and a message: invalid version, a path that escapes `web/`, a missing file, a model that is not a GLB, or a spawn that intersects an obstacle.
 
-`scene.id` and `scene.bounds` are required. `floor`, `walls`, `sky`, `cityscape`, `shadows`, `spawnPoints`, `props`, `collision`, and `placements` are optional. A missing block is left out: no facade slots without `walls`, no backdrop without `sky` or `cityscape`, and no stand-in for a missing floor or shadow setting. Missing spawn points leave the host fallback spawn in place. When `walls` is present, each of `south`, `east`, `north`, and `west` names a model asset, and collision ids 10–13 are reserved for those boxes.
+`scene.id` and `scene.bounds` are required. `floor`, `walls`, `sky`, `cityscape`, `shadows`, `spawnPoints`, `props`, `collision`, `doors`, and `placements` are optional. A missing block is left out. Missing spawn points leave the host fallback spawn in place. When `walls` is present, each of `south`, `east`, `north`, and `west` names a model asset, and collision ids 10–13 are reserved for those boxes.
 
-`scene.bounds` is the bounds object, or a path to a JSON file of that object. `scene.spawnPoints` is the spawn array, or a path to a JSON file of that array. A path uses the same rules as a placements file: relative to the arena repo, or into the sibling blueprint-scene checkout. A missing file fails the load.
+`scene.bounds` is the bounds object, or a path to a JSON file of that object. `scene.spawnPoints` is the spawn array, or a path to a JSON file of that array. A path uses the same rules as a placements file: relative to the arena repo, or into a sibling blueprint-scene checkout when configured that way. A missing file fails the load.
 
-`scene.placements` is a list of placements files. A single path string is accepted as a one-element list. Each file's placements and obstacles are concatenated, and ids must be unique across files. A missing file fails the load. A placement file may also carry `scene.spawnPoints`, `scene.props`, and `scene.collision`, which are appended. It does not replace `floor`, `sky`, `cityscape`, `shadows`, or the manifest `bounds`.
+`scene.placements` is a list of placements files. A single path string is accepted as a one-element list. Each file's placements and obstacles are concatenated, and ids must be unique across files. A missing file fails the load. A placement file may also carry `scene.spawnPoints`, `scene.props`, and `scene.collision`, which are appended. It does not replace `floor`, `sky`, `cityscape`, `shadows`, or the manifest `bounds`. Building and room placements from bake typically live in files such as `buildings.placements.json`, `rooms.placements.json`, and `doors.placements.json`.
 
 `scene.shadows.quality` is `off`, `basic`, `soft`, or `realistic`. `realistic` is a 4096 variance shadow map, `soft` is PCF at 2048, and `basic` is an unfiltered 512 map.
 
@@ -69,40 +78,40 @@ Each asset keeps its own license id and provenance origin.
 
 ## Scripts
 
-```
-| Script                     | What it does                                                                    |
-| -------------------------- | ------------------------------------------------------------------------------- |
-| `npm run dev`              | Build, then start the live host                                                 |
-| `npm start`                | Start `dist/server/main.js`                                                     |
-| `npm run build`            | Clean `dist/`, compile the server with `tsc`, bundle the client with esbuild    |
-| `npm run typecheck`        | Typecheck server and client without emitting                                    |
-| `npm test`                 | Node’s test runner. Requires a prior `npm run build`                            |
-| `npm run start:arena`      | Headless arena for 8 ticks (pass a count: `npm run start:arena-wall` runs 40)   |
-| `npm run start:arena-miss` | Same path with presentation assets marked missing                               |
-| `npm run run:lossless`     | Headless runner, clean delivery                                                 |
-| `npm run run:lossy`        | Headless runner, loss and jitter                                                |
-| `npm run run:partition`    | Headless runner, a temporary partition                                          |
-| `npm run bench`            | Headless bench, default 200 entities and 30 ticks (`npm run bench -- 1000 120`) |
-| `npm run record:arena`     | Record a wander trace to `viewer/replay/arena-wander.jsonl`                     |
-| `npm run bake:map`         | Top-down PNG of the arena into `web/assets/map-bake.png` (needs `build:server`) |
-```
+| Script | What it does |
+| --- | --- |
+| `npm run dev` | Build, then start the live host |
+| `npm start` | Start `dist/server/main.js` |
+| `npm run build` | Clean `dist/`, compile the server with `tsc`, bundle the client with esbuild |
+| `npm run typecheck` | Typecheck server, client, and util without emitting |
+| `npm test` | Node’s test runner. Requires a prior `npm run build` |
+| `npm run bake:scene` | Run `scripts/bake.sh` (blueprint-scene → `web/game` + cut models) |
+| `npm run bake:map` | Top-down PNG of the arena into `web/assets/map-bake.png` |
+| `npm run start:arena` | Headless arena for 8 ticks (`npm run start:arena-wall` runs 40) |
+| `npm run start:arena-miss` | Same path with presentation assets marked missing |
+| `npm run run:lossless` | Headless runner, clean delivery |
+| `npm run run:lossy` | Headless runner, loss and jitter |
+| `npm run run:partition` | Headless runner, a temporary partition |
+| `npm run bench` | Headless bench, default 200 entities and 30 ticks (`npm run bench -- 1000 120`) |
+| `npm run record:arena` | Record a wander trace |
 
-`node scripts/make-placeholders.mjs` writes original procedural stand-ins under `web/assets` (stone floor, cloudy sky, crate and player GLBs). The game file is what the server loads; point an asset `uri` at a new file for it to appear in the room.
+`node scripts/make-placeholders.mjs` writes original procedural stand-ins under `web/assets` when needed. The game file is what the server loads; point an asset `uri` at a new file for it to appear in the scene.
 
 ## Layout
 
 ```text
-src/server/ HTTP host, manifest compile, world load, wander tick
-src/client/ Browser bootstrap, scene, pawn presentation, camera, HUD
-src/util/   Map bake. Not part of the client or the server build
-src/shared/ Arena view, movement names, shadow settings
-src/ Headless ExampleApp, runners, bench, wander recording
-web/game/ arena.game.json
-web/assets/ Models and textures copied into dist/web
-web/index.html Page shell
-scripts/ Client bundle and placeholder art
-test/ Manifest, host, movement, shadows, wall mount, static world
-dist/ Build output. The host serves dist/web and runs dist/server
+src/server/   HTTP host, manifest compile, world load, wander tick
+src/client/   Browser bootstrap, scene, doors, pawn presentation, camera, HUD
+src/util/     Map bake (not part of the client or server build)
+src/shared/   Arena view, movement names, shadow settings
+src/          Headless ExampleApp, runners, bench, wander recording
+dev/scenes/   Authoring SVGs and editable source models (pre-bake)
+web/game/     arena.game.json and bake outputs (placements, doors, collision)
+web/assets/   Runtime models and textures (including .cut.glb / KTX2 products)
+web/index.html
+scripts/      Client bundle, bake.sh, placeholder art
+test/         Manifest, host, movement, shadows, doors, static world
+dist/         Build output (host serves dist/web, runs dist/server)
 ```
 
 ## Tests

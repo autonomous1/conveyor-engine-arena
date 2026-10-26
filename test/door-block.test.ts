@@ -16,7 +16,7 @@ type Door = ArenaView["doors"][number];
 const RADIUS = 0.5;
 const HEIGHT = 1.8;
 
-/** door-1-1-9 and door-1-1-9-22 from arena-1: building-3 west face x = -9.2876, outward −X. */
+/** brutalist-building-3-bake.door-1-1-9 and .door-1-1-9-22 from arena-1: building-3 west face x = -9.2876, outward −X. */
 const ground: Door = { id: "ground", model: "/m/door1.glb", position: [-9.287584, 0, 36.585486], yaw: 270, hinge: "left", size: [1.047216, 2.1, 0.08], open: false };
 const high: Door = { id: "high", model: "/m/door1.glb", position: [-9.287584, 2.75, 33.274426], yaw: 270, hinge: "left", size: [1.047216, 2.1, 0.08], open: false, locked: true, key: "key" };
 
@@ -122,7 +122,7 @@ test("a locked elevated door blocks until its key is used, and never blocks a pa
   held.get(1)!.add("key");
   a.use();
   assert.deepEqual(a.frames.at(-1), { t: "door", id: "high", open: true, locked: false });
-  assert.equal(held.get(1)!.has("key"), false, "key consumed");
+  assert.equal(held.get(1)!.has("key"), true, "key stays held");
   const id = a.blockers.obstacleId("high")!;
   const box = a.world.listObstacles().find((b) => b.id === id)!;
   assert.ok(box.maxY! < -1000, "open: blocker parked far below the floor");

@@ -1,7 +1,7 @@
 /**
  * Hinged doors. KeyE sends `{ t: "use", v: 1, seq }`. The host swings the one
- * door whose clear volume the pawn capsule overlaps. A locked door opens only
- * when that pawn holds `key`, and that id is then consumed.
+ * door whose clear volume the pawn capsule overlaps. A locked door opens when
+ * that pawn holds `key`. The held id stays, so every leaf with that key opens.
  *
  * The volume is the stamped passage (2 m inward of the hinge plane) plus a
  * short reach outside it. It is not an obstacle.
@@ -147,17 +147,18 @@ export function pickDoorForUse(doors: readonly DoorRuntime[], pawn: PawnBody): D
 
 export type KeyRing = {
   hasKey(pawnId: number, keyId: string): boolean;
+  /** Single-use drop. Unlock does not call this. */
   consumeKey(pawnId: number, keyId: string): boolean;
 };
 
 /**
- * Unlocked: toggle `open`. Locked with this pawn's key: consume it, unlock, and open.
+ * Unlocked: toggle `open`. Locked while this pawn holds `door.key`: unlock and open.
+ * The key stays held, so the next leaf with the same id unlocks too.
  * Locked without that key: no change.
  */
 export function tryUseDoor(door: DoorRuntime, pawnId: number, keys: KeyRing): DoorFrame | undefined {
   if (door.locked) {
     if (!door.key || !keys.hasKey(pawnId, door.key)) return undefined;
-    if (!keys.consumeKey(pawnId, door.key)) return undefined;
     door.locked = false;
     door.open = true;
     return doorFrame(door.id, door.open, door.locked);

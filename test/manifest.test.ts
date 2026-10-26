@@ -223,7 +223,7 @@ test("optional scene blocks and a placements list", () => {
   assert.deepEqual(faceModel, {
     south: "/assets/models/brutalist-building-1-cbake.glb",
     west: "/assets/models/brutalist-building-2-cbake.cut.glb",
-    north: "/assets/models/brutalist-building-3-bake.glb",
+    north: "/assets/models/brutalist-building-3-bake.cut.glb",
     east: "/assets/models/brutalist-building-1-cbake.glb",
   });
 
@@ -432,7 +432,7 @@ test("props.placements.json yields alien-weapon-1 at asset scale times placement
   assert.equal(weapons.length, 1);
   const weapon = weapons[0]!;
   assert.equal(weapon.id, "alien-weapon-1");
-  assert.equal(weapon.scale, 1.5);
+  assert.equal(weapon.scale, 1.2);
   assert.equal(weapon.animation, "idle");
   assert.equal(weapon.animations?.idle.clip, "rotate");
   assert.equal(game.view.buildings.some((building) => building.id === "alien-weapon-1"), false);
@@ -443,7 +443,7 @@ test("props.placements.json yields alien-weapon-1 at asset scale times placement
   assert.equal(typeof stampYaw, "number");
   assert.equal(weapon.yaw, stampYaw);
   const pose = propInstancePose(weapon);
-  assert.equal(pose.scale, 1.5);
+  assert.equal(pose.scale, 1.2);
   assert.equal(pose.yaw, stampYaw);
   const template = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial());
   const instanced = placeStaticInstances(template, [pose]);
@@ -452,7 +452,7 @@ test("props.placements.json yields alien-weapon-1 at asset scale times placement
   instanced[0]!.getMatrixAt(0, matrix);
   const scale = new THREE.Vector3();
   matrix.decompose(new THREE.Vector3(), new THREE.Quaternion(), scale);
-  assert.ok(Math.abs(scale.x - 1.5) < 1e-6 && Math.abs(scale.y - 1.5) < 1e-6 && Math.abs(scale.z - 1.5) < 1e-6);
+  assert.ok(Math.abs(scale.x - 1.2) < 1e-6 && Math.abs(scale.y - 1.2) < 1e-6 && Math.abs(scale.z - 1.2) < 1e-6);
 
   const doubled = {
     formatVersion: 1,
@@ -478,7 +478,7 @@ test("props.placements.json yields alien-weapon-1 at asset scale times placement
   });
   const grown = merged.view.props.find((prop) => prop.id === "alien-weapon-1");
   assert.ok(grown);
-  assert.equal(grown.scale, 3);
+  assert.equal(grown.scale, 2.4);
   assert.equal(grown.animation, "idle");
   assert.equal(grown.animations?.idle.clip, "rotate");
   assert.ok(merged.definition.spawnPoints.some((spawn) => spawn.id === "pad" && spawn.x === 6));

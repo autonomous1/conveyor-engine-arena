@@ -7,19 +7,37 @@
   "footprint": {
     "minX": -3,
     "maxX": 3,
-    "minZ": -3,
-    "maxZ": 3
+    "minZ": -2.781,
+    "maxZ": 2.781
   },
   "height": 3,
   "obstacles": [
     {
       "id": "front.0",
-      "minX": -3,
+      "minX": 0.528442,
       "maxX": 3,
       "minY": 0,
+      "maxY": 2.1,
+      "minZ": 2.781,
+      "maxZ": 2.981
+    },
+    {
+      "id": "front.1",
+      "minX": -3,
+      "maxX": -0.544558,
+      "minY": 0,
+      "maxY": 2.1,
+      "minZ": 2.781,
+      "maxZ": 2.981
+    },
+    {
+      "id": "front.2",
+      "minX": -3,
+      "maxX": 3,
+      "minY": 2.1,
       "maxY": 3,
-      "minZ": 3,
-      "maxZ": 3.2
+      "minZ": 2.781,
+      "maxZ": 2.981
     },
     {
       "id": "back.0",
@@ -27,44 +45,44 @@
       "maxX": 3,
       "minY": 0,
       "maxY": 3,
-      "minZ": -3.2,
-      "maxZ": -3
+      "minZ": -2.981,
+      "maxZ": -2.781
     },
     {
       "id": "left.0",
       "minX": -3.2,
       "maxX": -3,
       "minY": 0,
-      "maxY": 2.1,
-      "minZ": 0.5365,
-      "maxZ": 3
-    },
-    {
-      "id": "left.1",
-      "minX": -3.2,
-      "maxX": -3,
-      "minY": 0,
-      "maxY": 2.1,
-      "minZ": -3,
-      "maxZ": -0.5365
-    },
-    {
-      "id": "left.2",
-      "minX": -3.2,
-      "maxX": -3,
-      "minY": 2.1,
       "maxY": 3,
-      "minZ": -3,
-      "maxZ": 3
+      "minZ": -2.781,
+      "maxZ": 2.781
     },
     {
       "id": "right.0",
       "minX": 3,
       "maxX": 3.2,
       "minY": 0,
+      "maxY": 2.1,
+      "minZ": -2.781,
+      "maxZ": -0.35322
+    },
+    {
+      "id": "right.1",
+      "minX": 3,
+      "maxX": 3.2,
+      "minY": 0,
+      "maxY": 2.1,
+      "minZ": 0.71978,
+      "maxZ": 2.781
+    },
+    {
+      "id": "right.2",
+      "minX": 3,
+      "maxX": 3.2,
+      "minY": 2.1,
       "maxY": 3,
-      "minZ": -3,
-      "maxZ": 3
+      "minZ": -2.781,
+      "maxZ": 2.781
     },
     {
       "id": "floor.0",
@@ -72,16 +90,16 @@
       "maxX": 3,
       "minY": -0.1,
       "maxY": 0,
-      "minZ": -3,
-      "maxZ": 3
+      "minZ": -2.781,
+      "maxZ": 2.781
     }
   ],
   "walkable": [
     {
       "minX": -3,
       "maxX": 3,
-      "minZ": -3,
-      "maxZ": 3
+      "minZ": -2.781,
+      "maxZ": 2.781
     }
   ],
   "holes": [],
@@ -89,11 +107,27 @@
     {
       "id": "door-1-1-9-22",
       "model": "door-1",
-      "wall": "left",
+      "wall": "right",
       "center": [
-        -3,
+        3,
         0,
-        0
+        0.18328
+      ],
+      "width": 1.073,
+      "height": 2.1,
+      "hinge": "left",
+      "open": false,
+      "locked": true,
+      "key": "key"
+    },
+    {
+      "id": "door-1-1-9-22-5",
+      "model": "door-2",
+      "wall": "front",
+      "center": [
+        -0.008058,
+        0,
+        2.781
       ],
       "width": 1.073,
       "height": 2.1,
@@ -110,7 +144,7 @@
       "position": [
         -1.009367,
         0,
-        2.04767
+        2.26666
       ],
       "yaw": 0,
       "scale": 1,
@@ -123,7 +157,7 @@
       "position": [
         0.597358,
         0,
-        -1.60656
+        -1.38757
       ],
       "yaw": 0,
       "scale": 1,
@@ -136,9 +170,9 @@
       "id": "lamp",
       "type": "point",
       "position": [
-        -0.045304,
+        0.097554,
         2.75,
-        0.28302
+        0.32345
       ],
       "color": "#ffd9a0",
       "intensity": 8,

@@ -87,7 +87,8 @@ test("scene.lights becomes view.lights", () => {
   }));
   assert.deepEqual(game.view.lights, [lamp, panel]);
   const installed = compile(document());
-  assert.deepEqual(installed.view.lights, []);
+  const file = JSON.parse(readFileSync(`${projectRoot()}/web/game/rooms.lights.json`, "utf8")) as { lights: unknown };
+  assert.deepEqual(installed.view.lights, file.lights);
 });
 
 test("colour red and 33 lights are issues", () => {

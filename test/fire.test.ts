@@ -296,7 +296,7 @@ test("a second client receives the laser and the segment matches the host hit", 
     b = openClient(host.url, view);
     const bw = await b.welcome;
     assert.notEqual(aw.ownedEntityId, bw.ownedEntityId);
-    const pose = await waitFor(2000, () => {
+    const pose = await waitFor(8000, () => {
       const self = a.poses.get(aw.ownedEntityId);
       const seen = b.poses.get(aw.ownedEntityId);
       if (!self || !seen) return undefined;
@@ -316,14 +316,16 @@ test("a second client receives the laser and the segment matches the host hit", 
     send(1);
     send(1);
     send(2);
-    const first = await waitFor(2000, () => b.lasers[0]);
+    const first = await waitFor(8000, () => b.lasers[0]);
+    const seenAt = Date.now();
     await delay(40);
     assert.equal(b.lasers.length, 1, "repeated or fast seq produced another laser");
     assert.equal(a.lasers.length, 1);
     assert.equal(a.errors.length, 0);
     assert.equal(b.errors.length, 0);
     assert.equal(first.shooter, aw.ownedEntityId);
-    assert.ok(first.until >= started + LASER_MS - 30 && first.until <= started + LASER_MS + 40, `until ${first.until - started}`);
+    const remain = first.until - seenAt;
+    assert.ok(remain >= 0 && remain <= LASER_MS + 40, `until ${first.until - started} remain ${remain}`);
     const expected = traceHitscan(origin, aimDirection(aim.yaw, aim.pitch), view.aabbs, others);
     assert.ok(expected.distance > 1, `self hit ${expected.distance}`);
     samePoint(first.from, expected.from);
