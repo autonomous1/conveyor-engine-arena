@@ -104,9 +104,26 @@ export function createPawnLayer(parent: THREE.Object3D, templates: CharacterTemp
     return pickLocomotion(current, groundSpeed, walk * pawn.scale, run * pawn.scale);
   }
 
+  function release(pawn: Pawn): void {
+    parent.remove(pawn.root);
+    if (!pawn.fallback) return;
+    pawn.root.traverse((obj) => {
+      const mesh = obj as THREE.Mesh;
+      if (mesh.userData.ownedGeometry) {
+        mesh.geometry?.dispose();
+        const material = mesh.material;
+        if (material && !Array.isArray(material)) material.dispose();
+      }
+    });
+  }
+
   function ensure(id: number, assetKey: string | undefined): Pawn {
     const existing = pawns.get(id);
-    if (existing) return existing;
+    if (existing) {
+      if (existing.assetKey === assetKey) return existing;
+      release(existing);
+      pawns.delete(id);
+    }
     const visual = assetKey ? templates.get(assetKey) : undefined;
     const root = new THREE.Group();
     let fallback = false;
@@ -194,17 +211,7 @@ export function createPawnLayer(parent: THREE.Object3D, templates: CharacterTemp
       }
       for (const [id, pawn] of pawns) {
         if (seen.has(id)) continue;
-        parent.remove(pawn.root);
-        if (pawn.fallback) {
-          pawn.root.traverse((obj) => {
-            const mesh = obj as THREE.Mesh;
-            if (mesh.userData.ownedGeometry) {
-              mesh.geometry?.dispose();
-              const material = mesh.material;
-              if (material && !Array.isArray(material)) material.dispose();
-            }
-          });
-        }
+        release(pawn);
         pawns.delete(id);
       }
       const report = [...pawns.entries()].map(([id, pawn]) => ({

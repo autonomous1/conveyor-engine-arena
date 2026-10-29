@@ -34,11 +34,16 @@ const arena = createArenaScene(view.shadows?.quality ?? "off");
 const collisionDebug = createAabbDebug(view.aabbs);
 arena.scene.add(collisionDebug.group);
 const sceneMap = createSceneMap();
+let pushModel: (id: string) => void = () => {};
 const options = createOptionsDialog(
   (on) => collisionDebug.setVisible(on),
   undefined,
   (on) => sceneMap.setVisible(on),
-  { noclipAllowed: view.noclip === true },
+  {
+    noclipAllowed: view.noclip === true,
+    modelChoices: view.modelChoices ?? [],
+    onModel: (id) => pushModel(id),
+  },
 );
 const fireDebug = createFireDebugLog(() => options.fireDebug);
 const visuals = await loadArenaVisuals(view, arena);
@@ -168,7 +173,11 @@ const link = connectLive({
     fireDebug.thrown("socket", err);
     hud.setStatus(`frame error ${pinnedError}`);
   },
+  model: () => options.modelChoice || undefined,
 });
+pushModel = (id) => {
+  link.sendModel(id);
+};
 
 let last = performance.now();
 let sendAcc = 0;

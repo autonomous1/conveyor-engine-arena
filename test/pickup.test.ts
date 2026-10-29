@@ -269,6 +269,7 @@ test("installed placements consume ammo, health, and weapon, and a crate type st
     placementFiles: [{ path: "./types.json", text: JSON.stringify(typesFile) }],
     boundsFile: base.boundsFile,
     spawnPointsFile: base.spawnPointsFile,
+    playerSpawnPointsFile: base.playerSpawnPointsFile,
     lightsFile: base.lightsFile,
   });
   const stayedIds = (stayedGame.view.pickups ?? []).map((item) => item.id);
@@ -287,6 +288,7 @@ test("installed placements consume ammo, health, and weapon, and a crate type st
     placementFiles: [{ path: "./no-box.json", text: JSON.stringify(bareFile) }],
     boundsFile: base.boundsFile,
     spawnPointsFile: base.spawnPointsFile,
+    playerSpawnPointsFile: base.playerSpawnPointsFile,
     lightsFile: base.lightsFile,
   }), (err: unknown) => {
     assert.ok(err instanceof GameManifestError);
@@ -648,7 +650,7 @@ function westStairToward(
 }
 
 test("one client takes alien-weapon-1 and the other sees it gone", { timeout: 40_000 }, async () => {
-  const host = await startArenaServer(0);
+  const host = await startArenaServer(0, true);
   const open: WebSocket[] = [];
   try {
     const page = await fetch(`${host.url}/arena.json`);
@@ -696,8 +698,8 @@ test("one client takes alien-weapon-1 and the other sees it gone", { timeout: 40
     const before = [...a.entities].sort((left, right) => left - right);
     assert.ok(before.length > 0);
 
-    // Own every other seat so wanderers stay off the stair during the climb.
-    const seats = loadArena().agents.length;
+    // Own every player pad. Unowned wander pawns are held so they stay off the stair.
+    const seats = loadArena().agents.filter((agent) => agent.role === "player").length;
     for (let n = 2; n < seats; n++) {
       const extra = openClient(host.url, view);
       open.push(extra.ws);
@@ -794,7 +796,7 @@ test("one client takes alien-weapon-1 and the other sees it gone", { timeout: 40
 });
 
 test("two tabs see a full pawn clear a health crate and a second crate", { timeout: 45_000 }, async () => {
-  const host = await startArenaServer(0);
+  const host = await startArenaServer(0, true);
   const open: WebSocket[] = [];
   try {
     const page = await fetch(`${host.url}/arena.json`);
@@ -812,7 +814,7 @@ test("two tabs see a full pawn clear a health crate and a second crate", { timeo
     const ammo = view.pickups?.find((item) => item.id === "cover-crate-2-1");
     assert.ok(health && ammo);
 
-    const seats = loadArena().agents.length;
+    const seats = loadArena().agents.filter((agent) => agent.role === "player").length;
     const a = openClient(host.url, view);
     open.push(a.ws);
     const aw = await a.welcome;

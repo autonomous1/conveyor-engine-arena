@@ -4,6 +4,7 @@
  * Escape is not handled here; the browser still unlocks the pointer.
  * Show collision, Fire debug, and Scene map stay in localStorage and are not part of the input message.
  * Noclip is localStorage too. The client sends it on the existing input `buttons` field, and only when the host set `view.noclip`.
+ * The model select is sessionStorage. It is sent on hello and again when the choice changes.
  * Host fire counters are painted here. They are not part of the crosshair HUD.
  */
 
@@ -13,6 +14,7 @@ export const SHOW_COLLISION_STORAGE_KEY = "arena.showCollision.v1";
 export const FIRE_DEBUG_STORAGE_KEY = "arena.fireDebug.v1";
 export const SHOW_SCENE_MAP_STORAGE_KEY = "arena.showSceneMap.v1";
 export const NOCLIP_STORAGE_KEY = "arena.noclip.v1";
+export const MODEL_CHOICE_STORAGE_KEY = "arena.modelChoice.v1";
 
 export type KeyValueStorage = {
   getItem(key: string): string | null;
@@ -37,6 +39,8 @@ export type OptionsModel = {
 
 export type OptionsDialog = OptionsModel & {
   setAudit(counters: AuditCounters): void;
+  /** Selected character id. Empty when the dialog was built without model choices. */
+  readonly modelChoice: string;
 };
 
 export function loadShowCollision(storage: KeyValueStorage | null | undefined): boolean {
@@ -108,6 +112,28 @@ export function saveNoclip(storage: KeyValueStorage | null | undefined, on: bool
     storage.setItem(NOCLIP_STORAGE_KEY, on ? "on" : "off");
   } catch {
     // The in-memory switch still applies for this session.
+  }
+}
+
+/** First id in `choices`, or the saved id when it is still in the list. */
+export function loadModelChoice(storage: KeyValueStorage | null | undefined, choices: readonly string[]): string {
+  const first = choices[0] ?? "";
+  if (!storage || choices.length === 0) return first;
+  try {
+    const saved = storage.getItem(MODEL_CHOICE_STORAGE_KEY);
+    if (saved && choices.includes(saved)) return saved;
+  } catch {
+    // Fall through to the first id.
+  }
+  return first;
+}
+
+export function saveModelChoice(storage: KeyValueStorage | null | undefined, id: string): void {
+  if (!storage) return;
+  try {
+    storage.setItem(MODEL_CHOICE_STORAGE_KEY, id);
+  } catch {
+    // The in-memory choice still applies for this session.
   }
 }
 
@@ -185,6 +211,15 @@ function browserStorage(): KeyValueStorage | null {
   }
 }
 
+function browserSession(): KeyValueStorage | null {
+  try {
+    if (typeof sessionStorage === "undefined") return null;
+    return sessionStorage;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * HTML panel. Call once the status bar exists. The returned model is the
  * same state the panel paints.
@@ -193,7 +228,14 @@ export function createOptionsDialog(
   onShowCollision: (on: boolean) => void,
   storage: KeyValueStorage | null = browserStorage(),
   onShowMap: (on: boolean) => void = () => {},
-  extras: { noclipAllowed?: boolean; onNoclip?: (on: boolean) => void } = {},
+  extras: {
+    noclipAllowed?: boolean;
+    onNoclip?: (on: boolean) => void;
+    modelChoices?: readonly string[];
+    onModel?: (id: string) => void;
+    /** Session store. `undefined` uses `sessionStorage`. `null` does not persist. */
+    modelStorage?: KeyValueStorage | null;
+  } = {},
 ): OptionsDialog {
   const noclipAllowed = extras.noclipAllowed === true;
   const model = createOptionsModel(storage, onShowCollision, () => {}, onShowMap, extras.onNoclip ?? (() => {}), noclipAllowed);
@@ -269,7 +311,42 @@ export function createOptionsDialog(
     "font:12px/1.45 ui-monospace, monospace",
   ].join(";");
 
-  panel.append(title, collisionSwitch, fireSwitch, mapSwitch, noclipSwitch, auditView);
+  const choices = (extras.modelChoices ?? []).filter((id) => id.length > 0);
+  let modelChoice = "";
+  let modelLabel: HTMLLabelElement | undefined;
+  if (choices.length > 0) {
+    const store = extras.modelStorage !== undefined ? extras.modelStorage : browserSession();
+    modelChoice = loadModelChoice(store, choices);
+    modelLabel = document.createElement("label");
+    modelLabel.setAttribute("for", "model-choice");
+    modelLabel.textContent = "Model";
+    modelLabel.style.cssText = "display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:8px;";
+    const modelSelect = document.createElement("select");
+    modelSelect.id = "model-choice";
+    modelSelect.style.cssText = [
+      "pointer-events:auto", "background:#1c2230", "color:inherit",
+      "border:1px solid #3c4454", "border-radius:4px", "font:inherit",
+    ].join(";");
+    for (const id of choices) {
+      const option = document.createElement("option");
+      option.value = id;
+      option.textContent = id;
+      modelSelect.append(option);
+    }
+    modelSelect.value = modelChoice;
+    modelSelect.addEventListener("change", () => {
+      const next = modelSelect.value;
+      if (!choices.includes(next) || next === modelChoice) return;
+      modelChoice = next;
+      saveModelChoice(store, next);
+      extras.onModel?.(next);
+    });
+    modelLabel.append(modelSelect);
+  }
+
+  panel.append(title, collisionSwitch, fireSwitch, mapSwitch, noclipSwitch);
+  if (modelLabel) panel.append(modelLabel);
+  panel.append(auditView);
 
   const paintSwitch = (el: HTMLButtonElement, on: boolean, label: string) => {
     el.setAttribute("aria-checked", on ? "true" : "false");
@@ -328,6 +405,11 @@ export function createOptionsDialog(
   else document.body.append(button);
   document.body.append(panel);
   const dialog = model as OptionsDialog;
+  Object.defineProperty(dialog, "modelChoice", {
+    get() {
+      return modelChoice;
+    },
+  });
   dialog.setAudit = (next) => {
     if (sameAudit(audit, next)) return;
     audit = {

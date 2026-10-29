@@ -157,6 +157,10 @@ export type ArenaView = {
     key?: string;
   }>;
   characters: Array<{ id: string; model: string; scale: number; animations: Record<Movement, CharacterAnimation> }>;
+  /** Human-selectable character ids, in `player.modelChoices` order. */
+  modelChoices: string[];
+  /** Wander-pawn character ids. Absent when bots use `modelChoices`. */
+  npcModelChoices?: string[];
   /**
    * Model URIs whose asset says `"instance": "static"`. Repeated placements of
    * one of these share one InstancedMesh per source mesh. URIs absent from this
@@ -179,6 +183,11 @@ export type ArenaView = {
    * Not part of either content hash.
    */
   spawns?: Array<{ id: string; x: number; z: number; yaw: number }>;
+  /**
+   * Human pads from `scene.playerSpawnPoints`. Wander spawns stay in `spawns`.
+   * Not part of either content hash.
+   */
+  playerSpawns?: Array<{ id: string; x: number; z: number; yaw: number }>;
   /**
    * Room lights from `scene.lights`. Empty when that field is absent.
    * Part of `presentationHash` only.

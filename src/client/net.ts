@@ -4,6 +4,7 @@ import { parseAudit, type AuditCounters } from "../shared/audit.js";
 import { parseHealth } from "../shared/health.js";
 import { parseDoor, parseDoorSet, useFrame, type DoorFrame } from "../shared/doors.js";
 import { parseGrenadePose, grenadeFrame, type GrenadePose } from "../shared/grenade.js";
+import { modelFrame } from "../shared/model-choice.js";
 import { parseLoadout, parsePickup, parsePickupSet, type LoadoutFrame, type PickupFrame } from "../shared/pickups.js";
 
 const TOKEN_KEY = "ce-arena-token";
@@ -38,6 +39,11 @@ export type LiveLink = {
   sendGrenade(seq: number, yaw: number, pitch: number): boolean;
   /** Arena frame. One press of E. Returns false when the socket has no owned pawn yet. */
   sendUse(seq: number): boolean;
+  /**
+   * Arena frame. Queued until welcome when the pawn is not owned yet.
+   * Returns false when the frame was not written on this call.
+   */
+  sendModel(model: string): boolean;
   /** True after the socket has closed. Closing does not open another socket. */
   socketClosed(): boolean;
   /** connecting, open, closing, or closed. */
@@ -120,6 +126,8 @@ export function connectLive(opts: {
   onInbound?: (summary: string) => void;
   /** Parse or apply threw. The caller pins the message. This does not resync. */
   onFault?: (err: unknown) => void;
+  /** Read when hello is sent. Empty omits the field. */
+  model?: () => string | undefined;
 }): LiveLink {
   const ws = new WebSocket(`${location.origin.replace(/^http/, "ws")}/`);
   let lastSeq = 0;
@@ -129,6 +137,12 @@ export function connectLive(opts: {
   let resyncs = 0;
   let closed = false;
   let welcomed = false;
+  let queuedModel: string | undefined;
+  const flushModel = () => {
+    if (!queuedModel || ownedId === undefined || ws.readyState !== WebSocket.OPEN) return;
+    ws.send(JSON.stringify(modelFrame(queuedModel)));
+    queuedModel = undefined;
+  };
   const requestResync = () => {
     if (ws.readyState !== WebSocket.OPEN) return;
     resyncs += 1;
@@ -149,6 +163,7 @@ export function connectLive(opts: {
   document.addEventListener("visibilitychange", onVisibility);
   ws.addEventListener("open", () => {
     const token = sessionStorage.getItem(TOKEN_KEY) ?? undefined;
+    const model = opts.model?.();
     ws.send(JSON.stringify({
       v: 1,
       type: "hello",
@@ -157,6 +172,7 @@ export function connectLive(opts: {
       bundleId: opts.bundleId,
       authoritativeHash: opts.authoritativeHash,
       token,
+      ...(typeof model === "string" && model.length > 0 ? { model } : {}),
     }));
     opts.onStatus({ phase: "hello", text: "hello sent", resyncs });
   });
@@ -236,6 +252,7 @@ export function connectLive(opts: {
           ownedEntityId: ownedId,
           resyncs,
         });
+        flushModel();
         return;
       }
       if (msg.type === "reject" || msg.type === "error") {
@@ -304,6 +321,13 @@ export function connectLive(opts: {
     sendUse(seq) {
       if (ownedId === undefined || ws.readyState !== WebSocket.OPEN) return false;
       ws.send(JSON.stringify(useFrame(seq)));
+      return true;
+    },
+    sendModel(model) {
+      if (!model) return false;
+      queuedModel = model;
+      if (ownedId === undefined || ws.readyState !== WebSocket.OPEN) return false;
+      flushModel();
       return true;
     },
     socketClosed() {

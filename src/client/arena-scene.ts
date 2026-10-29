@@ -175,8 +175,8 @@ function renderWithRoomLights(
 
 export function createArenaScene(quality: ShadowQuality): ArenaScene {
   const shadows = shadowSettings(quality);
-  const renderer = new THREE.WebGLRenderer({ antialias: true });
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+  const renderer = new THREE.WebGLRenderer({ antialias: false });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 1));
   renderer.setClearColor(0x8eb8d4);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;

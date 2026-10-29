@@ -25,11 +25,11 @@
      borderopacity="1.0"
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
-     inkscape:zoom="6.9434748"
-     inkscape:cx="-100.24254"
-     inkscape:cy="-5.8882771"
+     inkscape:zoom="3.8211517"
+     inkscape:cx="3.2339309"
+     inkscape:cy="3.3760323"
      inkscape:document-units="mm"
-     inkscape:current-layer="layer4"
+     inkscape:current-layer="layer-player-spawns"
      showgrid="false"
      inkscape:window-width="2812"
      inkscape:window-height="1549"
@@ -132,7 +132,7 @@
        width="0.67799997"
        height="0.48899999"
        x="-287.08514"
-       y="5.8388224"
+       y="5.3096557"
        inkscape:label="model:med-kit"
        transform="rotate(-90)" />
     <rect
@@ -140,8 +140,8 @@
        id="rect13030-4"
        width="0.40000001"
        height="1.5"
-       x="268.14691"
-       y="9.2811813"
+       x="268.4928"
+       y="6.4449997"
        inkscape:label="model:step"
        transform="rotate(90)" />
     <rect
@@ -149,8 +149,8 @@
        id="rect13030-1-3"
        width="0.40000001"
        height="1.5"
-       x="267.74692"
-       y="9.2811813"
+       x="268.0928"
+       y="6.4449997"
        inkscape:label="model:step"
        z="0.25"
        transform="rotate(90)" />
@@ -159,8 +159,8 @@
        id="rect13030-8-33"
        width="0.40000001"
        height="1.5"
-       x="267.34692"
-       y="9.2811813"
+       x="267.69281"
+       y="6.4449997"
        inkscape:label="model:step"
        z="0.5"
        transform="rotate(90)" />
@@ -169,8 +169,8 @@
        id="rect13030-5-86"
        width="0.40000001"
        height="1.5"
-       x="266.9469"
-       y="9.2811813"
+       x="267.29279"
+       y="6.4449997"
        inkscape:label="model:step"
        z="0.75"
        transform="rotate(90)" />
@@ -179,8 +179,8 @@
        id="rect13030-7-0"
        width="0.40000001"
        height="1.5"
-       x="266.54691"
-       y="9.2811813"
+       x="266.89279"
+       y="6.4449997"
        inkscape:label="model:step"
        z="1"
        transform="rotate(90)" />
@@ -189,8 +189,8 @@
        id="rect13030-1-5-4"
        width="0.40000001"
        height="1.5"
-       x="266.14691"
-       y="9.2811813"
+       x="266.4928"
+       y="6.4449997"
        inkscape:label="model:step"
        z="1.25"
        transform="rotate(90)" />
@@ -199,8 +199,8 @@
        id="rect13030-8-3-8"
        width="0.40000001"
        height="1.5"
-       x="265.74692"
-       y="9.2811813"
+       x="266.0928"
+       y="6.4449997"
        inkscape:label="model:step"
        z="1.5"
        transform="rotate(90)" />
@@ -209,8 +209,8 @@
        id="rect13030-5-8-8"
        width="0.40000001"
        height="1.5"
-       x="265.34692"
-       y="9.2811813"
+       x="265.69281"
+       y="6.4449997"
        inkscape:label="model:step"
        z="1.75"
        transform="rotate(90)" />
@@ -219,8 +219,8 @@
        id="rect13030-83-8"
        width="0.40000001"
        height="1.5"
-       x="264.9469"
-       y="9.2811813"
+       x="265.29279"
+       y="6.4449997"
        inkscape:label="model:step"
        z="2"
        transform="rotate(90)" />
@@ -229,8 +229,8 @@
        id="rect13030-1-1-9"
        width="0.40000001"
        height="1.5"
-       x="264.54691"
-       y="9.2811813"
+       x="264.89279"
+       y="6.4449997"
        inkscape:label="model:step"
        z="2.25"
        transform="rotate(90)" />
@@ -239,8 +239,8 @@
        id="rect13030-8-8-7"
        width="0.40000001"
        height="1.5"
-       x="264.14691"
-       y="9.2811813"
+       x="264.4928"
+       y="6.4449997"
        inkscape:label="model:step"
        z="2.5"
        transform="rotate(90)" />
@@ -249,8 +249,8 @@
        id="rect13030-5-9-7"
        width="0.40000001"
        height="1.5"
-       x="263.74692"
-       y="9.2811813"
+       x="264.0928"
+       y="6.4449997"
        inkscape:label="model:step"
        z="2.75"
        transform="rotate(90)" />
@@ -300,8 +300,8 @@
        id="cover-crate-2-6-1-2"
        width="0.67799997"
        height="0.48899999"
-       x="57.069016"
-       y="312.9975"
+       x="58.12735"
+       y="311.93915"
        inkscape:label="model:med-kit" />
     <rect
        style="color:#000000;display:inline;overflow:visible;opacity:1;vector-effect:none;fill:#087420;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:0.12563834px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
@@ -392,7 +392,7 @@
        width="0.51800001"
        height="0.48700002"
        x="-311.62573"
-       y="-46.759201"
+       y="-47.817535"
        inkscape:label="model:ammo-box"
        transform="rotate(-90)" />
     <rect
@@ -400,7 +400,7 @@
        id="cover-crate-2-1-1-9"
        width="0.51800001"
        height="0.48700002"
-       x="-52.475338"
+       x="-54.592007"
        y="326.45642"
        inkscape:label="model:ammo-box" />
     <rect
@@ -424,8 +424,8 @@
        id="cover-crate-2-6-0-7"
        width="0.67799997"
        height="0.48899999"
-       x="-303.36401"
-       y="-51.605064"
+       x="-308.12659"
+       y="-53.192566"
        inkscape:label="model:med-kit"
        transform="rotate(-90)" />
     <rect
@@ -441,8 +441,8 @@
        id="cover-crate-2-1-7-4"
        width="0.51800001"
        height="0.48700002"
-       x="21.817226"
-       y="284.44702"
+       x="20.758892"
+       y="285.50537"
        inkscape:label="model:ammo-box" />
     <rect
        style="color:#000000;display:inline;overflow:visible;opacity:1;vector-effect:none;fill:#3e67f2;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:0.10959286px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
@@ -488,7 +488,7 @@
        transform="rotate(-90)" />
     <rect
        inkscape:label="model:alien-weapon-enh"
-       y="-23.763"
+       y="-24.292168"
        x="-281.25449"
        height="0.68981802"
        width="1.2512332"
@@ -501,93 +501,102 @@
        id="key"
        width="0.31569594"
        height="0.30141628"
-       x="-10.205551"
-       y="263.75439"
+       x="-7.3693695"
+       y="264.10028"
        inkscape:label="model:key-1"
        z="3.75" />
+    <rect
+       inkscape:label="model:szukalski-centerpiece"
+       y="-0.067941904"
+       x="-295.20215"
+       height="3"
+       width="3"
+       id="centerpiece"
+       style="color:#000000;display:inline;overflow:visible;opacity:1;vector-effect:none;fill:#3e67f2;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:0.65459722px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
+       z="0"
+       transform="rotate(-90)" />
   </g>
   <g
      inkscape:groupmode="layer"
      id="layer5"
      inkscape:label="spawn-points"
-     style="display:inline"
-     sodipodi:insensitive="true">
+     style="display:inline">
     <text
        xml:space="preserve"
        style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.27715683px;line-height:3.82514548px;font-family:C059;-inkscape-font-specification:C059;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.12650871px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
-       x="-3.7122028"
-       y="294.00589"
+       x="-6.8973246"
+       y="288.60504"
        id="text1818"><tspan
          sodipodi:role="line"
          id="tspan1816"
-         x="-3.7122028"
-         y="294.00589"
+         x="-6.8973246"
+         y="288.60504"
          style="fill:#f23e3e;fill-opacity:1;stroke-width:0.12650871px">x</tspan></text>
     <text
        xml:space="preserve"
        style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.27715683px;line-height:3.82514548px;font-family:C059;-inkscape-font-specification:C059;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.12650871px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
-       x="-3.7094235"
-       y="299.47238"
+       x="18.586428"
+       y="288.46292"
        id="text1818-2"><tspan
          sodipodi:role="line"
          id="tspan1816-0"
-         x="-3.7094235"
-         y="299.47238"
+         x="18.586428"
+         y="288.46292"
          style="fill:#f23e3e;fill-opacity:1;stroke-width:0.12650871px">x</tspan></text>
     <text
        xml:space="preserve"
        style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.27715683px;line-height:3.82514548px;font-family:C059;-inkscape-font-specification:C059;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.12650871px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
-       x="-1.4948293"
-       y="297.01743"
+       x="-1.6333128"
+       y="304.56479"
        id="text1818-6"><tspan
          sodipodi:role="line"
          id="tspan1816-1"
-         x="-1.4948293"
-         y="297.01743"
+         x="-1.6333128"
+         y="304.56479"
          style="fill:#f23e3e;fill-opacity:1;stroke-width:0.12650871px">x</tspan></text>
     <text
        xml:space="preserve"
        style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.27715683px;line-height:3.82514548px;font-family:C059;-inkscape-font-specification:C059;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.12650871px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
-       x="3.4888494"
-       y="295.3877"
+       x="17.752655"
+       y="295.59543"
        id="text1818-5"><tspan
          sodipodi:role="line"
          id="tspan1816-5"
-         x="3.4888494"
-         y="295.3877"
+         x="17.752655"
+         y="295.59543"
          style="fill:#f23e3e;fill-opacity:1;stroke-width:0.12650871px">x</tspan></text>
     <text
        xml:space="preserve"
        style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.27715683px;line-height:3.82514548px;font-family:C059;-inkscape-font-specification:C059;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.12650871px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
-       x="2.0764637"
-       y="298.95999"
+       x="5.8155198"
+       y="303.52994"
        id="text1818-4"><tspan
          sodipodi:role="line"
          id="tspan1816-7"
-         x="2.0764637"
-         y="298.95999"
+         x="5.8155198"
+         y="303.52994"
          style="fill:#f23e3e;fill-opacity:1;stroke-width:0.12650871px">x</tspan></text>
     <text
        xml:space="preserve"
        style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.27715683px;line-height:3.82514548px;font-family:C059;-inkscape-font-specification:C059;letter-spacing:0px;word-spacing:0px;display:inline;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.12650871px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
-       x="-4.308423"
-       y="303.15741"
+       x="-6.5241599"
+       y="304.81921"
        id="text1818-2-5"><tspan
          sodipodi:role="line"
          id="tspan1816-0-9"
-         x="-4.308423"
-         y="303.15741"
+         x="-6.5241599"
+         y="304.81921"
          style="fill:#f23e3e;fill-opacity:1;stroke-width:0.12650871px">x</tspan></text>
     <text
        xml:space="preserve"
        style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.27715683px;line-height:3.82514548px;font-family:C059;-inkscape-font-specification:C059;letter-spacing:0px;word-spacing:0px;display:inline;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.12650871px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
-       x="-11.917562"
-       y="295.68265"
+       x="-16.349035"
+       y="291.45889"
        id="text1818-2-7"><tspan
          sodipodi:role="line"
          id="tspan1816-0-7"
-         x="-11.917562"
-         y="295.68265"
+         x="-16.349035"
+         y="291.45889"
          style="fill:#f23e3e;fill-opacity:1;stroke-width:0.12650871px">x</tspan></text>
     <text
        xml:space="preserve"
@@ -614,13 +623,13 @@
     <text
        xml:space="preserve"
        style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.27715683px;line-height:3.82514548px;font-family:C059;-inkscape-font-specification:C059;letter-spacing:0px;word-spacing:0px;display:inline;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.12650871px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
-       x="-13.31542"
-       y="300.30478"
+       x="-14.561772"
+       y="302.86673"
        id="text1818-2-7-3"><tspan
          sodipodi:role="line"
          id="tspan1816-0-7-0"
-         x="-13.31542"
-         y="300.30478"
+         x="-14.561772"
+         y="302.86673"
          style="fill:#f23e3e;fill-opacity:1;stroke-width:0.12650871px">x</tspan></text>
     <text
        xml:space="preserve"
@@ -636,25 +645,64 @@
     <text
        xml:space="preserve"
        style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.27715683px;line-height:3.82514548px;font-family:C059;-inkscape-font-specification:C059;letter-spacing:0px;word-spacing:0px;display:inline;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.12650871px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
-       x="0.55552435"
-       y="291.03314"
+       x="2.0788434"
+       y="285.70154"
        id="text1818-2-7-44"><tspan
          sodipodi:role="line"
          id="tspan1816-0-7-7"
-         x="0.55552435"
-         y="291.03314"
+         x="2.0788434"
+         y="285.70154"
          style="fill:#f23e3e;fill-opacity:1;stroke-width:0.12650871px">x</tspan></text>
     <text
        xml:space="preserve"
        style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.27715683px;line-height:3.82514548px;font-family:C059;-inkscape-font-specification:C059;letter-spacing:0px;word-spacing:0px;display:inline;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.12650871px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
-       x="0.19049951"
-       y="301.61887"
+       x="13.484921"
+       y="302.31128"
        id="text1818-2-7-6"><tspan
          sodipodi:role="line"
          id="tspan1816-0-7-3"
-         x="0.19049951"
-         y="301.61887"
+         x="13.484921"
+         y="302.31128"
          style="fill:#f23e3e;fill-opacity:1;stroke-width:0.12650871px">x</tspan></text>
+  </g>
+  <g
+     inkscape:groupmode="layer"
+     id="layer-player-spawns"
+     inkscape:label="player-spawns"
+     style="display:inline">
+    <text
+       id="player-pad-5"
+       x="-3.593992"
+       y="298.77838"
+       style="font-size:3.17499995px;line-height:3.17499995px;stroke:#0000ff;stroke-width:0.26458332;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1">
+      <tspan
+         x="-3.593992"
+         y="298.77838"
+         style="font-size:3.17499995px;line-height:3.17499995px;fill:#f23e3e;stroke:#0000ff;stroke-width:0.26458332;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+         id="tspan21205">x</tspan>
+    </text>
+    <text
+       id="player-pad-5-6"
+       x="0.54065782"
+       y="298.77838"
+       style="font-size:3.17499995px;line-height:3.17499995px;display:inline;stroke:#0000ff;stroke-width:0.26458332;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1">
+      <tspan
+         x="0.54065782"
+         y="298.77838"
+         style="font-size:3.17499995px;line-height:3.17499995px;fill:#f23e3e;stroke:#0000ff;stroke-width:0.26458332;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+         id="tspan21205-4">x</tspan>
+    </text>
+    <text
+       id="player-pad-5-1"
+       x="4.6753078"
+       y="298.77838"
+       style="font-size:3.17499995px;line-height:3.17499995px;display:inline;stroke:#0000ff;stroke-width:0.26458332;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1">
+      <tspan
+         x="4.6753078"
+         y="298.77838"
+         style="font-size:3.17499995px;line-height:3.17499995px;fill:#f23e3e;stroke:#0000ff;stroke-width:0.26458332;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+         id="tspan21205-2">x</tspan>
+    </text>
   </g>
   <g
      inkscape:groupmode="layer"
@@ -665,102 +713,6 @@
      inkscape:groupmode="layer"
      id="layer2"
      inkscape:label="buildings">
-    <g
-       id="brutalist-building-3-bake"
-       data-model="brutalist-building-3-bake"
-       inkscape:label="model:brutalist-building-3-bake"
-       transform="matrix(0,29.999998,-29.999998,0,0.70265041,269.90783)"
-       style="opacity:1;vector-effect:none;fill:none;fill-opacity:1;stroke:#303030;stroke-width:0.01666667;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1">
-      <path
-         d="M -0.499176,0.330688 H 0.2 V 0.15 H 0.2883 V 0.137909 H 0.3 V -0.15 H 0.499634 V -0.331238 H 0 V 0.15 h -0.499176 z"
-         id="path2"
-         inkscape:connector-curvature="0"
-         style="vector-effect:none;fill:none;fill-opacity:1;fill-rule:evenodd;stroke:#303030;stroke-width:0.01666667;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1" />
-    </g>
-    <g
-       id="brutalist-building-3-bake-1"
-       data-model="brutalist-building-3-bake"
-       inkscape:label="model:brutalist-building-3-bake"
-       transform="matrix(-29.999998,0,0,-29.999998,50.267535,284.12445)"
-       style="opacity:1;vector-effect:none;fill:none;fill-opacity:1;stroke:#303030;stroke-width:0.01666667;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1">
-      <path
-         d="M -0.499176,0.330688 H 0.2 V 0.15 H 0.2883 V 0.137909 H 0.3 V -0.15 H 0.499634 V -0.331238 H 0 V 0.15 h -0.499176 z"
-         id="path2-0"
-         inkscape:connector-curvature="0"
-         style="vector-effect:none;fill:none;fill-opacity:1;fill-rule:evenodd;stroke:#303030;stroke-width:0.01666667;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1" />
-    </g>
-    <g
-       id="brutalist-building-3-bake-3"
-       data-model="brutalist-building-3-bake"
-       inkscape:label="model:brutalist-building-3-bake"
-       transform="matrix(-29.999998,0,0,-29.999998,23.324406,324.93014)"
-       style="opacity:1;vector-effect:none;fill:none;fill-opacity:1;stroke:#303030;stroke-width:0.01666667;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1">
-      <path
-         d="M -0.499176,0.330688 H 0.2 V 0.15 H 0.2883 V 0.137909 H 0.3 V -0.15 H 0.499634 V -0.331238 H 0 V 0.15 h -0.499176 z"
-         id="path2-4"
-         inkscape:connector-curvature="0"
-         style="vector-effect:none;fill:none;fill-opacity:1;fill-rule:evenodd;stroke:#303030;stroke-width:0.01666667;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1" />
-    </g>
-    <g
-       id="brutalist-building-1-cbake"
-       data-model="brutalist-building-1-cbake"
-       inkscape:label="model:brutalist-building-1-cbake"
-       transform="matrix(29.999998,0,0,29.999998,-31.588467,269.76747)"
-       style="opacity:1;vector-effect:none;fill:none;fill-opacity:1;stroke:#303030;stroke-width:0.01666667;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1">
-      <path
-         d="M -0.35,0.45 H -0.3 V 0.5 h 0.1 V 0.45 h 0.05 V 0.487854 H -0.1 V 0.45 h 0.088084 V 0.4 H -0.05 V 0.25 h 0.2 V 0.2 H 0.346893 V -0.1 H -0.05 v -0.399664 h -0.3 z"
-         id="path2-03"
-         inkscape:connector-curvature="0"
-         style="vector-effect:none;fill:none;fill-opacity:1;fill-rule:evenodd;stroke:#303030;stroke-width:0.01666667;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1" />
-    </g>
-    <g
-       id="brutalist-building-1-cbake-9"
-       data-model="brutalist-building-1-cbake"
-       inkscape:label="model:brutalist-building-1-cbake"
-       transform="matrix(0,-29.999998,29.999998,0,-40.881819,327.52212)"
-       style="opacity:1;vector-effect:none;fill:none;fill-opacity:1;stroke:#303030;stroke-width:0.01666667;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1">
-      <path
-         d="M -0.35,0.45 H -0.3 V 0.5 h 0.1 V 0.45 h 0.05 V 0.487854 H -0.1 V 0.45 h 0.088084 V 0.4 H -0.05 V 0.25 h 0.2 V 0.2 H 0.346893 V -0.1 H -0.05 v -0.399664 h -0.3 z"
-         id="path2-03-6"
-         inkscape:connector-curvature="0"
-         style="vector-effect:none;fill:none;fill-opacity:1;fill-rule:evenodd;stroke:#303030;stroke-width:0.01666667;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1" />
-    </g>
-    <g
-       id="brutalist-building-1-cbake-93"
-       data-model="brutalist-building-1-cbake"
-       inkscape:label="model:brutalist-building-1-cbake"
-       transform="matrix(-29.999998,0,0,-29.999998,-7.6641525,324.66218)"
-       style="opacity:1;vector-effect:none;fill:none;fill-opacity:1;stroke:#303030;stroke-width:0.01666667;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1">
-      <path
-         d="M -0.35,0.45 H -0.3 V 0.5 h 0.1 V 0.45 h 0.05 V 0.487854 H -0.1 V 0.45 h 0.088084 V 0.4 H -0.05 V 0.25 h 0.2 V 0.2 H 0.346893 V -0.1 H -0.05 v -0.399664 h -0.3 z"
-         id="path2-03-3"
-         inkscape:connector-curvature="0"
-         style="vector-effect:none;fill:none;fill-opacity:1;fill-rule:evenodd;stroke:#303030;stroke-width:0.01666667;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1" />
-    </g>
-    <g
-       id="brutalist-building-1-cbake-8"
-       data-model="brutalist-building-1-cbake"
-       inkscape:label="model:brutalist-building-1-cbake"
-       transform="matrix(0,-29.999998,29.999998,0,50.397806,324.03871)"
-       style="opacity:1;vector-effect:none;fill:none;fill-opacity:1;stroke:#303030;stroke-width:0.01666667;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1">
-      <path
-         d="M -0.35,0.45 H -0.3 V 0.5 h 0.1 V 0.45 h 0.05 V 0.487854 H -0.1 V 0.45 h 0.088084 V 0.4 H -0.05 V 0.25 h 0.2 V 0.2 H 0.346893 V -0.1 H -0.05 v -0.399664 h -0.3 z"
-         id="path2-03-0"
-         inkscape:connector-curvature="0"
-         style="vector-effect:none;fill:none;fill-opacity:1;fill-rule:evenodd;stroke:#303030;stroke-width:0.01666667;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1" />
-    </g>
-    <g
-       id="brutalist-building-3-bake-3-2"
-       data-model="brutalist-building-3-bake"
-       inkscape:label="model:brutalist-building-3-bake"
-       transform="matrix(0,-29.999998,29.999998,0,-49.825875,298.78412)"
-       style="opacity:1;vector-effect:none;fill:none;fill-opacity:1;stroke:#303030;stroke-width:0.01666667;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1">
-      <path
-         d="M -0.499176,0.330688 H 0.2 V 0.15 H 0.2883 V 0.137909 H 0.3 V -0.15 H 0.499634 V -0.331238 H 0 V 0.15 h -0.499176 z"
-         id="path2-4-6"
-         inkscape:connector-curvature="0"
-         style="vector-effect:none;fill:none;fill-opacity:1;fill-rule:evenodd;stroke:#303030;stroke-width:0.01666667;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1" />
-    </g>
     <g
        id="brutalist-building-2-cbake"
        data-model="brutalist-building-2-cbake"
@@ -797,6 +749,102 @@
          style="vector-effect:none;fill:none;fill-opacity:1;fill-rule:evenodd;stroke:#0000ff;stroke-width:0.00088194;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
          inkscape:connector-curvature="0" />
     </g>
+    <g
+       id="brutalist-building-1-cbake"
+       data-model="brutalist-building-1-cbake"
+       inkscape:label="model:brutalist-building-1-cbake"
+       transform="matrix(30.000001,0,0,30.000001,-32.912434,268.87709)"
+       style="fill:none;stroke:#000000;stroke-width:0.00088194;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1">
+      <path
+         d="m -0.35,0.45 h 0.3 V 0.2 H 0.344392 V -0.1 H -0.05 v -0.379762 h -0.3 z"
+         id="path2-5"
+         inkscape:connector-curvature="0"
+         style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:0.00088194;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1" />
+    </g>
+    <g
+       id="brutalist-building-1-cbake-0"
+       data-model="brutalist-building-1-cbake"
+       inkscape:label="model:brutalist-building-1-cbake"
+       transform="matrix(0,-30.000001,30.000001,0,-35.870532,325.34687)"
+       style="fill:none;stroke:#000000;stroke-width:0.00088194;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1">
+      <path
+         d="m -0.35,0.45 h 0.3 V 0.2 H 0.344392 V -0.1 H -0.05 v -0.379762 h -0.3 z"
+         id="path2-2"
+         inkscape:connector-curvature="0"
+         style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:0.00088194;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1" />
+    </g>
+    <g
+       id="brutalist-building-1-cbake-9"
+       data-model="brutalist-building-1-cbake"
+       inkscape:label="model:brutalist-building-1-cbake"
+       transform="matrix(-30.000001,0,0,-30.000001,-8.800191,322.0792)"
+       style="fill:none;stroke:#000000;stroke-width:0.00088194;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1">
+      <path
+         d="m -0.35,0.45 h 0.3 V 0.2 H 0.344392 V -0.1 H -0.05 v -0.379762 h -0.3 z"
+         id="path2-43"
+         inkscape:connector-curvature="0"
+         style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:0.00088194;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1" />
+    </g>
+    <g
+       id="brutalist-building-1-cbake-5"
+       data-model="brutalist-building-1-cbake"
+       inkscape:label="model:brutalist-building-1-cbake"
+       transform="matrix(0,-30.000001,30.000001,0,51.290177,325.20853)"
+       style="fill:none;stroke:#000000;stroke-width:0.00088194;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1">
+      <path
+         d="m -0.35,0.45 h 0.3 V 0.2 H 0.344392 V -0.1 H -0.05 v -0.379762 h -0.3 z"
+         id="path2-1"
+         inkscape:connector-curvature="0"
+         style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:0.00088194;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1" />
+    </g>
+    <g
+       id="brutalist-building-3-bake"
+       data-model="brutalist-building-3-bake"
+       inkscape:label="model:brutalist-building-3-bake"
+       transform="matrix(0,30.000001,-30.000001,0,3.3187532,270.14562)"
+       style="fill:none;stroke:#000000;stroke-width:0.00088194;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1">
+      <path
+         d="M -0.495692,0.325258 H 0.2 V 0.138389 H 0.25 V -0.15 H 0.496653 V -0.3 H 0.4 V -0.32998 H 0 V 0.15 h -0.495692 z"
+         id="path2"
+         inkscape:connector-curvature="0"
+         style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:0.00088194;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1" />
+    </g>
+    <g
+       id="brutalist-building-3-bake-7"
+       data-model="brutalist-building-3-bake"
+       inkscape:label="model:brutalist-building-3-bake"
+       transform="matrix(0,30.000001,-30.000001,0,-49.461899,297.33146)"
+       style="fill:none;stroke:#000000;stroke-width:0.00088194;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1">
+      <path
+         d="M -0.495692,0.325258 H 0.2 V 0.138389 H 0.25 V -0.15 H 0.496653 V -0.3 H 0.4 V -0.32998 H 0 V 0.15 h -0.495692 z"
+         id="path2-431"
+         inkscape:connector-curvature="0"
+         style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:0.00088194;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1" />
+    </g>
+    <g
+       id="brutalist-building-3-bake-4"
+       data-model="brutalist-building-3-bake"
+       inkscape:label="model:brutalist-building-3-bake"
+       transform="matrix(-30.000001,0,0,-30.000001,23.603146,323.5616)"
+       style="fill:none;stroke:#000000;stroke-width:0.00088194;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1">
+      <path
+         d="M -0.495692,0.325258 H 0.2 V 0.138389 H 0.25 V -0.15 H 0.496653 V -0.3 H 0.4 V -0.32998 H 0 V 0.15 h -0.495692 z"
+         id="path2-69"
+         inkscape:connector-curvature="0"
+         style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:0.00088194;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1" />
+    </g>
+    <g
+       id="brutalist-building-3-bake-4-4"
+       data-model="brutalist-building-3-bake"
+       inkscape:label="model:brutalist-building-3-bake"
+       transform="matrix(-30.000001,0,0,-30.000001,53.071767,284.68516)"
+       style="fill:none;stroke:#000000;stroke-width:0.00088194;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1">
+      <path
+         d="M -0.495692,0.325258 H 0.2 V 0.138389 H 0.25 V -0.15 H 0.496653 V -0.3 H 0.4 V -0.32998 H 0 V 0.15 h -0.495692 z"
+         id="path2-69-2"
+         inkscape:connector-curvature="0"
+         style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:0.00088194;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1" />
+    </g>
   </g>
   <g
      inkscape:groupmode="layer"
@@ -807,8 +855,8 @@
        id="door-1-1-9"
        width="0.49405965"
        height="1.8900341"
-       x="-9.3650703"
-       y="258.60059"
+       x="-6.6679597"
+       y="258.98621"
        data-building="brutalist-building-3-bake"
        model="door1.glb"
        inkscape:label="model:door-1" />
@@ -817,8 +865,8 @@
        id="door-1-1-9-22"
        width="0.49405965"
        height="1.8900341"
-       x="-9.2811813"
-       y="261.85687"
+       x="-6.7132077"
+       y="262.22263"
        data-building="brutalist-building-3-bake"
        model="door1.glb"
        inkscape:label="model:door-1"

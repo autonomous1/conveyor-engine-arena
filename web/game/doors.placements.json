@@ -7,9 +7,9 @@
       "model": "door-1",
       "type": "door",
       "position": [
-        -9.055092,
+        -6.43899,
         0,
-        36.509376
+        36.123756
       ],
       "yaw": 270,
       "hinge": "left",
@@ -25,9 +25,9 @@
       "model": "door-1",
       "type": "door",
       "position": [
-        -9.055092,
+        -6.43899,
         2.75,
-        33.253096
+        32.887336
       ],
       "yaw": 270,
       "hinge": "left",
@@ -41,13 +41,51 @@
       "key": "key"
     },
     {
-      "id": "brutalist-building-3-bake-1.door-1-1-9",
+      "id": "brutalist-building-3-bake-7.door-1-1-9",
       "model": "door-1",
       "type": "door",
       "position": [
-        59.684741,
+        -59.219642,
         0,
-        22.633292
+        8.937916
+      ],
+      "yaw": 270,
+      "hinge": "left",
+      "size": [
+        1.047216,
+        2.1,
+        0.08
+      ],
+      "open": false
+    },
+    {
+      "id": "brutalist-building-3-bake-7.door-1-1-9-22",
+      "model": "door-1",
+      "type": "door",
+      "position": [
+        -59.219642,
+        2.75,
+        5.701496
+      ],
+      "yaw": 270,
+      "hinge": "left",
+      "size": [
+        1.047216,
+        2.1,
+        0.08
+      ],
+      "open": false,
+      "locked": true,
+      "key": "key"
+    },
+    {
+      "id": "brutalist-building-3-bake-4.door-1-1-9",
+      "model": "door-1",
+      "type": "door",
+      "position": [
+        32.872522,
+        0,
+        -16.803857
       ],
       "yaw": 0,
       "hinge": "left",
@@ -59,13 +97,13 @@
       "open": false
     },
     {
-      "id": "brutalist-building-3-bake-1.door-1-1-9-22",
+      "id": "brutalist-building-3-bake-4.door-1-1-9-22",
       "model": "door-1",
       "type": "door",
       "position": [
-        56.428461,
+        29.636102,
         2.75,
-        22.633292
+        -16.803857
       ],
       "yaw": 0,
       "hinge": "left",
@@ -79,13 +117,13 @@
       "key": "key"
     },
     {
-      "id": "brutalist-building-3-bake-3.door-1-1-9",
+      "id": "brutalist-building-3-bake-4-4.door-1-1-9",
       "model": "door-1",
       "type": "door",
       "position": [
-        32.741612,
+        62.341143,
         0,
-        -18.172398
+        22.072583
       ],
       "yaw": 0,
       "hinge": "left",
@@ -97,53 +135,15 @@
       "open": false
     },
     {
-      "id": "brutalist-building-3-bake-3.door-1-1-9-22",
+      "id": "brutalist-building-3-bake-4-4.door-1-1-9-22",
       "model": "door-1",
       "type": "door",
       "position": [
-        29.485332,
+        59.104723,
         2.75,
-        -18.172398
+        22.072583
       ],
       "yaw": 0,
-      "hinge": "left",
-      "size": [
-        1.047216,
-        2.1,
-        0.08
-      ],
-      "open": false,
-      "locked": true,
-      "key": "key"
-    },
-    {
-      "id": "brutalist-building-3-bake-3-2.door-1-1-9",
-      "model": "door-1",
-      "type": "door",
-      "position": [
-        -40.068133,
-        0,
-        -11.201326
-      ],
-      "yaw": 90,
-      "hinge": "left",
-      "size": [
-        1.047216,
-        2.1,
-        0.08
-      ],
-      "open": false
-    },
-    {
-      "id": "brutalist-building-3-bake-3-2.door-1-1-9-22",
-      "model": "door-1",
-      "type": "door",
-      "position": [
-        -40.068133,
-        2.75,
-        -7.945046
-      ],
-      "yaw": 90,
       "hinge": "left",
       "size": [
         1.047216,

@@ -171,14 +171,15 @@ test("two players own different pawns and only their own input moves them", asyn
     assert.ok(Number.isFinite(bw.ownedEntityId));
     const startA = await waitPose(a.poses, aw.ownedEntityId);
     const startB = await waitPose(b.poses, bw.ownedEntityId);
-    const stopA = a.drive(1, 0, Math.PI / 2, aw.ownedEntityId);
+    // The first pad's east side is the next player, so this walk goes west.
+    const stopA = a.drive(-1, 0, -Math.PI / 2, aw.ownedEntityId);
     const stopB = b.drive(0, 0, Math.PI, bw.ownedEntityId);
     await new Promise((resolve) => setTimeout(resolve, 1500));
     const endA = a.poses.get(aw.ownedEntityId);
     const endB = b.poses.get(bw.ownedEntityId);
     assert.ok(endA);
     assert.ok(endB);
-    assert.ok(endA.x > startA.x + 1.5, `A ${startA.x} -> ${endA.x}`);
+    assert.ok(endA.x < startA.x - 1.5, `A ${startA.x} -> ${endA.x}`);
     const limit = view.pawnRadius;
     assert.ok(endA.x > view.bounds.minX + limit && endA.x < view.bounds.maxX - limit, `A x ${endA.x}`);
     assert.ok(endA.z > view.bounds.minZ + limit && endA.z < view.bounds.maxZ - limit, `A z ${endA.z}`);
@@ -203,7 +204,7 @@ test("a hello with no free pawn is refused", async () => {
   const open: WebSocket[] = [];
   try {
     const view = await (await fetch(host.url + "/arena.json")).json() as { world: string; bundleId: string; authoritativeHash: string };
-    const seats = loadArena().agents.length;
+    const seats = loadArena().agents.filter((agent) => agent.role === "player").length;
     const seated = [];
     for (let i = 0; i < seats; i++) {
       const client = hello(host.url, view);

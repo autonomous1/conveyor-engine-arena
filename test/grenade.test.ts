@@ -354,7 +354,7 @@ test("grenade code does not use Rapier or a kernel body", () => {
 });
 
 test("the other client sees the grenade travel and P does not send a laser", async () => {
-  const host = await startArenaServer(0);
+  const host = await startArenaServer(0, true);
   const opened: ReturnType<typeof openClient>[] = [];
   try {
     const view = await (await fetch(host.url + "/arena.json")).json() as {
@@ -367,8 +367,8 @@ test("the other client sees the grenade travel and P does not send a laser", asy
       aabbs: TraceAabb[];
     };
     assert.equal(view.grenade, "/assets/models/grenade-launched.glb");
-    // Own every pawn before the throw. A wanderer at 5 m/s can step into a 10 m arc.
-    const seats = loadArena().agents.length;
+    // Own every player pad. Unowned wander pawns are held so one cannot step into the arc.
+    const seats = loadArena().agents.filter((agent) => agent.role === "player").length;
     for (let n = 0; n < seats; n++) opened.push(openClient(host.url, view));
     const welcomes = await Promise.all(opened.map((client) => client.welcome));
     const owned: Array<{ client: ReturnType<typeof openClient>; id: number }> = [];

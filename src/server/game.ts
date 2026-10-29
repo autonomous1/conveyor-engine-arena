@@ -1,7 +1,7 @@
 import type { AuthoritativeWorld } from "conveyor-engine-world";
 import type { EngineWsServer } from "conveyor-engine-transport-ws";
 import type { Audit } from "../shared/audit.js";
-import { pickRespawnSpawn, type PawnHealth } from "../shared/health.js";
+import { pawnHitsBox, pickRespawnSpawn, type BlockPawn, type PawnHealth, type SpawnPick } from "../shared/health.js";
 import { moveIntent, yawFromQuat } from "../shared/look.js";
 import { approachYaw, commitShielded, enqueueOwnedMove, MOVE_DT, MOVEMENTS, movementIntent, yawQuaternion } from "../shared/movements.js";
 import { deliverAuditFrame } from "./audit.js";
@@ -120,6 +120,9 @@ export function startWanderLoop(
   audit?: Audit,
   onTick?: () => void,
   hostNoclip = false,
+  playerSpawns: readonly SpawnPick[] = [],
+  /** Unowned wander pawns stay on their pads. Tests use this so a bot cannot cross a shot or a stair. */
+  holdNpcs = false,
 ): () => void {
   const rng = splitMix(20260917);
   const snaps = hostSnapPath((clientId, envelope) => {
@@ -157,6 +160,7 @@ export function startWanderLoop(
         }
         continue;
       }
+      if (agent.role === "player" && !owned.has(agent.id)) continue;
       if (owned.has(agent.id)) {
         const cmd = held.get(agent.id);
         const moveX = cmd?.moveX ?? 0;
@@ -172,6 +176,7 @@ export function startWanderLoop(
         if (moved) agent.gait = moved.gait;
         continue;
       }
+      if (holdNpcs) continue;
       if (tick >= agent.nextTurn) {
         agent.heading += (unit01(rng) - 0.5) * Math.PI;
         let gait = MOVEMENTS[Math.floor(unit01(rng) * MOVEMENTS.length)] ?? "idle";
@@ -186,7 +191,7 @@ export function startWanderLoop(
       stepUnownedWander(world, agent);
     }
     if (health) {
-      for (const id of health.takeRespawns()) respawnPawn(world, agents, id);
+      for (const id of health.takeRespawns()) respawnPawn(world, agents, id, playerSpawns);
     }
     const snap = noclipIds.length > 0
       ? commitShielded(world, BigInt(tick), noclipIds)
@@ -223,31 +228,76 @@ export function startWanderLoop(
 }
 
 /** Move a pawn that just became alive onto a free spawn. The shot itself does not write a transform. */
-function respawnPawn(world: AuthoritativeWorld, agents: WanderAgent[], id: number): void {
+function respawnPawn(world: AuthoritativeWorld, agents: WanderAgent[], id: number, playerSpawns: readonly SpawnPick[]): void {
+  const agent = agents.find((item) => item.id === id);
+  if (agent) agent.gait = "idle";
+  const pads = agent?.role === "player" ? playerSpawns : world.listSpawnPoints();
+  const spawn = claimClearSpawn(world, id, pads);
+  const view = world.store.view(id);
+  if (!view || !spawn) {
+    world.enqueue({ kind: "setClip", entity: id, clip: "idle", speed: 0 });
+    return;
+  }
+  if (agent) agent.heading = spawn.yaw;
+  placePawn(world, id, spawn);
+  world.enqueue({ kind: "setClip", entity: id, clip: "idle", speed: 0 });
+}
+
+/**
+ * First player pad clear of obstacles and other pawns.
+ * `pending` is a pad already chosen for another pawn but not committed yet.
+ * A pad that is still blocked is left unused. Respawn keeps the "first pad anyway" fallback.
+ */
+export function claimClearSpawn(
+  world: AuthoritativeWorld,
+  id: number,
+  spawns: readonly SpawnPick[],
+  pending: ReadonlyMap<number, SpawnPick> = new Map(),
+): SpawnPick | undefined {
   const view = world.store.view(id);
   const radius = view && view.radius > 0 ? view.radius : 0.5;
   const height = Number.isFinite(world.pawnHeight) ? world.pawnHeight : 1.8;
-  const pawns = world.query().filter((entity) => entity.radius > 0).map((entity) => ({
+  const pawns: BlockPawn[] = world.query().filter((entity) => entity.radius > 0).map((entity) => ({
     id: entity.id,
     x: entity.position.x,
     y: entity.position.y,
     z: entity.position.z,
     radius: entity.radius,
   }));
-  const spawn = pickRespawnSpawn(world.listSpawnPoints(), {
+  for (const [entity, spawn] of pending) {
+    const body = world.store.view(entity);
+    pawns.push({
+      id: entity,
+      x: spawn.x,
+      y: spawn.y,
+      z: spawn.z,
+      radius: body && body.radius > 0 ? body.radius : radius,
+    });
+  }
+  const blockers = {
     self: id,
     radius,
     height,
     aabbs: world.listObstacles(),
     pawns,
-  });
-  const agent = agents.find((item) => item.id === id);
-  if (agent) agent.gait = "idle";
-  if (!view || !spawn) {
-    world.enqueue({ kind: "setClip", entity: id, clip: "idle", speed: 0 });
-    return;
+  };
+  const picked = pickRespawnSpawn(spawns, blockers);
+  if (!picked) return undefined;
+  if (blockers.aabbs.some((box) => pawnHitsBox(picked.x, picked.z, radius, picked.y, height, box))) return undefined;
+  for (const pawn of pawns) {
+    if (pawn.id === id) continue;
+    const dx = picked.x - pawn.x;
+    const dz = picked.z - pawn.z;
+    if (Math.abs(picked.y - pawn.y) >= height) continue;
+    const reach = radius + pawn.radius;
+    if (dx * dx + dz * dz < reach * reach) return undefined;
   }
-  if (agent) agent.heading = spawn.yaw;
+  return picked;
+}
+
+export function placePawn(world: AuthoritativeWorld, id: number, spawn: SpawnPick): void {
+  const view = world.store.view(id);
+  if (!view) return;
   world.enqueue({ kind: "clearInput", entity: id });
   world.enqueue({
     kind: "setTransform",
@@ -256,5 +306,17 @@ function respawnPawn(world: AuthoritativeWorld, agents: WanderAgent[], id: numbe
     rotation: yawQuaternion(spawn.yaw),
     scale: { x: view.scale.x, y: view.scale.y, z: view.scale.z },
   });
-  world.enqueue({ kind: "setClip", entity: id, clip: "idle", speed: 0 });
+}
+
+/** Replace the pawn mesh key. Ignored when `assetKey` is not one of `allowed`. */
+export function applyPawnModel(world: AuthoritativeWorld, id: number, assetKey: string | undefined, allowed: readonly string[]): void {
+  if (!assetKey || !allowed.includes(assetKey)) return;
+  const view = world.store.view(id);
+  const render = view?.render;
+  if (!render || render.assetKey === assetKey) return;
+  world.enqueue({
+    kind: "setLifecycle",
+    entity: id,
+    render: { ...render, assetKey },
+  });
 }

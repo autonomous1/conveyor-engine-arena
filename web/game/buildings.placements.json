@@ -3,102 +3,6 @@
   "units": "meters",
   "placements": [
     {
-      "id": "brutalist-building-3-bake",
-      "model": "brutalist-building-3-bake",
-      "type": "building",
-      "position": [
-        0.70265,
-        0,
-        27.09217
-      ],
-      "yaw": 90,
-      "scale": 29.999998
-    },
-    {
-      "id": "brutalist-building-3-bake-1",
-      "model": "brutalist-building-3-bake",
-      "type": "building",
-      "position": [
-        50.267535,
-        0,
-        12.87555
-      ],
-      "yaw": 180,
-      "scale": 29.999998
-    },
-    {
-      "id": "brutalist-building-3-bake-3",
-      "model": "brutalist-building-3-bake",
-      "type": "building",
-      "position": [
-        23.324406,
-        0,
-        -27.93014
-      ],
-      "yaw": 180,
-      "scale": 29.999998
-    },
-    {
-      "id": "brutalist-building-1-cbake",
-      "model": "brutalist-building-1-cbake",
-      "type": "building",
-      "position": [
-        -31.588467,
-        0,
-        27.23253
-      ],
-      "yaw": 0,
-      "scale": 29.999998
-    },
-    {
-      "id": "brutalist-building-1-cbake-9",
-      "model": "brutalist-building-1-cbake",
-      "type": "building",
-      "position": [
-        -40.881819,
-        0,
-        -30.52212
-      ],
-      "yaw": 270,
-      "scale": 29.999998
-    },
-    {
-      "id": "brutalist-building-1-cbake-93",
-      "model": "brutalist-building-1-cbake",
-      "type": "building",
-      "position": [
-        -7.664152,
-        0,
-        -27.66218
-      ],
-      "yaw": 180,
-      "scale": 29.999998
-    },
-    {
-      "id": "brutalist-building-1-cbake-8",
-      "model": "brutalist-building-1-cbake",
-      "type": "building",
-      "position": [
-        50.397806,
-        0,
-        -27.03871
-      ],
-      "yaw": 270,
-      "scale": 29.999998
-    },
-    {
-      "id": "brutalist-building-3-bake-3-2",
-      "model": "brutalist-building-3-bake",
-      "type": "building",
-      "position": [
-        -49.825875,
-        0,
-        -1.78412
-      ],
-      "yaw": 270,
-      "scale": 29.999998
-    },
-    {
       "id": "brutalist-building-2-cbake",
       "model": "brutalist-building-2-cbake",
       "type": "building",
@@ -133,3201 +37,105 @@
       ],
       "yaw": 90,
       "scale": 29.999998
+    },
+    {
+      "id": "brutalist-building-1-cbake",
+      "model": "brutalist-building-1-cbake",
+      "type": "building",
+      "position": [
+        -32.912434,
+        0,
+        28.12291
+      ],
+      "yaw": 0,
+      "scale": 30.000001
+    },
+    {
+      "id": "brutalist-building-1-cbake-0",
+      "model": "brutalist-building-1-cbake",
+      "type": "building",
+      "position": [
+        -35.870532,
+        0,
+        -28.34687
+      ],
+      "yaw": 270,
+      "scale": 30.000001
+    },
+    {
+      "id": "brutalist-building-1-cbake-9",
+      "model": "brutalist-building-1-cbake",
+      "type": "building",
+      "position": [
+        -8.800191,
+        0,
+        -25.0792
+      ],
+      "yaw": 180,
+      "scale": 30.000001
+    },
+    {
+      "id": "brutalist-building-1-cbake-5",
+      "model": "brutalist-building-1-cbake",
+      "type": "building",
+      "position": [
+        51.290177,
+        0,
+        -28.20853
+      ],
+      "yaw": 270,
+      "scale": 30.000001
+    },
+    {
+      "id": "brutalist-building-3-bake",
+      "model": "brutalist-building-3-bake",
+      "type": "building",
+      "position": [
+        3.318753,
+        0,
+        26.85438
+      ],
+      "yaw": 90,
+      "scale": 30.000001
+    },
+    {
+      "id": "brutalist-building-3-bake-7",
+      "model": "brutalist-building-3-bake",
+      "type": "building",
+      "position": [
+        -49.461899,
+        0,
+        -0.33146
+      ],
+      "yaw": 90,
+      "scale": 30.000001
+    },
+    {
+      "id": "brutalist-building-3-bake-4",
+      "model": "brutalist-building-3-bake",
+      "type": "building",
+      "position": [
+        23.603146,
+        0,
+        -26.5616
+      ],
+      "yaw": 180,
+      "scale": 30.000001
+    },
+    {
+      "id": "brutalist-building-3-bake-4-4",
+      "model": "brutalist-building-3-bake",
+      "type": "building",
+      "position": [
+        53.071767,
+        0,
+        12.31484
+      ],
+      "yaw": 180,
+      "scale": 30.000001
     }
   ],
   "obstacles": [
-    {
-      "id": "brutalist-building-3-bake-wall-0",
-      "kind": "aabb",
-      "min": [
-        -9.055092,
-        0,
-        26.09217
-      ],
-      "max": [
-        -3.29735,
-        7,
-        33.253096
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-wall-1",
-      "kind": "aabb",
-      "min": [
-        -9.055092,
-        0,
-        34.300312
-      ],
-      "max": [
-        -3.29735,
-        7,
-        36.509376
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-wall-2",
-      "kind": "aabb",
-      "min": [
-        -9.055092,
-        4.85,
-        33.253096
-      ],
-      "max": [
-        -7.055092,
-        7,
-        34.300312
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-wall-3",
-      "kind": "aabb",
-      "min": [
-        -9.055092,
-        0,
-        33.253096
-      ],
-      "max": [
-        -7.055092,
-        2.75,
-        34.300312
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-wall-4",
-      "kind": "aabb",
-      "min": [
-        -7.055092,
-        0,
-        33.253096
-      ],
-      "max": [
-        -3.29735,
-        7,
-        34.300312
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-wall-5",
-      "kind": "aabb",
-      "min": [
-        -9.055092,
-        0,
-        37.556592
-      ],
-      "max": [
-        -3.29735,
-        7,
-        41.962917
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-wall-6",
-      "kind": "aabb",
-      "min": [
-        -9.055092,
-        2.1,
-        36.509376
-      ],
-      "max": [
-        -7.055092,
-        7,
-        37.556592
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-wall-7",
-      "kind": "aabb",
-      "min": [
-        -7.055092,
-        0,
-        36.509376
-      ],
-      "max": [
-        -3.29735,
-        7,
-        37.556592
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-wall-8",
-      "kind": "aabb",
-      "min": [
-        -9.055092,
-        9.5,
-        26.09217
-      ],
-      "max": [
-        -3.29735,
-        16.384443,
-        41.962917
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-wall-9",
-      "kind": "aabb",
-      "min": [
-        -9.055092,
-        7,
-        23.09217
-      ],
-      "max": [
-        -3.29735,
-        9.5,
-        41.962917
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-wall-10",
-      "kind": "aabb",
-      "min": [
-        -9.055092,
-        0,
-        21.09217
-      ],
-      "max": [
-        -4.29735,
-        16.378939,
-        33.253096
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-wall-11",
-      "kind": "aabb",
-      "min": [
-        -9.055092,
-        0,
-        34.300312
-      ],
-      "max": [
-        -4.29735,
-        16.378939,
-        36.509376
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-wall-12",
-      "kind": "aabb",
-      "min": [
-        -9.055092,
-        4.85,
-        33.253096
-      ],
-      "max": [
-        -7.055092,
-        16.378939,
-        34.300312
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-wall-13",
-      "kind": "aabb",
-      "min": [
-        -9.055092,
-        0,
-        33.253096
-      ],
-      "max": [
-        -7.055092,
-        2.75,
-        34.300312
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-wall-14",
-      "kind": "aabb",
-      "min": [
-        -7.055092,
-        0,
-        33.253096
-      ],
-      "max": [
-        -4.29735,
-        16.378939,
-        34.300312
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-wall-15",
-      "kind": "aabb",
-      "min": [
-        -9.055092,
-        0,
-        37.556592
-      ],
-      "max": [
-        -4.29735,
-        16.378939,
-        41.962917
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-wall-16",
-      "kind": "aabb",
-      "min": [
-        -9.055092,
-        2.1,
-        36.509376
-      ],
-      "max": [
-        -7.055092,
-        16.378939,
-        37.556592
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-wall-17",
-      "kind": "aabb",
-      "min": [
-        -7.055092,
-        0,
-        36.509376
-      ],
-      "max": [
-        -4.29735,
-        16.378939,
-        37.556592
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-wall-18",
-      "kind": "aabb",
-      "min": [
-        -4.29735,
-        0,
-        20.09217
-      ],
-      "max": [
-        -3.29735,
-        16.384443,
-        41.962917
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-wall-19",
-      "kind": "aabb",
-      "min": [
-        4.70265,
-        0,
-        12.192591
-      ],
-      "max": [
-        10.602041,
-        7,
-        27.09217
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-wall-20",
-      "kind": "aabb",
-      "min": [
-        -3.29735,
-        0,
-        26.580715
-      ],
-      "max": [
-        -0.29735,
-        6.810669,
-        26.580715
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-wall-21",
-      "kind": "aabb",
-      "min": [
-        -0.29735,
-        0,
-        19.09217
-      ],
-      "max": [
-        0.70265,
-        7,
-        26.580715
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-wall-22",
-      "kind": "aabb",
-      "min": [
-        -0.29735,
-        9.5,
-        19.09217
-      ],
-      "max": [
-        0.70265,
-        16.384443,
-        26.580715
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-wall-23",
-      "kind": "aabb",
-      "min": [
-        1.70265,
-        0,
-        19.09217
-      ],
-      "max": [
-        2.70265,
-        7,
-        26.580715
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-wall-24",
-      "kind": "aabb",
-      "min": [
-        1.70265,
-        9.5,
-        19.09217
-      ],
-      "max": [
-        2.70265,
-        16.384443,
-        26.580715
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-wall-25",
-      "kind": "aabb",
-      "min": [
-        2.70265,
-        0.126087,
-        26.547249
-      ],
-      "max": [
-        4.70265,
-        6.821474,
-        26.571743
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-wall-26",
-      "kind": "aabb",
-      "min": [
-        4.70265,
-        12,
-        20.09217
-      ],
-      "max": [
-        5.70265,
-        14.608354,
-        26.571743
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-wall-27",
-      "kind": "aabb",
-      "min": [
-        4.70265,
-        9.5,
-        12.192591
-      ],
-      "max": [
-        5.70265,
-        12,
-        26.571743
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-wall-28",
-      "kind": "aabb",
-      "min": [
-        -9.055092,
-        9.5,
-        24.09217
-      ],
-      "max": [
-        5.70265,
-        12,
-        26.09217
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-wall-29",
-      "kind": "aabb",
-      "min": [
-        -9.055092,
-        15,
-        21.09217
-      ],
-      "max": [
-        2.70265,
-        16.384443,
-        26.09217
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-wall-30",
-      "kind": "aabb",
-      "min": [
-        -9.055092,
-        12,
-        21.09217
-      ],
-      "max": [
-        5.70265,
-        15,
-        26.09217
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-wall-31",
-      "kind": "aabb",
-      "min": [
-        -9.055092,
-        0,
-        21.09217
-      ],
-      "max": [
-        10.602041,
-        7,
-        26.09217
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-wall-32",
-      "kind": "aabb",
-      "min": [
-        -3.29735,
-        0,
-        19.09217
-      ],
-      "max": [
-        -0.29735,
-        7,
-        26.09217
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-wall-33",
-      "kind": "aabb",
-      "min": [
-        -3.29735,
-        9.5,
-        19.09217
-      ],
-      "max": [
-        -0.29735,
-        16.384443,
-        26.09217
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-wall-34",
-      "kind": "aabb",
-      "min": [
-        0.70265,
-        0,
-        19.09217
-      ],
-      "max": [
-        1.70265,
-        7,
-        26.09217
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-wall-35",
-      "kind": "aabb",
-      "min": [
-        0.70265,
-        9.5,
-        19.09217
-      ],
-      "max": [
-        1.70265,
-        16.384443,
-        26.09217
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-wall-36",
-      "kind": "aabb",
-      "min": [
-        2.70265,
-        12,
-        20.09217
-      ],
-      "max": [
-        4.70265,
-        14.608354,
-        26.09217
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-wall-37",
-      "kind": "aabb",
-      "min": [
-        2.70265,
-        0,
-        19.09217
-      ],
-      "max": [
-        4.70265,
-        7,
-        26.09217
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-wall-38",
-      "kind": "aabb",
-      "min": [
-        2.70265,
-        9.5,
-        19.09217
-      ],
-      "max": [
-        4.70265,
-        12,
-        26.09217
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-wall-39",
-      "kind": "aabb",
-      "min": [
-        -9.055092,
-        9.5,
-        21.09217
-      ],
-      "max": [
-        10.602041,
-        12,
-        24.09217
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-wall-40",
-      "kind": "aabb",
-      "min": [
-        4.70265,
-        7,
-        12.192591
-      ],
-      "max": [
-        10.602041,
-        9.5,
-        24.09217
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-wall-41",
-      "kind": "aabb",
-      "min": [
-        5.70265,
-        9.5,
-        12.192591
-      ],
-      "max": [
-        10.602041,
-        11.613191,
-        24.09217
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-wall-42",
-      "kind": "aabb",
-      "min": [
-        -9.055092,
-        7,
-        21.09217
-      ],
-      "max": [
-        10.602041,
-        9.5,
-        23.09217
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-wall-43",
-      "kind": "aabb",
-      "min": [
-        -3.29735,
-        7,
-        19.09217
-      ],
-      "max": [
-        4.70265,
-        9.5,
-        23.09217
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-wall-44",
-      "kind": "aabb",
-      "min": [
-        -4.29735,
-        15,
-        20.09217
-      ],
-      "max": [
-        2.70265,
-        16.384443,
-        21.09217
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-wall-45",
-      "kind": "aabb",
-      "min": [
-        -4.29735,
-        12,
-        20.09217
-      ],
-      "max": [
-        5.70265,
-        15,
-        21.09217
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-wall-46",
-      "kind": "aabb",
-      "min": [
-        -4.29735,
-        0,
-        20.09217
-      ],
-      "max": [
-        10.602041,
-        12,
-        21.09217
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-wall-47",
-      "kind": "aabb",
-      "min": [
-        -3.29735,
-        12,
-        19.09217
-      ],
-      "max": [
-        2.70265,
-        16.384443,
-        20.09217
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-wall-48",
-      "kind": "aabb",
-      "min": [
-        -3.29735,
-        0,
-        19.09217
-      ],
-      "max": [
-        10.602041,
-        12,
-        20.09217
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-wall-49",
-      "kind": "aabb",
-      "min": [
-        4.70265,
-        9.5,
-        12.192591
-      ],
-      "max": [
-        10.602041,
-        11.613191,
-        19.09217
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-1-wall-0",
-      "kind": "aabb",
-      "min": [
-        49.267535,
-        0,
-        16.87555
-      ],
-      "max": [
-        56.428461,
-        7,
-        22.633292
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-1-wall-1",
-      "kind": "aabb",
-      "min": [
-        57.475677,
-        0,
-        16.87555
-      ],
-      "max": [
-        59.684741,
-        7,
-        22.633292
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-1-wall-2",
-      "kind": "aabb",
-      "min": [
-        56.428461,
-        4.85,
-        20.633292
-      ],
-      "max": [
-        57.475677,
-        7,
-        22.633292
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-1-wall-3",
-      "kind": "aabb",
-      "min": [
-        56.428461,
-        0,
-        20.633292
-      ],
-      "max": [
-        57.475677,
-        2.75,
-        22.633292
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-1-wall-4",
-      "kind": "aabb",
-      "min": [
-        56.428461,
-        0,
-        16.87555
-      ],
-      "max": [
-        57.475677,
-        7,
-        20.633292
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-1-wall-5",
-      "kind": "aabb",
-      "min": [
-        60.731957,
-        0,
-        16.87555
-      ],
-      "max": [
-        65.138282,
-        7,
-        22.633292
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-1-wall-6",
-      "kind": "aabb",
-      "min": [
-        59.684741,
-        2.1,
-        20.633292
-      ],
-      "max": [
-        60.731957,
-        7,
-        22.633292
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-1-wall-7",
-      "kind": "aabb",
-      "min": [
-        59.684741,
-        0,
-        16.87555
-      ],
-      "max": [
-        60.731957,
-        7,
-        20.633292
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-1-wall-8",
-      "kind": "aabb",
-      "min": [
-        49.267535,
-        9.5,
-        16.87555
-      ],
-      "max": [
-        65.138282,
-        16.384443,
-        22.633292
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-1-wall-9",
-      "kind": "aabb",
-      "min": [
-        46.267535,
-        7,
-        16.87555
-      ],
-      "max": [
-        65.138282,
-        9.5,
-        22.633292
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-1-wall-10",
-      "kind": "aabb",
-      "min": [
-        44.267535,
-        0,
-        17.87555
-      ],
-      "max": [
-        56.428461,
-        16.378939,
-        22.633292
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-1-wall-11",
-      "kind": "aabb",
-      "min": [
-        57.475677,
-        0,
-        17.87555
-      ],
-      "max": [
-        59.684741,
-        16.378939,
-        22.633292
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-1-wall-12",
-      "kind": "aabb",
-      "min": [
-        56.428461,
-        4.85,
-        20.633292
-      ],
-      "max": [
-        57.475677,
-        16.378939,
-        22.633292
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-1-wall-13",
-      "kind": "aabb",
-      "min": [
-        56.428461,
-        0,
-        20.633292
-      ],
-      "max": [
-        57.475677,
-        2.75,
-        22.633292
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-1-wall-14",
-      "kind": "aabb",
-      "min": [
-        56.428461,
-        0,
-        17.87555
-      ],
-      "max": [
-        57.475677,
-        16.378939,
-        20.633292
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-1-wall-15",
-      "kind": "aabb",
-      "min": [
-        60.731957,
-        0,
-        17.87555
-      ],
-      "max": [
-        65.138282,
-        16.378939,
-        22.633292
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-1-wall-16",
-      "kind": "aabb",
-      "min": [
-        59.684741,
-        2.1,
-        20.633292
-      ],
-      "max": [
-        60.731957,
-        16.378939,
-        22.633292
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-1-wall-17",
-      "kind": "aabb",
-      "min": [
-        59.684741,
-        0,
-        17.87555
-      ],
-      "max": [
-        60.731957,
-        16.378939,
-        20.633292
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-1-wall-18",
-      "kind": "aabb",
-      "min": [
-        43.267535,
-        0,
-        16.87555
-      ],
-      "max": [
-        65.138282,
-        16.384443,
-        17.87555
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-1-wall-19",
-      "kind": "aabb",
-      "min": [
-        35.367956,
-        0,
-        2.976159
-      ],
-      "max": [
-        50.267535,
-        7,
-        8.87555
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-1-wall-20",
-      "kind": "aabb",
-      "min": [
-        49.75608,
-        0,
-        13.87555
-      ],
-      "max": [
-        49.75608,
-        6.810669,
-        16.87555
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-1-wall-21",
-      "kind": "aabb",
-      "min": [
-        42.267535,
-        0,
-        12.87555
-      ],
-      "max": [
-        49.75608,
-        7,
-        13.87555
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-1-wall-22",
-      "kind": "aabb",
-      "min": [
-        42.267535,
-        9.5,
-        12.87555
-      ],
-      "max": [
-        49.75608,
-        16.384443,
-        13.87555
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-1-wall-23",
-      "kind": "aabb",
-      "min": [
-        42.267535,
-        0,
-        10.87555
-      ],
-      "max": [
-        49.75608,
-        7,
-        11.87555
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-1-wall-24",
-      "kind": "aabb",
-      "min": [
-        42.267535,
-        9.5,
-        10.87555
-      ],
-      "max": [
-        49.75608,
-        16.384443,
-        11.87555
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-1-wall-25",
-      "kind": "aabb",
-      "min": [
-        49.722614,
-        0.126087,
-        8.87555
-      ],
-      "max": [
-        49.747108,
-        6.821474,
-        10.87555
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-1-wall-26",
-      "kind": "aabb",
-      "min": [
-        43.267535,
-        12,
-        7.87555
-      ],
-      "max": [
-        49.747108,
-        14.608354,
-        8.87555
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-1-wall-27",
-      "kind": "aabb",
-      "min": [
-        35.367956,
-        9.5,
-        7.87555
-      ],
-      "max": [
-        49.747108,
-        12,
-        8.87555
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-1-wall-28",
-      "kind": "aabb",
-      "min": [
-        47.267535,
-        9.5,
-        7.87555
-      ],
-      "max": [
-        49.267535,
-        12,
-        22.633292
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-1-wall-29",
-      "kind": "aabb",
-      "min": [
-        44.267535,
-        15,
-        10.87555
-      ],
-      "max": [
-        49.267535,
-        16.384443,
-        22.633292
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-1-wall-30",
-      "kind": "aabb",
-      "min": [
-        44.267535,
-        12,
-        7.87555
-      ],
-      "max": [
-        49.267535,
-        15,
-        22.633292
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-1-wall-31",
-      "kind": "aabb",
-      "min": [
-        44.267535,
-        0,
-        2.976159
-      ],
-      "max": [
-        49.267535,
-        7,
-        22.633292
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-1-wall-32",
-      "kind": "aabb",
-      "min": [
-        42.267535,
-        0,
-        13.87555
-      ],
-      "max": [
-        49.267535,
-        7,
-        16.87555
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-1-wall-33",
-      "kind": "aabb",
-      "min": [
-        42.267535,
-        9.5,
-        13.87555
-      ],
-      "max": [
-        49.267535,
-        16.384443,
-        16.87555
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-1-wall-34",
-      "kind": "aabb",
-      "min": [
-        42.267535,
-        0,
-        11.87555
-      ],
-      "max": [
-        49.267535,
-        7,
-        12.87555
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-1-wall-35",
-      "kind": "aabb",
-      "min": [
-        42.267535,
-        9.5,
-        11.87555
-      ],
-      "max": [
-        49.267535,
-        16.384443,
-        12.87555
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-1-wall-36",
-      "kind": "aabb",
-      "min": [
-        43.267535,
-        12,
-        8.87555
-      ],
-      "max": [
-        49.267535,
-        14.608354,
-        10.87555
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-1-wall-37",
-      "kind": "aabb",
-      "min": [
-        42.267535,
-        0,
-        8.87555
-      ],
-      "max": [
-        49.267535,
-        7,
-        10.87555
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-1-wall-38",
-      "kind": "aabb",
-      "min": [
-        42.267535,
-        9.5,
-        8.87555
-      ],
-      "max": [
-        49.267535,
-        12,
-        10.87555
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-1-wall-39",
-      "kind": "aabb",
-      "min": [
-        44.267535,
-        9.5,
-        2.976159
-      ],
-      "max": [
-        47.267535,
-        12,
-        22.633292
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-1-wall-40",
-      "kind": "aabb",
-      "min": [
-        35.367956,
-        7,
-        2.976159
-      ],
-      "max": [
-        47.267535,
-        9.5,
-        8.87555
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-1-wall-41",
-      "kind": "aabb",
-      "min": [
-        35.367956,
-        9.5,
-        2.976159
-      ],
-      "max": [
-        47.267535,
-        11.613191,
-        7.87555
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-1-wall-42",
-      "kind": "aabb",
-      "min": [
-        44.267535,
-        7,
-        2.976159
-      ],
-      "max": [
-        46.267535,
-        9.5,
-        22.633292
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-1-wall-43",
-      "kind": "aabb",
-      "min": [
-        42.267535,
-        7,
-        8.87555
-      ],
-      "max": [
-        46.267535,
-        9.5,
-        16.87555
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-1-wall-44",
-      "kind": "aabb",
-      "min": [
-        43.267535,
-        15,
-        10.87555
-      ],
-      "max": [
-        44.267535,
-        16.384443,
-        17.87555
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-1-wall-45",
-      "kind": "aabb",
-      "min": [
-        43.267535,
-        12,
-        7.87555
-      ],
-      "max": [
-        44.267535,
-        15,
-        17.87555
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-1-wall-46",
-      "kind": "aabb",
-      "min": [
-        43.267535,
-        0,
-        2.976159
-      ],
-      "max": [
-        44.267535,
-        12,
-        17.87555
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-1-wall-47",
-      "kind": "aabb",
-      "min": [
-        42.267535,
-        12,
-        10.87555
-      ],
-      "max": [
-        43.267535,
-        16.384443,
-        16.87555
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-1-wall-48",
-      "kind": "aabb",
-      "min": [
-        42.267535,
-        0,
-        2.976159
-      ],
-      "max": [
-        43.267535,
-        12,
-        16.87555
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-1-wall-49",
-      "kind": "aabb",
-      "min": [
-        35.367956,
-        9.5,
-        2.976159
-      ],
-      "max": [
-        42.267535,
-        11.613191,
-        8.87555
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-wall-0",
-      "kind": "aabb",
-      "min": [
-        22.324406,
-        0,
-        -23.93014
-      ],
-      "max": [
-        29.485332,
-        7,
-        -18.172398
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-wall-1",
-      "kind": "aabb",
-      "min": [
-        30.532548,
-        0,
-        -23.93014
-      ],
-      "max": [
-        32.741612,
-        7,
-        -18.172398
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-wall-2",
-      "kind": "aabb",
-      "min": [
-        29.485332,
-        4.85,
-        -20.172398
-      ],
-      "max": [
-        30.532548,
-        7,
-        -18.172398
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-wall-3",
-      "kind": "aabb",
-      "min": [
-        29.485332,
-        0,
-        -20.172398
-      ],
-      "max": [
-        30.532548,
-        2.75,
-        -18.172398
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-wall-4",
-      "kind": "aabb",
-      "min": [
-        29.485332,
-        0,
-        -23.93014
-      ],
-      "max": [
-        30.532548,
-        7,
-        -20.172398
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-wall-5",
-      "kind": "aabb",
-      "min": [
-        33.788828,
-        0,
-        -23.93014
-      ],
-      "max": [
-        38.195153,
-        7,
-        -18.172398
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-wall-6",
-      "kind": "aabb",
-      "min": [
-        32.741612,
-        2.1,
-        -20.172398
-      ],
-      "max": [
-        33.788828,
-        7,
-        -18.172398
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-wall-7",
-      "kind": "aabb",
-      "min": [
-        32.741612,
-        0,
-        -23.93014
-      ],
-      "max": [
-        33.788828,
-        7,
-        -20.172398
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-wall-8",
-      "kind": "aabb",
-      "min": [
-        22.324406,
-        9.5,
-        -23.93014
-      ],
-      "max": [
-        38.195153,
-        16.384443,
-        -18.172398
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-wall-9",
-      "kind": "aabb",
-      "min": [
-        19.324406,
-        7,
-        -23.93014
-      ],
-      "max": [
-        38.195153,
-        9.5,
-        -18.172398
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-wall-10",
-      "kind": "aabb",
-      "min": [
-        17.324406,
-        0,
-        -22.93014
-      ],
-      "max": [
-        29.485332,
-        16.378939,
-        -18.172398
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-wall-11",
-      "kind": "aabb",
-      "min": [
-        30.532548,
-        0,
-        -22.93014
-      ],
-      "max": [
-        32.741612,
-        16.378939,
-        -18.172398
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-wall-12",
-      "kind": "aabb",
-      "min": [
-        29.485332,
-        4.85,
-        -20.172398
-      ],
-      "max": [
-        30.532548,
-        16.378939,
-        -18.172398
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-wall-13",
-      "kind": "aabb",
-      "min": [
-        29.485332,
-        0,
-        -20.172398
-      ],
-      "max": [
-        30.532548,
-        2.75,
-        -18.172398
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-wall-14",
-      "kind": "aabb",
-      "min": [
-        29.485332,
-        0,
-        -22.93014
-      ],
-      "max": [
-        30.532548,
-        16.378939,
-        -20.172398
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-wall-15",
-      "kind": "aabb",
-      "min": [
-        33.788828,
-        0,
-        -22.93014
-      ],
-      "max": [
-        38.195153,
-        16.378939,
-        -18.172398
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-wall-16",
-      "kind": "aabb",
-      "min": [
-        32.741612,
-        2.1,
-        -20.172398
-      ],
-      "max": [
-        33.788828,
-        16.378939,
-        -18.172398
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-wall-17",
-      "kind": "aabb",
-      "min": [
-        32.741612,
-        0,
-        -22.93014
-      ],
-      "max": [
-        33.788828,
-        16.378939,
-        -20.172398
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-wall-18",
-      "kind": "aabb",
-      "min": [
-        16.324406,
-        0,
-        -23.93014
-      ],
-      "max": [
-        38.195153,
-        16.384443,
-        -22.93014
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-wall-19",
-      "kind": "aabb",
-      "min": [
-        8.424827,
-        0,
-        -37.829531
-      ],
-      "max": [
-        23.324406,
-        7,
-        -31.93014
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-wall-20",
-      "kind": "aabb",
-      "min": [
-        22.812951,
-        0,
-        -26.93014
-      ],
-      "max": [
-        22.812951,
-        6.810669,
-        -23.93014
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-wall-21",
-      "kind": "aabb",
-      "min": [
-        15.324406,
-        0,
-        -27.93014
-      ],
-      "max": [
-        22.812951,
-        7,
-        -26.93014
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-wall-22",
-      "kind": "aabb",
-      "min": [
-        15.324406,
-        9.5,
-        -27.93014
-      ],
-      "max": [
-        22.812951,
-        16.384443,
-        -26.93014
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-wall-23",
-      "kind": "aabb",
-      "min": [
-        15.324406,
-        0,
-        -29.93014
-      ],
-      "max": [
-        22.812951,
-        7,
-        -28.93014
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-wall-24",
-      "kind": "aabb",
-      "min": [
-        15.324406,
-        9.5,
-        -29.93014
-      ],
-      "max": [
-        22.812951,
-        16.384443,
-        -28.93014
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-wall-25",
-      "kind": "aabb",
-      "min": [
-        22.779485,
-        0.126087,
-        -31.93014
-      ],
-      "max": [
-        22.803979,
-        6.821474,
-        -29.93014
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-wall-26",
-      "kind": "aabb",
-      "min": [
-        16.324406,
-        12,
-        -32.93014
-      ],
-      "max": [
-        22.803979,
-        14.608354,
-        -31.93014
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-wall-27",
-      "kind": "aabb",
-      "min": [
-        8.424827,
-        9.5,
-        -32.93014
-      ],
-      "max": [
-        22.803979,
-        12,
-        -31.93014
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-wall-28",
-      "kind": "aabb",
-      "min": [
-        20.324406,
-        9.5,
-        -32.93014
-      ],
-      "max": [
-        22.324406,
-        12,
-        -18.172398
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-wall-29",
-      "kind": "aabb",
-      "min": [
-        17.324406,
-        15,
-        -29.93014
-      ],
-      "max": [
-        22.324406,
-        16.384443,
-        -18.172398
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-wall-30",
-      "kind": "aabb",
-      "min": [
-        17.324406,
-        12,
-        -32.93014
-      ],
-      "max": [
-        22.324406,
-        15,
-        -18.172398
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-wall-31",
-      "kind": "aabb",
-      "min": [
-        17.324406,
-        0,
-        -37.829531
-      ],
-      "max": [
-        22.324406,
-        7,
-        -18.172398
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-wall-32",
-      "kind": "aabb",
-      "min": [
-        15.324406,
-        0,
-        -26.93014
-      ],
-      "max": [
-        22.324406,
-        7,
-        -23.93014
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-wall-33",
-      "kind": "aabb",
-      "min": [
-        15.324406,
-        9.5,
-        -26.93014
-      ],
-      "max": [
-        22.324406,
-        16.384443,
-        -23.93014
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-wall-34",
-      "kind": "aabb",
-      "min": [
-        15.324406,
-        0,
-        -28.93014
-      ],
-      "max": [
-        22.324406,
-        7,
-        -27.93014
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-wall-35",
-      "kind": "aabb",
-      "min": [
-        15.324406,
-        9.5,
-        -28.93014
-      ],
-      "max": [
-        22.324406,
-        16.384443,
-        -27.93014
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-wall-36",
-      "kind": "aabb",
-      "min": [
-        16.324406,
-        12,
-        -31.93014
-      ],
-      "max": [
-        22.324406,
-        14.608354,
-        -29.93014
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-wall-37",
-      "kind": "aabb",
-      "min": [
-        15.324406,
-        0,
-        -31.93014
-      ],
-      "max": [
-        22.324406,
-        7,
-        -29.93014
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-wall-38",
-      "kind": "aabb",
-      "min": [
-        15.324406,
-        9.5,
-        -31.93014
-      ],
-      "max": [
-        22.324406,
-        12,
-        -29.93014
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-wall-39",
-      "kind": "aabb",
-      "min": [
-        17.324406,
-        9.5,
-        -37.829531
-      ],
-      "max": [
-        20.324406,
-        12,
-        -18.172398
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-wall-40",
-      "kind": "aabb",
-      "min": [
-        8.424827,
-        7,
-        -37.829531
-      ],
-      "max": [
-        20.324406,
-        9.5,
-        -31.93014
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-wall-41",
-      "kind": "aabb",
-      "min": [
-        8.424827,
-        9.5,
-        -37.829531
-      ],
-      "max": [
-        20.324406,
-        11.613191,
-        -32.93014
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-wall-42",
-      "kind": "aabb",
-      "min": [
-        17.324406,
-        7,
-        -37.829531
-      ],
-      "max": [
-        19.324406,
-        9.5,
-        -18.172398
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-wall-43",
-      "kind": "aabb",
-      "min": [
-        15.324406,
-        7,
-        -31.93014
-      ],
-      "max": [
-        19.324406,
-        9.5,
-        -23.93014
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-wall-44",
-      "kind": "aabb",
-      "min": [
-        16.324406,
-        15,
-        -29.93014
-      ],
-      "max": [
-        17.324406,
-        16.384443,
-        -22.93014
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-wall-45",
-      "kind": "aabb",
-      "min": [
-        16.324406,
-        12,
-        -32.93014
-      ],
-      "max": [
-        17.324406,
-        15,
-        -22.93014
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-wall-46",
-      "kind": "aabb",
-      "min": [
-        16.324406,
-        0,
-        -37.829531
-      ],
-      "max": [
-        17.324406,
-        12,
-        -22.93014
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-wall-47",
-      "kind": "aabb",
-      "min": [
-        15.324406,
-        12,
-        -29.93014
-      ],
-      "max": [
-        16.324406,
-        16.384443,
-        -23.93014
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-wall-48",
-      "kind": "aabb",
-      "min": [
-        15.324406,
-        0,
-        -37.829531
-      ],
-      "max": [
-        16.324406,
-        12,
-        -23.93014
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-wall-49",
-      "kind": "aabb",
-      "min": [
-        8.424827,
-        9.5,
-        -37.829531
-      ],
-      "max": [
-        15.324406,
-        11.613191,
-        -31.93014
-      ]
-    },
-    {
-      "id": "brutalist-building-1-cbake-wall-0",
-      "kind": "aabb",
-      "min": [
-        -42.384693,
-        0,
-        13.592493
-      ],
-      "max": [
-        -42.088467,
-        15.934345,
-        41.62539
-      ]
-    },
-    {
-      "id": "brutalist-building-1-cbake-wall-1",
-      "kind": "aabb",
-      "min": [
-        -42.384693,
-        0,
-        13.73253
-      ],
-      "max": [
-        -33.588467,
-        15.934345,
-        21.73253
-      ]
-    },
-    {
-      "id": "brutalist-building-1-cbake-wall-2",
-      "kind": "aabb",
-      "min": [
-        -42.384693,
-        0,
-        21.73253
-      ],
-      "max": [
-        -21.256705,
-        16,
-        30.23253
-      ]
-    },
-    {
-      "id": "brutalist-building-1-cbake-wall-3",
-      "kind": "aabb",
-      "min": [
-        -42.384693,
-        0,
-        30.23253
-      ],
-      "max": [
-        -33.588467,
-        15.934345,
-        41.62539
-      ]
-    },
-    {
-      "id": "brutalist-building-1-cbake-wall-4",
-      "kind": "aabb",
-      "min": [
-        -42.088467,
-        0,
-        13.592493
-      ],
-      "max": [
-        -33.503769,
-        15.934345,
-        13.73253
-      ]
-    },
-    {
-      "id": "brutalist-building-1-cbake-wall-5",
-      "kind": "aabb",
-      "min": [
-        -42.088467,
-        0,
-        13.73253
-      ],
-      "max": [
-        -33.588467,
-        16,
-        41.62539
-      ]
-    },
-    {
-      "id": "brutalist-building-1-cbake-wall-6",
-      "kind": "aabb",
-      "min": [
-        -37.511316,
-        16,
-        21.73253
-      ],
-      "max": [
-        -21.256705,
-        28.966663,
-        30.23253
-      ]
-    },
-    {
-      "id": "brutalist-building-1-cbake-9-wall-0",
-      "kind": "aabb",
-      "min": [
-        -55.274679,
-        0,
-        -41.318346
-      ],
-      "max": [
-        -27.241782,
-        15.934345,
-        -41.02212
-      ]
-    },
-    {
-      "id": "brutalist-building-1-cbake-9-wall-1",
-      "kind": "aabb",
-      "min": [
-        -35.381819,
-        0,
-        -41.318346
-      ],
-      "max": [
-        -27.381819,
-        15.934345,
-        -32.52212
-      ]
-    },
-    {
-      "id": "brutalist-building-1-cbake-9-wall-2",
-      "kind": "aabb",
-      "min": [
-        -43.881819,
-        0,
-        -41.318346
-      ],
-      "max": [
-        -35.381819,
-        16,
-        -20.190358
-      ]
-    },
-    {
-      "id": "brutalist-building-1-cbake-9-wall-3",
-      "kind": "aabb",
-      "min": [
-        -55.274679,
-        0,
-        -41.318346
-      ],
-      "max": [
-        -43.881819,
-        15.934345,
-        -32.52212
-      ]
-    },
-    {
-      "id": "brutalist-building-1-cbake-9-wall-4",
-      "kind": "aabb",
-      "min": [
-        -27.381819,
-        0,
-        -41.02212
-      ],
-      "max": [
-        -27.241782,
-        15.934345,
-        -32.437422
-      ]
-    },
-    {
-      "id": "brutalist-building-1-cbake-9-wall-5",
-      "kind": "aabb",
-      "min": [
-        -55.274679,
-        0,
-        -41.02212
-      ],
-      "max": [
-        -27.381819,
-        16,
-        -32.52212
-      ]
-    },
-    {
-      "id": "brutalist-building-1-cbake-9-wall-6",
-      "kind": "aabb",
-      "min": [
-        -43.881819,
-        16,
-        -36.444969
-      ],
-      "max": [
-        -35.381819,
-        28.966663,
-        -20.190358
-      ]
-    },
-    {
-      "id": "brutalist-building-1-cbake-93-wall-0",
-      "kind": "aabb",
-      "min": [
-        2.835848,
-        0,
-        -42.05504
-      ],
-      "max": [
-        3.132074,
-        15.934345,
-        -14.022143
-      ]
-    },
-    {
-      "id": "brutalist-building-1-cbake-93-wall-1",
-      "kind": "aabb",
-      "min": [
-        -5.664152,
-        0,
-        -22.16218
-      ],
-      "max": [
-        3.132074,
-        15.934345,
-        -14.16218
-      ]
-    },
-    {
-      "id": "brutalist-building-1-cbake-93-wall-2",
-      "kind": "aabb",
-      "min": [
-        -17.995914,
-        0,
-        -30.66218
-      ],
-      "max": [
-        3.132074,
-        16,
-        -22.16218
-      ]
-    },
-    {
-      "id": "brutalist-building-1-cbake-93-wall-3",
-      "kind": "aabb",
-      "min": [
-        -5.664152,
-        0,
-        -42.05504
-      ],
-      "max": [
-        3.132074,
-        15.934345,
-        -30.66218
-      ]
-    },
-    {
-      "id": "brutalist-building-1-cbake-93-wall-4",
-      "kind": "aabb",
-      "min": [
-        -5.74885,
-        0,
-        -14.16218
-      ],
-      "max": [
-        2.835848,
-        15.934345,
-        -14.022143
-      ]
-    },
-    {
-      "id": "brutalist-building-1-cbake-93-wall-5",
-      "kind": "aabb",
-      "min": [
-        -5.664152,
-        0,
-        -42.05504
-      ],
-      "max": [
-        2.835848,
-        16,
-        -14.16218
-      ]
-    },
-    {
-      "id": "brutalist-building-1-cbake-93-wall-6",
-      "kind": "aabb",
-      "min": [
-        -17.995914,
-        16,
-        -30.66218
-      ],
-      "max": [
-        -1.741303,
-        28.966663,
-        -22.16218
-      ]
-    },
-    {
-      "id": "brutalist-building-1-cbake-8-wall-0",
-      "kind": "aabb",
-      "min": [
-        36.004946,
-        0,
-        -37.834936
-      ],
-      "max": [
-        64.037843,
-        15.934345,
-        -37.53871
-      ]
-    },
-    {
-      "id": "brutalist-building-1-cbake-8-wall-1",
-      "kind": "aabb",
-      "min": [
-        55.897806,
-        0,
-        -37.834936
-      ],
-      "max": [
-        63.897806,
-        15.934345,
-        -29.03871
-      ]
-    },
-    {
-      "id": "brutalist-building-1-cbake-8-wall-2",
-      "kind": "aabb",
-      "min": [
-        47.397806,
-        0,
-        -37.834936
-      ],
-      "max": [
-        55.897806,
-        16,
-        -16.706948
-      ]
-    },
-    {
-      "id": "brutalist-building-1-cbake-8-wall-3",
-      "kind": "aabb",
-      "min": [
-        36.004946,
-        0,
-        -37.834936
-      ],
-      "max": [
-        47.397806,
-        15.934345,
-        -29.03871
-      ]
-    },
-    {
-      "id": "brutalist-building-1-cbake-8-wall-4",
-      "kind": "aabb",
-      "min": [
-        63.897806,
-        0,
-        -37.53871
-      ],
-      "max": [
-        64.037843,
-        15.934345,
-        -28.954012
-      ]
-    },
-    {
-      "id": "brutalist-building-1-cbake-8-wall-5",
-      "kind": "aabb",
-      "min": [
-        36.004946,
-        0,
-        -37.53871
-      ],
-      "max": [
-        63.897806,
-        16,
-        -29.03871
-      ]
-    },
-    {
-      "id": "brutalist-building-1-cbake-8-wall-6",
-      "kind": "aabb",
-      "min": [
-        47.397806,
-        16,
-        -32.961559
-      ],
-      "max": [
-        55.897806,
-        28.966663,
-        -16.706948
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-2-wall-0",
-      "kind": "aabb",
-      "min": [
-        -45.825875,
-        0,
-        -7.945046
-      ],
-      "max": [
-        -40.068133,
-        7,
-        -0.78412
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-2-wall-1",
-      "kind": "aabb",
-      "min": [
-        -45.825875,
-        0,
-        -11.201326
-      ],
-      "max": [
-        -40.068133,
-        7,
-        -8.992262
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-2-wall-2",
-      "kind": "aabb",
-      "min": [
-        -42.068133,
-        4.85,
-        -8.992262
-      ],
-      "max": [
-        -40.068133,
-        7,
-        -7.945046
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-2-wall-3",
-      "kind": "aabb",
-      "min": [
-        -42.068133,
-        0,
-        -8.992262
-      ],
-      "max": [
-        -40.068133,
-        2.75,
-        -7.945046
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-2-wall-4",
-      "kind": "aabb",
-      "min": [
-        -45.825875,
-        0,
-        -8.992262
-      ],
-      "max": [
-        -42.068133,
-        7,
-        -7.945046
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-2-wall-5",
-      "kind": "aabb",
-      "min": [
-        -45.825875,
-        0,
-        -16.654867
-      ],
-      "max": [
-        -40.068133,
-        7,
-        -12.248542
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-2-wall-6",
-      "kind": "aabb",
-      "min": [
-        -42.068133,
-        2.1,
-        -12.248542
-      ],
-      "max": [
-        -40.068133,
-        7,
-        -11.201326
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-2-wall-7",
-      "kind": "aabb",
-      "min": [
-        -45.825875,
-        0,
-        -12.248542
-      ],
-      "max": [
-        -42.068133,
-        7,
-        -11.201326
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-2-wall-8",
-      "kind": "aabb",
-      "min": [
-        -45.825875,
-        9.5,
-        -16.654867
-      ],
-      "max": [
-        -40.068133,
-        16.384443,
-        -0.78412
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-2-wall-9",
-      "kind": "aabb",
-      "min": [
-        -45.825875,
-        7,
-        -16.654867
-      ],
-      "max": [
-        -40.068133,
-        9.5,
-        2.21588
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-2-wall-10",
-      "kind": "aabb",
-      "min": [
-        -44.825875,
-        0,
-        -7.945046
-      ],
-      "max": [
-        -40.068133,
-        16.378939,
-        4.21588
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-2-wall-11",
-      "kind": "aabb",
-      "min": [
-        -44.825875,
-        0,
-        -11.201326
-      ],
-      "max": [
-        -40.068133,
-        16.378939,
-        -8.992262
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-2-wall-12",
-      "kind": "aabb",
-      "min": [
-        -42.068133,
-        4.85,
-        -8.992262
-      ],
-      "max": [
-        -40.068133,
-        16.378939,
-        -7.945046
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-2-wall-13",
-      "kind": "aabb",
-      "min": [
-        -42.068133,
-        0,
-        -8.992262
-      ],
-      "max": [
-        -40.068133,
-        2.75,
-        -7.945046
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-2-wall-14",
-      "kind": "aabb",
-      "min": [
-        -44.825875,
-        0,
-        -8.992262
-      ],
-      "max": [
-        -42.068133,
-        16.378939,
-        -7.945046
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-2-wall-15",
-      "kind": "aabb",
-      "min": [
-        -44.825875,
-        0,
-        -16.654867
-      ],
-      "max": [
-        -40.068133,
-        16.378939,
-        -12.248542
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-2-wall-16",
-      "kind": "aabb",
-      "min": [
-        -42.068133,
-        2.1,
-        -12.248542
-      ],
-      "max": [
-        -40.068133,
-        16.378939,
-        -11.201326
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-2-wall-17",
-      "kind": "aabb",
-      "min": [
-        -44.825875,
-        0,
-        -12.248542
-      ],
-      "max": [
-        -42.068133,
-        16.378939,
-        -11.201326
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-2-wall-18",
-      "kind": "aabb",
-      "min": [
-        -45.825875,
-        0,
-        -16.654867
-      ],
-      "max": [
-        -44.825875,
-        16.384443,
-        5.21588
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-2-wall-19",
-      "kind": "aabb",
-      "min": [
-        -59.725266,
-        0,
-        -1.78412
-      ],
-      "max": [
-        -53.825875,
-        7,
-        13.115459
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-2-wall-20",
-      "kind": "aabb",
-      "min": [
-        -48.825875,
-        0,
-        -1.272665
-      ],
-      "max": [
-        -45.825875,
-        6.810669,
-        -1.272665
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-2-wall-21",
-      "kind": "aabb",
-      "min": [
-        -49.825875,
-        0,
-        -1.272665
-      ],
-      "max": [
-        -48.825875,
-        7,
-        6.21588
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-2-wall-22",
-      "kind": "aabb",
-      "min": [
-        -49.825875,
-        9.5,
-        -1.272665
-      ],
-      "max": [
-        -48.825875,
-        16.384443,
-        6.21588
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-2-wall-23",
-      "kind": "aabb",
-      "min": [
-        -51.825875,
-        0,
-        -1.272665
-      ],
-      "max": [
-        -50.825875,
-        7,
-        6.21588
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-2-wall-24",
-      "kind": "aabb",
-      "min": [
-        -51.825875,
-        9.5,
-        -1.272665
-      ],
-      "max": [
-        -50.825875,
-        16.384443,
-        6.21588
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-2-wall-25",
-      "kind": "aabb",
-      "min": [
-        -53.825875,
-        0.126087,
-        -1.263693
-      ],
-      "max": [
-        -51.825875,
-        6.821474,
-        -1.239199
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-2-wall-26",
-      "kind": "aabb",
-      "min": [
-        -54.825875,
-        12,
-        -1.263693
-      ],
-      "max": [
-        -53.825875,
-        14.608354,
-        5.21588
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-2-wall-27",
-      "kind": "aabb",
-      "min": [
-        -54.825875,
-        9.5,
-        -1.263693
-      ],
-      "max": [
-        -53.825875,
-        12,
-        13.115459
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-2-wall-28",
-      "kind": "aabb",
-      "min": [
-        -54.825875,
-        9.5,
-        -0.78412
-      ],
-      "max": [
-        -40.068133,
-        12,
-        1.21588
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-2-wall-29",
-      "kind": "aabb",
-      "min": [
-        -51.825875,
-        15,
-        -0.78412
-      ],
-      "max": [
-        -40.068133,
-        16.384443,
-        4.21588
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-2-wall-30",
-      "kind": "aabb",
-      "min": [
-        -54.825875,
-        12,
-        -0.78412
-      ],
-      "max": [
-        -40.068133,
-        15,
-        4.21588
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-2-wall-31",
-      "kind": "aabb",
-      "min": [
-        -59.725266,
-        0,
-        -0.78412
-      ],
-      "max": [
-        -40.068133,
-        7,
-        4.21588
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-2-wall-32",
-      "kind": "aabb",
-      "min": [
-        -48.825875,
-        0,
-        -0.78412
-      ],
-      "max": [
-        -45.825875,
-        7,
-        6.21588
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-2-wall-33",
-      "kind": "aabb",
-      "min": [
-        -48.825875,
-        9.5,
-        -0.78412
-      ],
-      "max": [
-        -45.825875,
-        16.384443,
-        6.21588
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-2-wall-34",
-      "kind": "aabb",
-      "min": [
-        -50.825875,
-        0,
-        -0.78412
-      ],
-      "max": [
-        -49.825875,
-        7,
-        6.21588
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-2-wall-35",
-      "kind": "aabb",
-      "min": [
-        -50.825875,
-        9.5,
-        -0.78412
-      ],
-      "max": [
-        -49.825875,
-        16.384443,
-        6.21588
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-2-wall-36",
-      "kind": "aabb",
-      "min": [
-        -53.825875,
-        12,
-        -0.78412
-      ],
-      "max": [
-        -51.825875,
-        14.608354,
-        5.21588
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-2-wall-37",
-      "kind": "aabb",
-      "min": [
-        -53.825875,
-        0,
-        -0.78412
-      ],
-      "max": [
-        -51.825875,
-        7,
-        6.21588
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-2-wall-38",
-      "kind": "aabb",
-      "min": [
-        -53.825875,
-        9.5,
-        -0.78412
-      ],
-      "max": [
-        -51.825875,
-        12,
-        6.21588
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-2-wall-39",
-      "kind": "aabb",
-      "min": [
-        -59.725266,
-        9.5,
-        1.21588
-      ],
-      "max": [
-        -40.068133,
-        12,
-        4.21588
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-2-wall-40",
-      "kind": "aabb",
-      "min": [
-        -59.725266,
-        7,
-        1.21588
-      ],
-      "max": [
-        -53.825875,
-        9.5,
-        13.115459
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-2-wall-41",
-      "kind": "aabb",
-      "min": [
-        -59.725266,
-        9.5,
-        1.21588
-      ],
-      "max": [
-        -54.825875,
-        11.613191,
-        13.115459
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-2-wall-42",
-      "kind": "aabb",
-      "min": [
-        -59.725266,
-        7,
-        2.21588
-      ],
-      "max": [
-        -40.068133,
-        9.5,
-        4.21588
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-2-wall-43",
-      "kind": "aabb",
-      "min": [
-        -53.825875,
-        7,
-        2.21588
-      ],
-      "max": [
-        -45.825875,
-        9.5,
-        6.21588
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-2-wall-44",
-      "kind": "aabb",
-      "min": [
-        -51.825875,
-        15,
-        4.21588
-      ],
-      "max": [
-        -44.825875,
-        16.384443,
-        5.21588
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-2-wall-45",
-      "kind": "aabb",
-      "min": [
-        -54.825875,
-        12,
-        4.21588
-      ],
-      "max": [
-        -44.825875,
-        15,
-        5.21588
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-2-wall-46",
-      "kind": "aabb",
-      "min": [
-        -59.725266,
-        0,
-        4.21588
-      ],
-      "max": [
-        -44.825875,
-        12,
-        5.21588
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-2-wall-47",
-      "kind": "aabb",
-      "min": [
-        -51.825875,
-        12,
-        5.21588
-      ],
-      "max": [
-        -45.825875,
-        16.384443,
-        6.21588
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-2-wall-48",
-      "kind": "aabb",
-      "min": [
-        -59.725266,
-        0,
-        5.21588
-      ],
-      "max": [
-        -45.825875,
-        12,
-        6.21588
-      ]
-    },
-    {
-      "id": "brutalist-building-3-bake-3-2-wall-49",
-      "kind": "aabb",
-      "min": [
-        -59.725266,
-        9.5,
-        6.21588
-      ],
-      "max": [
-        -53.825875,
-        11.613191,
-        13.115459
-      ]
-    },
     {
       "id": "brutalist-building-2-cbake-wall-0",
       "kind": "aabb",
@@ -7246,6 +4054,3198 @@
         -18.596311,
         10.5,
         -13.94983
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-wall-0",
+      "kind": "aabb",
+      "min": [
+        -43.708661,
+        0,
+        14.482871
+      ],
+      "max": [
+        -43.412434,
+        15.934347,
+        42.515771
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-wall-1",
+      "kind": "aabb",
+      "min": [
+        -43.708661,
+        0,
+        14.62291
+      ],
+      "max": [
+        -34.912434,
+        15.934347,
+        22.62291
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-wall-2",
+      "kind": "aabb",
+      "min": [
+        -43.708661,
+        0,
+        22.62291
+      ],
+      "max": [
+        -22.580671,
+        16,
+        31.12291
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-wall-3",
+      "kind": "aabb",
+      "min": [
+        -43.708661,
+        0,
+        31.12291
+      ],
+      "max": [
+        -34.912434,
+        15.934347,
+        42.515771
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-wall-4",
+      "kind": "aabb",
+      "min": [
+        -43.412434,
+        0,
+        14.482871
+      ],
+      "max": [
+        -34.827736,
+        15.934347,
+        14.62291
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-wall-5",
+      "kind": "aabb",
+      "min": [
+        -43.412434,
+        0,
+        14.62291
+      ],
+      "max": [
+        -34.912434,
+        16,
+        42.515771
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-wall-6",
+      "kind": "aabb",
+      "min": [
+        -38.835284,
+        16,
+        22.62291
+      ],
+      "max": [
+        -22.580671,
+        28.966666,
+        31.12291
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-0-wall-0",
+      "kind": "aabb",
+      "min": [
+        -50.263393,
+        0,
+        -39.143097
+      ],
+      "max": [
+        -22.230493,
+        15.934347,
+        -38.84687
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-0-wall-1",
+      "kind": "aabb",
+      "min": [
+        -30.370532,
+        0,
+        -39.143097
+      ],
+      "max": [
+        -22.370532,
+        15.934347,
+        -30.34687
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-0-wall-2",
+      "kind": "aabb",
+      "min": [
+        -38.870532,
+        0,
+        -39.143097
+      ],
+      "max": [
+        -30.370532,
+        16,
+        -18.015107
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-0-wall-3",
+      "kind": "aabb",
+      "min": [
+        -50.263393,
+        0,
+        -39.143097
+      ],
+      "max": [
+        -38.870532,
+        15.934347,
+        -30.34687
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-0-wall-4",
+      "kind": "aabb",
+      "min": [
+        -22.370532,
+        0,
+        -38.84687
+      ],
+      "max": [
+        -22.230493,
+        15.934347,
+        -30.262172
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-0-wall-5",
+      "kind": "aabb",
+      "min": [
+        -50.263393,
+        0,
+        -38.84687
+      ],
+      "max": [
+        -22.370532,
+        16,
+        -30.34687
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-0-wall-6",
+      "kind": "aabb",
+      "min": [
+        -38.870532,
+        16,
+        -34.26972
+      ],
+      "max": [
+        -30.370532,
+        28.966666,
+        -18.015107
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-9-wall-0",
+      "kind": "aabb",
+      "min": [
+        1.699809,
+        0,
+        -39.472061
+      ],
+      "max": [
+        1.996036,
+        15.934347,
+        -11.439161
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-9-wall-1",
+      "kind": "aabb",
+      "min": [
+        -6.800191,
+        0,
+        -19.5792
+      ],
+      "max": [
+        1.996036,
+        15.934347,
+        -11.5792
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-9-wall-2",
+      "kind": "aabb",
+      "min": [
+        -19.131954,
+        0,
+        -28.0792
+      ],
+      "max": [
+        1.996036,
+        16,
+        -19.5792
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-9-wall-3",
+      "kind": "aabb",
+      "min": [
+        -6.800191,
+        0,
+        -39.472061
+      ],
+      "max": [
+        1.996036,
+        15.934347,
+        -28.0792
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-9-wall-4",
+      "kind": "aabb",
+      "min": [
+        -6.884889,
+        0,
+        -11.5792
+      ],
+      "max": [
+        1.699809,
+        15.934347,
+        -11.439161
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-9-wall-5",
+      "kind": "aabb",
+      "min": [
+        -6.800191,
+        0,
+        -39.472061
+      ],
+      "max": [
+        1.699809,
+        16,
+        -11.5792
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-9-wall-6",
+      "kind": "aabb",
+      "min": [
+        -19.131954,
+        16,
+        -28.0792
+      ],
+      "max": [
+        -2.877341,
+        28.966666,
+        -19.5792
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-5-wall-0",
+      "kind": "aabb",
+      "min": [
+        36.897316,
+        0,
+        -39.004757
+      ],
+      "max": [
+        64.930216,
+        15.934347,
+        -38.70853
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-5-wall-1",
+      "kind": "aabb",
+      "min": [
+        56.790177,
+        0,
+        -39.004757
+      ],
+      "max": [
+        64.790177,
+        15.934347,
+        -30.20853
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-5-wall-2",
+      "kind": "aabb",
+      "min": [
+        48.290177,
+        0,
+        -39.004757
+      ],
+      "max": [
+        56.790177,
+        16,
+        -17.876767
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-5-wall-3",
+      "kind": "aabb",
+      "min": [
+        36.897316,
+        0,
+        -39.004757
+      ],
+      "max": [
+        48.290177,
+        15.934347,
+        -30.20853
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-5-wall-4",
+      "kind": "aabb",
+      "min": [
+        64.790177,
+        0,
+        -38.70853
+      ],
+      "max": [
+        64.930216,
+        15.934347,
+        -30.123832
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-5-wall-5",
+      "kind": "aabb",
+      "min": [
+        36.897316,
+        0,
+        -38.70853
+      ],
+      "max": [
+        64.790177,
+        16,
+        -30.20853
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-5-wall-6",
+      "kind": "aabb",
+      "min": [
+        48.290177,
+        16,
+        -34.13138
+      ],
+      "max": [
+        56.790177,
+        28.966666,
+        -17.876767
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-wall-0",
+      "kind": "aabb",
+      "min": [
+        -6.43899,
+        0,
+        25.85438
+      ],
+      "max": [
+        -0.681247,
+        7,
+        32.887336
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-wall-1",
+      "kind": "aabb",
+      "min": [
+        -6.43899,
+        0,
+        33.934552
+      ],
+      "max": [
+        -0.681247,
+        7,
+        36.123756
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-wall-2",
+      "kind": "aabb",
+      "min": [
+        -6.43899,
+        4.85,
+        32.887336
+      ],
+      "max": [
+        -4.43899,
+        7,
+        33.934552
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-wall-3",
+      "kind": "aabb",
+      "min": [
+        -6.43899,
+        0,
+        32.887336
+      ],
+      "max": [
+        -4.43899,
+        2.75,
+        33.934552
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-wall-4",
+      "kind": "aabb",
+      "min": [
+        -4.43899,
+        0,
+        32.887336
+      ],
+      "max": [
+        -0.681247,
+        7,
+        33.934552
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-wall-5",
+      "kind": "aabb",
+      "min": [
+        -6.43899,
+        0,
+        37.170972
+      ],
+      "max": [
+        -0.681247,
+        7,
+        41.725128
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-wall-6",
+      "kind": "aabb",
+      "min": [
+        -6.43899,
+        2.1,
+        36.123756
+      ],
+      "max": [
+        -4.43899,
+        7,
+        37.170972
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-wall-7",
+      "kind": "aabb",
+      "min": [
+        -4.43899,
+        0,
+        36.123756
+      ],
+      "max": [
+        -0.681247,
+        7,
+        37.170972
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-wall-8",
+      "kind": "aabb",
+      "min": [
+        -6.43899,
+        9.5,
+        25.85438
+      ],
+      "max": [
+        -0.681247,
+        16.384444,
+        41.725128
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-wall-9",
+      "kind": "aabb",
+      "min": [
+        -6.43899,
+        7,
+        22.85438
+      ],
+      "max": [
+        -0.681247,
+        9.5,
+        41.725128
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-wall-10",
+      "kind": "aabb",
+      "min": [
+        -6.43899,
+        0,
+        20.85438
+      ],
+      "max": [
+        -1.681247,
+        16.378941,
+        32.887336
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-wall-11",
+      "kind": "aabb",
+      "min": [
+        -6.43899,
+        0,
+        33.934552
+      ],
+      "max": [
+        -1.681247,
+        16.378941,
+        36.123756
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-wall-12",
+      "kind": "aabb",
+      "min": [
+        -6.43899,
+        4.85,
+        32.887336
+      ],
+      "max": [
+        -4.43899,
+        16.378941,
+        33.934552
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-wall-13",
+      "kind": "aabb",
+      "min": [
+        -6.43899,
+        0,
+        32.887336
+      ],
+      "max": [
+        -4.43899,
+        2.75,
+        33.934552
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-wall-14",
+      "kind": "aabb",
+      "min": [
+        -4.43899,
+        0,
+        32.887336
+      ],
+      "max": [
+        -1.681247,
+        16.378941,
+        33.934552
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-wall-15",
+      "kind": "aabb",
+      "min": [
+        -6.43899,
+        0,
+        37.170972
+      ],
+      "max": [
+        -1.681247,
+        16.378941,
+        41.725128
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-wall-16",
+      "kind": "aabb",
+      "min": [
+        -6.43899,
+        2.1,
+        36.123756
+      ],
+      "max": [
+        -4.43899,
+        16.378941,
+        37.170972
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-wall-17",
+      "kind": "aabb",
+      "min": [
+        -4.43899,
+        0,
+        36.123756
+      ],
+      "max": [
+        -1.681247,
+        16.378941,
+        37.170972
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-wall-18",
+      "kind": "aabb",
+      "min": [
+        -1.681247,
+        0,
+        19.85438
+      ],
+      "max": [
+        -0.681247,
+        16.384444,
+        41.725128
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-wall-19",
+      "kind": "aabb",
+      "min": [
+        7.318753,
+        0,
+        11.954799
+      ],
+      "max": [
+        13.218145,
+        7,
+        26.85438
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-wall-20",
+      "kind": "aabb",
+      "min": [
+        -0.681247,
+        0,
+        26.342925
+      ],
+      "max": [
+        2.318753,
+        6.81067,
+        26.342925
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-wall-21",
+      "kind": "aabb",
+      "min": [
+        2.318753,
+        0,
+        18.85438
+      ],
+      "max": [
+        3.318753,
+        7,
+        26.342925
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-wall-22",
+      "kind": "aabb",
+      "min": [
+        2.318753,
+        9.5,
+        18.85438
+      ],
+      "max": [
+        3.318753,
+        16.384444,
+        26.342925
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-wall-23",
+      "kind": "aabb",
+      "min": [
+        4.318753,
+        0,
+        18.85438
+      ],
+      "max": [
+        5.318753,
+        7,
+        26.342925
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-wall-24",
+      "kind": "aabb",
+      "min": [
+        4.318753,
+        9.5,
+        18.85438
+      ],
+      "max": [
+        5.318753,
+        16.384444,
+        26.342925
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-wall-25",
+      "kind": "aabb",
+      "min": [
+        5.318753,
+        0.126087,
+        26.309459
+      ],
+      "max": [
+        7.318753,
+        6.821475,
+        26.333953
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-wall-26",
+      "kind": "aabb",
+      "min": [
+        7.318753,
+        12,
+        19.85438
+      ],
+      "max": [
+        8.318753,
+        14.608356,
+        26.333953
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-wall-27",
+      "kind": "aabb",
+      "min": [
+        7.318753,
+        9.5,
+        11.954799
+      ],
+      "max": [
+        8.318753,
+        12,
+        26.333953
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-wall-28",
+      "kind": "aabb",
+      "min": [
+        -6.43899,
+        9.5,
+        23.85438
+      ],
+      "max": [
+        8.318753,
+        12,
+        25.85438
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-wall-29",
+      "kind": "aabb",
+      "min": [
+        -6.43899,
+        15,
+        20.85438
+      ],
+      "max": [
+        5.318753,
+        16.384444,
+        25.85438
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-wall-30",
+      "kind": "aabb",
+      "min": [
+        -6.43899,
+        12,
+        20.85438
+      ],
+      "max": [
+        8.318753,
+        15,
+        25.85438
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-wall-31",
+      "kind": "aabb",
+      "min": [
+        -6.43899,
+        0,
+        20.85438
+      ],
+      "max": [
+        13.218145,
+        7,
+        25.85438
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-wall-32",
+      "kind": "aabb",
+      "min": [
+        -0.681247,
+        0,
+        18.85438
+      ],
+      "max": [
+        2.318753,
+        7,
+        25.85438
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-wall-33",
+      "kind": "aabb",
+      "min": [
+        -0.681247,
+        9.5,
+        18.85438
+      ],
+      "max": [
+        2.318753,
+        16.384444,
+        25.85438
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-wall-34",
+      "kind": "aabb",
+      "min": [
+        3.318753,
+        0,
+        18.85438
+      ],
+      "max": [
+        4.318753,
+        7,
+        25.85438
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-wall-35",
+      "kind": "aabb",
+      "min": [
+        3.318753,
+        9.5,
+        18.85438
+      ],
+      "max": [
+        4.318753,
+        16.384444,
+        25.85438
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-wall-36",
+      "kind": "aabb",
+      "min": [
+        5.318753,
+        12,
+        19.85438
+      ],
+      "max": [
+        7.318753,
+        14.608356,
+        25.85438
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-wall-37",
+      "kind": "aabb",
+      "min": [
+        5.318753,
+        0,
+        18.85438
+      ],
+      "max": [
+        7.318753,
+        7,
+        25.85438
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-wall-38",
+      "kind": "aabb",
+      "min": [
+        5.318753,
+        9.5,
+        18.85438
+      ],
+      "max": [
+        7.318753,
+        12,
+        25.85438
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-wall-39",
+      "kind": "aabb",
+      "min": [
+        -6.43899,
+        9.5,
+        20.85438
+      ],
+      "max": [
+        13.218145,
+        12,
+        23.85438
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-wall-40",
+      "kind": "aabb",
+      "min": [
+        7.318753,
+        7,
+        11.954799
+      ],
+      "max": [
+        13.218145,
+        9.5,
+        23.85438
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-wall-41",
+      "kind": "aabb",
+      "min": [
+        8.318753,
+        9.5,
+        11.954799
+      ],
+      "max": [
+        13.218145,
+        11.613192,
+        23.85438
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-wall-42",
+      "kind": "aabb",
+      "min": [
+        -6.43899,
+        7,
+        20.85438
+      ],
+      "max": [
+        13.218145,
+        9.5,
+        22.85438
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-wall-43",
+      "kind": "aabb",
+      "min": [
+        -0.681247,
+        7,
+        18.85438
+      ],
+      "max": [
+        7.318753,
+        9.5,
+        22.85438
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-wall-44",
+      "kind": "aabb",
+      "min": [
+        -1.681247,
+        15,
+        19.85438
+      ],
+      "max": [
+        5.318753,
+        16.384444,
+        20.85438
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-wall-45",
+      "kind": "aabb",
+      "min": [
+        -1.681247,
+        12,
+        19.85438
+      ],
+      "max": [
+        8.318753,
+        15,
+        20.85438
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-wall-46",
+      "kind": "aabb",
+      "min": [
+        -1.681247,
+        0,
+        19.85438
+      ],
+      "max": [
+        13.218145,
+        12,
+        20.85438
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-wall-47",
+      "kind": "aabb",
+      "min": [
+        -0.681247,
+        12,
+        18.85438
+      ],
+      "max": [
+        5.318753,
+        16.384444,
+        19.85438
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-wall-48",
+      "kind": "aabb",
+      "min": [
+        -0.681247,
+        0,
+        18.85438
+      ],
+      "max": [
+        13.218145,
+        12,
+        19.85438
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-wall-49",
+      "kind": "aabb",
+      "min": [
+        7.318753,
+        9.5,
+        11.954799
+      ],
+      "max": [
+        13.218145,
+        11.613192,
+        18.85438
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-7-wall-0",
+      "kind": "aabb",
+      "min": [
+        -59.219642,
+        0,
+        -1.33146
+      ],
+      "max": [
+        -53.461899,
+        7,
+        5.701496
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-7-wall-1",
+      "kind": "aabb",
+      "min": [
+        -59.219642,
+        0,
+        6.748712
+      ],
+      "max": [
+        -53.461899,
+        7,
+        8.937916
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-7-wall-2",
+      "kind": "aabb",
+      "min": [
+        -59.219642,
+        4.85,
+        5.701496
+      ],
+      "max": [
+        -57.219642,
+        7,
+        6.748712
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-7-wall-3",
+      "kind": "aabb",
+      "min": [
+        -59.219642,
+        0,
+        5.701496
+      ],
+      "max": [
+        -57.219642,
+        2.75,
+        6.748712
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-7-wall-4",
+      "kind": "aabb",
+      "min": [
+        -57.219642,
+        0,
+        5.701496
+      ],
+      "max": [
+        -53.461899,
+        7,
+        6.748712
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-7-wall-5",
+      "kind": "aabb",
+      "min": [
+        -59.219642,
+        0,
+        9.985132
+      ],
+      "max": [
+        -53.461899,
+        7,
+        14.539288
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-7-wall-6",
+      "kind": "aabb",
+      "min": [
+        -59.219642,
+        2.1,
+        8.937916
+      ],
+      "max": [
+        -57.219642,
+        7,
+        9.985132
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-7-wall-7",
+      "kind": "aabb",
+      "min": [
+        -57.219642,
+        0,
+        8.937916
+      ],
+      "max": [
+        -53.461899,
+        7,
+        9.985132
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-7-wall-8",
+      "kind": "aabb",
+      "min": [
+        -59.219642,
+        9.5,
+        -1.33146
+      ],
+      "max": [
+        -53.461899,
+        16.384444,
+        14.539288
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-7-wall-9",
+      "kind": "aabb",
+      "min": [
+        -59.219642,
+        7,
+        -4.33146
+      ],
+      "max": [
+        -53.461899,
+        9.5,
+        14.539288
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-7-wall-10",
+      "kind": "aabb",
+      "min": [
+        -59.219642,
+        0,
+        -6.33146
+      ],
+      "max": [
+        -54.461899,
+        16.378941,
+        5.701496
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-7-wall-11",
+      "kind": "aabb",
+      "min": [
+        -59.219642,
+        0,
+        6.748712
+      ],
+      "max": [
+        -54.461899,
+        16.378941,
+        8.937916
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-7-wall-12",
+      "kind": "aabb",
+      "min": [
+        -59.219642,
+        4.85,
+        5.701496
+      ],
+      "max": [
+        -57.219642,
+        16.378941,
+        6.748712
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-7-wall-13",
+      "kind": "aabb",
+      "min": [
+        -59.219642,
+        0,
+        5.701496
+      ],
+      "max": [
+        -57.219642,
+        2.75,
+        6.748712
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-7-wall-14",
+      "kind": "aabb",
+      "min": [
+        -57.219642,
+        0,
+        5.701496
+      ],
+      "max": [
+        -54.461899,
+        16.378941,
+        6.748712
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-7-wall-15",
+      "kind": "aabb",
+      "min": [
+        -59.219642,
+        0,
+        9.985132
+      ],
+      "max": [
+        -54.461899,
+        16.378941,
+        14.539288
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-7-wall-16",
+      "kind": "aabb",
+      "min": [
+        -59.219642,
+        2.1,
+        8.937916
+      ],
+      "max": [
+        -57.219642,
+        16.378941,
+        9.985132
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-7-wall-17",
+      "kind": "aabb",
+      "min": [
+        -57.219642,
+        0,
+        8.937916
+      ],
+      "max": [
+        -54.461899,
+        16.378941,
+        9.985132
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-7-wall-18",
+      "kind": "aabb",
+      "min": [
+        -54.461899,
+        0,
+        -7.33146
+      ],
+      "max": [
+        -53.461899,
+        16.384444,
+        14.539288
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-7-wall-19",
+      "kind": "aabb",
+      "min": [
+        -45.461899,
+        0,
+        -15.231041
+      ],
+      "max": [
+        -39.562507,
+        7,
+        -0.33146
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-7-wall-20",
+      "kind": "aabb",
+      "min": [
+        -53.461899,
+        0,
+        -0.842915
+      ],
+      "max": [
+        -50.461899,
+        6.81067,
+        -0.842915
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-7-wall-21",
+      "kind": "aabb",
+      "min": [
+        -50.461899,
+        0,
+        -8.33146
+      ],
+      "max": [
+        -49.461899,
+        7,
+        -0.842915
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-7-wall-22",
+      "kind": "aabb",
+      "min": [
+        -50.461899,
+        9.5,
+        -8.33146
+      ],
+      "max": [
+        -49.461899,
+        16.384444,
+        -0.842915
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-7-wall-23",
+      "kind": "aabb",
+      "min": [
+        -48.461899,
+        0,
+        -8.33146
+      ],
+      "max": [
+        -47.461899,
+        7,
+        -0.842915
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-7-wall-24",
+      "kind": "aabb",
+      "min": [
+        -48.461899,
+        9.5,
+        -8.33146
+      ],
+      "max": [
+        -47.461899,
+        16.384444,
+        -0.842915
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-7-wall-25",
+      "kind": "aabb",
+      "min": [
+        -47.461899,
+        0.126087,
+        -0.876381
+      ],
+      "max": [
+        -45.461899,
+        6.821475,
+        -0.851887
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-7-wall-26",
+      "kind": "aabb",
+      "min": [
+        -45.461899,
+        12,
+        -7.33146
+      ],
+      "max": [
+        -44.461899,
+        14.608356,
+        -0.851887
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-7-wall-27",
+      "kind": "aabb",
+      "min": [
+        -45.461899,
+        9.5,
+        -15.231041
+      ],
+      "max": [
+        -44.461899,
+        12,
+        -0.851887
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-7-wall-28",
+      "kind": "aabb",
+      "min": [
+        -59.219642,
+        9.5,
+        -3.33146
+      ],
+      "max": [
+        -44.461899,
+        12,
+        -1.33146
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-7-wall-29",
+      "kind": "aabb",
+      "min": [
+        -59.219642,
+        15,
+        -6.33146
+      ],
+      "max": [
+        -47.461899,
+        16.384444,
+        -1.33146
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-7-wall-30",
+      "kind": "aabb",
+      "min": [
+        -59.219642,
+        12,
+        -6.33146
+      ],
+      "max": [
+        -44.461899,
+        15,
+        -1.33146
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-7-wall-31",
+      "kind": "aabb",
+      "min": [
+        -59.219642,
+        0,
+        -6.33146
+      ],
+      "max": [
+        -39.562507,
+        7,
+        -1.33146
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-7-wall-32",
+      "kind": "aabb",
+      "min": [
+        -53.461899,
+        0,
+        -8.33146
+      ],
+      "max": [
+        -50.461899,
+        7,
+        -1.33146
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-7-wall-33",
+      "kind": "aabb",
+      "min": [
+        -53.461899,
+        9.5,
+        -8.33146
+      ],
+      "max": [
+        -50.461899,
+        16.384444,
+        -1.33146
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-7-wall-34",
+      "kind": "aabb",
+      "min": [
+        -49.461899,
+        0,
+        -8.33146
+      ],
+      "max": [
+        -48.461899,
+        7,
+        -1.33146
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-7-wall-35",
+      "kind": "aabb",
+      "min": [
+        -49.461899,
+        9.5,
+        -8.33146
+      ],
+      "max": [
+        -48.461899,
+        16.384444,
+        -1.33146
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-7-wall-36",
+      "kind": "aabb",
+      "min": [
+        -47.461899,
+        12,
+        -7.33146
+      ],
+      "max": [
+        -45.461899,
+        14.608356,
+        -1.33146
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-7-wall-37",
+      "kind": "aabb",
+      "min": [
+        -47.461899,
+        0,
+        -8.33146
+      ],
+      "max": [
+        -45.461899,
+        7,
+        -1.33146
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-7-wall-38",
+      "kind": "aabb",
+      "min": [
+        -47.461899,
+        9.5,
+        -8.33146
+      ],
+      "max": [
+        -45.461899,
+        12,
+        -1.33146
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-7-wall-39",
+      "kind": "aabb",
+      "min": [
+        -59.219642,
+        9.5,
+        -6.33146
+      ],
+      "max": [
+        -39.562507,
+        12,
+        -3.33146
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-7-wall-40",
+      "kind": "aabb",
+      "min": [
+        -45.461899,
+        7,
+        -15.231041
+      ],
+      "max": [
+        -39.562507,
+        9.5,
+        -3.33146
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-7-wall-41",
+      "kind": "aabb",
+      "min": [
+        -44.461899,
+        9.5,
+        -15.231041
+      ],
+      "max": [
+        -39.562507,
+        11.613192,
+        -3.33146
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-7-wall-42",
+      "kind": "aabb",
+      "min": [
+        -59.219642,
+        7,
+        -6.33146
+      ],
+      "max": [
+        -39.562507,
+        9.5,
+        -4.33146
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-7-wall-43",
+      "kind": "aabb",
+      "min": [
+        -53.461899,
+        7,
+        -8.33146
+      ],
+      "max": [
+        -45.461899,
+        9.5,
+        -4.33146
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-7-wall-44",
+      "kind": "aabb",
+      "min": [
+        -54.461899,
+        15,
+        -7.33146
+      ],
+      "max": [
+        -47.461899,
+        16.384444,
+        -6.33146
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-7-wall-45",
+      "kind": "aabb",
+      "min": [
+        -54.461899,
+        12,
+        -7.33146
+      ],
+      "max": [
+        -44.461899,
+        15,
+        -6.33146
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-7-wall-46",
+      "kind": "aabb",
+      "min": [
+        -54.461899,
+        0,
+        -7.33146
+      ],
+      "max": [
+        -39.562507,
+        12,
+        -6.33146
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-7-wall-47",
+      "kind": "aabb",
+      "min": [
+        -53.461899,
+        12,
+        -8.33146
+      ],
+      "max": [
+        -47.461899,
+        16.384444,
+        -7.33146
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-7-wall-48",
+      "kind": "aabb",
+      "min": [
+        -53.461899,
+        0,
+        -8.33146
+      ],
+      "max": [
+        -39.562507,
+        12,
+        -7.33146
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-7-wall-49",
+      "kind": "aabb",
+      "min": [
+        -45.461899,
+        9.5,
+        -15.231041
+      ],
+      "max": [
+        -39.562507,
+        11.613192,
+        -8.33146
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-wall-0",
+      "kind": "aabb",
+      "min": [
+        22.603146,
+        0,
+        -22.5616
+      ],
+      "max": [
+        29.636102,
+        7,
+        -16.803857
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-wall-1",
+      "kind": "aabb",
+      "min": [
+        30.683318,
+        0,
+        -22.5616
+      ],
+      "max": [
+        32.872522,
+        7,
+        -16.803857
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-wall-2",
+      "kind": "aabb",
+      "min": [
+        29.636102,
+        4.85,
+        -18.803857
+      ],
+      "max": [
+        30.683318,
+        7,
+        -16.803857
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-wall-3",
+      "kind": "aabb",
+      "min": [
+        29.636102,
+        0,
+        -18.803857
+      ],
+      "max": [
+        30.683318,
+        2.75,
+        -16.803857
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-wall-4",
+      "kind": "aabb",
+      "min": [
+        29.636102,
+        0,
+        -22.5616
+      ],
+      "max": [
+        30.683318,
+        7,
+        -18.803857
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-wall-5",
+      "kind": "aabb",
+      "min": [
+        33.919738,
+        0,
+        -22.5616
+      ],
+      "max": [
+        38.473894,
+        7,
+        -16.803857
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-wall-6",
+      "kind": "aabb",
+      "min": [
+        32.872522,
+        2.1,
+        -18.803857
+      ],
+      "max": [
+        33.919738,
+        7,
+        -16.803857
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-wall-7",
+      "kind": "aabb",
+      "min": [
+        32.872522,
+        0,
+        -22.5616
+      ],
+      "max": [
+        33.919738,
+        7,
+        -18.803857
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-wall-8",
+      "kind": "aabb",
+      "min": [
+        22.603146,
+        9.5,
+        -22.5616
+      ],
+      "max": [
+        38.473894,
+        16.384444,
+        -16.803857
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-wall-9",
+      "kind": "aabb",
+      "min": [
+        19.603146,
+        7,
+        -22.5616
+      ],
+      "max": [
+        38.473894,
+        9.5,
+        -16.803857
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-wall-10",
+      "kind": "aabb",
+      "min": [
+        17.603146,
+        0,
+        -21.5616
+      ],
+      "max": [
+        29.636102,
+        16.378941,
+        -16.803857
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-wall-11",
+      "kind": "aabb",
+      "min": [
+        30.683318,
+        0,
+        -21.5616
+      ],
+      "max": [
+        32.872522,
+        16.378941,
+        -16.803857
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-wall-12",
+      "kind": "aabb",
+      "min": [
+        29.636102,
+        4.85,
+        -18.803857
+      ],
+      "max": [
+        30.683318,
+        16.378941,
+        -16.803857
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-wall-13",
+      "kind": "aabb",
+      "min": [
+        29.636102,
+        0,
+        -18.803857
+      ],
+      "max": [
+        30.683318,
+        2.75,
+        -16.803857
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-wall-14",
+      "kind": "aabb",
+      "min": [
+        29.636102,
+        0,
+        -21.5616
+      ],
+      "max": [
+        30.683318,
+        16.378941,
+        -18.803857
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-wall-15",
+      "kind": "aabb",
+      "min": [
+        33.919738,
+        0,
+        -21.5616
+      ],
+      "max": [
+        38.473894,
+        16.378941,
+        -16.803857
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-wall-16",
+      "kind": "aabb",
+      "min": [
+        32.872522,
+        2.1,
+        -18.803857
+      ],
+      "max": [
+        33.919738,
+        16.378941,
+        -16.803857
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-wall-17",
+      "kind": "aabb",
+      "min": [
+        32.872522,
+        0,
+        -21.5616
+      ],
+      "max": [
+        33.919738,
+        16.378941,
+        -18.803857
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-wall-18",
+      "kind": "aabb",
+      "min": [
+        16.603146,
+        0,
+        -22.5616
+      ],
+      "max": [
+        38.473894,
+        16.384444,
+        -21.5616
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-wall-19",
+      "kind": "aabb",
+      "min": [
+        8.703565,
+        0,
+        -36.460992
+      ],
+      "max": [
+        23.603146,
+        7,
+        -30.5616
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-wall-20",
+      "kind": "aabb",
+      "min": [
+        23.091691,
+        0,
+        -25.5616
+      ],
+      "max": [
+        23.091691,
+        6.81067,
+        -22.5616
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-wall-21",
+      "kind": "aabb",
+      "min": [
+        15.603146,
+        0,
+        -26.5616
+      ],
+      "max": [
+        23.091691,
+        7,
+        -25.5616
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-wall-22",
+      "kind": "aabb",
+      "min": [
+        15.603146,
+        9.5,
+        -26.5616
+      ],
+      "max": [
+        23.091691,
+        16.384444,
+        -25.5616
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-wall-23",
+      "kind": "aabb",
+      "min": [
+        15.603146,
+        0,
+        -28.5616
+      ],
+      "max": [
+        23.091691,
+        7,
+        -27.5616
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-wall-24",
+      "kind": "aabb",
+      "min": [
+        15.603146,
+        9.5,
+        -28.5616
+      ],
+      "max": [
+        23.091691,
+        16.384444,
+        -27.5616
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-wall-25",
+      "kind": "aabb",
+      "min": [
+        23.058225,
+        0.126087,
+        -30.5616
+      ],
+      "max": [
+        23.082719,
+        6.821475,
+        -28.5616
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-wall-26",
+      "kind": "aabb",
+      "min": [
+        16.603146,
+        12,
+        -31.5616
+      ],
+      "max": [
+        23.082719,
+        14.608356,
+        -30.5616
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-wall-27",
+      "kind": "aabb",
+      "min": [
+        8.703565,
+        9.5,
+        -31.5616
+      ],
+      "max": [
+        23.082719,
+        12,
+        -30.5616
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-wall-28",
+      "kind": "aabb",
+      "min": [
+        20.603146,
+        9.5,
+        -31.5616
+      ],
+      "max": [
+        22.603146,
+        12,
+        -16.803857
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-wall-29",
+      "kind": "aabb",
+      "min": [
+        17.603146,
+        15,
+        -28.5616
+      ],
+      "max": [
+        22.603146,
+        16.384444,
+        -16.803857
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-wall-30",
+      "kind": "aabb",
+      "min": [
+        17.603146,
+        12,
+        -31.5616
+      ],
+      "max": [
+        22.603146,
+        15,
+        -16.803857
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-wall-31",
+      "kind": "aabb",
+      "min": [
+        17.603146,
+        0,
+        -36.460992
+      ],
+      "max": [
+        22.603146,
+        7,
+        -16.803857
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-wall-32",
+      "kind": "aabb",
+      "min": [
+        15.603146,
+        0,
+        -25.5616
+      ],
+      "max": [
+        22.603146,
+        7,
+        -22.5616
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-wall-33",
+      "kind": "aabb",
+      "min": [
+        15.603146,
+        9.5,
+        -25.5616
+      ],
+      "max": [
+        22.603146,
+        16.384444,
+        -22.5616
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-wall-34",
+      "kind": "aabb",
+      "min": [
+        15.603146,
+        0,
+        -27.5616
+      ],
+      "max": [
+        22.603146,
+        7,
+        -26.5616
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-wall-35",
+      "kind": "aabb",
+      "min": [
+        15.603146,
+        9.5,
+        -27.5616
+      ],
+      "max": [
+        22.603146,
+        16.384444,
+        -26.5616
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-wall-36",
+      "kind": "aabb",
+      "min": [
+        16.603146,
+        12,
+        -30.5616
+      ],
+      "max": [
+        22.603146,
+        14.608356,
+        -28.5616
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-wall-37",
+      "kind": "aabb",
+      "min": [
+        15.603146,
+        0,
+        -30.5616
+      ],
+      "max": [
+        22.603146,
+        7,
+        -28.5616
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-wall-38",
+      "kind": "aabb",
+      "min": [
+        15.603146,
+        9.5,
+        -30.5616
+      ],
+      "max": [
+        22.603146,
+        12,
+        -28.5616
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-wall-39",
+      "kind": "aabb",
+      "min": [
+        17.603146,
+        9.5,
+        -36.460992
+      ],
+      "max": [
+        20.603146,
+        12,
+        -16.803857
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-wall-40",
+      "kind": "aabb",
+      "min": [
+        8.703565,
+        7,
+        -36.460992
+      ],
+      "max": [
+        20.603146,
+        9.5,
+        -30.5616
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-wall-41",
+      "kind": "aabb",
+      "min": [
+        8.703565,
+        9.5,
+        -36.460992
+      ],
+      "max": [
+        20.603146,
+        11.613192,
+        -31.5616
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-wall-42",
+      "kind": "aabb",
+      "min": [
+        17.603146,
+        7,
+        -36.460992
+      ],
+      "max": [
+        19.603146,
+        9.5,
+        -16.803857
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-wall-43",
+      "kind": "aabb",
+      "min": [
+        15.603146,
+        7,
+        -30.5616
+      ],
+      "max": [
+        19.603146,
+        9.5,
+        -22.5616
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-wall-44",
+      "kind": "aabb",
+      "min": [
+        16.603146,
+        15,
+        -28.5616
+      ],
+      "max": [
+        17.603146,
+        16.384444,
+        -21.5616
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-wall-45",
+      "kind": "aabb",
+      "min": [
+        16.603146,
+        12,
+        -31.5616
+      ],
+      "max": [
+        17.603146,
+        15,
+        -21.5616
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-wall-46",
+      "kind": "aabb",
+      "min": [
+        16.603146,
+        0,
+        -36.460992
+      ],
+      "max": [
+        17.603146,
+        12,
+        -21.5616
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-wall-47",
+      "kind": "aabb",
+      "min": [
+        15.603146,
+        12,
+        -28.5616
+      ],
+      "max": [
+        16.603146,
+        16.384444,
+        -22.5616
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-wall-48",
+      "kind": "aabb",
+      "min": [
+        15.603146,
+        0,
+        -36.460992
+      ],
+      "max": [
+        16.603146,
+        12,
+        -22.5616
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-wall-49",
+      "kind": "aabb",
+      "min": [
+        8.703565,
+        9.5,
+        -36.460992
+      ],
+      "max": [
+        15.603146,
+        11.613192,
+        -30.5616
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-4-wall-0",
+      "kind": "aabb",
+      "min": [
+        52.071767,
+        0,
+        16.31484
+      ],
+      "max": [
+        59.104723,
+        7,
+        22.072583
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-4-wall-1",
+      "kind": "aabb",
+      "min": [
+        60.151939,
+        0,
+        16.31484
+      ],
+      "max": [
+        62.341143,
+        7,
+        22.072583
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-4-wall-2",
+      "kind": "aabb",
+      "min": [
+        59.104723,
+        4.85,
+        20.072583
+      ],
+      "max": [
+        60.151939,
+        7,
+        22.072583
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-4-wall-3",
+      "kind": "aabb",
+      "min": [
+        59.104723,
+        0,
+        20.072583
+      ],
+      "max": [
+        60.151939,
+        2.75,
+        22.072583
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-4-wall-4",
+      "kind": "aabb",
+      "min": [
+        59.104723,
+        0,
+        16.31484
+      ],
+      "max": [
+        60.151939,
+        7,
+        20.072583
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-4-wall-5",
+      "kind": "aabb",
+      "min": [
+        63.388359,
+        0,
+        16.31484
+      ],
+      "max": [
+        67.942515,
+        7,
+        22.072583
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-4-wall-6",
+      "kind": "aabb",
+      "min": [
+        62.341143,
+        2.1,
+        20.072583
+      ],
+      "max": [
+        63.388359,
+        7,
+        22.072583
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-4-wall-7",
+      "kind": "aabb",
+      "min": [
+        62.341143,
+        0,
+        16.31484
+      ],
+      "max": [
+        63.388359,
+        7,
+        20.072583
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-4-wall-8",
+      "kind": "aabb",
+      "min": [
+        52.071767,
+        9.5,
+        16.31484
+      ],
+      "max": [
+        67.942515,
+        16.384444,
+        22.072583
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-4-wall-9",
+      "kind": "aabb",
+      "min": [
+        49.071767,
+        7,
+        16.31484
+      ],
+      "max": [
+        67.942515,
+        9.5,
+        22.072583
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-4-wall-10",
+      "kind": "aabb",
+      "min": [
+        47.071767,
+        0,
+        17.31484
+      ],
+      "max": [
+        59.104723,
+        16.378941,
+        22.072583
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-4-wall-11",
+      "kind": "aabb",
+      "min": [
+        60.151939,
+        0,
+        17.31484
+      ],
+      "max": [
+        62.341143,
+        16.378941,
+        22.072583
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-4-wall-12",
+      "kind": "aabb",
+      "min": [
+        59.104723,
+        4.85,
+        20.072583
+      ],
+      "max": [
+        60.151939,
+        16.378941,
+        22.072583
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-4-wall-13",
+      "kind": "aabb",
+      "min": [
+        59.104723,
+        0,
+        20.072583
+      ],
+      "max": [
+        60.151939,
+        2.75,
+        22.072583
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-4-wall-14",
+      "kind": "aabb",
+      "min": [
+        59.104723,
+        0,
+        17.31484
+      ],
+      "max": [
+        60.151939,
+        16.378941,
+        20.072583
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-4-wall-15",
+      "kind": "aabb",
+      "min": [
+        63.388359,
+        0,
+        17.31484
+      ],
+      "max": [
+        67.942515,
+        16.378941,
+        22.072583
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-4-wall-16",
+      "kind": "aabb",
+      "min": [
+        62.341143,
+        2.1,
+        20.072583
+      ],
+      "max": [
+        63.388359,
+        16.378941,
+        22.072583
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-4-wall-17",
+      "kind": "aabb",
+      "min": [
+        62.341143,
+        0,
+        17.31484
+      ],
+      "max": [
+        63.388359,
+        16.378941,
+        20.072583
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-4-wall-18",
+      "kind": "aabb",
+      "min": [
+        46.071767,
+        0,
+        16.31484
+      ],
+      "max": [
+        67.942515,
+        16.384444,
+        17.31484
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-4-wall-19",
+      "kind": "aabb",
+      "min": [
+        38.172186,
+        0,
+        2.415448
+      ],
+      "max": [
+        53.071767,
+        7,
+        8.31484
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-4-wall-20",
+      "kind": "aabb",
+      "min": [
+        52.560312,
+        0,
+        13.31484
+      ],
+      "max": [
+        52.560312,
+        6.81067,
+        16.31484
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-4-wall-21",
+      "kind": "aabb",
+      "min": [
+        45.071767,
+        0,
+        12.31484
+      ],
+      "max": [
+        52.560312,
+        7,
+        13.31484
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-4-wall-22",
+      "kind": "aabb",
+      "min": [
+        45.071767,
+        9.5,
+        12.31484
+      ],
+      "max": [
+        52.560312,
+        16.384444,
+        13.31484
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-4-wall-23",
+      "kind": "aabb",
+      "min": [
+        45.071767,
+        0,
+        10.31484
+      ],
+      "max": [
+        52.560312,
+        7,
+        11.31484
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-4-wall-24",
+      "kind": "aabb",
+      "min": [
+        45.071767,
+        9.5,
+        10.31484
+      ],
+      "max": [
+        52.560312,
+        16.384444,
+        11.31484
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-4-wall-25",
+      "kind": "aabb",
+      "min": [
+        52.526846,
+        0.126087,
+        8.31484
+      ],
+      "max": [
+        52.55134,
+        6.821475,
+        10.31484
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-4-wall-26",
+      "kind": "aabb",
+      "min": [
+        46.071767,
+        12,
+        7.31484
+      ],
+      "max": [
+        52.55134,
+        14.608356,
+        8.31484
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-4-wall-27",
+      "kind": "aabb",
+      "min": [
+        38.172186,
+        9.5,
+        7.31484
+      ],
+      "max": [
+        52.55134,
+        12,
+        8.31484
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-4-wall-28",
+      "kind": "aabb",
+      "min": [
+        50.071767,
+        9.5,
+        7.31484
+      ],
+      "max": [
+        52.071767,
+        12,
+        22.072583
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-4-wall-29",
+      "kind": "aabb",
+      "min": [
+        47.071767,
+        15,
+        10.31484
+      ],
+      "max": [
+        52.071767,
+        16.384444,
+        22.072583
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-4-wall-30",
+      "kind": "aabb",
+      "min": [
+        47.071767,
+        12,
+        7.31484
+      ],
+      "max": [
+        52.071767,
+        15,
+        22.072583
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-4-wall-31",
+      "kind": "aabb",
+      "min": [
+        47.071767,
+        0,
+        2.415448
+      ],
+      "max": [
+        52.071767,
+        7,
+        22.072583
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-4-wall-32",
+      "kind": "aabb",
+      "min": [
+        45.071767,
+        0,
+        13.31484
+      ],
+      "max": [
+        52.071767,
+        7,
+        16.31484
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-4-wall-33",
+      "kind": "aabb",
+      "min": [
+        45.071767,
+        9.5,
+        13.31484
+      ],
+      "max": [
+        52.071767,
+        16.384444,
+        16.31484
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-4-wall-34",
+      "kind": "aabb",
+      "min": [
+        45.071767,
+        0,
+        11.31484
+      ],
+      "max": [
+        52.071767,
+        7,
+        12.31484
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-4-wall-35",
+      "kind": "aabb",
+      "min": [
+        45.071767,
+        9.5,
+        11.31484
+      ],
+      "max": [
+        52.071767,
+        16.384444,
+        12.31484
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-4-wall-36",
+      "kind": "aabb",
+      "min": [
+        46.071767,
+        12,
+        8.31484
+      ],
+      "max": [
+        52.071767,
+        14.608356,
+        10.31484
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-4-wall-37",
+      "kind": "aabb",
+      "min": [
+        45.071767,
+        0,
+        8.31484
+      ],
+      "max": [
+        52.071767,
+        7,
+        10.31484
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-4-wall-38",
+      "kind": "aabb",
+      "min": [
+        45.071767,
+        9.5,
+        8.31484
+      ],
+      "max": [
+        52.071767,
+        12,
+        10.31484
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-4-wall-39",
+      "kind": "aabb",
+      "min": [
+        47.071767,
+        9.5,
+        2.415448
+      ],
+      "max": [
+        50.071767,
+        12,
+        22.072583
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-4-wall-40",
+      "kind": "aabb",
+      "min": [
+        38.172186,
+        7,
+        2.415448
+      ],
+      "max": [
+        50.071767,
+        9.5,
+        8.31484
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-4-wall-41",
+      "kind": "aabb",
+      "min": [
+        38.172186,
+        9.5,
+        2.415448
+      ],
+      "max": [
+        50.071767,
+        11.613192,
+        7.31484
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-4-wall-42",
+      "kind": "aabb",
+      "min": [
+        47.071767,
+        7,
+        2.415448
+      ],
+      "max": [
+        49.071767,
+        9.5,
+        22.072583
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-4-wall-43",
+      "kind": "aabb",
+      "min": [
+        45.071767,
+        7,
+        8.31484
+      ],
+      "max": [
+        49.071767,
+        9.5,
+        16.31484
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-4-wall-44",
+      "kind": "aabb",
+      "min": [
+        46.071767,
+        15,
+        10.31484
+      ],
+      "max": [
+        47.071767,
+        16.384444,
+        17.31484
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-4-wall-45",
+      "kind": "aabb",
+      "min": [
+        46.071767,
+        12,
+        7.31484
+      ],
+      "max": [
+        47.071767,
+        15,
+        17.31484
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-4-wall-46",
+      "kind": "aabb",
+      "min": [
+        46.071767,
+        0,
+        2.415448
+      ],
+      "max": [
+        47.071767,
+        12,
+        17.31484
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-4-wall-47",
+      "kind": "aabb",
+      "min": [
+        45.071767,
+        12,
+        10.31484
+      ],
+      "max": [
+        46.071767,
+        16.384444,
+        16.31484
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-4-wall-48",
+      "kind": "aabb",
+      "min": [
+        45.071767,
+        0,
+        2.415448
+      ],
+      "max": [
+        46.071767,
+        12,
+        16.31484
+      ]
+    },
+    {
+      "id": "brutalist-building-3-bake-4-4-wall-49",
+      "kind": "aabb",
+      "min": [
+        38.172186,
+        9.5,
+        2.415448
+      ],
+      "max": [
+        45.071767,
+        11.613192,
+        8.31484
       ]
     }
   ]

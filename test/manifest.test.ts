@@ -86,12 +86,20 @@ function placementPropCount(): number {
 
 function compile(doc: unknown, read: (uri: string) => Uint8Array | undefined, sources?: CompileSources) {
   const resolved = sources ?? readManifestSources(projectRoot(), doc);
-  // Partial sources still need the installed lights file when the scene keeps that path.
-  if (resolved && !resolved.lightsFile) {
-    const scene = doc && typeof doc === "object" ? (doc as { scene?: { lights?: unknown } }).scene : undefined;
-    if (typeof scene?.lights === "string") {
+  // Partial sources still need the installed lights and player pads when the scene keeps those paths.
+  if (resolved) {
+    const scene = doc && typeof doc === "object"
+      ? (doc as { scene?: { lights?: unknown; playerSpawnPoints?: unknown } }).scene
+      : undefined;
+    if (!resolved.lightsFile && typeof scene?.lights === "string") {
       const installed = readManifestSources(projectRoot(), document());
       if (installed?.lightsFile?.path === scene.lights) resolved.lightsFile = installed.lightsFile;
+    }
+    if (!resolved.playerSpawnPointsFile && typeof scene?.playerSpawnPoints === "string") {
+      const installed = readManifestSources(projectRoot(), document());
+      if (installed?.playerSpawnPointsFile?.path === scene.playerSpawnPoints) {
+        resolved.playerSpawnPointsFile = installed.playerSpawnPointsFile;
+      }
     }
   }
   return compileGame(doc, read, resolved);
@@ -112,7 +120,16 @@ test("installed manifest matches the authoritative world and keeps spawns clear"
   assert.equal(game.view.cityscape === undefined, scene.cityscape === undefined);
   assert.equal(game.view.sky === undefined, scene.sky === undefined);
   assert.ok(game.view.characters.length >= 2);
+  assert.ok(game.view.modelChoices.includes("grok-bot"));
+  assert.ok(game.view.modelChoices.includes("player-1"));
+  assert.ok(game.view.modelChoices.length >= 2);
+  assert.deepEqual(game.view.npcModelChoices, ["ratty", "cyborg-endoskeleton", "player-a", "player-b", "player-d"]);
+  assert.equal(game.view.characters.find((character) => character.id === "player-1")?.model, "/assets/models/player-2.glb");
+  assert.ok(game.view.characters.some((character) => character.id === "cyborg-endoskeleton"));
   for (const character of game.view.characters) assert.ok(character.scale > 0, character.id);
+  assert.ok((game.view.playerSpawns?.length ?? 0) >= 3);
+  const playerIds = new Set((game.view.playerSpawns ?? []).map((spawn) => spawn.id));
+  assert.equal(game.definition.spawnPoints.some((spawn) => playerIds.has(spawn.id)), false);
   assert.ok(game.view.staticModels.includes("/assets/models/brutalist-building-1-cbake.glb"));
   assert.ok(game.view.staticModels.includes("/assets/models/med-kit.glb"));
   assert.ok(game.view.staticModels.includes("/assets/models/ammo-box.glb"));
@@ -428,22 +445,25 @@ test("props.placements.json yields alien-weapon-1 at asset scale times placement
   scene.scene.bounds = { minX: -80, maxX: 80, minY: -2, maxY: 12, minZ: -80, maxZ: 80 };
   scene.scene.spawnPoints = [];
   const game = compile(scene, read);
-  const weapons = game.view.props.filter((prop) => prop.model.endsWith("/alien-weapon-enh.glb"));
-  assert.equal(weapons.length, 1);
-  const weapon = weapons[0]!;
-  assert.equal(weapon.id, "alien-weapon-1");
-  assert.equal(weapon.scale, 1.2);
+  const weaponAsset = (document().assets as Array<{ id?: string; uri?: string }> | undefined)?.find((item) => item.id === "alien-weapon-enh");
+  assert.equal(typeof weaponAsset?.uri, "string");
+  const weapon = game.view.props.find((prop) => prop.id === "alien-weapon-1");
+  assert.ok(weapon);
+  assert.equal(weapon.model, weaponAsset?.uri);
   assert.equal(weapon.animation, "idle");
   assert.equal(weapon.animations?.idle.clip, "rotate");
   assert.equal(game.view.buildings.some((building) => building.id === "alien-weapon-1"), false);
   const propsFile = JSON.parse(readFileSync(`${projectRoot()}/web/game/props.placements.json`, "utf8")) as {
-    placements: Array<{ id?: string; yaw?: number }>;
+    placements: Array<{ id?: string; yaw?: number; scale?: number }>;
   };
-  const stampYaw = propsFile.placements.find((item) => item.id === "alien-weapon-1")?.yaw;
-  assert.equal(typeof stampYaw, "number");
+  const stamp = propsFile.placements.find((item) => item.id === "alien-weapon-1");
+  assert.equal(typeof stamp?.yaw, "number");
+  const stampYaw = stamp?.yaw;
+  const expectedScale = assetScale("alien-weapon-enh") * (typeof stamp?.scale === "number" ? stamp.scale : 1);
+  assert.equal(weapon.scale, expectedScale);
   assert.equal(weapon.yaw, stampYaw);
   const pose = propInstancePose(weapon);
-  assert.equal(pose.scale, 1.2);
+  assert.equal(pose.scale, expectedScale);
   assert.equal(pose.yaw, stampYaw);
   const template = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial());
   const instanced = placeStaticInstances(template, [pose]);
@@ -452,7 +472,7 @@ test("props.placements.json yields alien-weapon-1 at asset scale times placement
   instanced[0]!.getMatrixAt(0, matrix);
   const scale = new THREE.Vector3();
   matrix.decompose(new THREE.Vector3(), new THREE.Quaternion(), scale);
-  assert.ok(Math.abs(scale.x - 1.2) < 1e-6 && Math.abs(scale.y - 1.2) < 1e-6 && Math.abs(scale.z - 1.2) < 1e-6);
+  assert.ok(Math.abs(scale.x - expectedScale) < 1e-6 && Math.abs(scale.y - expectedScale) < 1e-6 && Math.abs(scale.z - expectedScale) < 1e-6);
 
   const doubled = {
     formatVersion: 1,
@@ -478,7 +498,7 @@ test("props.placements.json yields alien-weapon-1 at asset scale times placement
   });
   const grown = merged.view.props.find((prop) => prop.id === "alien-weapon-1");
   assert.ok(grown);
-  assert.equal(grown.scale, 2.4);
+  assert.equal(grown.scale, assetScale("alien-weapon-enh") * 2);
   assert.equal(grown.animation, "idle");
   assert.equal(grown.animations?.idle.clip, "rotate");
   assert.ok(merged.definition.spawnPoints.some((spawn) => spawn.id === "pad" && spawn.x === 6));

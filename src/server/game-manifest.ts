@@ -58,6 +58,8 @@ type AssetRec = {
   animations?: Record<Movement, CharacterAnimation>;
   /** `"static"` placements share one InstancedMesh per source mesh. Omitted means clone. */
   instance?: "static";
+  /** Asset `type`, such as `"character"`. Omitted when the asset has none. */
+  assetType?: string;
 };
 
 /** A wall face from the manifest. Position and yaw are optional; the client falls back to the face anchor. */
@@ -76,6 +78,21 @@ const KNOWN_ORIGINS = new Set([
 ]);
 
 const WALL_IDS = [10, 11, 12, 13] as const;
+
+/** Same clearance rule as the kernel spawn check. A span above the head, or below the feet, is free. */
+function spawnHitsBox(
+  spawn: { x: number; y: number; z: number },
+  radius: number,
+  height: number,
+  box: { minX: number; maxX: number; minZ: number; maxZ: number; minY?: number; maxY?: number },
+): boolean {
+  if (box.minY !== undefined && box.maxY !== undefined) {
+    const head = spawn.y + height;
+    if (spawn.y >= box.maxY || head <= box.minY) return false;
+  }
+  return spawn.x + radius > box.minX && spawn.x - radius < box.maxX
+    && spawn.z + radius > box.minZ && spawn.z - radius < box.maxZ;
+}
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
@@ -313,6 +330,8 @@ export type CompileSources = {
   boundsFile?: PlacementFileSource;
   /** Set when `scene.spawnPoints` is a path. The text is the spawn array. */
   spawnPointsFile?: PlacementFileSource;
+  /** Set when `scene.playerSpawnPoints` is a path. The text is the human pad array. */
+  playerSpawnPointsFile?: PlacementFileSource;
   /**
    * Set when `scene.lights` is a path. The text is a lights object or a lights array.
    * Presentation hash only. Absent lights compile to `[]`.
@@ -420,36 +439,37 @@ function jsonObject(
 /** Inline array, or a path to a JSON file that is that array. Absent is an empty list. */
 function spawnList(
   scene: Record<string, unknown> | undefined,
-  sources: CompileSources | undefined,
+  field: "spawnPoints" | "playerSpawnPoints",
+  file: PlacementFileSource | undefined,
   issues: GameIssue[],
 ): unknown[] {
-  if (!scene || !Object.prototype.hasOwnProperty.call(scene, "spawnPoints")) return [];
-  const value = scene.spawnPoints;
+  const issuePath = `scene.${field}`;
+  if (!scene || !Object.prototype.hasOwnProperty.call(scene, field)) return [];
+  const value = scene[field];
   if (typeof value === "string") {
     if (!value.trim()) {
-      issues.push({ path: "scene.spawnPoints", message: "must be an array or a path" });
+      issues.push({ path: issuePath, message: "must be an array or a path" });
       return [];
     }
-    const file = sources?.spawnPointsFile;
     if (!file || file.path !== value) {
-      issues.push({ path: "scene.spawnPoints", message: "file was not loaded" });
+      issues.push({ path: issuePath, message: "file was not loaded" });
       return [];
     }
     let parsed: unknown;
     try {
       parsed = JSON.parse(file.text);
     } catch (err) {
-      issues.push({ path: "scene.spawnPoints", message: `invalid json: ${err instanceof Error ? err.message : String(err)}` });
+      issues.push({ path: issuePath, message: `invalid json: ${err instanceof Error ? err.message : String(err)}` });
       return [];
     }
     if (!Array.isArray(parsed)) {
-      issues.push({ path: "scene.spawnPoints", message: "must be an array" });
+      issues.push({ path: issuePath, message: "must be an array" });
       return [];
     }
     return parsed;
   }
   if (Array.isArray(value)) return value;
-  issues.push({ path: "scene.spawnPoints", message: "must be an array or a path" });
+  issues.push({ path: issuePath, message: "must be an array or a path" });
   return [];
 }
 
@@ -740,8 +760,9 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
         if (radius !== undefined && radius <= 0) issues.push({ path: `${path}.radius`, message: "must be > 0" });
         if (height !== undefined && height <= 0) issues.push({ path: `${path}.height`, message: "must be > 0" });
       }
+      const assetType = typeof item.type === "string" ? item.type : undefined;
       if (id && kind && uri && mediaType && licenseId && origin) {
-        assets.set(id, { id, kind, uri, mediaType, licenseId, origin, notes, scale, shape, radius, height, animation, animations, instance });
+        assets.set(id, { id, kind, uri, mediaType, licenseId, origin, notes, scale, shape, radius, height, animation, animations, instance, assetType });
       }
     });
   }
@@ -772,8 +793,12 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
     propEntries.push({ item, path: `scene.props[${index}]` });
   });
   const spawnEntries: Array<{ item: unknown; path: string }> = [];
-  spawnList(scene, sources, issues).forEach((item, index) => {
+  spawnList(scene, "spawnPoints", sources?.spawnPointsFile, issues).forEach((item, index) => {
     spawnEntries.push({ item, path: `scene.spawnPoints[${index}]` });
+  });
+  const playerSpawnEntries: Array<{ item: unknown; path: string }> = [];
+  spawnList(scene, "playerSpawnPoints", sources?.playerSpawnPointsFile, issues).forEach((item, index) => {
+    playerSpawnEntries.push({ item, path: `scene.playerSpawnPoints[${index}]` });
   });
 
   const bakedBuildings: ArenaView["buildings"] = [];
@@ -1045,36 +1070,65 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
   const pawnRadius = player ? num(player.radius, "player.radius", issues) : undefined;
   const pawnHeight = player ? num(player.height, "player.height", issues) : undefined;
   if (pawnRadius !== undefined && pawnRadius <= 0) issues.push({ path: "player.radius", message: "must be > 0" });
-  const choices = player && Array.isArray(player.modelChoices) ? player.modelChoices : undefined;
-  if (!choices || choices.length < 2) issues.push({ path: "player.modelChoices", message: "at least two model ids are required" });
   const characters: ArenaView["characters"] = [];
-  choices?.forEach((choice, index) => {
-    const id = str(choice, `player.modelChoices[${index}]`, issues);
-    refAsset(id, `player.modelChoices[${index}]`, "model");
-    const asset = id ? assets.get(id) : undefined;
-    if (id && asset?.kind === "model") {
-      if (!asset.animations) issues.push({ path: `player.modelChoices[${index}]`, message: "animations for idle, walk, run, fall, and angry are required" });
-      else characters.push({ id, model: asset.uri, scale: asset.scale ?? 1, animations: asset.animations });
+  const takeCharacters = (raw: unknown, path: string, min: number | undefined): string[] => {
+    if (raw === undefined) {
+      if (min !== undefined) issues.push({ path, message: `at least ${min} model ids are required` });
+      return [];
     }
-  });
+    if (!Array.isArray(raw)) {
+      issues.push({ path, message: "must be an array of model ids" });
+      return [];
+    }
+    if (min !== undefined && raw.length < min) issues.push({ path, message: `at least ${min} model ids are required` });
+    const ids: string[] = [];
+    raw.forEach((choice, index) => {
+      const id = str(choice, `${path}[${index}]`, issues);
+      refAsset(id, `${path}[${index}]`, "model");
+      const asset = id ? assets.get(id) : undefined;
+      if (!id || !asset || asset.kind !== "model") return;
+      if (asset.assetType !== "character") {
+        issues.push({ path: `${path}[${index}]`, message: "must be a character" });
+        return;
+      }
+      if (!asset.animations) {
+        issues.push({ path: `${path}[${index}]`, message: "animations for idle, walk, run, fall, and angry are required" });
+        return;
+      }
+      ids.push(id);
+      if (!characters.some((character) => character.id === id)) {
+        characters.push({ id, model: asset.uri, scale: asset.scale ?? 1, animations: asset.animations });
+      }
+    });
+    return ids;
+  };
+  const modelChoices = takeCharacters(player?.modelChoices, "player.modelChoices", 2);
+  const npcModelChoices = player && Object.prototype.hasOwnProperty.call(player, "npcModelChoices")
+    ? takeCharacters(player.npcModelChoices, "player.npcModelChoices", undefined)
+    : [];
 
-  const spawns: Array<{ id: string; x: number; y: number; z: number; yaw: number }> = [];
-  const seenSpawns = new Set<string>();
-  for (const entry of spawnEntries) {
-    const { item, path } = entry;
-    if (!isObject(item)) {
-      issues.push({ path, message: "must be an object" });
-      continue;
+  const readSpawns = (entries: Array<{ item: unknown; path: string }>, seen: Set<string>) => {
+    const parsed: Array<{ id: string; x: number; y: number; z: number; yaw: number }> = [];
+    for (const entry of entries) {
+      const { item, path } = entry;
+      if (!isObject(item)) {
+        issues.push({ path, message: "must be an object" });
+        continue;
+      }
+      const id = str(item.id, `${path}.id`, issues);
+      const x = num(item.x, `${path}.x`, issues);
+      const y = num(item.y, `${path}.y`, issues);
+      const z = num(item.z, `${path}.z`, issues);
+      const yaw = num(item.yaw, `${path}.yaw`, issues);
+      if (id && seen.has(id)) issues.push({ path: `${path}.id`, message: `duplicate id ${id}` });
+      if (id) seen.add(id);
+      if (id && x !== undefined && y !== undefined && z !== undefined && yaw !== undefined) parsed.push({ id, x, y, z, yaw });
     }
-    const id = str(item.id, `${path}.id`, issues);
-    const x = num(item.x, `${path}.x`, issues);
-    const y = num(item.y, `${path}.y`, issues);
-    const z = num(item.z, `${path}.z`, issues);
-    const yaw = num(item.yaw, `${path}.yaw`, issues);
-    if (id && seenSpawns.has(id)) issues.push({ path: `${path}.id`, message: `duplicate id ${id}` });
-    if (id) seenSpawns.add(id);
-    if (id && x !== undefined && y !== undefined && z !== undefined && yaw !== undefined) spawns.push({ id, x, y, z, yaw });
-  }
+    return parsed;
+  };
+  const seenSpawns = new Set<string>();
+  const spawns = readSpawns(spawnEntries, seenSpawns);
+  const playerSpawns = readSpawns(playerSpawnEntries, seenSpawns);
 
   const fileBytes = new Map<string, Uint8Array>();
   for (const asset of assets.values()) {
@@ -1223,6 +1277,13 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
     const messages = (err as { issues?: string[] }).issues ?? [err instanceof Error ? err.message : "static world rejected"];
     throw new GameManifestError(messages.map((message) => ({ path: "scene", message })));
   }
+  const blockedPads = playerSpawns.filter((spawn) => resolved.definition.aabbs.some((box) => spawnHitsBox(spawn, pawnRadius, pawnHeight, box)));
+  if (blockedPads.length) {
+    throw new GameManifestError(blockedPads.map((spawn) => ({
+      path: "scene.playerSpawnPoints",
+      message: `spawn ${spawn.id} intersects an obstacle`,
+    })));
+  }
 
   const sourceOf = new Map<number, string>();
   for (const [sourceId, box] of boxBySource) sourceOf.set(box.id, sourceId);
@@ -1268,6 +1329,8 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
     props,
     pickups,
     characters,
+    modelChoices,
+    ...(npcModelChoices.length > 0 ? { npcModelChoices } : {}),
     staticModels: [...assets.values()]
       .filter((asset) => asset.kind === "model" && asset.instance === "static")
       .map((asset) => asset.uri)
@@ -1288,6 +1351,9 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
     pawnRadius,
     pawnHeight,
     spawns: spawns.map((spawn) => ({ id: spawn.id, x: spawn.x, z: spawn.z, yaw: spawn.yaw })),
+    ...(playerSpawns.length > 0
+      ? { playerSpawns: playerSpawns.map((spawn) => ({ id: spawn.id, x: spawn.x, z: spawn.z, yaw: spawn.yaw })) }
+      : {}),
     lights,
     ...(grenadeModel ? { grenade: grenadeModel } : {}),
   };

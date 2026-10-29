@@ -160,18 +160,12 @@ test("one held key opens every baked leaf that names that key", () => {
     placements: Array<{ id?: string }>;
   };
   assert.equal(propsFile.placements.filter((row) => row.id === "key").length, 1);
-  const named = [
-    "brutalist-building-3-bake.door-1-1-9-22",
-    "brutalist-building-3-bake-1.door-1-1-9-22",
-  ];
   const leaves = doorsFile.placements.filter((door) => door.key === "key");
-  assert.ok(leaves.length >= named.length);
-  for (const id of named) {
-    const door = leaves.find((row) => row.id === id);
-    assert.ok(door, id);
-    assert.equal(door.locked, true, id);
-    assert.equal(door.key, "key", id);
-    assert.equal(door.open, false, id);
+  assert.ok(leaves.length >= 2);
+  for (const door of leaves) {
+    assert.equal(door.locked, true, door.id);
+    assert.equal(door.key, "key", door.id);
+    assert.equal(door.open, false, door.id);
   }
   let consumed = false;
   const held = {

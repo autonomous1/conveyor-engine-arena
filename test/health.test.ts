@@ -264,7 +264,8 @@ test("two clients: a kill stops movement and respawn returns full health on a sp
       pawnHeight: number;
       aabbs: TraceAabb[];
     };
-    const spawns = JSON.parse(readFileSync(fileURLToPath(new URL("../web/game/spawn-points.json", import.meta.url)), "utf8")) as Array<{ x: number; y: number; z: number }>;
+    // Humans claim and respawn on player pads. NPC wander marks are a different list.
+    const spawns = JSON.parse(readFileSync(fileURLToPath(new URL("../web/game/player-spawns.json", import.meta.url)), "utf8")) as Array<{ x: number; y: number; z: number }>;
     a = openClient(host.url, view);
     b = openClient(host.url, view);
     const aw = await a.welcome;

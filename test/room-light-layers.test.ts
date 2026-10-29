@@ -80,6 +80,7 @@ function view(): ArenaView {
     aabbs: [],
     pawnRadius: 0.3,
     pawnHeight: 1.7,
+    modelChoices: [],
     lights: [lamp, panel],
   };
 }

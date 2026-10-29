@@ -26,6 +26,7 @@
       "radius": "80"
     },
     "spawnPoints": "./web/game/spawn-points.json",
+    "playerSpawnPoints": "./web/game/player-spawns.json",
     "lights": "./web/game/rooms.lights.json",
     "placements": [
       "./web/game/buildings.placements.json",
@@ -392,11 +393,51 @@
           "referenceSpeed": 3.220485679
         },
         "fall": {
-          "clip": "fall",
+          "clip": "dance_05",
           "speed": 0
         },
         "angry": {
           "clip": "dance_05",
+          "speed": 3
+        }
+      },
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "CC0-1.0",
+        "status": "spdx"
+      },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Original procedural placeholder made for this arena. No third-party art."
+      }
+    },
+    {
+      "id": "steampunk-dog",
+      "kind": "model",
+      "type": "character",
+      "uri": "/assets/models/steampunk-dog.glb",
+      "scale": 2,
+      "animations": {
+        "idle": {
+          "clip": "preset:quadruped:walk",
+          "speed": 0
+        },
+        "walk": {
+          "clip": "preset:quadruped:walk",
+          "speed": 1,
+          "referenceSpeed": 0.897262531
+        },
+        "run": {
+          "clip": "preset:quadruped:walk",
+          "speed": 3,
+          "referenceSpeed": 3.220485679
+        },
+        "fall": {
+          "clip": "preset:quadruped:walk",
+          "speed": 0
+        },
+        "angry": {
+          "clip": "preset:quadruped:walk",
           "speed": 3
         }
       },
@@ -493,6 +534,23 @@
       }
     },
     {
+      "id": "szukalski-centerpiece",
+      "kind": "model",
+      "type": "crate",
+      "scale":6,
+      "instance": "static",
+      "uri": "/assets/models/szukalski-centerpiece.glb",
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "CC0-1.0",
+        "status": "spdx"
+      },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Generated with tripo"
+      }
+    },
+    {
       "id": "room-a",
       "kind": "model",
       "type": "room",
@@ -582,11 +640,11 @@
     {
       "id": "alien-weapon-enh",
       "kind": "model",
-      "scale": 1.2,
+      "scale": 1.5,
       "type": "weapon",
       "instance": "static",
       "animation": "idle",
-      "uri": "/assets/models/alien-weapon-enh.glb",
+      "uri": "/assets/models/laser-rifle.glb",
       "mediaType": "model/gltf-binary",
       "animations": {
         "idle": {
@@ -640,9 +698,12 @@
     "radius": 0.5,
     "height": 1.8,
     "modelChoices": [
+      "grok-bot",
+      "player-1"
+    ],
+    "npcModelChoices": [
       "ratty",
       "cyborg-endoskeleton",
-      "grok-bot",
       "player-a",
       "player-b",
       "player-d"

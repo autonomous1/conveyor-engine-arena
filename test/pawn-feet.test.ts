@@ -32,10 +32,18 @@ test("idle and fallen pawns rest on the floor and the shot stays at eye height",
         assert.equal(track.name.includes("position[y]") || track.name.endsWith(".position.y"), false, track.name);
       }
     }
+    const sourceFall = findClip(gltf.animations, asset.animations.fall.clip);
+    assert.ok(sourceFall, `${id} fall clip`);
     const fall = findClip(prepared.clips, asset.animations.fall.clip);
     assert.ok(fall, `${id} fall clip`);
-    assert.ok(fall.tracks.some((track) => track.name.endsWith(".position[x]")), `${id} fall keeps root x`);
-    assert.ok(fall.tracks.some((track) => track.name.endsWith(".position[z]")), `${id} fall keeps root z`);
+    // withoutRootMotionY keeps X and Z only when the source root's Y actually moves.
+    const keepsRoot = rootYSpan(sourceFall) > 1e-4;
+    if (keepsRoot) {
+      assert.ok(fall.tracks.some((track) => track.name.endsWith(".position[x]")), `${id} fall keeps root x`);
+      assert.ok(fall.tracks.some((track) => track.name.endsWith(".position[z]")), `${id} fall keeps root z`);
+    } else {
+      assert.equal(fall.tracks.some((track) => track.name.includes("position")), false, `${id} fall has no root motion to keep`);
+    }
 
     const templates: CharacterTemplates = new Map([
       [id, { object: prepared.object, clips: prepared.clips, animations: asset.animations as CharacterVisual["animations"] }],
@@ -56,12 +64,14 @@ test("idle and fallen pawns rest on the floor and the shot stays at eye height",
       assertPawnStays(parent.children[0]!, id);
     }
 
-    const boneName = fall.tracks.find((track) => track.name.endsWith(".position[x]"))!.name.slice(0, -".position[x]".length);
-    const bone = parent.children[0]!.getObjectByName(boneName);
-    assert.ok(bone, `${id} root bone ${boneName}`);
-    const restY = bone.position.y;
+    const rootTrack = fall.tracks.find((track) => track.name.endsWith(".position[x]"));
+    const bone = rootTrack
+      ? parent.children[0]!.getObjectByName(rootTrack.name.slice(0, -".position[x]".length))
+      : undefined;
+    if (rootTrack) assert.ok(bone, `${id} root bone`);
+    const restY = bone?.position.y;
     pawns.apply(snap(id, "fall"), 0.05, () => undefined);
-    assert.equal(bone.position.y, restY, `${id} mixer wrote root position.y`);
+    if (bone) assert.equal(bone.position.y, restY, `${id} mixer wrote root position.y`);
     assert.equal(animReport()[0]?.loop, THREE.LoopOnce);
     assert.equal(animReport()[0]?.clamp, true);
 
@@ -81,6 +91,24 @@ test("idle and fallen pawns rest on the floor and the shot stays at eye height",
     assert.equal(parent.children[0]!.position.y + EYE_HEIGHT, 1.6);
   }
 });
+
+/** Largest Y span on a vector position track. Matches the root-motion cutoff in pawn-feet. */
+function rootYSpan(clip: THREE.AnimationClip): number {
+  let best = 0;
+  for (const track of clip.tracks) {
+    if (!track.name.endsWith(".position") || track.getValueSize() < 2) continue;
+    const size = track.getValueSize();
+    let min = Infinity;
+    let max = -Infinity;
+    for (let i = 1; i < track.values.length; i += size) {
+      const value = track.values[i] ?? 0;
+      if (value < min) min = value;
+      if (value > max) max = value;
+    }
+    if (max - min > best) best = max - min;
+  }
+  return best;
+}
 
 function assertPawnStays(root: THREE.Object3D, id: string): void {
   assert.deepEqual([root.position.x, root.position.y, root.position.z], [3, 0, 4], `${id} pawn transform moved`);

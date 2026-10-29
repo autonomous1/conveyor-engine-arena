@@ -6,13 +6,14 @@ import { WebSocketServer, type WebSocket } from "ws";
 import { decodeFrame, encodeFrame, EngineWsServer } from "conveyor-engine-transport-ws";
 import type { TransportSocket } from "conveyor-engine-transport-ws";
 import { createAudit } from "../shared/audit.js";
-import { createPawnHealth } from "../shared/health.js";
+import { createPawnHealth, type SpawnPick } from "../shared/health.js";
+import { helloModel, parseModelFrame } from "../shared/model-choice.js";
 import { createPawnKit, createPickupHost } from "../shared/pickups.js";
 import { createArenaDoors, createDoorBlockers } from "./doors.js";
 import { createArenaFire } from "./fire.js";
 import { createArenaGrenades } from "./grenade.js";
 import { decodeMoveButtons } from "../shared/movements.js";
-import { createHeldInputs, startWanderLoop, startPropAnimation } from "./game.js";
+import { applyPawnModel, claimClearSpawn, createHeldInputs, placePawn, startWanderLoop, startPropAnimation } from "./game.js";
 import { createHostSocketPaths } from "./host-path.js";
 import { pawnBodies, releasePickupObstacle } from "./pickups.js";
 import { loadArena } from "./world-loader.js";
@@ -127,9 +128,11 @@ function refusedWelcome(text: string, refused: Set<number>): number | undefined 
   return undefined;
 }
 
-export async function startArenaServer(port = Number(process.env.PORT ?? 4173)): Promise<ArenaHost> {
+export async function startArenaServer(port = Number(process.env.PORT ?? 4173), holdNpcs = false): Promise<ArenaHost> {
   const loaded = loadArena();
   const held = createHeldInputs();
+  /** Pads chosen since the last commit. The next hello treats them as occupied. */
+  const reservedPads = new Map<number, SpawnPick>();
   const health = createPawnHealth();
   const kit = createPawnKit();
   const pickupHost = createPickupHost(loaded.view.pickups ?? []);
@@ -160,7 +163,7 @@ export async function startArenaServer(port = Number(process.env.PORT ?? 4173)):
   const engine: EngineWsServer = new EngineWsServer({
     compatibility: { protocol: 1, world: loaded.view.world },
     bundle: { bundleId: loaded.view.bundleId, authoritativeHash: loaded.view.authoritativeHash },
-    onHello: (session): number | undefined => {
+    onHello: (session, hello): number | undefined => {
       const used = new Set<number>();
       for (const clientId of engine.connected) {
         if (clientId === session.clientId) continue;
@@ -168,12 +171,26 @@ export async function startArenaServer(port = Number(process.env.PORT ?? 4173)):
         if (record?.connected && record.ownedEntity !== undefined) used.add(record.ownedEntity);
       }
       const previous = engine.gateway.get(session.clientId);
-      if (previous?.connected && previous.ownedEntity !== undefined && !used.has(previous.ownedEntity)) {
-        return previous.ownedEntity;
+      const reused = previous?.connected && previous.ownedEntity !== undefined && !used.has(previous.ownedEntity)
+        ? previous.ownedEntity
+        : undefined;
+      const seats = loaded.agents.filter((agent) => agent.role === "player");
+      const owned = reused ?? seats.find((agent) => !used.has(agent.id))?.id;
+      if (owned === undefined) {
+        refused.add(session.clientId);
+        return undefined;
       }
-      const free = loaded.agents.find((agent) => !used.has(agent.id))?.id;
-      if (free === undefined) refused.add(session.clientId);
-      return free;
+      if (reused === undefined) {
+        const pad = claimClearSpawn(loaded.world, owned, loaded.playerSpawns, reservedPads);
+        if (pad) {
+          placePawn(loaded.world, owned, pad);
+          const agent = loaded.agents.find((item) => item.id === owned);
+          if (agent) agent.heading = pad.yaw;
+          reservedPads.set(owned, pad);
+        }
+      }
+      applyPawnModel(loaded.world, owned, helloModel(hello), loaded.view.modelChoices);
+      return owned;
     },
     onAdmit: (input) => {
       const owned = engine.gateway.get(input.clientId)?.ownedEntity;
@@ -222,6 +239,7 @@ export async function startArenaServer(port = Number(process.env.PORT ?? 4173)):
     },
   });
   const stopLoop = startWanderLoop(loaded.world, loaded.agents, engine, held, (line) => console.error(line), health, audit, () => {
+    reservedPads.clear();
     const grants = pickupHost.take(pawnBodies(loaded.world, health), health, kit);
     for (const grant of grants) {
       releasePickupObstacle(loaded.world, loaded.view.aabbs, grant.id);
@@ -237,7 +255,7 @@ export async function startArenaServer(port = Number(process.env.PORT ?? 4173)):
       }
     }
     grenades.tick();
-  }, loaded.view.noclip === true);
+  }, loaded.view.noclip === true, loaded.playerSpawns, holdNpcs);
   const propClips = startPropAnimation(loaded.view.props);
   const fire = createArenaFire({
     world: loaded.world,
@@ -280,6 +298,12 @@ export async function startArenaServer(port = Number(process.env.PORT ?? 4173)):
     const socket = socketFromWs(ws, refused, (clientId) => engine.disconnect(clientId), (sock, frame) => {
       const clientId = clientIdFor(engine, sock);
       if (clientId === undefined) return;
+      const chosen = parseModelFrame(frame);
+      if (chosen) {
+        const pawnId = engine.replicator.get(clientId)?.ownedEntity;
+        if (pawnId !== undefined) applyPawnModel(loaded.world, pawnId, chosen, loaded.view.modelChoices);
+        return;
+      }
       try {
         fire.onFrame(clientId, frame);
       } catch (err) {
