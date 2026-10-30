@@ -40,14 +40,13 @@
   },
   "license": "ISC",
   "dependencies": {
-    "conveyor-engine-assets": "^0.1.0",
-    "conveyor-engine-client": "^0.1.0",
-    "conveyor-engine-core": "^0.1.0",
-    "conveyor-engine-replication": "^0.1.0",
-    "conveyor-engine-three": "^0.1.0",
-    "conveyor-engine-transport-ws": "^0.1.0",
-    "conveyor-engine-world": "^0.1.0",
-    "npm": "^11.21.1",
+    "conveyor-engine-assets": "^0.1.1",
+    "conveyor-engine-client": "^0.1.1",
+    "conveyor-engine-core": "^0.1.1",
+    "conveyor-engine-replication": "^0.1.1",
+    "conveyor-engine-three": "^0.1.1",
+    "conveyor-engine-transport-ws": "^0.1.1",
+    "conveyor-engine-world": "^0.1.1",
     "three": "~0.186.0",
     "three-gamepad-controls": "^0.24.0",
     "ws": "^8.18.0"
@@ -56,7 +55,7 @@
     "@gltf-transform/cli": "4.5.0",
     "@types/node": "^22.10.0",
     "@types/ws": "^8.5.14",
-    "blueprint-scene": "^0.1.4",
+    "blueprint-scene": "^0.1.7",
     "esbuild": "^0.25.0",
     "typescript": "^5.8.2"
   }
