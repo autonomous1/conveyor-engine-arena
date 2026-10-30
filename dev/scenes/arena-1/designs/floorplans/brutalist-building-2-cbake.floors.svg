@@ -48,10 +48,10 @@
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
      inkscape:zoom="11.412027"
-     inkscape:cx="24.41168"
+     inkscape:cx="24.324053"
      inkscape:cy="58.885251"
      inkscape:document-units="mm"
-     inkscape:current-layer="layer2"
+     inkscape:current-layer="g30179"
      showgrid="false"
      inkscape:window-width="2812"
      inkscape:window-height="1549"
@@ -269,9 +269,9 @@
        style="display:inline;vector-effect:none;fill:url(#pattern2787);fill-opacity:1;fill-rule:evenodd;stroke:#0000ff;stroke-width:0.0264582;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
        id="brutalist-building-2-cbake-7"
        d="m 0.0132291,267.35227 v 29.63448 H 10.014238 v -5.81724 H 4.5132289 v -18.08709 h 8.3913891 v -5.73015 z"
-       inkscape:label="model:brutalist-building-2-cbake"
+       inkscape:label="floor-texture"
        data-model="brutalist-building-2-cbake"
-       z="2.75" />
+       z="0" />
   </g>
   <g
      inkscape:groupmode="layer"
@@ -301,6 +301,20 @@
     </g>
   </g>
   <g
+     style="display:none"
+     inkscape:label="floor-2-texture"
+     id="g30183"
+     inkscape:groupmode="layer">
+    <path
+       z="2.75"
+       data-model="brutalist-building-2-cbake"
+       inkscape:label="floor-texture"
+       d="m 0.0132291,267.35227 v 29.63448 H 10.014238 v -5.81724 H 4.5132289 v -18.08709 h 8.3913891 v -5.73015 z"
+       id="path30181"
+       style="display:inline;vector-effect:none;fill:url(#pattern2787);fill-opacity:1;fill-rule:evenodd;stroke:#0000ff;stroke-width:0.0264582;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
+       inkscape:connector-curvature="0" />
+  </g>
+  <g
      inkscape:groupmode="layer"
      id="layer4"
      inkscape:label="floor-3"
@@ -318,5 +332,19 @@
          style="vector-effect:none;fill:none;fill-opacity:1;fill-rule:evenodd;stroke:#0000ff;stroke-width:0.00088194;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
          inkscape:connector-curvature="0" />
     </g>
+  </g>
+  <g
+     style="display:inline"
+     inkscape:label="floor-3-texture"
+     id="g30179"
+     inkscape:groupmode="layer">
+    <path
+       z="5.5"
+       data-model="brutalist-building-2-cbake"
+       inkscape:label="floor-texture"
+       d="m 0.0132291,267.35227 v 29.63448 H 10.014238 v -5.81724 H 4.5132289 v -18.08709 h 8.3913891 v -5.73015 z"
+       id="path30177"
+       style="display:inline;vector-effect:none;fill:url(#pattern2787);fill-opacity:1;fill-rule:evenodd;stroke:#0000ff;stroke-width:0.0264582;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
+       inkscape:connector-curvature="0" />
   </g>
 </svg>
