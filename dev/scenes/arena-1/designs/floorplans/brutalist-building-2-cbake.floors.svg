@@ -47,11 +47,11 @@
      borderopacity="1.0"
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
-     inkscape:zoom="11.412027"
-     inkscape:cx="24.324053"
-     inkscape:cy="58.885251"
+     inkscape:zoom="39.970962"
+     inkscape:cx="21.775273"
+     inkscape:cy="13.012587"
      inkscape:document-units="mm"
-     inkscape:current-layer="g30179"
+     inkscape:current-layer="layer3"
      showgrid="false"
      inkscape:window-width="2812"
      inkscape:window-height="1549"
@@ -228,16 +228,6 @@
      id="layer2"
      inkscape:label="floor-1"
      style="display:inline">
-    <rect
-       style="color:#000000;display:inline;overflow:visible;opacity:1;vector-effect:none;fill:none;fill-opacity:1;fill-rule:nonzero;stroke:#000000;stroke-width:0.02649075;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
-       id="room-a-1-5"
-       width="9.9735088"
-       height="5.9735093"
-       x="-10.036755"
-       y="-296.98676"
-       inkscape:label="model:room-a"
-       transform="scale(-1)"
-       z="0.1" />
     <g
        id="brutalist-building-2-cbake"
        data-model="brutalist-building-2-cbake"
@@ -258,6 +248,16 @@
        x="0.11305027"
        y="267.45206"
        inkscape:label="model:room-b" />
+    <rect
+       style="color:#000000;display:inline;overflow:visible;opacity:1;vector-effect:none;fill:none;fill-opacity:1;fill-rule:nonzero;stroke:#000000;stroke-width:0.02562737;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
+       id="room-a-1-5-8"
+       width="9.7888937"
+       height="5.6959162"
+       x="-9.9017076"
+       y="-296.93719"
+       inkscape:label="model:room-a"
+       transform="scale(-1)"
+       z="0.1" />
   </g>
   <g
      inkscape:groupmode="layer"
@@ -299,6 +299,16 @@
          style="vector-effect:none;fill:none;fill-opacity:1;fill-rule:evenodd;stroke:#0000ff;stroke-width:0.00088194;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
          inkscape:connector-curvature="0" />
     </g>
+    <rect
+       style="color:#000000;display:inline;overflow:visible;opacity:1;vector-effect:none;fill:none;fill-opacity:1;fill-rule:nonzero;stroke:#000000;stroke-width:0.02562737;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
+       id="room-a-1-5-8-8"
+       width="9.7888937"
+       height="5.6959162"
+       x="-9.9017076"
+       y="-296.93719"
+       inkscape:label="model:room-a"
+       transform="scale(-1)"
+       z="0.1" />
   </g>
   <g
      style="display:none"
@@ -334,7 +344,7 @@
     </g>
   </g>
   <g
-     style="display:inline"
+     style="display:none"
      inkscape:label="floor-3-texture"
      id="g30179"
      inkscape:groupmode="layer">

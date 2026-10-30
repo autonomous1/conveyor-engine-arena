@@ -30,7 +30,7 @@
      inkscape:cx="11.290859"
      inkscape:cy="11.338583"
      inkscape:document-units="mm"
-     inkscape:current-layer="layer10"
+     inkscape:current-layer="layer11"
      showgrid="false"
      inkscape:window-width="2812"
      inkscape:window-height="1549"
@@ -57,12 +57,12 @@
        sodipodi:absref="/home/tim/dev/conveyor-engine-arena/dev/scenes/arena-1/designs/rooms/textures/floor.png"
        xlink:href="textures/floor.png"
        inkscape:label="floor"
-       width="10"
-       height="6"
+       width="9.8149996"
+       height="5.7220001"
        preserveAspectRatio="none"
        id="image19968"
        x="0"
-       y="291" />
+       y="291.27802" />
   </g>
   <g
      inkscape:label="walls"
@@ -72,7 +72,7 @@
        sodipodi:absref="/home/tim/dev/conveyor-engine-arena/dev/scenes/arena-1/designs/rooms/textures/wall-8-crop1.png"
        xlink:href="textures/wall-8-crop1.png"
        inkscape:label="back"
-       width="10"
+       width="9.8149996"
        height="4"
        preserveAspectRatio="none"
        id="image20092"
@@ -82,50 +82,50 @@
        sodipodi:absref="/home/tim/dev/conveyor-engine-arena/dev/scenes/arena-1/designs/rooms/textures/wall-7-crop1.png"
        xlink:href="textures/wall-7-crop1.png"
        inkscape:label="front"
-       width="10"
+       width="9.8149996"
        height="4"
        preserveAspectRatio="none"
        id="image20138"
        x="0"
-       y="287" />
+       y="287.27802" />
     <image
        sodipodi:absref="/home/tim/dev/conveyor-engine-arena/dev/scenes/arena-1/designs/rooms/textures/wall-6.png"
        xlink:href="textures/wall-6.png"
        inkscape:label="left"
        transform="rotate(90)"
-       width="6"
+       width="5.7220001"
        height="4"
        preserveAspectRatio="none"
        id="image20200"
-       x="291"
-       y="1.781861e-14" />
+       x="291.27802"
+       y="1.7762178e-14" />
     <image
        sodipodi:absref="/home/tim/dev/conveyor-engine-arena/dev/scenes/arena-1/designs/rooms/textures/wall-2.png"
        xlink:href="textures/wall-2.png"
        inkscape:label="right"
        transform="rotate(-90)"
-       width="6"
+       width="5.7220001"
        height="4"
        preserveAspectRatio="none"
        id="image20262"
-       x="-297"
-       y="10" />
+       x="-297.00003"
+       y="9.8149996" />
   </g>
   <g
      inkscape:groupmode="layer"
      id="layer11"
      inkscape:label="ceiling"
-     style="display:none">
+     style="display:inline">
     <image
        sodipodi:absref="/home/tim/dev/conveyor-engine-arena/dev/scenes/arena-1/designs/rooms/textures/ceiling.png"
        xlink:href="textures/ceiling.png"
        inkscape:label="ceiling"
-       width="10"
-       height="6"
+       width="9.8149996"
+       height="5.7220001"
        preserveAspectRatio="none"
        id="image20324"
        x="0"
-       y="291" />
+       y="291.27802" />
   </g>
   <g
      inkscape:groupmode="layer"
@@ -149,7 +149,7 @@
        id="door-1-1-9-22-5"
        width="0.49405965"
        height="1.073"
-       x="9.7661076"
+       x="9.5893307"
        y="293.45828"
        model="door2.glb"
        inkscape:label="model:door-2"

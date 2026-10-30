@@ -5,101 +5,101 @@
   "glb": "room-a.glb",
   "source": "svg",
   "footprint": {
-    "minX": -5,
-    "maxX": 5,
-    "minZ": -3,
-    "maxZ": 3
+    "minX": -4.9075,
+    "maxX": 4.9075,
+    "minZ": -2.861,
+    "maxZ": 2.861
   },
   "height": 4,
   "obstacles": [
     {
       "id": "front.0",
-      "minX": -5,
-      "maxX": 5,
+      "minX": -4.9075,
+      "maxX": 4.9075,
       "minY": 0,
       "maxY": 4,
-      "minZ": 3,
-      "maxZ": 3.2
+      "minZ": 2.861,
+      "maxZ": 3.061
     },
     {
       "id": "back.0",
-      "minX": -5,
-      "maxX": 5,
+      "minX": -4.9075,
+      "maxX": 4.9075,
       "minY": 0,
       "maxY": 4,
-      "minZ": -3.2,
-      "maxZ": -3
+      "minZ": -3.061,
+      "maxZ": -2.861
     },
     {
       "id": "left.0",
-      "minX": -5.2,
-      "maxX": -5,
+      "minX": -5.1075,
+      "maxX": -4.9075,
       "minY": 0,
       "maxY": 2.1,
-      "minZ": 0.56177,
-      "maxZ": 3
+      "minZ": 0.70079,
+      "maxZ": 2.861
     },
     {
       "id": "left.1",
-      "minX": -5.2,
-      "maxX": -5,
+      "minX": -5.1075,
+      "maxX": -4.9075,
       "minY": 0,
       "maxY": 2.1,
-      "minZ": -3,
-      "maxZ": -0.51123
+      "minZ": -2.861,
+      "maxZ": -0.37221
     },
     {
       "id": "left.2",
-      "minX": -5.2,
-      "maxX": -5,
+      "minX": -5.1075,
+      "maxX": -4.9075,
       "minY": 2.1,
       "maxY": 4,
-      "minZ": -3,
-      "maxZ": 3
+      "minZ": -2.861,
+      "maxZ": 2.861
     },
     {
       "id": "right.0",
-      "minX": 5,
-      "maxX": 5.2,
+      "minX": 4.9075,
+      "maxX": 5.1075,
       "minY": 0,
       "maxY": 2.1,
-      "minZ": -3,
-      "maxZ": -0.53128
+      "minZ": -2.861,
+      "maxZ": -0.39226
     },
     {
       "id": "right.1",
-      "minX": 5,
-      "maxX": 5.2,
+      "minX": 4.9075,
+      "maxX": 5.1075,
       "minY": 0,
       "maxY": 2.1,
-      "minZ": 0.54172,
-      "maxZ": 3
+      "minZ": 0.68074,
+      "maxZ": 2.861
     },
     {
       "id": "right.2",
-      "minX": 5,
-      "maxX": 5.2,
+      "minX": 4.9075,
+      "maxX": 5.1075,
       "minY": 2.1,
       "maxY": 4,
-      "minZ": -3,
-      "maxZ": 3
+      "minZ": -2.861,
+      "maxZ": 2.861
     },
     {
       "id": "floor.0",
-      "minX": -5,
-      "maxX": 5,
+      "minX": -4.9075,
+      "maxX": 4.9075,
       "minY": -0.1,
       "maxY": 0,
-      "minZ": -3,
-      "maxZ": 3
+      "minZ": -2.861,
+      "maxZ": 2.861
     }
   ],
   "walkable": [
     {
-      "minX": -5,
-      "maxX": 5,
-      "minZ": -3,
-      "maxZ": 3
+      "minX": -4.9075,
+      "maxX": 4.9075,
+      "minZ": -2.861,
+      "maxZ": 2.861
     }
   ],
   "holes": [],
@@ -109,9 +109,9 @@
       "model": "door-1",
       "wall": "left",
       "center": [
-        -5,
+        -4.9075,
         0,
-        0.02527
+        0.16429
       ],
       "width": 1.073,
       "height": 2.1,
@@ -125,9 +125,9 @@
       "model": "door-2",
       "wall": "right",
       "center": [
-        5,
+        4.9075,
         0,
-        0.00522
+        0.14424
       ],
       "width": 1.073,
       "height": 2.1,
@@ -142,9 +142,9 @@
       "id": "cover-crate-2-1",
       "model": "ammo-box",
       "position": [
-        -3.009367,
+        -2.916867,
         0,
-        2.04767
+        2.18669
       ],
       "yaw": 0,
       "scale": 1,
@@ -155,9 +155,9 @@
       "id": "cover-crate-2-6",
       "model": "med-kit",
       "position": [
-        -1.402642,
+        -1.310141,
         0,
-        -1.60656
+        -1.46754
       ],
       "yaw": 0,
       "scale": 1,
@@ -170,9 +170,9 @@
       "id": "lamp",
       "type": "point",
       "position": [
-        -0.012372,
+        0.080129,
         3.75,
-        0.18201
+        0.32103
       ],
       "color": "#ffd9a0",
       "intensity": 8,
