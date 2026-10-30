@@ -28,7 +28,7 @@ const root = path.join(import.meta.dirname, "..");
 /** Floor-2 room leaf: the building hull does not fill this opening. */
 const PASSAGE = "brutalist-building-2-cbake.room-b-1-3.door-1-1-9-22";
 /** Ground room leaf: same use path. */
-const GROUND = "brutalist-building-2-cbake.room-a-1-5.door-1-1-9-22-5";
+const GROUND = "brutalist-building-2-cbake.room-a-1-5-8.door-1-1-9-22-5";
 /** Locked exterior leaf. The stamped gap stays 2 m. */
 const EXTERIOR = "brutalist-building-3-bake.door-1-1-9-22";
 
