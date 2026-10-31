@@ -28,6 +28,7 @@
     "spawnPoints": "./web/game/spawn-points.json",
     "playerSpawnPoints": "./web/game/player-spawns.json",
     "lights": "./web/game/rooms.lights.json",
+    "elevators": "./web/game/elevators.json",
     "placements": [
       "./web/game/buildings.placements.json",
       "./web/game/doors.placements.json",
@@ -66,6 +67,58 @@
       "provenance": {
         "origin": "manual",
         "notes": "Original rebaked onto simpler cube model for this arena."
+      }
+    },
+    {
+      "id": "brutalist-building-1-cbake.floor-2.hall",
+      "kind": "model",
+      "type": "floor",
+      "instance": "static",
+      "uri": "/assets/models/brutalist-building-1-cbake.floor-2.hall.glb",
+      "mediaType": "model/gltf-binary",
+      "license": { "id": "unspecified", "status": "unknown" },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Elevated hall floor baked from brutalist-building-1-cbake.floors.svg. Albedo is the floor-texture pattern."
+      }
+    },
+    {
+      "id": "brutalist-building-1-cbake.floor-3.hall",
+      "kind": "model",
+      "type": "floor",
+      "instance": "static",
+      "uri": "/assets/models/brutalist-building-1-cbake.floor-3.hall.glb",
+      "mediaType": "model/gltf-binary",
+      "license": { "id": "unspecified", "status": "unknown" },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Elevated hall floor baked from brutalist-building-1-cbake.floors.svg. Albedo is the floor-texture pattern."
+      }
+    },
+    {
+      "id": "brutalist-building-1-cbake.floor-4.hall",
+      "kind": "model",
+      "type": "floor",
+      "instance": "static",
+      "uri": "/assets/models/brutalist-building-1-cbake.floor-4.hall.glb",
+      "mediaType": "model/gltf-binary",
+      "license": { "id": "unspecified", "status": "unknown" },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Elevated hall floor baked from brutalist-building-1-cbake.floors.svg. Albedo is the floor-texture pattern."
+      }
+    },
+    {
+      "id": "brutalist-building-1-cbake.floor-5.hall",
+      "kind": "model",
+      "type": "floor",
+      "instance": "static",
+      "uri": "/assets/models/brutalist-building-1-cbake.floor-5.hall.glb",
+      "mediaType": "model/gltf-binary",
+      "license": { "id": "unspecified", "status": "unknown" },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Elevated hall floor baked from brutalist-building-1-cbake.floors.svg. Albedo is the floor-texture pattern."
       }
     },
     {
@@ -518,6 +571,23 @@
       }
     },
     {
+      "id": "elevator-1-door",
+      "kind": "model",
+      "type": "door",
+      "action":"yaw",
+      "instance": "static",
+      "uri": "/assets/models/elevator-1-door.glb",
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "CC0-1.0",
+        "status": "spdx"
+      },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Generated with blueprint-sceen prop --shape door"
+      }
+    },
+    {
       "id": "ammo-box",
       "kind": "model",
       "type": "ammo",
@@ -604,6 +674,22 @@
       "type": "room",
       "instance": "static",
       "uri": "/assets/models/room-b.glb",
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "CC0-1.0",
+        "status": "spdx"
+      },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Generated with blueprint-sceen prop --shape crate"
+      }
+    },
+    {
+      "id": "elevator-1",
+      "kind": "model",
+      "type": "room",
+      "instance": "static",
+      "uri": "/assets/models/elevator-1.glb",
       "mediaType": "model/gltf-binary",
       "license": {
         "id": "CC0-1.0",

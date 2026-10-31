@@ -86,10 +86,10 @@ function placementPropCount(): number {
 
 function compile(doc: unknown, read: (uri: string) => Uint8Array | undefined, sources?: CompileSources) {
   const resolved = sources ?? readManifestSources(projectRoot(), doc);
-  // Partial sources still need the installed lights and player pads when the scene keeps those paths.
+  // Partial sources still need the installed lights, player pads, and elevators when the scene keeps those paths.
   if (resolved) {
     const scene = doc && typeof doc === "object"
-      ? (doc as { scene?: { lights?: unknown; playerSpawnPoints?: unknown } }).scene
+      ? (doc as { scene?: { lights?: unknown; playerSpawnPoints?: unknown; elevators?: unknown } }).scene
       : undefined;
     if (!resolved.lightsFile && typeof scene?.lights === "string") {
       const installed = readManifestSources(projectRoot(), document());
@@ -100,6 +100,10 @@ function compile(doc: unknown, read: (uri: string) => Uint8Array | undefined, so
       if (installed?.playerSpawnPointsFile?.path === scene.playerSpawnPoints) {
         resolved.playerSpawnPointsFile = installed.playerSpawnPointsFile;
       }
+    }
+    if (!resolved.elevatorsFile && typeof scene?.elevators === "string") {
+      const installed = readManifestSources(projectRoot(), document());
+      if (installed?.elevatorsFile?.path === scene.elevators) resolved.elevatorsFile = installed.elevatorsFile;
     }
   }
   return compileGame(doc, read, resolved);
@@ -516,6 +520,63 @@ test("props.placements.json yields alien-weapon-1 at asset scale times placement
   assert.throws(() => compile(missing, read, { placementFiles: [] }), (err: unknown) => {
     assert.ok(err instanceof GameManifestError);
     assert.match(err.message, /file was not loaded/);
+    return true;
+  });
+});
+
+test("scene.elevators path compiles and an absent field omits the key", () => {
+  const files = filesFromDisk();
+  const read = (uri: string) => files.get(uri);
+  const bareDoc = structuredClone(document()) as { scene: Record<string, unknown> };
+  delete bareDoc.scene.elevators;
+  const bare = compile(bareDoc, read);
+  assert.equal("elevators" in bare.view, false);
+
+  const withPath = structuredClone(document()) as { scene: Record<string, unknown> };
+  withPath.scene.elevators = "./web/game/elevators.json";
+  const loaded = readManifestSources(projectRoot(), withPath);
+  assert.ok(loaded?.elevatorsFile, "elevators file was not loaded");
+  const compiled = compile(withPath, read, loaded);
+  assert.ok(compiled.view.elevators && compiled.view.elevators.length > 0);
+  assert.equal(compiled.authoritativeHash, bare.authoritativeHash);
+  assert.equal(compiled.presentationHash, bare.presentationHash);
+  for (const row of compiled.view.elevators) {
+    assert.ok(row.stops.length >= 2, row.id);
+    assert.equal(row.landings.length, row.stops.length, row.id);
+    assert.ok(row.polygon.length >= 3, row.id);
+    assert.ok(row.speed > 0, row.id);
+    assert.ok(row.waitS >= 0, row.id);
+  }
+
+  const emptySources = readManifestSources(projectRoot(), withPath)!;
+  emptySources.elevatorsFile = {
+    path: "./web/game/elevators.json",
+    text: JSON.stringify({ formatVersion: 1, units: "meters", elevators: [] }),
+  };
+  const empty = compile(withPath, read, emptySources);
+  assert.equal("elevators" in empty.view, false);
+  assert.equal(empty.authoritativeHash, bare.authoritativeHash);
+  assert.equal(empty.presentationHash, bare.presentationHash);
+
+  const badSources = readManifestSources(projectRoot(), withPath)!;
+  badSources.elevatorsFile = {
+    path: "./web/game/elevators.json",
+    text: JSON.stringify({
+      formatVersion: 1,
+      units: "meters",
+      elevators: [{
+        id: "bad-cab",
+        stops: [2, 1],
+        speed: 1,
+        waitS: 0,
+        polygon: [[0, 0], [1, 0], [1, 1]],
+        landings: [[0, 2, 0], [0, 1, 0]],
+      }],
+    }),
+  };
+  assert.throws(() => compile(withPath, read, badSources), (err: unknown) => {
+    assert.ok(err instanceof GameManifestError);
+    assert.ok(err.issues.some((issue) => issue.path.includes("bad-cab")));
     return true;
   });
 });

@@ -10,6 +10,7 @@ import { createPawnHealth, type SpawnPick } from "../shared/health.js";
 import { helloModel, parseModelFrame } from "../shared/model-choice.js";
 import { createPawnKit, createPickupHost } from "../shared/pickups.js";
 import { createArenaDoors, createDoorBlockers } from "./doors.js";
+import { createArenaElevators } from "./elevators.js";
 import { createArenaFire } from "./fire.js";
 import { createArenaGrenades } from "./grenade.js";
 import { decodeMoveButtons } from "../shared/movements.js";
@@ -150,6 +151,8 @@ export async function startArenaServer(port = Number(process.env.PORT ?? 4173), 
     if (welcome.type !== "welcome") return text;
     welcome.pickups = pickupHost.remainingIds();
     welcome.doors = doorHost.snapshot();
+    const elevators = elevatorHost.snapshot();
+    if (elevators.length > 0) welcome.elevators = elevators;
     const owned = welcome.ownedEntityId;
     if (typeof owned === "number") {
       const weapon = kit.weaponOf(owned);
@@ -230,6 +233,24 @@ export async function startArenaServer(port = Number(process.env.PORT ?? 4173), 
     blockers: createDoorBlockers(loaded.world),
     log: (line) => console.log(line),
   });
+  const elevatorHost = createArenaElevators({
+    elevators: loaded.view.elevators ?? [],
+    world: loaded.world,
+    pawns: () => pawnBodies(loaded.world, health),
+    ownedPawn(clientId) {
+      return engine.replicator.get(clientId)?.ownedEntity;
+    },
+    alive(pawnId) {
+      return !health.isDead(pawnId);
+    },
+    sendAll(frame) {
+      const text = encodeFrame(frame);
+      for (const clientId of engine.connected) {
+        engine.session(clientId)?.socket.send(text);
+      }
+    },
+    log: (line) => console.log(line),
+  });
   const grenades = createArenaGrenades({
     world: loaded.world,
     server: engine,
@@ -255,7 +276,7 @@ export async function startArenaServer(port = Number(process.env.PORT ?? 4173), 
       }
     }
     grenades.tick();
-  }, loaded.view.noclip === true, loaded.playerSpawns, holdNpcs);
+  }, loaded.view.noclip === true, loaded.playerSpawns, holdNpcs, elevatorHost);
   const propClips = startPropAnimation(loaded.view.props);
   const fire = createArenaFire({
     world: loaded.world,
@@ -315,7 +336,15 @@ export async function startArenaServer(port = Number(process.env.PORT ?? 4173), 
         console.error("grenade threw", err);
       }
       try {
-        doorHost.onFrame(clientId, frame);
+        elevatorHost.onFrame(clientId, frame);
+      } catch (err) {
+        console.error("elevator threw", err);
+      }
+      try {
+        if (doorHost.onFrame(clientId, frame) === false) {
+          const pawnId = engine.replicator.get(clientId)?.ownedEntity;
+          if (pawnId !== undefined) elevatorHost.onUse(pawnId);
+        }
       } catch (err) {
         console.error("door threw", err);
       }

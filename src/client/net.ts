@@ -3,6 +3,7 @@ import { fireShotFrame, summarizeInbound } from "../shared/fire-debug.js";
 import { parseAudit, type AuditCounters } from "../shared/audit.js";
 import { parseHealth } from "../shared/health.js";
 import { parseDoor, parseDoorSet, useFrame, type DoorFrame } from "../shared/doors.js";
+import { parseElevatorSet, parseElevatorState, type ElevatorState } from "../shared/elevators.js";
 import { parseGrenadePose, grenadeFrame, type GrenadePose } from "../shared/grenade.js";
 import { modelFrame } from "../shared/model-choice.js";
 import { parseLoadout, parsePickup, parsePickupSet, type LoadoutFrame, type PickupFrame } from "../shared/pickups.js";
@@ -39,6 +40,8 @@ export type LiveLink = {
   sendGrenade(seq: number, yaw: number, pitch: number): boolean;
   /** Arena frame. One press of E. Returns false when the socket has no owned pawn yet. */
   sendUse(seq: number): boolean;
+  /** Arena frame. Call `stop` on elevator `id`. Returns false when the socket has no owned pawn yet. */
+  sendElevator(id: string, stop: number): boolean;
   /**
    * Arena frame. Queued until welcome when the pawn is not owned yet.
    * Returns false when the frame was not written on this call.
@@ -118,6 +121,10 @@ export function connectLive(opts: {
   onDoor?: (door: DoorFrame) => void;
   /** Full door list from welcome, so a late joiner matches. */
   onDoors?: (doors: readonly DoorFrame[]) => void;
+  /** One cab moved. `y` is the cab floor. `stop` is the last stop it arrived at. */
+  onElevator?: (elevator: ElevatorState) => void;
+  /** Full cab list from welcome, so a late joiner matches. */
+  onElevators?: (elevators: readonly ElevatorState[]) => void;
   /** This client only. Other clients do not receive a viewmodel. */
   onLoadout?: (loadout: LoadoutFrame) => void;
   /** Read when a shot is sent. The host logs only when this is on. */
@@ -216,6 +223,8 @@ export function connectLive(opts: {
       if (pickup) opts.onPickup?.(pickup);
       const door = parseDoor(msg);
       if (door) opts.onDoor?.(door);
+      const elevator = parseElevatorState(msg);
+      if (elevator) opts.onElevator?.(elevator);
       const loadout = parseLoadout(msg);
       if (loadout) opts.onLoadout?.(loadout);
       return;
@@ -240,6 +249,8 @@ export function connectLive(opts: {
         if (ids) opts.onPickupSet?.(ids);
         const doors = parseDoorSet(msg.doors);
         if (doors) opts.onDoors?.(doors);
+        const elevators = parseElevatorSet(msg.elevators);
+        if (elevators) opts.onElevators?.(elevators);
         if (typeof msg.weapon === "string" || typeof msg.ammo === "number") {
           const ammo = typeof msg.ammo === "number" && Number.isFinite(msg.ammo) ? msg.ammo : 0;
           const weapon = typeof msg.weapon === "string" && msg.weapon.length > 0 ? msg.weapon : undefined;
@@ -321,6 +332,11 @@ export function connectLive(opts: {
     sendUse(seq) {
       if (ownedId === undefined || ws.readyState !== WebSocket.OPEN) return false;
       ws.send(JSON.stringify(useFrame(seq)));
+      return true;
+    },
+    sendElevator(id, stop) {
+      if (ownedId === undefined || ws.readyState !== WebSocket.OPEN) return false;
+      ws.send(JSON.stringify({ t: "elevator", id, stop }));
       return true;
     },
     sendModel(model) {

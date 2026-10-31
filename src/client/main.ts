@@ -1,6 +1,15 @@
 import { EngineClient } from "conveyor-engine-client";
-import type { ArenaView } from "../shared/arena-view.js";
+import * as THREE from "three";
+import type { ArenaElevator, ArenaView } from "../shared/arena-view.js";
 import { aimDirection, eyeLook, INPUT_HZ, moveIntent, yawFromQuat } from "../shared/look.js";
+import {
+  elevatorPolygonBounds,
+  inCab,
+  landingAt,
+  stopForKey,
+  type ElevatorRuntime,
+  type ElevatorState,
+} from "../shared/elevators.js";
 import { encodeMoveButtons } from "../shared/movements.js";
 import { dropPickupAabb } from "../shared/pickups.js";
 import { clientFaultText, createFireDebugLog } from "../shared/fire-debug.js";
@@ -49,6 +58,9 @@ const fireDebug = createFireDebugLog(() => options.fireDebug);
 const visuals = await loadArenaVisuals(view, arena);
 /** Open state per door, from the file then from host frames. A shut leaf stops the predicted beam like the host shot. */
 const doorOpen = new Map((view.doors ?? []).map((door) => [door.id, door.open === true && door.locked !== true]));
+const cabState = new Map<string, ElevatorState>();
+const cabPick = new Map<string, number>();
+const cabMeshes = createCabMeshes(view.elevators ?? [], arena.scene);
 
 sceneMap.setWorld({
   bounds: view.bounds,
@@ -150,6 +162,10 @@ const link = connectLive({
   onDoor: (door) => swingDoor(door.id, door.open),
   onDoors: (doors) => {
     for (const door of doors) swingDoor(door.id, door.open);
+  },
+  onElevator: (row) => applyCab(row),
+  onElevators: (rows) => {
+    for (const row of rows) applyCab(row);
   },
   onLoadout: (loadout) => {
     showWeapon(loadout.weapon);
@@ -261,6 +277,10 @@ function drawFrame(now: number) {
       const seq = useSeq + 1;
       if (link.sendUse(seq)) useSeq = seq;
     }
+    if (sample.digit) {
+      const call = elevatorCall(pawn, sample.digit);
+      if (call && link.sendElevator(call.id, call.stop) && call.inCab) cabPick.set(call.id, call.stop);
+    }
     if (clock.due) {
       pendingFireLog = {
         socketClosed: link.socketClosed(),
@@ -352,8 +372,9 @@ function drawFrame(now: number) {
   const mine = ownedId === undefined ? undefined : pawnVital.get(ownedId);
   const hpLabel = localHealthLabel(mine);
   const hpText = hpLabel === "" ? "" : ` · ${hpLabel}`;
+  const liftText = owned ? liftLabel(owned.position) : "";
   if (!pinnedError) {
-    hud.setStatus(`${statusText} · ${look}${hpText} · meshes ${pawns.count} models ${pawns.count - pawns.fallbacks} fallback ${pawns.fallbacks + visuals.fallbacks}`);
+    hud.setStatus(`${statusText} · ${look}${hpText} · meshes ${pawns.count} models ${pawns.count - pawns.fallbacks} fallback ${pawns.fallbacks + visuals.fallbacks}${liftText}`);
   }
   hud.setProfile(input.profile);
   arena.renderer.render(arena.scene, arena.camera);
@@ -391,6 +412,79 @@ function drawFrame(now: number) {
   }
 }
 requestAnimationFrame(frame);
+
+const CAB_BOX_H = 0.1;
+
+function createCabMeshes(elevators: readonly ArenaElevator[], scene: THREE.Scene): Map<string, THREE.Mesh> {
+  const meshes = new Map<string, THREE.Mesh>();
+  for (const def of elevators) {
+    const bounds = elevatorPolygonBounds(def.polygon);
+    const width = bounds.maxX - bounds.minX;
+    const depth = bounds.maxZ - bounds.minZ;
+    if (!(width > 0) || !(depth > 0)) continue;
+    const mesh = new THREE.Mesh(
+      new THREE.BoxGeometry(width, CAB_BOX_H, depth),
+      new THREE.MeshStandardMaterial({ color: 0xb7b1a6, roughness: 0.8 }),
+    );
+    const y = def.stops[0] ?? 0;
+    mesh.position.set((bounds.minX + bounds.maxX) / 2, y + 0.02 - CAB_BOX_H / 2, (bounds.minZ + bounds.maxZ) / 2);
+    mesh.name = def.id;
+    scene.add(mesh);
+    meshes.set(def.id, mesh);
+  }
+  return meshes;
+}
+
+function applyCab(row: ElevatorState): void {
+  cabState.set(row.id, row);
+  const mesh = cabMeshes.get(row.id);
+  if (mesh) mesh.position.y = row.y + 0.02 - CAB_BOX_H / 2;
+  if (cabPick.get(row.id) === row.stop && row.doorsOpen) cabPick.delete(row.id);
+}
+
+function cabRuntime(def: ArenaElevator): ElevatorRuntime {
+  const state = cabState.get(def.id);
+  const at = state?.stop ?? 0;
+  return {
+    id: def.id,
+    at,
+    queue: [],
+    phase: state?.doorsOpen === false ? "moving" : "idle",
+    t: 0,
+    y: state?.y ?? def.stops[at] ?? def.stops[0] ?? 0,
+  };
+}
+
+function elevatorCall(
+  pawn: { x: number; y: number; z: number },
+  digit: string,
+): { id: string; stop: number; inCab: boolean } | undefined {
+  const elevators = view.elevators ?? [];
+  for (const def of elevators) {
+    if (!inCab(def, cabRuntime(def), pawn.x, pawn.y, pawn.z)) continue;
+    const stop = stopForKey(digit, def.stops.length);
+    if (stop === undefined) return undefined;
+    return { id: def.id, stop, inCab: true };
+  }
+  for (const def of elevators) {
+    const stop = landingAt(def, pawn.x, pawn.y, pawn.z);
+    if (stop === undefined) continue;
+    return { id: def.id, stop, inCab: false };
+  }
+  return undefined;
+}
+
+function liftLabel(pawn: { x: number; y: number; z: number }): string {
+  for (const def of view.elevators ?? []) {
+    const rt = cabRuntime(def);
+    if (!inCab(def, rt, pawn.x, pawn.y, pawn.z)) continue;
+    const at = rt.at + 1;
+    const picked = cabPick.get(def.id);
+    if (picked !== undefined && picked !== rt.at) return ` · lift ${at}→${picked + 1}`;
+    return ` · lift ${at}`;
+  }
+  return "";
+}
 
 function shutLeafBoxes(): Array<{ id: number; minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number }> {
   const out: Array<{ id: number; minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number }> = [];

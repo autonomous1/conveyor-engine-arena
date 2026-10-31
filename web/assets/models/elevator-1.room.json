@@ -1,0 +1,120 @@
+{
+  "formatVersion": 1,
+  "units": "meters",
+  "id": "elevator-1",
+  "glb": "elevator-1.glb",
+  "source": "svg",
+  "footprint": {
+    "minX": -0.75,
+    "maxX": 0.75,
+    "minZ": -0.75,
+    "maxZ": 0.75
+  },
+  "height": 2.23,
+  "obstacles": [
+    {
+      "id": "front.0",
+      "minX": 0.548293,
+      "maxX": 0.75,
+      "minY": 0,
+      "maxY": 2.1,
+      "minZ": 0.75,
+      "maxZ": 0.95
+    },
+    {
+      "id": "front.1",
+      "minX": -0.75,
+      "maxX": -0.524707,
+      "minY": 0,
+      "maxY": 2.1,
+      "minZ": 0.75,
+      "maxZ": 0.95
+    },
+    {
+      "id": "front.2",
+      "minX": -0.75,
+      "maxX": 0.75,
+      "minY": 2.1,
+      "maxY": 2.23,
+      "minZ": 0.75,
+      "maxZ": 0.95
+    },
+    {
+      "id": "back.0",
+      "minX": -0.75,
+      "maxX": 0.75,
+      "minY": 0,
+      "maxY": 2.23,
+      "minZ": -0.95,
+      "maxZ": -0.75
+    },
+    {
+      "id": "left.0",
+      "minX": -0.95,
+      "maxX": -0.75,
+      "minY": 0,
+      "maxY": 2.23,
+      "minZ": -0.75,
+      "maxZ": 0.75
+    },
+    {
+      "id": "right.0",
+      "minX": 0.75,
+      "maxX": 0.95,
+      "minY": 0,
+      "maxY": 2.23,
+      "minZ": -0.75,
+      "maxZ": 0.75
+    },
+    {
+      "id": "floor.0",
+      "minX": -0.75,
+      "maxX": 0.75,
+      "minY": -0.1,
+      "maxY": 0,
+      "minZ": -0.75,
+      "maxZ": 0.75
+    }
+  ],
+  "walkable": [
+    {
+      "minX": -0.75,
+      "maxX": 0.75,
+      "minZ": -0.75,
+      "maxZ": 0.75
+    }
+  ],
+  "holes": [],
+  "doors": [
+    {
+      "id": "door-1-1-9-22",
+      "model": "elevator-1-door",
+      "wall": "front",
+      "center": [
+        0.011793,
+        0,
+        0.75
+      ],
+      "width": 1.073,
+      "height": 2.1,
+      "hinge": "left",
+      "open": false,
+      "key": "key"
+    }
+  ],
+  "props": [],
+  "lights": [
+    {
+      "id": "lamp",
+      "type": "point",
+      "position": [
+        -0.022238,
+        2.2,
+        0.13943
+      ],
+      "color": "#ffd9a0",
+      "intensity": 8,
+      "range": 3.5
+    }
+  ]
+}

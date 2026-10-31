@@ -24,8 +24,26 @@
     {
       "id": "back.0",
       "minX": -4.9075,
+      "maxX": -0.732964,
+      "minY": 0,
+      "maxY": 2.1,
+      "minZ": -3.061,
+      "maxZ": -2.861
+    },
+    {
+      "id": "back.1",
+      "minX": 0.340036,
       "maxX": 4.9075,
       "minY": 0,
+      "maxY": 2.1,
+      "minZ": -3.061,
+      "maxZ": -2.861
+    },
+    {
+      "id": "back.2",
+      "minX": -4.9075,
+      "maxX": 4.9075,
+      "minY": 2.1,
       "maxY": 4,
       "minZ": -3.061,
       "maxZ": -2.861
@@ -62,24 +80,6 @@
       "minX": 4.9075,
       "maxX": 5.1075,
       "minY": 0,
-      "maxY": 2.1,
-      "minZ": -2.861,
-      "maxZ": -0.39226
-    },
-    {
-      "id": "right.1",
-      "minX": 4.9075,
-      "maxX": 5.1075,
-      "minY": 0,
-      "maxY": 2.1,
-      "minZ": 0.68074,
-      "maxZ": 2.861
-    },
-    {
-      "id": "right.2",
-      "minX": 4.9075,
-      "maxX": 5.1075,
-      "minY": 2.1,
       "maxY": 4,
       "minZ": -2.861,
       "maxZ": 2.861
@@ -123,11 +123,11 @@
     {
       "id": "door-1-1-9-22-5",
       "model": "door-2",
-      "wall": "right",
+      "wall": "back",
       "center": [
-        4.9075,
+        -0.196464,
         0,
-        0.14424
+        -2.861
       ],
       "width": 1.073,
       "height": 2.1,
@@ -165,18 +165,5 @@
       "drawnDepth": 0.489
     }
   ],
-  "lights": [
-    {
-      "id": "lamp",
-      "type": "point",
-      "position": [
-        0.080129,
-        3.75,
-        0.32103
-      ],
-      "color": "#ffd9a0",
-      "intensity": 8,
-      "range": 6
-    }
-  ]
+  "lights": []
 }

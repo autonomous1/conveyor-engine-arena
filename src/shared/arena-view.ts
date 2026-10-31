@@ -63,6 +63,19 @@ export function propClipName(prop: {
   return clip || undefined;
 }
 
+/**
+ * One elevator cab. `stops` are world y, ascending. `polygon` is the cab
+ * footprint in world XZ. `landings` is one point per stop, outside the door.
+ */
+export type ArenaElevator = {
+  id: string;
+  stops: number[];
+  speed: number;
+  waitS: number;
+  polygon: Array<[number, number]>;
+  landings: Array<[number, number, number]>;
+};
+
 /** One room light. `color` is `#rrggbb`. A rect carries `yaw`, `width`, and `height`. */
 export type ArenaLight = {
   id: string;
@@ -193,6 +206,11 @@ export type ArenaView = {
    * Part of `presentationHash` only.
    */
   lights: ArenaLight[];
+  /**
+   * Elevator cabs from `scene.elevators`. Omitted when there are none.
+   * Not part of either content hash.
+   */
+  elevators?: ArenaElevator[];
   /** Thrown grenade mesh. Absent when the manifest has no `grenade` model. */
   grenade?: string;
   /**

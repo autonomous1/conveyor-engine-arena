@@ -1501,6 +1501,966 @@
       ],
       "yaw": 180,
       "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake.room-a-1-5-8.cover-crate-2-1",
+      "model": "ammo-box",
+      "type": "ammo",
+      "position": [
+        -42.651395,
+        0,
+        34.60426
+      ],
+      "yaw": 270,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake.room-a-1-5-8.cover-crate-2-6",
+      "model": "med-kit",
+      "type": "health",
+      "position": [
+        -38.997165,
+        0,
+        36.210986
+      ],
+      "yaw": 270,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake.room-a-1-5-8-9.cover-crate-2-1",
+      "model": "ammo-box",
+      "type": "ammo",
+      "position": [
+        -42.651395,
+        0,
+        16.70027
+      ],
+      "yaw": 270,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake.room-a-1-5-8-9.cover-crate-2-6",
+      "model": "med-kit",
+      "type": "health",
+      "position": [
+        -38.997165,
+        0,
+        18.306996
+      ],
+      "yaw": 270,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake.room-a-1-5-8-8.cover-crate-2-1",
+      "model": "ammo-box",
+      "type": "ammo",
+      "position": [
+        -42.651395,
+        3,
+        34.60426
+      ],
+      "yaw": 270,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake.room-a-1-5-8-8.cover-crate-2-6",
+      "model": "med-kit",
+      "type": "health",
+      "position": [
+        -38.997165,
+        3,
+        36.210986
+      ],
+      "yaw": 270,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake.room-a-1-5-8-9-9.cover-crate-2-1",
+      "model": "ammo-box",
+      "type": "ammo",
+      "position": [
+        -42.651395,
+        3,
+        16.70027
+      ],
+      "yaw": 270,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake.room-a-1-5-8-9-9.cover-crate-2-6",
+      "model": "med-kit",
+      "type": "health",
+      "position": [
+        -38.997165,
+        3,
+        18.306996
+      ],
+      "yaw": 270,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake.room-a-1-5-8-0.cover-crate-2-1",
+      "model": "ammo-box",
+      "type": "ammo",
+      "position": [
+        -42.651395,
+        6,
+        34.60426
+      ],
+      "yaw": 270,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake.room-a-1-5-8-0.cover-crate-2-6",
+      "model": "med-kit",
+      "type": "health",
+      "position": [
+        -38.997165,
+        6,
+        36.210986
+      ],
+      "yaw": 270,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake.room-a-1-5-8-9-6.cover-crate-2-1",
+      "model": "ammo-box",
+      "type": "ammo",
+      "position": [
+        -42.651395,
+        6,
+        16.70027
+      ],
+      "yaw": 270,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake.room-a-1-5-8-9-6.cover-crate-2-6",
+      "model": "med-kit",
+      "type": "health",
+      "position": [
+        -38.997165,
+        6,
+        18.306996
+      ],
+      "yaw": 270,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake.room-a-1-5-8-87.cover-crate-2-1",
+      "model": "ammo-box",
+      "type": "ammo",
+      "position": [
+        -42.651395,
+        9,
+        34.60426
+      ],
+      "yaw": 270,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake.room-a-1-5-8-87.cover-crate-2-6",
+      "model": "med-kit",
+      "type": "health",
+      "position": [
+        -38.997165,
+        9,
+        36.210986
+      ],
+      "yaw": 270,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake.room-a-1-5-8-9-90.cover-crate-2-1",
+      "model": "ammo-box",
+      "type": "ammo",
+      "position": [
+        -42.651395,
+        9,
+        16.70027
+      ],
+      "yaw": 270,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake.room-a-1-5-8-9-90.cover-crate-2-6",
+      "model": "med-kit",
+      "type": "health",
+      "position": [
+        -38.997165,
+        9,
+        18.306996
+      ],
+      "yaw": 270,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake.room-a-1-5-8-3.cover-crate-2-1",
+      "model": "ammo-box",
+      "type": "ammo",
+      "position": [
+        -42.651395,
+        12,
+        34.60426
+      ],
+      "yaw": 270,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake.room-a-1-5-8-3.cover-crate-2-6",
+      "model": "med-kit",
+      "type": "health",
+      "position": [
+        -38.997165,
+        12,
+        36.210986
+      ],
+      "yaw": 270,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake.room-a-1-5-8-9-3.cover-crate-2-1",
+      "model": "ammo-box",
+      "type": "ammo",
+      "position": [
+        -42.651395,
+        12,
+        16.70027
+      ],
+      "yaw": 270,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake.room-a-1-5-8-9-3.cover-crate-2-6",
+      "model": "med-kit",
+      "type": "health",
+      "position": [
+        -38.997165,
+        12,
+        18.306996
+      ],
+      "yaw": 270,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-0.room-a-1-5-8.cover-crate-2-1",
+      "model": "ammo-box",
+      "type": "ammo",
+      "position": [
+        -42.351882,
+        0,
+        -38.085831
+      ],
+      "yaw": 180,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-0.room-a-1-5-8.cover-crate-2-6",
+      "model": "med-kit",
+      "type": "health",
+      "position": [
+        -43.958608,
+        0,
+        -34.431601
+      ],
+      "yaw": 180,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-0.room-a-1-5-8-9.cover-crate-2-1",
+      "model": "ammo-box",
+      "type": "ammo",
+      "position": [
+        -24.447892,
+        0,
+        -38.085831
+      ],
+      "yaw": 180,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-0.room-a-1-5-8-9.cover-crate-2-6",
+      "model": "med-kit",
+      "type": "health",
+      "position": [
+        -26.054618,
+        0,
+        -34.431601
+      ],
+      "yaw": 180,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-0.room-a-1-5-8-8.cover-crate-2-1",
+      "model": "ammo-box",
+      "type": "ammo",
+      "position": [
+        -42.351882,
+        3,
+        -38.085831
+      ],
+      "yaw": 180,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-0.room-a-1-5-8-8.cover-crate-2-6",
+      "model": "med-kit",
+      "type": "health",
+      "position": [
+        -43.958608,
+        3,
+        -34.431601
+      ],
+      "yaw": 180,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-0.room-a-1-5-8-9-9.cover-crate-2-1",
+      "model": "ammo-box",
+      "type": "ammo",
+      "position": [
+        -24.447892,
+        3,
+        -38.085831
+      ],
+      "yaw": 180,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-0.room-a-1-5-8-9-9.cover-crate-2-6",
+      "model": "med-kit",
+      "type": "health",
+      "position": [
+        -26.054618,
+        3,
+        -34.431601
+      ],
+      "yaw": 180,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-0.room-a-1-5-8-0.cover-crate-2-1",
+      "model": "ammo-box",
+      "type": "ammo",
+      "position": [
+        -42.351882,
+        6,
+        -38.085831
+      ],
+      "yaw": 180,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-0.room-a-1-5-8-0.cover-crate-2-6",
+      "model": "med-kit",
+      "type": "health",
+      "position": [
+        -43.958608,
+        6,
+        -34.431601
+      ],
+      "yaw": 180,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-0.room-a-1-5-8-9-6.cover-crate-2-1",
+      "model": "ammo-box",
+      "type": "ammo",
+      "position": [
+        -24.447892,
+        6,
+        -38.085831
+      ],
+      "yaw": 180,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-0.room-a-1-5-8-9-6.cover-crate-2-6",
+      "model": "med-kit",
+      "type": "health",
+      "position": [
+        -26.054618,
+        6,
+        -34.431601
+      ],
+      "yaw": 180,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-0.room-a-1-5-8-87.cover-crate-2-1",
+      "model": "ammo-box",
+      "type": "ammo",
+      "position": [
+        -42.351882,
+        9,
+        -38.085831
+      ],
+      "yaw": 180,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-0.room-a-1-5-8-87.cover-crate-2-6",
+      "model": "med-kit",
+      "type": "health",
+      "position": [
+        -43.958608,
+        9,
+        -34.431601
+      ],
+      "yaw": 180,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-0.room-a-1-5-8-9-90.cover-crate-2-1",
+      "model": "ammo-box",
+      "type": "ammo",
+      "position": [
+        -24.447892,
+        9,
+        -38.085831
+      ],
+      "yaw": 180,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-0.room-a-1-5-8-9-90.cover-crate-2-6",
+      "model": "med-kit",
+      "type": "health",
+      "position": [
+        -26.054618,
+        9,
+        -34.431601
+      ],
+      "yaw": 180,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-0.room-a-1-5-8-3.cover-crate-2-1",
+      "model": "ammo-box",
+      "type": "ammo",
+      "position": [
+        -42.351882,
+        12,
+        -38.085831
+      ],
+      "yaw": 180,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-0.room-a-1-5-8-3.cover-crate-2-6",
+      "model": "med-kit",
+      "type": "health",
+      "position": [
+        -43.958608,
+        12,
+        -34.431601
+      ],
+      "yaw": 180,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-0.room-a-1-5-8-9-3.cover-crate-2-1",
+      "model": "ammo-box",
+      "type": "ammo",
+      "position": [
+        -24.447892,
+        12,
+        -38.085831
+      ],
+      "yaw": 180,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-0.room-a-1-5-8-9-3.cover-crate-2-6",
+      "model": "med-kit",
+      "type": "health",
+      "position": [
+        -26.054618,
+        12,
+        -34.431601
+      ],
+      "yaw": 180,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-9.room-a-1-5-8.cover-crate-2-1",
+      "model": "ammo-box",
+      "type": "ammo",
+      "position": [
+        0.93877,
+        0,
+        -31.56055
+      ],
+      "yaw": 90,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-9.room-a-1-5-8.cover-crate-2-6",
+      "model": "med-kit",
+      "type": "health",
+      "position": [
+        -2.71546,
+        0,
+        -33.167276
+      ],
+      "yaw": 90,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-9.room-a-1-5-8-9.cover-crate-2-1",
+      "model": "ammo-box",
+      "type": "ammo",
+      "position": [
+        0.93877,
+        0,
+        -13.65656
+      ],
+      "yaw": 90,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-9.room-a-1-5-8-9.cover-crate-2-6",
+      "model": "med-kit",
+      "type": "health",
+      "position": [
+        -2.71546,
+        0,
+        -15.263286
+      ],
+      "yaw": 90,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-9.room-a-1-5-8-8.cover-crate-2-1",
+      "model": "ammo-box",
+      "type": "ammo",
+      "position": [
+        0.93877,
+        3,
+        -31.56055
+      ],
+      "yaw": 90,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-9.room-a-1-5-8-8.cover-crate-2-6",
+      "model": "med-kit",
+      "type": "health",
+      "position": [
+        -2.71546,
+        3,
+        -33.167276
+      ],
+      "yaw": 90,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-9.room-a-1-5-8-9-9.cover-crate-2-1",
+      "model": "ammo-box",
+      "type": "ammo",
+      "position": [
+        0.93877,
+        3,
+        -13.65656
+      ],
+      "yaw": 90,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-9.room-a-1-5-8-9-9.cover-crate-2-6",
+      "model": "med-kit",
+      "type": "health",
+      "position": [
+        -2.71546,
+        3,
+        -15.263286
+      ],
+      "yaw": 90,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-9.room-a-1-5-8-0.cover-crate-2-1",
+      "model": "ammo-box",
+      "type": "ammo",
+      "position": [
+        0.93877,
+        6,
+        -31.56055
+      ],
+      "yaw": 90,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-9.room-a-1-5-8-0.cover-crate-2-6",
+      "model": "med-kit",
+      "type": "health",
+      "position": [
+        -2.71546,
+        6,
+        -33.167276
+      ],
+      "yaw": 90,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-9.room-a-1-5-8-9-6.cover-crate-2-1",
+      "model": "ammo-box",
+      "type": "ammo",
+      "position": [
+        0.93877,
+        6,
+        -13.65656
+      ],
+      "yaw": 90,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-9.room-a-1-5-8-9-6.cover-crate-2-6",
+      "model": "med-kit",
+      "type": "health",
+      "position": [
+        -2.71546,
+        6,
+        -15.263286
+      ],
+      "yaw": 90,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-9.room-a-1-5-8-87.cover-crate-2-1",
+      "model": "ammo-box",
+      "type": "ammo",
+      "position": [
+        0.93877,
+        9,
+        -31.56055
+      ],
+      "yaw": 90,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-9.room-a-1-5-8-87.cover-crate-2-6",
+      "model": "med-kit",
+      "type": "health",
+      "position": [
+        -2.71546,
+        9,
+        -33.167276
+      ],
+      "yaw": 90,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-9.room-a-1-5-8-9-90.cover-crate-2-1",
+      "model": "ammo-box",
+      "type": "ammo",
+      "position": [
+        0.93877,
+        9,
+        -13.65656
+      ],
+      "yaw": 90,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-9.room-a-1-5-8-9-90.cover-crate-2-6",
+      "model": "med-kit",
+      "type": "health",
+      "position": [
+        -2.71546,
+        9,
+        -15.263286
+      ],
+      "yaw": 90,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-9.room-a-1-5-8-3.cover-crate-2-1",
+      "model": "ammo-box",
+      "type": "ammo",
+      "position": [
+        0.93877,
+        12,
+        -31.56055
+      ],
+      "yaw": 90,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-9.room-a-1-5-8-3.cover-crate-2-6",
+      "model": "med-kit",
+      "type": "health",
+      "position": [
+        -2.71546,
+        12,
+        -33.167276
+      ],
+      "yaw": 90,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-9.room-a-1-5-8-9-3.cover-crate-2-1",
+      "model": "ammo-box",
+      "type": "ammo",
+      "position": [
+        0.93877,
+        12,
+        -13.65656
+      ],
+      "yaw": 90,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-9.room-a-1-5-8-9-3.cover-crate-2-6",
+      "model": "med-kit",
+      "type": "health",
+      "position": [
+        -2.71546,
+        12,
+        -15.263286
+      ],
+      "yaw": 90,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-5.room-a-1-5-8.cover-crate-2-1",
+      "model": "ammo-box",
+      "type": "ammo",
+      "position": [
+        44.808827,
+        0,
+        -37.947491
+      ],
+      "yaw": 180,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-5.room-a-1-5-8.cover-crate-2-6",
+      "model": "med-kit",
+      "type": "health",
+      "position": [
+        43.202101,
+        0,
+        -34.293261
+      ],
+      "yaw": 180,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-5.room-a-1-5-8-9.cover-crate-2-1",
+      "model": "ammo-box",
+      "type": "ammo",
+      "position": [
+        62.712817,
+        0,
+        -37.947491
+      ],
+      "yaw": 180,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-5.room-a-1-5-8-9.cover-crate-2-6",
+      "model": "med-kit",
+      "type": "health",
+      "position": [
+        61.106091,
+        0,
+        -34.293261
+      ],
+      "yaw": 180,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-5.room-a-1-5-8-8.cover-crate-2-1",
+      "model": "ammo-box",
+      "type": "ammo",
+      "position": [
+        44.808827,
+        3,
+        -37.947491
+      ],
+      "yaw": 180,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-5.room-a-1-5-8-8.cover-crate-2-6",
+      "model": "med-kit",
+      "type": "health",
+      "position": [
+        43.202101,
+        3,
+        -34.293261
+      ],
+      "yaw": 180,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-5.room-a-1-5-8-9-9.cover-crate-2-1",
+      "model": "ammo-box",
+      "type": "ammo",
+      "position": [
+        62.712817,
+        3,
+        -37.947491
+      ],
+      "yaw": 180,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-5.room-a-1-5-8-9-9.cover-crate-2-6",
+      "model": "med-kit",
+      "type": "health",
+      "position": [
+        61.106091,
+        3,
+        -34.293261
+      ],
+      "yaw": 180,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-5.room-a-1-5-8-0.cover-crate-2-1",
+      "model": "ammo-box",
+      "type": "ammo",
+      "position": [
+        44.808827,
+        6,
+        -37.947491
+      ],
+      "yaw": 180,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-5.room-a-1-5-8-0.cover-crate-2-6",
+      "model": "med-kit",
+      "type": "health",
+      "position": [
+        43.202101,
+        6,
+        -34.293261
+      ],
+      "yaw": 180,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-5.room-a-1-5-8-9-6.cover-crate-2-1",
+      "model": "ammo-box",
+      "type": "ammo",
+      "position": [
+        62.712817,
+        6,
+        -37.947491
+      ],
+      "yaw": 180,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-5.room-a-1-5-8-9-6.cover-crate-2-6",
+      "model": "med-kit",
+      "type": "health",
+      "position": [
+        61.106091,
+        6,
+        -34.293261
+      ],
+      "yaw": 180,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-5.room-a-1-5-8-87.cover-crate-2-1",
+      "model": "ammo-box",
+      "type": "ammo",
+      "position": [
+        44.808827,
+        9,
+        -37.947491
+      ],
+      "yaw": 180,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-5.room-a-1-5-8-87.cover-crate-2-6",
+      "model": "med-kit",
+      "type": "health",
+      "position": [
+        43.202101,
+        9,
+        -34.293261
+      ],
+      "yaw": 180,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-5.room-a-1-5-8-9-90.cover-crate-2-1",
+      "model": "ammo-box",
+      "type": "ammo",
+      "position": [
+        62.712817,
+        9,
+        -37.947491
+      ],
+      "yaw": 180,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-5.room-a-1-5-8-9-90.cover-crate-2-6",
+      "model": "med-kit",
+      "type": "health",
+      "position": [
+        61.106091,
+        9,
+        -34.293261
+      ],
+      "yaw": 180,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-5.room-a-1-5-8-3.cover-crate-2-1",
+      "model": "ammo-box",
+      "type": "ammo",
+      "position": [
+        44.808827,
+        12,
+        -37.947491
+      ],
+      "yaw": 180,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-5.room-a-1-5-8-3.cover-crate-2-6",
+      "model": "med-kit",
+      "type": "health",
+      "position": [
+        43.202101,
+        12,
+        -34.293261
+      ],
+      "yaw": 180,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-5.room-a-1-5-8-9-3.cover-crate-2-1",
+      "model": "ammo-box",
+      "type": "ammo",
+      "position": [
+        62.712817,
+        12,
+        -37.947491
+      ],
+      "yaw": 180,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-1-cbake-5.room-a-1-5-8-9-3.cover-crate-2-6",
+      "model": "med-kit",
+      "type": "health",
+      "position": [
+        61.106091,
+        12,
+        -34.293261
+      ],
+      "yaw": 180,
+      "scale": 1
     }
   ],
   "obstacles": [
@@ -3252,6 +4212,1126 @@
         -21.94061,
         3.236602,
         -9.6573
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake.room-a-1-5-8.cover-crate-2-1-box",
+      "kind": "aabb",
+      "min": [
+        -42.892259,
+        0,
+        34.345124
+      ],
+      "max": [
+        -42.410531,
+        0.481728,
+        34.863396
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake.room-a-1-5-8.cover-crate-2-6-box",
+      "kind": "aabb",
+      "min": [
+        -39.241876,
+        0,
+        35.872127
+      ],
+      "max": [
+        -38.752453,
+        0.486602,
+        36.549844
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake.room-a-1-5-8-9.cover-crate-2-1-box",
+      "kind": "aabb",
+      "min": [
+        -42.892259,
+        0,
+        16.441134
+      ],
+      "max": [
+        -42.410531,
+        0.481728,
+        16.959406
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake.room-a-1-5-8-9.cover-crate-2-6-box",
+      "kind": "aabb",
+      "min": [
+        -39.241876,
+        0,
+        17.968137
+      ],
+      "max": [
+        -38.752453,
+        0.486602,
+        18.645854
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake.room-a-1-5-8-8.cover-crate-2-1-box",
+      "kind": "aabb",
+      "min": [
+        -42.892259,
+        3,
+        34.345124
+      ],
+      "max": [
+        -42.410531,
+        3.481728,
+        34.863396
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake.room-a-1-5-8-8.cover-crate-2-6-box",
+      "kind": "aabb",
+      "min": [
+        -39.241876,
+        3,
+        35.872127
+      ],
+      "max": [
+        -38.752453,
+        3.486602,
+        36.549844
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake.room-a-1-5-8-9-9.cover-crate-2-1-box",
+      "kind": "aabb",
+      "min": [
+        -42.892259,
+        3,
+        16.441134
+      ],
+      "max": [
+        -42.410531,
+        3.481728,
+        16.959406
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake.room-a-1-5-8-9-9.cover-crate-2-6-box",
+      "kind": "aabb",
+      "min": [
+        -39.241876,
+        3,
+        17.968137
+      ],
+      "max": [
+        -38.752453,
+        3.486602,
+        18.645854
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake.room-a-1-5-8-0.cover-crate-2-1-box",
+      "kind": "aabb",
+      "min": [
+        -42.892259,
+        6,
+        34.345124
+      ],
+      "max": [
+        -42.410531,
+        6.481728,
+        34.863396
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake.room-a-1-5-8-0.cover-crate-2-6-box",
+      "kind": "aabb",
+      "min": [
+        -39.241876,
+        6,
+        35.872127
+      ],
+      "max": [
+        -38.752453,
+        6.486602,
+        36.549844
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake.room-a-1-5-8-9-6.cover-crate-2-1-box",
+      "kind": "aabb",
+      "min": [
+        -42.892259,
+        6,
+        16.441134
+      ],
+      "max": [
+        -42.410531,
+        6.481728,
+        16.959406
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake.room-a-1-5-8-9-6.cover-crate-2-6-box",
+      "kind": "aabb",
+      "min": [
+        -39.241876,
+        6,
+        17.968137
+      ],
+      "max": [
+        -38.752453,
+        6.486602,
+        18.645854
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake.room-a-1-5-8-87.cover-crate-2-1-box",
+      "kind": "aabb",
+      "min": [
+        -42.892259,
+        9,
+        34.345124
+      ],
+      "max": [
+        -42.410531,
+        9.481728,
+        34.863396
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake.room-a-1-5-8-87.cover-crate-2-6-box",
+      "kind": "aabb",
+      "min": [
+        -39.241876,
+        9,
+        35.872127
+      ],
+      "max": [
+        -38.752453,
+        9.486602,
+        36.549844
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake.room-a-1-5-8-9-90.cover-crate-2-1-box",
+      "kind": "aabb",
+      "min": [
+        -42.892259,
+        9,
+        16.441134
+      ],
+      "max": [
+        -42.410531,
+        9.481728,
+        16.959406
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake.room-a-1-5-8-9-90.cover-crate-2-6-box",
+      "kind": "aabb",
+      "min": [
+        -39.241876,
+        9,
+        17.968137
+      ],
+      "max": [
+        -38.752453,
+        9.486602,
+        18.645854
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake.room-a-1-5-8-3.cover-crate-2-1-box",
+      "kind": "aabb",
+      "min": [
+        -42.892259,
+        12,
+        34.345124
+      ],
+      "max": [
+        -42.410531,
+        12.481728,
+        34.863396
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake.room-a-1-5-8-3.cover-crate-2-6-box",
+      "kind": "aabb",
+      "min": [
+        -39.241876,
+        12,
+        35.872127
+      ],
+      "max": [
+        -38.752453,
+        12.486602,
+        36.549844
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake.room-a-1-5-8-9-3.cover-crate-2-1-box",
+      "kind": "aabb",
+      "min": [
+        -42.892259,
+        12,
+        16.441134
+      ],
+      "max": [
+        -42.410531,
+        12.481728,
+        16.959406
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake.room-a-1-5-8-9-3.cover-crate-2-6-box",
+      "kind": "aabb",
+      "min": [
+        -39.241876,
+        12,
+        17.968137
+      ],
+      "max": [
+        -38.752453,
+        12.486602,
+        18.645854
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-0.room-a-1-5-8.cover-crate-2-1-box",
+      "kind": "aabb",
+      "min": [
+        -42.611018,
+        0,
+        -38.326695
+      ],
+      "max": [
+        -42.092746,
+        0.481728,
+        -37.844967
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-0.room-a-1-5-8.cover-crate-2-6-box",
+      "kind": "aabb",
+      "min": [
+        -44.297466,
+        0,
+        -34.676312
+      ],
+      "max": [
+        -43.619749,
+        0.486602,
+        -34.186889
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-0.room-a-1-5-8-9.cover-crate-2-1-box",
+      "kind": "aabb",
+      "min": [
+        -24.707028,
+        0,
+        -38.326695
+      ],
+      "max": [
+        -24.188756,
+        0.481728,
+        -37.844967
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-0.room-a-1-5-8-9.cover-crate-2-6-box",
+      "kind": "aabb",
+      "min": [
+        -26.393476,
+        0,
+        -34.676312
+      ],
+      "max": [
+        -25.715759,
+        0.486602,
+        -34.186889
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-0.room-a-1-5-8-8.cover-crate-2-1-box",
+      "kind": "aabb",
+      "min": [
+        -42.611018,
+        3,
+        -38.326695
+      ],
+      "max": [
+        -42.092746,
+        3.481728,
+        -37.844967
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-0.room-a-1-5-8-8.cover-crate-2-6-box",
+      "kind": "aabb",
+      "min": [
+        -44.297466,
+        3,
+        -34.676312
+      ],
+      "max": [
+        -43.619749,
+        3.486602,
+        -34.186889
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-0.room-a-1-5-8-9-9.cover-crate-2-1-box",
+      "kind": "aabb",
+      "min": [
+        -24.707028,
+        3,
+        -38.326695
+      ],
+      "max": [
+        -24.188756,
+        3.481728,
+        -37.844967
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-0.room-a-1-5-8-9-9.cover-crate-2-6-box",
+      "kind": "aabb",
+      "min": [
+        -26.393476,
+        3,
+        -34.676312
+      ],
+      "max": [
+        -25.715759,
+        3.486602,
+        -34.186889
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-0.room-a-1-5-8-0.cover-crate-2-1-box",
+      "kind": "aabb",
+      "min": [
+        -42.611018,
+        6,
+        -38.326695
+      ],
+      "max": [
+        -42.092746,
+        6.481728,
+        -37.844967
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-0.room-a-1-5-8-0.cover-crate-2-6-box",
+      "kind": "aabb",
+      "min": [
+        -44.297466,
+        6,
+        -34.676312
+      ],
+      "max": [
+        -43.619749,
+        6.486602,
+        -34.186889
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-0.room-a-1-5-8-9-6.cover-crate-2-1-box",
+      "kind": "aabb",
+      "min": [
+        -24.707028,
+        6,
+        -38.326695
+      ],
+      "max": [
+        -24.188756,
+        6.481728,
+        -37.844967
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-0.room-a-1-5-8-9-6.cover-crate-2-6-box",
+      "kind": "aabb",
+      "min": [
+        -26.393476,
+        6,
+        -34.676312
+      ],
+      "max": [
+        -25.715759,
+        6.486602,
+        -34.186889
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-0.room-a-1-5-8-87.cover-crate-2-1-box",
+      "kind": "aabb",
+      "min": [
+        -42.611018,
+        9,
+        -38.326695
+      ],
+      "max": [
+        -42.092746,
+        9.481728,
+        -37.844967
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-0.room-a-1-5-8-87.cover-crate-2-6-box",
+      "kind": "aabb",
+      "min": [
+        -44.297466,
+        9,
+        -34.676312
+      ],
+      "max": [
+        -43.619749,
+        9.486602,
+        -34.186889
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-0.room-a-1-5-8-9-90.cover-crate-2-1-box",
+      "kind": "aabb",
+      "min": [
+        -24.707028,
+        9,
+        -38.326695
+      ],
+      "max": [
+        -24.188756,
+        9.481728,
+        -37.844967
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-0.room-a-1-5-8-9-90.cover-crate-2-6-box",
+      "kind": "aabb",
+      "min": [
+        -26.393476,
+        9,
+        -34.676312
+      ],
+      "max": [
+        -25.715759,
+        9.486602,
+        -34.186889
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-0.room-a-1-5-8-3.cover-crate-2-1-box",
+      "kind": "aabb",
+      "min": [
+        -42.611018,
+        12,
+        -38.326695
+      ],
+      "max": [
+        -42.092746,
+        12.481728,
+        -37.844967
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-0.room-a-1-5-8-3.cover-crate-2-6-box",
+      "kind": "aabb",
+      "min": [
+        -44.297466,
+        12,
+        -34.676312
+      ],
+      "max": [
+        -43.619749,
+        12.486602,
+        -34.186889
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-0.room-a-1-5-8-9-3.cover-crate-2-1-box",
+      "kind": "aabb",
+      "min": [
+        -24.707028,
+        12,
+        -38.326695
+      ],
+      "max": [
+        -24.188756,
+        12.481728,
+        -37.844967
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-0.room-a-1-5-8-9-3.cover-crate-2-6-box",
+      "kind": "aabb",
+      "min": [
+        -26.393476,
+        12,
+        -34.676312
+      ],
+      "max": [
+        -25.715759,
+        12.486602,
+        -34.186889
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-9.room-a-1-5-8.cover-crate-2-1-box",
+      "kind": "aabb",
+      "min": [
+        0.697906,
+        0,
+        -31.819686
+      ],
+      "max": [
+        1.179634,
+        0.481728,
+        -31.301414
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-9.room-a-1-5-8.cover-crate-2-6-box",
+      "kind": "aabb",
+      "min": [
+        -2.960172,
+        0,
+        -33.506134
+      ],
+      "max": [
+        -2.470749,
+        0.486602,
+        -32.828417
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-9.room-a-1-5-8-9.cover-crate-2-1-box",
+      "kind": "aabb",
+      "min": [
+        0.697906,
+        0,
+        -13.915696
+      ],
+      "max": [
+        1.179634,
+        0.481728,
+        -13.397424
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-9.room-a-1-5-8-9.cover-crate-2-6-box",
+      "kind": "aabb",
+      "min": [
+        -2.960172,
+        0,
+        -15.602144
+      ],
+      "max": [
+        -2.470749,
+        0.486602,
+        -14.924427
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-9.room-a-1-5-8-8.cover-crate-2-1-box",
+      "kind": "aabb",
+      "min": [
+        0.697906,
+        3,
+        -31.819686
+      ],
+      "max": [
+        1.179634,
+        3.481728,
+        -31.301414
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-9.room-a-1-5-8-8.cover-crate-2-6-box",
+      "kind": "aabb",
+      "min": [
+        -2.960172,
+        3,
+        -33.506134
+      ],
+      "max": [
+        -2.470749,
+        3.486602,
+        -32.828417
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-9.room-a-1-5-8-9-9.cover-crate-2-1-box",
+      "kind": "aabb",
+      "min": [
+        0.697906,
+        3,
+        -13.915696
+      ],
+      "max": [
+        1.179634,
+        3.481728,
+        -13.397424
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-9.room-a-1-5-8-9-9.cover-crate-2-6-box",
+      "kind": "aabb",
+      "min": [
+        -2.960172,
+        3,
+        -15.602144
+      ],
+      "max": [
+        -2.470749,
+        3.486602,
+        -14.924427
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-9.room-a-1-5-8-0.cover-crate-2-1-box",
+      "kind": "aabb",
+      "min": [
+        0.697906,
+        6,
+        -31.819686
+      ],
+      "max": [
+        1.179634,
+        6.481728,
+        -31.301414
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-9.room-a-1-5-8-0.cover-crate-2-6-box",
+      "kind": "aabb",
+      "min": [
+        -2.960172,
+        6,
+        -33.506134
+      ],
+      "max": [
+        -2.470749,
+        6.486602,
+        -32.828417
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-9.room-a-1-5-8-9-6.cover-crate-2-1-box",
+      "kind": "aabb",
+      "min": [
+        0.697906,
+        6,
+        -13.915696
+      ],
+      "max": [
+        1.179634,
+        6.481728,
+        -13.397424
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-9.room-a-1-5-8-9-6.cover-crate-2-6-box",
+      "kind": "aabb",
+      "min": [
+        -2.960172,
+        6,
+        -15.602144
+      ],
+      "max": [
+        -2.470749,
+        6.486602,
+        -14.924427
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-9.room-a-1-5-8-87.cover-crate-2-1-box",
+      "kind": "aabb",
+      "min": [
+        0.697906,
+        9,
+        -31.819686
+      ],
+      "max": [
+        1.179634,
+        9.481728,
+        -31.301414
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-9.room-a-1-5-8-87.cover-crate-2-6-box",
+      "kind": "aabb",
+      "min": [
+        -2.960172,
+        9,
+        -33.506134
+      ],
+      "max": [
+        -2.470749,
+        9.486602,
+        -32.828417
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-9.room-a-1-5-8-9-90.cover-crate-2-1-box",
+      "kind": "aabb",
+      "min": [
+        0.697906,
+        9,
+        -13.915696
+      ],
+      "max": [
+        1.179634,
+        9.481728,
+        -13.397424
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-9.room-a-1-5-8-9-90.cover-crate-2-6-box",
+      "kind": "aabb",
+      "min": [
+        -2.960172,
+        9,
+        -15.602144
+      ],
+      "max": [
+        -2.470749,
+        9.486602,
+        -14.924427
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-9.room-a-1-5-8-3.cover-crate-2-1-box",
+      "kind": "aabb",
+      "min": [
+        0.697906,
+        12,
+        -31.819686
+      ],
+      "max": [
+        1.179634,
+        12.481728,
+        -31.301414
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-9.room-a-1-5-8-3.cover-crate-2-6-box",
+      "kind": "aabb",
+      "min": [
+        -2.960172,
+        12,
+        -33.506134
+      ],
+      "max": [
+        -2.470749,
+        12.486602,
+        -32.828417
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-9.room-a-1-5-8-9-3.cover-crate-2-1-box",
+      "kind": "aabb",
+      "min": [
+        0.697906,
+        12,
+        -13.915696
+      ],
+      "max": [
+        1.179634,
+        12.481728,
+        -13.397424
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-9.room-a-1-5-8-9-3.cover-crate-2-6-box",
+      "kind": "aabb",
+      "min": [
+        -2.960172,
+        12,
+        -15.602144
+      ],
+      "max": [
+        -2.470749,
+        12.486602,
+        -14.924427
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-5.room-a-1-5-8.cover-crate-2-1-box",
+      "kind": "aabb",
+      "min": [
+        44.549691,
+        0,
+        -38.188355
+      ],
+      "max": [
+        45.067963,
+        0.481728,
+        -37.706627
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-5.room-a-1-5-8.cover-crate-2-6-box",
+      "kind": "aabb",
+      "min": [
+        42.863243,
+        0,
+        -34.537972
+      ],
+      "max": [
+        43.54096,
+        0.486602,
+        -34.048549
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-5.room-a-1-5-8-9.cover-crate-2-1-box",
+      "kind": "aabb",
+      "min": [
+        62.453681,
+        0,
+        -38.188355
+      ],
+      "max": [
+        62.971953,
+        0.481728,
+        -37.706627
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-5.room-a-1-5-8-9.cover-crate-2-6-box",
+      "kind": "aabb",
+      "min": [
+        60.767233,
+        0,
+        -34.537972
+      ],
+      "max": [
+        61.44495,
+        0.486602,
+        -34.048549
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-5.room-a-1-5-8-8.cover-crate-2-1-box",
+      "kind": "aabb",
+      "min": [
+        44.549691,
+        3,
+        -38.188355
+      ],
+      "max": [
+        45.067963,
+        3.481728,
+        -37.706627
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-5.room-a-1-5-8-8.cover-crate-2-6-box",
+      "kind": "aabb",
+      "min": [
+        42.863243,
+        3,
+        -34.537972
+      ],
+      "max": [
+        43.54096,
+        3.486602,
+        -34.048549
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-5.room-a-1-5-8-9-9.cover-crate-2-1-box",
+      "kind": "aabb",
+      "min": [
+        62.453681,
+        3,
+        -38.188355
+      ],
+      "max": [
+        62.971953,
+        3.481728,
+        -37.706627
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-5.room-a-1-5-8-9-9.cover-crate-2-6-box",
+      "kind": "aabb",
+      "min": [
+        60.767233,
+        3,
+        -34.537972
+      ],
+      "max": [
+        61.44495,
+        3.486602,
+        -34.048549
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-5.room-a-1-5-8-0.cover-crate-2-1-box",
+      "kind": "aabb",
+      "min": [
+        44.549691,
+        6,
+        -38.188355
+      ],
+      "max": [
+        45.067963,
+        6.481728,
+        -37.706627
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-5.room-a-1-5-8-0.cover-crate-2-6-box",
+      "kind": "aabb",
+      "min": [
+        42.863243,
+        6,
+        -34.537972
+      ],
+      "max": [
+        43.54096,
+        6.486602,
+        -34.048549
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-5.room-a-1-5-8-9-6.cover-crate-2-1-box",
+      "kind": "aabb",
+      "min": [
+        62.453681,
+        6,
+        -38.188355
+      ],
+      "max": [
+        62.971953,
+        6.481728,
+        -37.706627
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-5.room-a-1-5-8-9-6.cover-crate-2-6-box",
+      "kind": "aabb",
+      "min": [
+        60.767233,
+        6,
+        -34.537972
+      ],
+      "max": [
+        61.44495,
+        6.486602,
+        -34.048549
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-5.room-a-1-5-8-87.cover-crate-2-1-box",
+      "kind": "aabb",
+      "min": [
+        44.549691,
+        9,
+        -38.188355
+      ],
+      "max": [
+        45.067963,
+        9.481728,
+        -37.706627
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-5.room-a-1-5-8-87.cover-crate-2-6-box",
+      "kind": "aabb",
+      "min": [
+        42.863243,
+        9,
+        -34.537972
+      ],
+      "max": [
+        43.54096,
+        9.486602,
+        -34.048549
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-5.room-a-1-5-8-9-90.cover-crate-2-1-box",
+      "kind": "aabb",
+      "min": [
+        62.453681,
+        9,
+        -38.188355
+      ],
+      "max": [
+        62.971953,
+        9.481728,
+        -37.706627
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-5.room-a-1-5-8-9-90.cover-crate-2-6-box",
+      "kind": "aabb",
+      "min": [
+        60.767233,
+        9,
+        -34.537972
+      ],
+      "max": [
+        61.44495,
+        9.486602,
+        -34.048549
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-5.room-a-1-5-8-3.cover-crate-2-1-box",
+      "kind": "aabb",
+      "min": [
+        44.549691,
+        12,
+        -38.188355
+      ],
+      "max": [
+        45.067963,
+        12.481728,
+        -37.706627
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-5.room-a-1-5-8-3.cover-crate-2-6-box",
+      "kind": "aabb",
+      "min": [
+        42.863243,
+        12,
+        -34.537972
+      ],
+      "max": [
+        43.54096,
+        12.486602,
+        -34.048549
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-5.room-a-1-5-8-9-3.cover-crate-2-1-box",
+      "kind": "aabb",
+      "min": [
+        62.453681,
+        12,
+        -38.188355
+      ],
+      "max": [
+        62.971953,
+        12.481728,
+        -37.706627
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-5.room-a-1-5-8-9-3.cover-crate-2-6-box",
+      "kind": "aabb",
+      "min": [
+        60.767233,
+        12,
+        -34.537972
+      ],
+      "max": [
+        61.44495,
+        12.486602,
+        -34.048549
       ]
     }
   ]

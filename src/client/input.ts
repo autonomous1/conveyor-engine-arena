@@ -22,6 +22,8 @@ import {
  * F fires while the pointer is locked. F does not change the gamepad profile.
  * P throws a grenade on the same lock. P does not fire. F does not throw.
  * E uses the door the pawn is overlapping. E does not fire and does not throw.
+ * Digit0–Digit9 and Numpad0–Numpad9 call an elevator floor while the pointer
+ * is locked. A repeat does not call again. They do not fire or use a door.
  * Space ascends and Control descends. Both are held, like WASD, and do not fire.
  * A gamepad fire button is included only when that profile already binds one.
  * Neither profile binds a grenade button or a use button.
@@ -38,6 +40,8 @@ export type PlaySample = {
   grenade: boolean;
   /** E was pressed once while locked. A hold does not repeat. */
   using: boolean;
+  /** Digit or numpad code pressed once while locked. Absent when none. */
+  digit?: string;
   /** Space is +1, ControlLeft or ControlRight is -1, both or neither is 0. */
   ascend: -1 | 0 | 1;
 };
@@ -82,6 +86,7 @@ export function attachPlayInput(
   let grenadeDown = false;
   let grenadeQueued = false;
   let useQueued = false;
+  let digitQueued: string | undefined;
   let profile = loadGamepadProfile(storage);
   const pad = new GamepadInput();
 
@@ -119,6 +124,12 @@ export function attachPlayInput(
       useQueued = true;
       return;
     }
+    if (/^(?:Digit|Numpad)[0-9]$/.test(ev.code)) {
+      if (!down) return;
+      if (ev.repeat || document.pointerLockElement !== dom) return;
+      digitQueued = ev.code;
+      return;
+    }
     if (ev.code === "Space" || ev.code === "ControlLeft" || ev.code === "ControlRight") {
       if (ev.repeat) return;
       ev.preventDefault();
@@ -153,6 +164,7 @@ export function attachPlayInput(
       grenadeDown = false;
       grenadeQueued = false;
       useQueued = false;
+      digitQueued = undefined;
     }
     document.body.style.cursor = locked ? "none" : "default";
   };
@@ -175,6 +187,7 @@ export function attachPlayInput(
     grenadeDown = false;
     grenadeQueued = false;
     useQueued = false;
+    digitQueued = undefined;
   };
 
   window.addEventListener("keydown", down);
@@ -215,10 +228,22 @@ export function attachPlayInput(
       const firing = (document.pointerLockElement === dom && (fireDown || fireQueued)) || padFire;
       const grenade = document.pointerLockElement === dom && (grenadeDown || grenadeQueued);
       const using = document.pointerLockElement === dom && useQueued;
+      const digit = digitQueued;
       fireQueued = false;
       grenadeQueued = false;
       useQueued = false;
-      return { forward: move.forward, strafe: move.strafe, yaw, pitch, firing, grenade, using, ascend: ascendFromKeys(keys) };
+      digitQueued = undefined;
+      return {
+        forward: move.forward,
+        strafe: move.strafe,
+        yaw,
+        pitch,
+        firing,
+        grenade,
+        using,
+        ascend: ascendFromKeys(keys),
+        ...(digit ? { digit } : {}),
+      };
     },
   };
 }

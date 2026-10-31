@@ -13,7 +13,7 @@ import {
   type StaticWorldDefinition,
 } from "conveyor-engine-assets";
 import { attachBuildingProfiles } from "../shared/building-profile.js";
-import type { ArenaView, CharacterAnimation } from "../shared/arena-view.js";
+import type { ArenaElevator, ArenaView, CharacterAnimation } from "../shared/arena-view.js";
 import { DEFAULT_MOVEMENT_SPEED, MOVEMENTS, type Movement } from "../shared/movements.js";
 import { AMMO_PICKUP, HEALTH_PICKUP, parsePickupKind, type PickupPlacement } from "../shared/pickups.js";
 import { interpretPlacements } from "./placements-file.js";
@@ -338,6 +338,11 @@ export type CompileSources = {
    */
   lightsFile?: PlacementFileSource;
   /**
+   * Set when `scene.elevators` is a path. The text is an elevators object.
+   * Not part of either content hash. An empty list is omitted from the view.
+   */
+  elevatorsFile?: PlacementFileSource;
+  /**
    * `web/game/building-profiles.json`. Outlines for the scene map.
    * Absent when that file was not loaded. Not part of either content hash.
    */
@@ -524,6 +529,166 @@ function sceneLights(
     if (light) lights.push(light);
   });
   return lights;
+}
+
+/**
+ * `scene.elevators` is an array, or a path to an elevators.json object.
+ * Absent is `[]`, and the view omits the key when the list stays empty.
+ * Each failure names the elevator id.
+ */
+function sceneElevators(
+  scene: Record<string, unknown> | undefined,
+  sources: CompileSources | undefined,
+  issues: GameIssue[],
+): ArenaElevator[] {
+  if (!scene || !Object.prototype.hasOwnProperty.call(scene, "elevators")) return [];
+  const value = scene.elevators;
+  let items: unknown[] | undefined;
+  if (typeof value === "string") {
+    if (!value.trim()) {
+      issues.push({ path: "scene.elevators", message: "must be an array or a path" });
+      return [];
+    }
+    const file = sources?.elevatorsFile;
+    if (!file || file.path !== value) {
+      issues.push({ path: "scene.elevators", message: "file was not loaded" });
+      return [];
+    }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(file.text);
+    } catch (err) {
+      issues.push({ path: "scene.elevators", message: `invalid json: ${err instanceof Error ? err.message : String(err)}` });
+      return [];
+    }
+    items = elevatorItems(parsed, "scene.elevators", issues);
+  } else if (Array.isArray(value)) {
+    items = value;
+  } else {
+    issues.push({ path: "scene.elevators", message: "must be an array or a path" });
+    return [];
+  }
+  if (!items) return [];
+  const elevators: ArenaElevator[] = [];
+  items.forEach((item, index) => {
+    const row = parseElevator(item, index, issues);
+    if (row) elevators.push(row);
+  });
+  return elevators;
+}
+
+function elevatorItems(parsed: unknown, issuePath: string, issues: GameIssue[]): unknown[] | undefined {
+  if (Array.isArray(parsed)) return parsed;
+  if (!isObject(parsed)) {
+    issues.push({ path: issuePath, message: "must be an object" });
+    return undefined;
+  }
+  if (parsed.formatVersion !== undefined && parsed.formatVersion !== 1) {
+    issues.push({ path: `${issuePath}.formatVersion`, message: "must be 1" });
+  }
+  if (parsed.units !== undefined && parsed.units !== "meters") {
+    issues.push({ path: `${issuePath}.units`, message: "must be meters" });
+  }
+  if (!Array.isArray(parsed.elevators)) {
+    issues.push({ path: `${issuePath}.elevators`, message: "required array" });
+    return undefined;
+  }
+  return parsed.elevators;
+}
+
+function parseElevator(value: unknown, index: number, issues: GameIssue[]): ArenaElevator | undefined {
+  const id = isObject(value) && typeof value.id === "string" && value.id ? value.id : undefined;
+  const path = id ? `scene.elevators.${id}` : `scene.elevators[${index}]`;
+  if (!isObject(value)) {
+    issues.push({ path, message: "must be an object" });
+    return undefined;
+  }
+  if (!id) issues.push({ path: `${path}.id`, message: "required string" });
+  const stops = numList(value.stops, `${path}.stops`, issues);
+  const speed = num(value.speed, `${path}.speed`, issues);
+  const waitS = num(value.waitS, `${path}.waitS`, issues);
+  const polygon = pairList(value.polygon, `${path}.polygon`, issues);
+  const landings = tripleList(value.landings, `${path}.landings`, issues);
+  let ok = id !== undefined && stops !== undefined && polygon !== undefined && landings !== undefined && speed !== undefined && waitS !== undefined;
+  if (stops && stops.length < 2) {
+    issues.push({ path: `${path}.stops`, message: "needs at least two stops" });
+    ok = false;
+  } else if (stops) {
+    for (let i = 1; i < stops.length; i += 1) {
+      if (!(stops[i]! > stops[i - 1]!)) {
+        issues.push({ path: `${path}.stops`, message: "stops must increase" });
+        ok = false;
+        break;
+      }
+    }
+  }
+  if (speed !== undefined && !(speed > 0)) {
+    issues.push({ path: `${path}.speed`, message: "must be > 0" });
+    ok = false;
+  }
+  if (waitS !== undefined && waitS < 0) {
+    issues.push({ path: `${path}.waitS`, message: "must be >= 0" });
+    ok = false;
+  }
+  if (polygon && polygon.length < 3) {
+    issues.push({ path: `${path}.polygon`, message: "needs at least three points" });
+    ok = false;
+  }
+  if (stops && landings && landings.length !== stops.length) {
+    issues.push({ path: `${path}.landings`, message: "must match stops" });
+    ok = false;
+  }
+  if (!ok || !id || !stops || !polygon || !landings || speed === undefined || waitS === undefined) return undefined;
+  return { id, stops, speed, waitS, polygon, landings };
+}
+
+function numList(value: unknown, path: string, issues: GameIssue[]): number[] | undefined {
+  if (!Array.isArray(value)) {
+    issues.push({ path, message: "required array" });
+    return undefined;
+  }
+  const out: number[] = [];
+  for (let index = 0; index < value.length; index += 1) {
+    const item = num(value[index], `${path}[${index}]`, issues);
+    if (item === undefined) return undefined;
+    out.push(item);
+  }
+  return out;
+}
+
+function pairList(value: unknown, path: string, issues: GameIssue[]): Array<[number, number]> | undefined {
+  if (!Array.isArray(value)) {
+    issues.push({ path, message: "required array" });
+    return undefined;
+  }
+  const out: Array<[number, number]> = [];
+  for (let index = 0; index < value.length; index += 1) {
+    const item = value[index];
+    const at = `${path}[${index}]`;
+    if (!Array.isArray(item) || item.length !== 2) {
+      issues.push({ path: at, message: "must be [x,z]" });
+      return undefined;
+    }
+    const x = num(item[0], `${at}[0]`, issues);
+    const z = num(item[1], `${at}[1]`, issues);
+    if (x === undefined || z === undefined) return undefined;
+    out.push([x, z]);
+  }
+  return out;
+}
+
+function tripleList(value: unknown, path: string, issues: GameIssue[]): Array<[number, number, number]> | undefined {
+  if (!Array.isArray(value)) {
+    issues.push({ path, message: "required array" });
+    return undefined;
+  }
+  const out: Array<[number, number, number]> = [];
+  for (let index = 0; index < value.length; index += 1) {
+    const point = vec3(value[index], `${path}[${index}]`, issues);
+    if (!point) return undefined;
+    out.push(point);
+  }
+  return out;
 }
 
 function lightItems(parsed: unknown, issuePath: string, issues: GameIssue[]): unknown[] | undefined {
@@ -1158,6 +1323,7 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
   }
 
   const lights = sceneLights(scene, sources, issues);
+  const elevators = sceneElevators(scene, sources, issues);
 
   const facesReady = !walls || faceOrder.every((face) => {
     const placed = facePlacements[face];
@@ -1355,6 +1521,7 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
       ? { playerSpawns: playerSpawns.map((spawn) => ({ id: spawn.id, x: spawn.x, z: spawn.z, yaw: spawn.yaw })) }
       : {}),
     lights,
+    ...(elevators.length ? { elevators } : {}),
     ...(grenadeModel ? { grenade: grenadeModel } : {}),
   };
 

@@ -29,6 +29,7 @@
     "start:arena-wall": "node dist/run.js arena 40",
     "start:arena-miss": "node dist/run.js arena-miss",
     "bake:scene": "scripts/bake.sh",
+    "bake:sceneGraph": "scripts/bake-scene-graph.sh",
     "bake:ktx2": "bash scripts/bake-ktx2.sh",
     "bake:map": "node src/util/bake-map.ts",
     "run:lossless": "node dist/run.js lossless",

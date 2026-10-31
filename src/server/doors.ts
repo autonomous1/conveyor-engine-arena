@@ -105,37 +105,42 @@ export function createArenaDoors(opts: {
     drop(clientId: number) {
       gates.delete(clientId);
     },
-    onFrame(clientId: number, frame: unknown) {
+    /**
+     * False only for a fresh use from a live pawn with no door in reach.
+     * Every other use frame returns true, so one E press is not handled twice.
+     */
+    onFrame(clientId: number, frame: unknown): boolean {
       const use = parseUse(frame);
-      if (!use) return;
+      if (!use) return true;
       const sessionId = opts.sessionId(clientId);
-      if (sessionId === undefined) return;
+      if (sessionId === undefined) return true;
       const pawnId = opts.ownedPawn(clientId);
-      if (pawnId === undefined) return;
+      if (pawnId === undefined) return true;
       let row = gates.get(clientId);
       if (!row || row.sessionId !== sessionId) {
         row = { sessionId, lastSeq: 0 };
         gates.set(clientId, row);
       }
-      if (!(use.seq > row.lastSeq)) return;
+      if (!(use.seq > row.lastSeq)) return true;
       row.lastSeq = use.seq;
-      if (opts.alive && !opts.alive(pawnId)) return;
+      if (opts.alive && !opts.alive(pawnId)) return true;
       const pawn = opts.pawnOf(pawnId);
-      if (!pawn || !pawn.alive) return;
+      if (!pawn || !pawn.alive) return true;
       const at = `client=${clientId} pawn=${pawnId} at (${pawn.x.toFixed(2)}, ${pawn.y.toFixed(2)}, ${pawn.z.toFixed(2)})`;
       const door = pickDoorForUse([...state.values()], pawn);
       if (!door) {
         opts.log?.(`[door] use ${at}: no door in reach${nearestNote([...state.values()], pawn)}`);
-        return;
+        return false;
       }
       const next = tryUseDoor(door, pawnId, opts.keys);
       if (!next) {
         opts.log?.(`[door] use ${at}: ${door.id} is locked; this pawn does not hold "${door.key ?? ""}"`);
-        return;
+        return true;
       }
       opts.blockers?.sync(door);
       opts.log?.(`[door] use ${at}: ${door.id} open=${next.open} locked=${next.locked}`);
       opts.sendAll(doorFrame(next.id, next.open, next.locked));
+      return true;
     },
   };
 }

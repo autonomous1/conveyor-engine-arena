@@ -271,6 +271,7 @@ test("installed placements consume ammo, health, and weapon, and a crate type st
     spawnPointsFile: base.spawnPointsFile,
     playerSpawnPointsFile: base.playerSpawnPointsFile,
     lightsFile: base.lightsFile,
+    elevatorsFile: base.elevatorsFile,
   });
   const stayedIds = (stayedGame.view.pickups ?? []).map((item) => item.id);
   assert.deepEqual(stayedIds, ["rounds"]);
@@ -290,6 +291,7 @@ test("installed placements consume ammo, health, and weapon, and a crate type st
     spawnPointsFile: base.spawnPointsFile,
     playerSpawnPointsFile: base.playerSpawnPointsFile,
     lightsFile: base.lightsFile,
+    elevatorsFile: base.elevatorsFile,
   }), (err: unknown) => {
     assert.ok(err instanceof GameManifestError);
     assert.ok(err.issues.some((issue) => issue.message === "pickup needs an aabb"));

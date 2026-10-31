@@ -15,18 +15,6 @@
       "range": 3.5
     },
     {
-      "id": "brutalist-building-2-cbake.room-a-1-5-8.lamp",
-      "type": "point",
-      "position": [
-        27.422333,
-        3.75,
-        15.793732
-      ],
-      "color": "#ffd9a0",
-      "intensity": 8,
-      "range": 6
-    },
-    {
       "id": "brutalist-building-2-cbake.room-b-1-3.lamp",
       "type": "point",
       "position": [
@@ -37,18 +25,6 @@
       "color": "#ffd9a0",
       "intensity": 8,
       "range": 3.5
-    },
-    {
-      "id": "brutalist-building-2-cbake.room-a-1-5-8-8.lamp",
-      "type": "point",
-      "position": [
-        27.422333,
-        6.5,
-        15.793732
-      ],
-      "color": "#ffd9a0",
-      "intensity": 8,
-      "range": 6
     },
     {
       "id": "brutalist-building-2-cbake-1.rect21094.lamp",
@@ -63,18 +39,6 @@
       "range": 3.5
     },
     {
-      "id": "brutalist-building-2-cbake-1.room-a-1-5-8.lamp",
-      "type": "point",
-      "position": [
-        18.017905,
-        3.75,
-        35.875707
-      ],
-      "color": "#ffd9a0",
-      "intensity": 8,
-      "range": 6
-    },
-    {
       "id": "brutalist-building-2-cbake-1.room-b-1-3.lamp",
       "type": "point",
       "position": [
@@ -85,18 +49,6 @@
       "color": "#ffd9a0",
       "intensity": 8,
       "range": 3.5
-    },
-    {
-      "id": "brutalist-building-2-cbake-1.room-a-1-5-8-8.lamp",
-      "type": "point",
-      "position": [
-        18.017905,
-        6.5,
-        35.875707
-      ],
-      "color": "#ffd9a0",
-      "intensity": 8,
-      "range": 6
     },
     {
       "id": "brutalist-building-2-cbake-3.rect21094.lamp",
@@ -111,18 +63,6 @@
       "range": 3.5
     },
     {
-      "id": "brutalist-building-2-cbake-3.room-a-1-5-8.lamp",
-      "type": "point",
-      "position": [
-        -23.669738,
-        3.75,
-        -11.690582
-      ],
-      "color": "#ffd9a0",
-      "intensity": 8,
-      "range": 6
-    },
-    {
       "id": "brutalist-building-2-cbake-3.room-b-1-3.lamp",
       "type": "point",
       "position": [
@@ -135,16 +75,52 @@
       "range": 3.5
     },
     {
-      "id": "brutalist-building-2-cbake-3.room-a-1-5-8-8.lamp",
+      "id": "brutalist-building-1-cbake.elevator-1-1.lamp",
       "type": "point",
       "position": [
-        -23.669738,
-        6.5,
-        -11.690582
+        -33.704202,
+        2.2,
+        26.841872
       ],
       "color": "#ffd9a0",
       "intensity": 8,
-      "range": 6
+      "range": 3.5
+    },
+    {
+      "id": "brutalist-building-1-cbake-0.elevator-1-1.lamp",
+      "type": "point",
+      "position": [
+        -34.589494,
+        2.2,
+        -29.138638
+      ],
+      "color": "#ffd9a0",
+      "intensity": 8,
+      "range": 3.5
+    },
+    {
+      "id": "brutalist-building-1-cbake-9.elevator-1-1.lamp",
+      "type": "point",
+      "position": [
+        -8.008423,
+        2.2,
+        -23.798162
+      ],
+      "color": "#ffd9a0",
+      "intensity": 8,
+      "range": 3.5
+    },
+    {
+      "id": "brutalist-building-1-cbake-5.elevator-1-1.lamp",
+      "type": "point",
+      "position": [
+        52.571215,
+        2.2,
+        -29.000298
+      ],
+      "color": "#ffd9a0",
+      "intensity": 8,
+      "range": 3.5
     }
   ]
 }

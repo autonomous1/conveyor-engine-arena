@@ -325,7 +325,8 @@ test("a second client receives the laser and the segment matches the host hit", 
     assert.equal(b.errors.length, 0);
     assert.equal(first.shooter, aw.ownedEntityId);
     const remain = first.until - seenAt;
-    assert.ok(remain >= 0 && remain <= LASER_MS + 40, `until ${first.until - started} remain ${remain}`);
+    // waitFor polls every 15 ms. A busy suite can notice the frame a few milliseconds after `until`.
+    assert.ok(remain >= -40 && remain <= LASER_MS + 40, `until ${first.until - started} remain ${remain}`);
     const expected = traceHitscan(origin, aimDirection(aim.yaw, aim.pitch), view.aabbs, others);
     assert.ok(expected.distance > 1, `self hit ${expected.distance}`);
     samePoint(first.from, expected.from);

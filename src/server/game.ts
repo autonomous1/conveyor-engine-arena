@@ -123,6 +123,8 @@ export function startWanderLoop(
   playerSpawns: readonly SpawnPick[] = [],
   /** Unowned wander pawns stay on their pads. Tests use this so a bot cannot cross a shot or a stair. */
   holdNpcs = false,
+  /** Cab step. Rider ids skip input for this tick and ride through slabs. */
+  elevators?: { step(dt: number): readonly number[] },
 ): () => void {
   const rng = splitMix(20260917);
   const snaps = hostSnapPath((clientId, envelope) => {
@@ -147,8 +149,10 @@ export function startWanderLoop(
       if (!owned.has(entity)) held.drop(entity);
     }
     noteArenaInterest(server);
+    const riders = elevators?.step(MOVE_DT) ?? [];
     const noclipIds: number[] = [];
     for (const agent of agents) {
+      if (riders.includes(agent.id)) continue;
       if (timedOut.has(agent.id)) continue;
       if (health?.isDead(agent.id)) {
         if (agent.gait !== "fall") {
@@ -193,8 +197,9 @@ export function startWanderLoop(
     if (health) {
       for (const id of health.takeRespawns()) respawnPawn(world, agents, id, playerSpawns);
     }
-    const snap = noclipIds.length > 0
-      ? commitShielded(world, BigInt(tick), noclipIds)
+    const shielded = [...noclipIds, ...riders];
+    const snap = shielded.length > 0
+      ? commitShielded(world, BigInt(tick), shielded)
       : world.commit(BigInt(tick));
     try {
       onTick?.();

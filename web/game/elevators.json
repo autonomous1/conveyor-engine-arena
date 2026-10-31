@@ -1,0 +1,302 @@
+{
+  "formatVersion": 1,
+  "units": "meters",
+  "elevators": [
+    {
+      "id": "brutalist-building-1-cbake-0.e1",
+      "kind": "elevator",
+      "building": "brutalist-building-1-cbake-0",
+      "floor": "1",
+      "y": 0,
+      "polygon": [
+        [
+          -33.861732,
+          -29.749208
+        ],
+        [
+          -33.861732,
+          -28.249208
+        ],
+        [
+          -35.361732,
+          -28.249208
+        ],
+        [
+          -35.361732,
+          -29.749208
+        ]
+      ],
+      "bounds": {
+        "minX": -35.361732,
+        "maxX": -33.861732,
+        "minZ": -29.749208,
+        "maxZ": -28.249208
+      },
+      "stops": [
+        0,
+        3,
+        6,
+        9,
+        12
+      ],
+      "waitS": 8,
+      "speed": 1,
+      "landings": [
+        [
+          -33.261732,
+          0,
+          -28.999208
+        ],
+        [
+          -33.261732,
+          3,
+          -28.999208
+        ],
+        [
+          -33.261732,
+          6,
+          -28.999208
+        ],
+        [
+          -33.261732,
+          9,
+          -28.999208
+        ],
+        [
+          -33.261732,
+          12,
+          -28.999208
+        ]
+      ],
+      "joins": [
+        "brutalist-building-1-cbake-0.floor-1.hall",
+        "brutalist-building-1-cbake-0.floor-2.hall",
+        "brutalist-building-1-cbake-0.floor-3.hall",
+        "brutalist-building-1-cbake-0.floor-4.hall",
+        "brutalist-building-1-cbake-0.floor-5.hall"
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-5.e1",
+      "kind": "elevator",
+      "building": "brutalist-building-1-cbake-5",
+      "floor": "1",
+      "y": 0,
+      "polygon": [
+        [
+          53.298977,
+          -29.610868
+        ],
+        [
+          53.298977,
+          -28.110868
+        ],
+        [
+          51.798977,
+          -28.110868
+        ],
+        [
+          51.798977,
+          -29.610868
+        ]
+      ],
+      "bounds": {
+        "minX": 51.798977,
+        "maxX": 53.298977,
+        "minZ": -29.610868,
+        "maxZ": -28.110868
+      },
+      "stops": [
+        0,
+        3,
+        6,
+        9,
+        12
+      ],
+      "waitS": 8,
+      "speed": 1,
+      "landings": [
+        [
+          53.898977,
+          0,
+          -28.860868
+        ],
+        [
+          53.898977,
+          3,
+          -28.860868
+        ],
+        [
+          53.898977,
+          6,
+          -28.860868
+        ],
+        [
+          53.898977,
+          9,
+          -28.860868
+        ],
+        [
+          53.898977,
+          12,
+          -28.860868
+        ]
+      ],
+      "joins": [
+        "brutalist-building-1-cbake-5.floor-1.hall",
+        "brutalist-building-1-cbake-5.floor-2.hall",
+        "brutalist-building-1-cbake-5.floor-3.hall",
+        "brutalist-building-1-cbake-5.floor-4.hall",
+        "brutalist-building-1-cbake-5.floor-5.hall"
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake-9.e1",
+      "kind": "elevator",
+      "building": "brutalist-building-1-cbake-9",
+      "floor": "1",
+      "y": 0,
+      "polygon": [
+        [
+          -7.397853,
+          -23.0704
+        ],
+        [
+          -8.897853,
+          -23.0704
+        ],
+        [
+          -8.897853,
+          -24.5704
+        ],
+        [
+          -7.397853,
+          -24.5704
+        ]
+      ],
+      "bounds": {
+        "minX": -8.897853,
+        "maxX": -7.397853,
+        "minZ": -24.5704,
+        "maxZ": -23.0704
+      },
+      "stops": [
+        0,
+        3,
+        6,
+        9,
+        12
+      ],
+      "waitS": 8,
+      "speed": 1,
+      "landings": [
+        [
+          -8.147853,
+          0,
+          -22.4704
+        ],
+        [
+          -8.147853,
+          3,
+          -22.4704
+        ],
+        [
+          -8.147853,
+          6,
+          -22.4704
+        ],
+        [
+          -8.147853,
+          9,
+          -22.4704
+        ],
+        [
+          -8.147853,
+          12,
+          -22.4704
+        ]
+      ],
+      "joins": [
+        "brutalist-building-1-cbake-9.floor-1.hall",
+        "brutalist-building-1-cbake-9.floor-2.hall",
+        "brutalist-building-1-cbake-9.floor-3.hall",
+        "brutalist-building-1-cbake-9.floor-4.hall",
+        "brutalist-building-1-cbake-9.floor-5.hall"
+      ]
+    },
+    {
+      "id": "brutalist-building-1-cbake.e1",
+      "kind": "elevator",
+      "building": "brutalist-building-1-cbake",
+      "floor": "1",
+      "y": 0,
+      "polygon": [
+        [
+          -34.314772,
+          26.11411
+        ],
+        [
+          -32.814772,
+          26.11411
+        ],
+        [
+          -32.814772,
+          27.61411
+        ],
+        [
+          -34.314772,
+          27.61411
+        ]
+      ],
+      "bounds": {
+        "minX": -34.314772,
+        "maxX": -32.814772,
+        "minZ": 26.11411,
+        "maxZ": 27.61411
+      },
+      "stops": [
+        0,
+        3,
+        6,
+        9,
+        12
+      ],
+      "waitS": 8,
+      "speed": 1,
+      "landings": [
+        [
+          -33.564772,
+          0,
+          25.51411
+        ],
+        [
+          -33.564772,
+          3,
+          25.51411
+        ],
+        [
+          -33.564772,
+          6,
+          25.51411
+        ],
+        [
+          -33.564772,
+          9,
+          25.51411
+        ],
+        [
+          -33.564772,
+          12,
+          25.51411
+        ]
+      ],
+      "joins": [
+        "brutalist-building-1-cbake.floor-1.hall",
+        "brutalist-building-1-cbake.floor-2.hall",
+        "brutalist-building-1-cbake.floor-3.hall",
+        "brutalist-building-1-cbake.floor-4.hall",
+        "brutalist-building-1-cbake.floor-5.hall"
+      ]
+    }
+  ]
+}
