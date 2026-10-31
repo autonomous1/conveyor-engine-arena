@@ -43,29 +43,29 @@
       "speed": 1,
       "landings": [
         [
-          -33.261732,
+          -34.611732,
           0,
-          -28.999208
+          -30.349208
         ],
         [
-          -33.261732,
+          -34.611732,
           3,
-          -28.999208
+          -30.349208
         ],
         [
-          -33.261732,
+          -34.611732,
           6,
-          -28.999208
+          -30.349208
         ],
         [
-          -33.261732,
+          -34.611732,
           9,
-          -28.999208
+          -30.349208
         ],
         [
-          -33.261732,
+          -34.611732,
           12,
-          -28.999208
+          -30.349208
         ]
       ],
       "joins": [
@@ -74,7 +74,8 @@
         "brutalist-building-1-cbake-0.floor-3.hall",
         "brutalist-building-1-cbake-0.floor-4.hall",
         "brutalist-building-1-cbake-0.floor-5.hall"
-      ]
+      ],
+      "room": "brutalist-building-1-cbake-0.elevator-1-1"
     },
     {
       "id": "brutalist-building-1-cbake-5.e1",
@@ -117,29 +118,29 @@
       "speed": 1,
       "landings": [
         [
-          53.898977,
+          52.548977,
           0,
-          -28.860868
+          -30.210868
         ],
         [
-          53.898977,
+          52.548977,
           3,
-          -28.860868
+          -30.210868
         ],
         [
-          53.898977,
+          52.548977,
           6,
-          -28.860868
+          -30.210868
         ],
         [
-          53.898977,
+          52.548977,
           9,
-          -28.860868
+          -30.210868
         ],
         [
-          53.898977,
+          52.548977,
           12,
-          -28.860868
+          -30.210868
         ]
       ],
       "joins": [
@@ -148,7 +149,8 @@
         "brutalist-building-1-cbake-5.floor-3.hall",
         "brutalist-building-1-cbake-5.floor-4.hall",
         "brutalist-building-1-cbake-5.floor-5.hall"
-      ]
+      ],
+      "room": "brutalist-building-1-cbake-5.elevator-1-1"
     },
     {
       "id": "brutalist-building-1-cbake-9.e1",
@@ -191,29 +193,29 @@
       "speed": 1,
       "landings": [
         [
-          -8.147853,
+          -6.797853,
           0,
-          -22.4704
+          -23.8204
         ],
         [
-          -8.147853,
+          -6.797853,
           3,
-          -22.4704
+          -23.8204
         ],
         [
-          -8.147853,
+          -6.797853,
           6,
-          -22.4704
+          -23.8204
         ],
         [
-          -8.147853,
+          -6.797853,
           9,
-          -22.4704
+          -23.8204
         ],
         [
-          -8.147853,
+          -6.797853,
           12,
-          -22.4704
+          -23.8204
         ]
       ],
       "joins": [
@@ -222,7 +224,8 @@
         "brutalist-building-1-cbake-9.floor-3.hall",
         "brutalist-building-1-cbake-9.floor-4.hall",
         "brutalist-building-1-cbake-9.floor-5.hall"
-      ]
+      ],
+      "room": "brutalist-building-1-cbake-9.elevator-1-1"
     },
     {
       "id": "brutalist-building-1-cbake.e1",
@@ -265,29 +268,29 @@
       "speed": 1,
       "landings": [
         [
-          -33.564772,
+          -34.914772,
           0,
-          25.51411
+          26.86411
         ],
         [
-          -33.564772,
+          -34.914772,
           3,
-          25.51411
+          26.86411
         ],
         [
-          -33.564772,
+          -34.914772,
           6,
-          25.51411
+          26.86411
         ],
         [
-          -33.564772,
+          -34.914772,
           9,
-          25.51411
+          26.86411
         ],
         [
-          -33.564772,
+          -34.914772,
           12,
-          25.51411
+          26.86411
         ]
       ],
       "joins": [
@@ -296,7 +299,8 @@
         "brutalist-building-1-cbake.floor-3.hall",
         "brutalist-building-1-cbake.floor-4.hall",
         "brutalist-building-1-cbake.floor-5.hall"
-      ]
+      ],
+      "room": "brutalist-building-1-cbake.elevator-1-1"
     }
   ]
 }
