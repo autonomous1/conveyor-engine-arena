@@ -246,6 +246,7 @@ test("installed placements consume ammo, health, and weapon, and a crate type st
   const base = installedSources();
   const stayed = structuredClone(document()) as { scene: Record<string, unknown> };
   stayed.scene.placements = ["./types.json"];
+  delete stayed.scene.sceneGraph;
   const typesFile = {
     formatVersion: 1,
     units: "meters",
@@ -279,6 +280,7 @@ test("installed placements consume ammo, health, and weapon, and a crate type st
 
   const bareDoc = structuredClone(document()) as { scene: Record<string, unknown> };
   bareDoc.scene.placements = ["./no-box.json"];
+  delete bareDoc.scene.sceneGraph;
   const bareFile = {
     formatVersion: 1,
     units: "meters",

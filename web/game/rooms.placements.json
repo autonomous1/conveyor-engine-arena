@@ -1580,12 +1580,12 @@
     },
     {
       "id": "brutalist-building-1-cbake.elevator-1-1.door-1-1-9-22",
-      "model": "elevator-1-door",
+      "model": "elevator-1-door-2",
       "type": "door",
       "position": [
         -34.314772,
         0,
-        26.339403
+        26.32761
       ],
       "yaw": 270,
       "hinge": "left",
@@ -1799,10 +1799,10 @@
     },
     {
       "id": "brutalist-building-1-cbake-0.elevator-1-1.door-1-1-9-22",
-      "model": "elevator-1-door",
+      "model": "elevator-1-door-2",
       "type": "door",
       "position": [
-        -34.087025,
+        -34.075232,
         0,
         -29.749208
       ],
@@ -2018,12 +2018,12 @@
     },
     {
       "id": "brutalist-building-1-cbake-9.elevator-1-1.door-1-1-9-22",
-      "model": "elevator-1-door",
+      "model": "elevator-1-door-2",
       "type": "door",
       "position": [
         -7.397853,
         0,
-        -23.295693
+        -23.2839
       ],
       "yaw": 90,
       "hinge": "left",
@@ -2237,10 +2237,10 @@
     },
     {
       "id": "brutalist-building-1-cbake-5.elevator-1-1.door-1-1-9-22",
-      "model": "elevator-1-door",
+      "model": "elevator-1-door-2",
       "type": "door",
       "position": [
-        53.073684,
+        53.085477,
         0,
         -29.610868
       ],
@@ -4480,7 +4480,7 @@
       "min": [
         -34.514772,
         0,
-        27.412403
+        27.40061
       ],
       "max": [
         -34.314772,
@@ -4499,7 +4499,7 @@
       "max": [
         -34.314772,
         2.1,
-        26.339403
+        26.32761
       ]
     },
     {
@@ -6093,7 +6093,7 @@
         -29.949208
       ],
       "max": [
-        -35.160025,
+        -35.148232,
         2.1,
         -29.749208
       ]
@@ -6102,7 +6102,7 @@
       "id": "brutalist-building-1-cbake-0.elevator-1-1.front.1",
       "kind": "aabb",
       "min": [
-        -34.087025,
+        -34.075232,
         0,
         -29.949208
       ],
@@ -7705,7 +7705,7 @@
       "max": [
         -7.197853,
         2.1,
-        -24.368693
+        -24.3569
       ]
     },
     {
@@ -7714,7 +7714,7 @@
       "min": [
         -7.397853,
         0,
-        -23.295693
+        -23.2839
       ],
       "max": [
         -7.197853,
@@ -9313,7 +9313,7 @@
         -29.810868
       ],
       "max": [
-        52.000684,
+        52.012477,
         2.1,
         -29.610868
       ]
@@ -9322,7 +9322,7 @@
       "id": "brutalist-building-1-cbake-5.elevator-1-1.front.1",
       "kind": "aabb",
       "min": [
-        53.073684,
+        53.085477,
         0,
         -29.810868
       ],

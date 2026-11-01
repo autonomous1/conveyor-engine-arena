@@ -1,0 +1,119 @@
+{
+  "formatVersion": 1,
+  "units": "meters",
+  "places": [
+    {
+      "id": "hall-b.floor-1.hall",
+      "kind": "hall",
+      "y": 0,
+      "polygon": [[0, 0], [10, 0], [10, 4], [4, 4], [4, 10], [0, 10]],
+      "bounds": { "minX": 0, "maxX": 10, "minZ": 0, "maxZ": 10 }
+    },
+    {
+      "id": "hall-b.floor-2.hall",
+      "kind": "hall",
+      "y": 2.75,
+      "polygon": [[0, 0], [10, 0], [10, 4], [4, 4], [4, 10], [0, 10]],
+      "bounds": { "minX": 0, "maxX": 10, "minZ": 0, "maxZ": 10 }
+    },
+    {
+      "id": "hall-b.room-1",
+      "kind": "room",
+      "y": 0,
+      "polygon": [[0, 0], [4, 0], [4, 4], [0, 4]],
+      "bounds": { "minX": 0, "maxX": 4, "minZ": 0, "maxZ": 4 }
+    },
+    {
+      "id": "hall-b.s1",
+      "kind": "stairs",
+      "y": 0,
+      "top": 2.75,
+      "width": 2,
+      "run": 4,
+      "landings": { "bottom": [14, 0, 2], "top": [14, 2.75, 2] },
+      "joins": { "from": "hall-b.floor-1.hall", "to": "hall-b.floor-2.hall" },
+      "polygon": [[12, 0], [16, 0], [16, 4], [12, 4]],
+      "bounds": { "minX": 12, "maxX": 16, "minZ": 0, "maxZ": 4 }
+    },
+    {
+      "id": "hall-b.deck",
+      "kind": "platform",
+      "y": 4,
+      "polygon": [[12, 6], [16, 6], [16, 10], [12, 10]],
+      "bounds": { "minX": 12, "maxX": 16, "minZ": 6, "maxZ": 10 }
+    },
+    {
+      "id": "hall-b.e1",
+      "kind": "elevator",
+      "y": 0,
+      "polygon": [[20, 0], [24, 0], [24, 4], [20, 4]],
+      "bounds": { "minX": 20, "maxX": 24, "minZ": 0, "maxZ": 4 },
+      "stops": [0, 2.75],
+      "waitS": 8,
+      "speed": 1,
+      "landings": [[24.6, 0, 2], [24.6, 2.75, 2]],
+      "joins": ["hall-b.floor-1.hall", "hall-b.floor-2.hall"],
+      "room": "hall-b.lift-room"
+    },
+    {
+      "id": "hall-b.e1@0",
+      "kind": "elevator",
+      "y": 0,
+      "polygon": [[20, 0], [24, 0], [24, 4], [20, 4]],
+      "bounds": { "minX": 20, "maxX": 24, "minZ": 0, "maxZ": 4 }
+    },
+    {
+      "id": "hall-b.e1@1",
+      "kind": "elevator",
+      "y": 2.75,
+      "polygon": [[20, 0], [24, 0], [24, 4], [20, 4]],
+      "bounds": { "minX": 20, "maxX": 24, "minZ": 0, "maxZ": 4 }
+    },
+    {
+      "id": "hall-b.lift-room",
+      "kind": "room",
+      "y": 0,
+      "polygon": [[20, 0], [24, 0], [24, 4], [20, 4]],
+      "bounds": { "minX": 20, "maxX": 24, "minZ": 0, "maxZ": 4 }
+    },
+    {
+      "id": "outside",
+      "kind": "outside",
+      "y": 0,
+      "polygon": [[-20, -20], [40, -20], [40, 40], [-20, 40]],
+      "bounds": { "minX": -20, "maxX": 40, "minZ": -20, "maxZ": 40 }
+    }
+  ],
+  "portals": [
+    {
+      "id": "hall-b.door-ext",
+      "kind": "door",
+      "a": "hall-b.room-1",
+      "b": "outside",
+      "door": "hall-b.door-ext",
+      "locked": true,
+      "key": "key",
+      "at": { "a": [0, 0.1, 2], "b": [-1, 0.1, 2] },
+      "width": 1,
+      "cost": 1
+    },
+    {
+      "id": "hall-b.e1:0-1",
+      "kind": "elevator",
+      "a": "hall-b.e1@0",
+      "b": "hall-b.e1@1",
+      "at": { "a": [22, 0, 2], "b": [22, 2.75, 2] },
+      "width": 1.5,
+      "cost": 2.75
+    },
+    {
+      "id": "hall-b.e1@0:landing",
+      "kind": "landing",
+      "a": "hall-b.e1@0",
+      "b": "hall-b.floor-1.hall",
+      "at": { "a": [22, 0, 0], "b": [22, 0, -1] },
+      "width": 1.5,
+      "cost": 0.5
+    }
+  ]
+}

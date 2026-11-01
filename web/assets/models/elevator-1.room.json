@@ -14,7 +14,7 @@
   "obstacles": [
     {
       "id": "front.0",
-      "minX": 0.548293,
+      "minX": 0.5365,
       "maxX": 0.75,
       "minY": 0,
       "maxY": 2.1,
@@ -24,7 +24,7 @@
     {
       "id": "front.1",
       "minX": -0.75,
-      "maxX": -0.524707,
+      "maxX": -0.5365,
       "minY": 0,
       "maxY": 2.1,
       "minZ": 0.75,
@@ -88,10 +88,10 @@
   "doors": [
     {
       "id": "door-1-1-9-22",
-      "model": "elevator-1-door",
+      "model": "elevator-1-door-2",
       "wall": "front",
       "center": [
-        0.011793,
+        0,
         0,
         0.75
       ],
@@ -110,10 +110,10 @@
       "position": [
         -0.022238,
         2.2,
-        0.13943
+        0.06592
       ],
       "color": "#ffd9a0",
-      "intensity": 8,
+      "intensity": 5,
       "range": 3.5
     }
   ]

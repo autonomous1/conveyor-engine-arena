@@ -2,6 +2,7 @@ import { AuthoritativeWorld, applyStaticWorldDefinition } from "conveyor-engine-
 import { loadInstalledGame } from "./load-game.js";
 import type { ArenaView } from "../shared/arena-view.js";
 import type { Movement } from "../shared/movements.js";
+import type { SceneGraph } from "../shared/scene-graph.js";
 
 export type WanderAgent = {
   id: number;
@@ -19,6 +20,8 @@ export type LoadedArena = {
   view: ArenaView;
   /** Human pads. Wander pawns are not created here. */
   playerSpawns: ReadonlyArray<{ id: string; x: number; y: number; z: number; yaw: number }>;
+  /** Privileged places and portals. Absent when the manifest has no `scene.sceneGraph`. */
+  sceneGraph?: SceneGraph;
 };
 
 export function loadArena(): LoadedArena {
@@ -48,7 +51,13 @@ export function loadArena(): LoadedArena {
     )),
   ];
   world.commit(0n);
-  return { world, agents, view: game.view, playerSpawns };
+  return {
+    world,
+    agents,
+    view: game.view,
+    playerSpawns,
+    ...(game.sceneGraph ? { sceneGraph: game.sceneGraph } : {}),
+  };
 }
 
 function spawnAgent(

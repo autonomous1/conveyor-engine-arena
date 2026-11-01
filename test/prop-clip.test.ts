@@ -24,6 +24,7 @@ test("alien-weapon-1 plays rotate and a still prop gets no mixer", async () => {
   }
   const scene = structuredClone(doc);
   scene.scene.placements = ["./web/game/props.placements.json"];
+  delete scene.scene.sceneGraph;
   scene.scene.bounds = { minX: -80, maxX: 80, minY: -2, maxY: 12, minZ: -80, maxZ: 80 };
   scene.scene.spawnPoints = [];
   const game = compileGame(scene, (uri) => files.get(uri), readManifestSources(root, scene));
@@ -94,6 +95,7 @@ test("the key on the top step draws, and a missing rotate clip keeps the mesh", 
   }
   const scene = structuredClone(doc);
   scene.scene.placements = ["./web/game/props.placements.json"];
+  delete scene.scene.sceneGraph;
   scene.scene.bounds = { minX: -80, maxX: 80, minY: -2, maxY: 12, minZ: -80, maxZ: 80 };
   scene.scene.spawnPoints = [];
   const game = compileGame(scene, (uri) => files.get(uri), readManifestSources(root, scene));

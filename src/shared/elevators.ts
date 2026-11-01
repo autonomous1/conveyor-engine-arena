@@ -209,7 +209,7 @@ export function parseElevatorSet(value: unknown): ElevatorState[] | undefined {
   return out;
 }
 
-function pointInPolygon(polygon: ReadonlyArray<readonly [number, number]>, x: number, z: number): boolean {
+export function pointInPolygon(polygon: ReadonlyArray<readonly [number, number]>, x: number, z: number): boolean {
   if (polygon.length < 3) return false;
   let inside = false;
   for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i, i += 1) {

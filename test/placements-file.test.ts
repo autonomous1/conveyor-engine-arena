@@ -118,7 +118,7 @@ test("a rooms placements file loads a room, a hinged door, and obstacles", async
   const root = path.join(import.meta.dirname, "..");
   const doc = JSON.parse(readFileSync(path.join(root, "web/game/arena.game.json"), "utf8")) as {
     assets?: Array<{ id?: string; uri?: string; kind?: string }>;
-    scene: { placements?: string | string[] };
+    scene: { placements?: string | string[]; sceneGraph?: string };
   };
   const roomAsset = doc.assets?.find((asset) => asset.id === "room-b");
   assert.equal(roomAsset?.kind, "model");
@@ -143,6 +143,7 @@ test("a rooms placements file loads a room, a hinged door, and obstacles", async
       { id: "room-case.front.0", kind: "aabb", min: [0, 10, 0], max: [1, 12, 1] },
     ],
   };
+  delete doc.scene.sceneGraph;
   const sources = readManifestSources(root, doc);
   assert.ok(sources?.placementFiles);
   const ref = "./web/game/rooms.placements.json";

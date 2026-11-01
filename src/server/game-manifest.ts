@@ -14,6 +14,7 @@ import {
 } from "conveyor-engine-assets";
 import { attachBuildingProfiles } from "../shared/building-profile.js";
 import type { ArenaElevator, ArenaView, CharacterAnimation } from "../shared/arena-view.js";
+import { parseSceneGraph, type ElevatorPlace, type SceneGraph } from "../shared/scene-graph.js";
 import { DEFAULT_MOVEMENT_SPEED, MOVEMENTS, type Movement } from "../shared/movements.js";
 import { AMMO_PICKUP, HEALTH_PICKUP, parsePickupKind, type PickupPlacement } from "../shared/pickups.js";
 import { interpretPlacements } from "./placements-file.js";
@@ -39,6 +40,11 @@ export type CompiledGame = {
   presentationHash: string;
   visualBytes: Uint8Array;
   bundleVersion: string;
+  /**
+   * Places and portals from `scene.sceneGraph`. Absent when that field is absent.
+   * Privileged: not copied onto `view` and not part of either content hash.
+   */
+  sceneGraph?: SceneGraph;
 };
 
 type AssetRec = {
@@ -343,6 +349,11 @@ export type CompileSources = {
    */
   elevatorsFile?: PlacementFileSource;
   /**
+   * Set when `scene.sceneGraph` is a path. The text is a scene-graph file.
+   * Not part of either content hash. Absent means no graph.
+   */
+  sceneGraphFile?: PlacementFileSource;
+  /**
    * `web/game/building-profiles.json`. Outlines for the scene map.
    * Absent when that file was not loaded. Not part of either content hash.
    */
@@ -575,6 +586,79 @@ function sceneElevators(
     if (row) elevators.push(row);
   });
   return elevators;
+}
+
+/**
+ * `scene.sceneGraph` is a path to a scene-graph file. Absent is no graph.
+ * Door lock mismatches are warnings: the compiled door wins and the graph still loads.
+ */
+function sceneGraph(
+  scene: Record<string, unknown> | undefined,
+  sources: CompileSources | undefined,
+  doors: ArenaView["doors"],
+  issues: GameIssue[],
+): SceneGraph | undefined {
+  if (!scene || !Object.prototype.hasOwnProperty.call(scene, "sceneGraph")) return undefined;
+  const value = scene.sceneGraph;
+  if (typeof value !== "string" || !value.trim()) {
+    issues.push({ path: "scene.sceneGraph", message: "must be a path" });
+    return undefined;
+  }
+  const file = sources?.sceneGraphFile;
+  if (!file || file.path !== value) {
+    issues.push({ path: "scene.sceneGraph", message: "file was not loaded" });
+    return undefined;
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(file.text);
+  } catch (err) {
+    issues.push({ path: "scene.sceneGraph", message: `invalid json: ${err instanceof Error ? err.message : String(err)}` });
+    return undefined;
+  }
+  const result = parseSceneGraph(parsed, doors);
+  if (!result.graph) {
+    issues.push(...result.issues);
+    return undefined;
+  }
+  if (result.issues.length) {
+    const listed = result.issues.slice(0, 3).map((issue) => issue.path).join(", ");
+    const more = result.issues.length > 3 ? ` and ${result.issues.length - 3} more` : "";
+    console.warn(`scene.sceneGraph: ${result.issues.length} door locks disagree with the door placement (${listed}${more}); the doors file wins`);
+  }
+  return result.graph;
+}
+
+/** Same shaft id should carry the same stops and landings. A difference is a warning. */
+function warnShaftDrift(graph: SceneGraph, elevators: readonly ArenaElevator[]): void {
+  const byId = new Map(elevators.map((row) => [row.id, row]));
+  const seen = new Set<string>();
+  for (const shaft of graph.shafts) {
+    seen.add(shaft.id);
+    const row = byId.get(shaft.id);
+    if (!row) {
+      console.warn(`scene.sceneGraph.places.${shaft.id}: no matching elevator`);
+      continue;
+    }
+    if (!sameNumbers(shaft.stops, row.stops) || !sameLandings(shaft.landings, row.landings)) {
+      console.warn(`scene.sceneGraph.places.${shaft.id}: stops or landings differ from scene.elevators`);
+    }
+  }
+  for (const row of elevators) {
+    if (seen.has(row.id)) continue;
+    console.warn(`scene.elevators.${row.id}: no matching scene-graph shaft`);
+  }
+}
+
+function sameNumbers(a: readonly number[], b: readonly number[]): boolean {
+  return a.length === b.length && a.every((item, index) => item === b[index]);
+}
+
+function sameLandings(a: ElevatorPlace["landings"], b: ArenaElevator["landings"]): boolean {
+  return a.length === b.length && a.every((point, index) => {
+    const other = b[index];
+    return !!other && point[0] === other[0] && point[1] === other[1] && point[2] === other[2];
+  });
 }
 
 function elevatorItems(parsed: unknown, issuePath: string, issues: GameIssue[]): unknown[] | undefined {
@@ -1345,6 +1429,8 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
 
   const lights = sceneLights(scene, sources, issues);
   const elevators = sceneElevators(scene, sources, issues);
+  const graph = sceneGraph(scene, sources, bakedDoors, issues);
+  if (graph && scene && Object.prototype.hasOwnProperty.call(scene, "elevators")) warnShaftDrift(graph, elevators);
   const buildingIds = new Set(bakedBuildings.map((building) => building.id));
   for (const cab of elevators) {
     if (!cab.room) continue;
@@ -1567,5 +1653,6 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
     presentationHash,
     visualBytes,
     bundleVersion,
+    ...(graph ? { sceneGraph: graph } : {}),
   };
 }

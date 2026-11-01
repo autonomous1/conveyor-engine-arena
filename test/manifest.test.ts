@@ -85,12 +85,17 @@ function placementPropCount(): number {
 }
 
 function compile(doc: unknown, read: (uri: string) => Uint8Array | undefined, sources?: CompileSources) {
+  const scene = doc && typeof doc === "object"
+    ? (doc as { scene?: { lights?: unknown; playerSpawnPoints?: unknown; elevators?: unknown; sceneGraph?: unknown; placements?: unknown } }).scene
+    : undefined;
+  const installedPlacements = (document() as { scene?: { placements?: unknown } }).scene?.placements;
+  // A placements subset does not include every baked door. Leave the graph off that compile.
+  const placementsChanged = !!scene && JSON.stringify(scene.placements) !== JSON.stringify(installedPlacements);
+  if (placementsChanged) delete scene.sceneGraph;
   const resolved = sources ?? readManifestSources(projectRoot(), doc);
   // Partial sources still need the installed lights, player pads, and elevators when the scene keeps those paths.
   if (resolved) {
-    const scene = doc && typeof doc === "object"
-      ? (doc as { scene?: { lights?: unknown; playerSpawnPoints?: unknown; elevators?: unknown } }).scene
-      : undefined;
+    if (placementsChanged) delete resolved.sceneGraphFile;
     if (!resolved.lightsFile && typeof scene?.lights === "string") {
       const installed = readManifestSources(projectRoot(), document());
       if (installed?.lightsFile?.path === scene.lights) resolved.lightsFile = installed.lightsFile;
@@ -104,6 +109,10 @@ function compile(doc: unknown, read: (uri: string) => Uint8Array | undefined, so
     if (!resolved.elevatorsFile && typeof scene?.elevators === "string") {
       const installed = readManifestSources(projectRoot(), document());
       if (installed?.elevatorsFile?.path === scene.elevators) resolved.elevatorsFile = installed.elevatorsFile;
+    }
+    if (!placementsChanged && !resolved.sceneGraphFile && typeof scene?.sceneGraph === "string") {
+      const installed = readManifestSources(projectRoot(), document());
+      if (installed?.sceneGraphFile?.path === scene.sceneGraph) resolved.sceneGraphFile = installed.sceneGraphFile;
     }
   }
   return compileGame(doc, read, resolved);
@@ -134,7 +143,7 @@ test("installed manifest matches the authoritative world and keeps spawns clear"
   assert.ok((game.view.playerSpawns?.length ?? 0) >= 3);
   const playerIds = new Set((game.view.playerSpawns ?? []).map((spawn) => spawn.id));
   assert.equal(game.definition.spawnPoints.some((spawn) => playerIds.has(spawn.id)), false);
-  assert.ok(game.view.staticModels.includes("/assets/models/brutalist-building-1-cbake.glb"));
+  assert.ok(game.view.staticModels.includes("/assets/models/brutalist-building-1-cbake.cut.glb"));
   assert.ok(game.view.staticModels.includes("/assets/models/med-kit.glb"));
   assert.ok(game.view.staticModels.includes("/assets/models/ammo-box.glb"));
   assert.ok(game.view.staticModels.includes("/assets/models/step.glb"));
@@ -242,10 +251,10 @@ test("optional scene blocks and a placements list", () => {
   const faced = compile(withWalls, read);
   const faceModel = Object.fromEntries(faced.view.walls.map((wall) => [wall.face, wall.model]));
   assert.deepEqual(faceModel, {
-    south: "/assets/models/brutalist-building-1-cbake.glb",
+    south: "/assets/models/brutalist-building-1-cbake.cut.glb",
     west: "/assets/models/brutalist-building-2-cbake.cut.glb",
     north: "/assets/models/brutalist-building-3-bake.cut.glb",
-    east: "/assets/models/brutalist-building-1-cbake.glb",
+    east: "/assets/models/brutalist-building-1-cbake.cut.glb",
   });
 
   delete base.scene.walls;
@@ -636,6 +645,67 @@ test("a non-string elevator room is a GameIssue and an unknown room is dropped",
     assert.equal(row.room, undefined);
     assert.ok(warnings.some((line) => line === `scene.elevators.${cabId}.room: unknown room placement "no-such-room"`));
     assert.equal(game.authoritativeHash, compile(withPath, read, file(doc)).authoritativeHash);
+  } finally {
+    console.warn = orig;
+  }
+});
+
+test("scene.sceneGraph is optional, a missing file is an issue, and invalid json is an issue", () => {
+  const files = filesFromDisk();
+  const read = (uri: string) => files.get(uri);
+  const withPath = structuredClone(document()) as { scene: Record<string, unknown> };
+  const loaded = compile(withPath, read);
+  assert.equal(loaded.sceneGraph?.places.length, 150);
+  assert.equal(loaded.sceneGraph?.portals.length, 288);
+  assert.equal("sceneGraph" in loaded.view, false);
+  assert.equal("places" in loaded.view, false);
+  assert.equal("portals" in loaded.view, false);
+
+  const bareDoc = structuredClone(withPath);
+  delete bareDoc.scene.sceneGraph;
+  const bare = compile(bareDoc, read);
+  assert.equal(bare.sceneGraph, undefined);
+  assert.equal(bare.authoritativeHash, loaded.authoritativeHash);
+  assert.equal(bare.presentationHash, loaded.presentationHash);
+
+  assert.throws(() => readManifestSources(projectRoot(), {
+    scene: { sceneGraph: "./web/game/missing-scene-graph.json" },
+  }), (err: unknown) => {
+    assert.ok(err instanceof GameManifestError);
+    assert.ok(err.issues.some((issue) => issue.path === "scene.sceneGraph"));
+    assert.match(err.message, /missing-scene-graph\.json/);
+    return true;
+  });
+
+  const badSources = readManifestSources(projectRoot(), withPath)!;
+  badSources.sceneGraphFile = { path: "./web/game/scene-graph.json", text: "{not json" };
+  assert.throws(() => compile(withPath, read, badSources), (err: unknown) => {
+    assert.ok(err instanceof GameManifestError);
+    assert.ok(err.issues.some((issue) => issue.path === "scene.sceneGraph" && issue.message.startsWith("invalid json:")));
+    return true;
+  });
+
+  const unloaded = readManifestSources(projectRoot(), withPath)!;
+  unloaded.sceneGraphFile = { path: "./other.json", text: "{}" };
+  assert.throws(() => compile(withPath, read, unloaded), (err: unknown) => {
+    assert.ok(err instanceof GameManifestError);
+    assert.ok(err.issues.some((issue) => issue.path === "scene.sceneGraph" && issue.message === "file was not loaded"));
+    return true;
+  });
+
+  const drifted = readManifestSources(projectRoot(), withPath)!;
+  const rows = JSON.parse(drifted.sceneGraphFile!.text) as { places: Array<{ id?: string; stops?: number[] }> };
+  const shaft = rows.places.find((place) => place.id === "brutalist-building-1-cbake-0.e1");
+  assert.ok(shaft?.stops);
+  shaft.stops[0] = 0.25;
+  drifted.sceneGraphFile = { path: "./web/game/scene-graph.json", text: JSON.stringify(rows) };
+  const warnings: string[] = [];
+  const orig = console.warn;
+  console.warn = (line?: unknown) => { warnings.push(String(line)); };
+  try {
+    const game = compile(withPath, read, drifted);
+    assert.equal(game.sceneGraph?.places.length, 150);
+    assert.ok(warnings.some((line) => line === "scene.sceneGraph.places.brutalist-building-1-cbake-0.e1: stops or landings differ from scene.elevators"));
   } finally {
     console.warn = orig;
   }
