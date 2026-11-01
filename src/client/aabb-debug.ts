@@ -65,6 +65,8 @@ export type AabbDebug = {
   setVisible(on: boolean): void;
   /** Remove the wireframe for a placement id. The other boxes stay. */
   remove(id: string): void;
+  /** Shift meshes whose source name starts with `prefix` by `dy` from their home center. */
+  offsetY(prefix: string, dy: number): void;
 };
 
 export function createAabbDebug(obstacles: readonly WorldAabb[]): AabbDebug {
@@ -104,6 +106,15 @@ export function createAabbDebug(obstacles: readonly WorldAabb[]): AabbDebug {
         group.remove(child);
       }
     },
+    offsetY(prefix: string, dy: number) {
+      for (const child of group.children) {
+        if (!child.name.startsWith(prefix)) continue;
+        const stored = child.userData.homeY;
+        const home = typeof stored === "number" ? stored : child.position.y;
+        if (typeof stored !== "number") child.userData.homeY = home;
+        child.position.y = home + dy;
+      }
+    },
   };
 }
 
@@ -135,6 +146,7 @@ function meshFor(obstacle: WorldAabb, material: THREE.Material): THREE.LineSegme
     (box.minY + box.maxY) / 2,
     (box.minZ + box.maxZ) / 2,
   );
+  mesh.userData.homeY = mesh.position.y;
   mesh.castShadow = false;
   mesh.receiveShadow = false;
   mesh.raycast = ignoreRaycast;

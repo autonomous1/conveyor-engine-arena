@@ -74,6 +74,10 @@ export type ArenaElevator = {
   waitS: number;
   polygon: Array<[number, number]>;
   landings: Array<[number, number, number]>;
+  /** Room placement that rides with the cab. Absent for an unbound shaft. */
+  room?: string;
+  /** Building placement id from the bake. */
+  building?: string;
 };
 
 /** One room light. `color` is `#rrggbb`. A rect carries `yaw`, `width`, and `height`. */

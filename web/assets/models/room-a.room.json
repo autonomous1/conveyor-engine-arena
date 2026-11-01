@@ -10,14 +10,14 @@
     "minZ": -2.861,
     "maxZ": 2.861
   },
-  "height": 4,
+  "height": 2.9,
   "obstacles": [
     {
       "id": "front.0",
       "minX": -4.9075,
       "maxX": 4.9075,
       "minY": 0,
-      "maxY": 4,
+      "maxY": 2.9,
       "minZ": 2.861,
       "maxZ": 3.061
     },
@@ -44,7 +44,7 @@
       "minX": -4.9075,
       "maxX": 4.9075,
       "minY": 2.1,
-      "maxY": 4,
+      "maxY": 2.9,
       "minZ": -3.061,
       "maxZ": -2.861
     },
@@ -53,25 +53,7 @@
       "minX": -5.1075,
       "maxX": -4.9075,
       "minY": 0,
-      "maxY": 2.1,
-      "minZ": 0.70079,
-      "maxZ": 2.861
-    },
-    {
-      "id": "left.1",
-      "minX": -5.1075,
-      "maxX": -4.9075,
-      "minY": 0,
-      "maxY": 2.1,
-      "minZ": -2.861,
-      "maxZ": -0.37221
-    },
-    {
-      "id": "left.2",
-      "minX": -5.1075,
-      "maxX": -4.9075,
-      "minY": 2.1,
-      "maxY": 4,
+      "maxY": 2.9,
       "minZ": -2.861,
       "maxZ": 2.861
     },
@@ -80,7 +62,7 @@
       "minX": 4.9075,
       "maxX": 5.1075,
       "minY": 0,
-      "maxY": 4,
+      "maxY": 2.9,
       "minZ": -2.861,
       "maxZ": 2.861
     },
@@ -104,22 +86,6 @@
   ],
   "holes": [],
   "doors": [
-    {
-      "id": "door-1-1-9-22",
-      "model": "door-1",
-      "wall": "left",
-      "center": [
-        -4.9075,
-        0,
-        0.16429
-      ],
-      "width": 1.073,
-      "height": 2.1,
-      "hinge": "left",
-      "open": false,
-      "locked": true,
-      "key": "key"
-    },
     {
       "id": "door-1-1-9-22-5",
       "model": "door-2",

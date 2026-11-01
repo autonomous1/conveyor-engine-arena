@@ -37,6 +37,7 @@ function rig() {
   const logs: string[] = [];
   const host = createArenaElevators({
     elevators: [cab],
+    aabbs: [],
     world,
     pawns: () => {
       const view = world.store.view(pawn)!;
@@ -119,6 +120,156 @@ test("a call from outside the cab and the landings is ignored", () => {
   assert.equal(ride.host.snapshot()[0]?.y, 0);
   assert.equal(ride.host.snapshot()[0]?.stop, 0);
   assert.ok(ride.logs.some((line) => line.startsWith("[elevator]")));
+});
+
+test("a bound room's walls and door ride with the cab and come home", () => {
+  const room = "bldg.cab";
+  const door = `${room}.door-1`;
+  const stops = [0, 3, 6, 9, 12];
+  const bound: ArenaElevator = {
+    id: "cab",
+    stops,
+    speed: 1,
+    waitS: 0,
+    polygon: [[0, 0], [2, 0], [2, 2], [0, 2]],
+    landings: stops.map((y) => [2.6, y, 1] as [number, number, number]),
+    room,
+    building: "bldg",
+  };
+  const world = new AuthoritativeWorld({ worldVersion: "t" });
+  world.pawnHeight = HEIGHT;
+  const homes = ["front.0", "front.1", "front.2", "back.0", "left.0", "right.0"].map((name, index) => {
+    const id = 10 + index;
+    world.addObstacle({ id, minX: 0, maxX: 1, minY: 0, maxY: 2.2, minZ: 0, maxZ: 1 });
+    return { id, source: `${room}.${name}`, minY: 0, maxY: 2.2 };
+  });
+  world.addObstacle({ id: 20, minX: 4, maxX: 5, minY: 1, maxY: 4, minZ: 0, maxZ: 1 });
+  const other = { id: 20, source: "bldg.other.front.0", minY: 1, maxY: 4 };
+  const spy: string[] = [];
+  const doors = {
+    offset(id: string, dy: number) { spy.push(`offset ${id} ${dy}`); },
+    force(id: string, open: boolean) { spy.push(`force ${id} ${open}`); },
+    hold(id: string, held: boolean) { spy.push(`hold ${id} ${held}`); },
+  };
+  const pawn = world.createEntity(0n, { type: "pawn", shape: "capsule", assetKey: "a" }, 1);
+  world.enqueue({ kind: "setBounds", entity: pawn, radius: RADIUS });
+  world.commit(0n);
+  const host = createArenaElevators({
+    elevators: [bound],
+    aabbs: [...homes, other],
+    doorIds: [door],
+    doors,
+    world,
+    pawns: () => {
+      const view = world.store.view(pawn)!;
+      return [{ id: pawn, x: view.position.x, y: view.position.y, z: view.position.z, radius: RADIUS, height: HEIGHT, alive: true }];
+    },
+    ownedPawn: () => pawn,
+    alive: () => true,
+    sendAll: () => {},
+  });
+  let tick = 1n;
+  const place = (x: number, y: number, z: number) => {
+    world.enqueue({
+      kind: "setTransform",
+      entity: pawn,
+      position: { x, y, z },
+      rotation: { x: 0, y: 0, z: 0, w: 1 },
+      scale: { x: 1, y: 1, z: 1 },
+    });
+    world.commit(tick++);
+  };
+  const live = (id: number) => world.listObstacles().find((box) => box.id === id)!;
+  place(1, 0, 1);
+  host.onFrame(1, { t: "elevator", id: "cab", stop: 2 });
+  let arrived = false;
+  for (let i = 0; i < 140; i += 1) {
+    const riders = host.step(MOVE_DT);
+    commitShielded(world, tick++, riders);
+    const row = host.snapshot()[0]!;
+    if (!row.doorsOpen || Math.abs(row.y - 6) <= 1e-9) {
+      for (const home of homes) {
+        near(live(home.id).minY ?? NaN, home.minY + row.y, `${home.source} minY`);
+        near(live(home.id).maxY ?? NaN, home.maxY + row.y, `${home.source} maxY`);
+      }
+    }
+    if (row.stop === 2 && row.doorsOpen && Math.abs(row.y - 6) <= 1e-9) {
+      arrived = true;
+      break;
+    }
+  }
+  assert.equal(arrived, true);
+  assert.equal(spy[0], `force ${door} false`);
+  assert.equal(spy[1], `hold ${door} true`);
+  assert.equal(spy.at(-2), `hold ${door} false`);
+  assert.equal(spy.at(-1), `force ${door} true`);
+  for (const home of homes) {
+    near(live(home.id).minY ?? NaN, home.minY + 6, "arrived minY");
+    near(live(home.id).maxY ?? NaN, home.maxY + 6, "arrived maxY");
+  }
+  near(live(other.id).minY ?? NaN, other.minY, "other minY");
+  near(live(other.id).maxY ?? NaN, other.maxY, "other maxY");
+
+  host.onFrame(1, { t: "elevator", id: "cab", stop: 0 });
+  let homeAgain = false;
+  for (let i = 0; i < 140; i += 1) {
+    const riders = host.step(MOVE_DT);
+    commitShielded(world, tick++, riders);
+    const row = host.snapshot()[0]!;
+    if (row.stop === 0 && row.doorsOpen && Math.abs(row.y) <= 1e-9) {
+      homeAgain = true;
+      break;
+    }
+  }
+  assert.equal(homeAgain, true);
+  for (const home of homes) {
+    assert.equal(live(home.id).minY, home.minY);
+    assert.equal(live(home.id).maxY, home.maxY);
+  }
+  assert.equal(live(other.id).minY, other.minY);
+  assert.equal(live(other.id).maxY, other.maxY);
+});
+
+test("an unbound cab does not move obstacle boxes", () => {
+  const world = new AuthoritativeWorld({ worldVersion: "t" });
+  world.pawnHeight = HEIGHT;
+  world.addObstacle({ id: 10, minX: 0, maxX: 1, minY: 0, maxY: 2.2, minZ: 0, maxZ: 1 });
+  const pawn = world.createEntity(0n, { type: "pawn", shape: "capsule", assetKey: "a" }, 1);
+  world.enqueue({ kind: "setBounds", entity: pawn, radius: RADIUS });
+  world.commit(0n);
+  const spy: string[] = [];
+  const host = createArenaElevators({
+    elevators: [cab],
+    aabbs: [{ id: 10, minX: 0, maxX: 1, minZ: 0, maxZ: 1, minY: 0, maxY: 2.2, source: "bldg.cab.front.0" }],
+    doorIds: ["bldg.cab.door-1"],
+    doors: {
+      offset: () => spy.push("offset"),
+      force: () => spy.push("force"),
+      hold: () => spy.push("hold"),
+    },
+    world,
+    pawns: () => {
+      const view = world.store.view(pawn)!;
+      return [{ id: pawn, x: view.position.x, y: view.position.y, z: view.position.z, radius: RADIUS, height: HEIGHT, alive: true }];
+    },
+    ownedPawn: () => pawn,
+    alive: () => true,
+    sendAll: () => {},
+  });
+  world.enqueue({
+    kind: "setTransform",
+    entity: pawn,
+    position: { x: 1, y: 0, z: 1 },
+    rotation: { x: 0, y: 0, z: 0, w: 1 },
+    scale: { x: 1, y: 1, z: 1 },
+  });
+  world.commit(1n);
+  host.onFrame(1, { t: "elevator", id: "cab", stop: 1 });
+  for (let i = 0; i < 80; i += 1) host.step(MOVE_DT);
+  const box = world.listObstacles().find((item) => item.id === 10)!;
+  assert.equal(box.minY, 0);
+  assert.equal(box.maxY, 2.2);
+  assert.deepEqual(spy, []);
 });
 
 test("E on the upper landing brings the cab up from the ground", () => {

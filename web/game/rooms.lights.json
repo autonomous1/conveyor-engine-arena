@@ -6,9 +6,9 @@
       "id": "brutalist-building-2-cbake.rect21094.lamp",
       "type": "point",
       "position": [
-        29.150911,
+        29.138619,
         2.75,
-        -8.71897
+        -8.73125
       ],
       "color": "#ffd9a0",
       "intensity": 8,
@@ -18,9 +18,9 @@
       "id": "brutalist-building-2-cbake.room-b-1-3.lamp",
       "type": "point",
       "position": [
-        29.20191,
+        29.138619,
         5.5,
-        -8.760982
+        -8.73326
       ],
       "color": "#ffd9a0",
       "intensity": 8,
@@ -30,9 +30,9 @@
       "id": "brutalist-building-2-cbake-1.rect21094.lamp",
       "type": "point",
       "position": [
-        42.530607,
+        42.542887,
         2.75,
-        37.604285
+        37.591993
       ],
       "color": "#ffd9a0",
       "intensity": 8,
@@ -42,9 +42,9 @@
       "id": "brutalist-building-2-cbake-1.room-b-1-3.lamp",
       "type": "point",
       "position": [
-        42.572619,
+        42.544897,
         5.5,
-        37.655284
+        37.591993
       ],
       "color": "#ffd9a0",
       "intensity": 8,
@@ -54,9 +54,9 @@
       "id": "brutalist-building-2-cbake-3.rect21094.lamp",
       "type": "point",
       "position": [
-        -25.398316,
+        -25.386024,
         2.75,
-        12.82212
+        12.8344
       ],
       "color": "#ffd9a0",
       "intensity": 8,
@@ -66,9 +66,9 @@
       "id": "brutalist-building-2-cbake-3.room-b-1-3.lamp",
       "type": "point",
       "position": [
-        -25.449315,
+        -25.386024,
         5.5,
-        12.864132
+        12.83641
       ],
       "color": "#ffd9a0",
       "intensity": 8,

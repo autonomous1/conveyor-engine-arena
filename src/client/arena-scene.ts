@@ -76,8 +76,15 @@ const roomLightReceivers: THREE.Object3D[] = [];
 let roomLightCount = 0;
 const roomLampMaterials = new WeakMap<THREE.Material, THREE.Material>();
 
-/** Asset ids `room` and `room-*`. The view stores the GLB uri, not the id. */
+/**
+ * GLB uris of rooms bound to an elevator. `elevator-1` does not match the
+ * `room` / `room-*` stem, so the bound model is added here before placement.
+ */
+const roomModelUris = new Set<string>();
+
+/** Asset ids `room` and `room-*`, plus any uri registered from a bound elevator. */
 function isRoomModel(model: string): boolean {
+  if (roomModelUris.has(model)) return true;
   const file = model.split("/").pop() ?? model;
   const stem = file.replace(/\.[^./]+$/, "");
   return stem === "room" || stem.startsWith("room-");
@@ -185,7 +192,7 @@ export function createArenaScene(quality: ShadowQuality): ArenaScene {
   document.body.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
-  scene.add(new THREE.HemisphereLight(0xc8d8ff, 0x3a3228, 1.3));
+  scene.add(new THREE.HemisphereLight(0xc8d8ff, 0x8a8070, 1.3));
   const key = new THREE.DirectionalLight(0xfff2d6, 2.3);
   // TODO: configure camera position from json
   key.position.set(120, 180, 80);
@@ -477,7 +484,8 @@ let rectAreaLightsReady = false;
  * and the parent yaw is `yaw * π / 180` about +Y. Neither casts a shadow.
  * Each lamp leaves layer 0 and joins the room layer.
  */
-export function placeRoomLights(lights: readonly ArenaView["lights"][number][], parent: THREE.Object3D): void {
+export function placeRoomLights(lights: readonly ArenaView["lights"][number][], parent: THREE.Object3D): Map<string, THREE.Object3D> {
+  const placed = new Map<string, THREE.Object3D>();
   for (const light of lights) {
     if (light.type === "point") {
       const point = new THREE.PointLight(light.color, light.intensity, light.range ?? 0, 2);
@@ -486,6 +494,7 @@ export function placeRoomLights(lights: readonly ArenaView["lights"][number][], 
       point.layers.disable(0);
       point.layers.enable(ROOM_LIGHT_LAYER);
       parent.add(point);
+      placed.set(light.id, point);
       continue;
     }
     if (!rectAreaLightsReady) {
@@ -502,8 +511,10 @@ export function placeRoomLights(lights: readonly ArenaView["lights"][number][], 
     group.rotation.y = (light.yaw ?? 0) * (Math.PI / 180);
     group.add(rect);
     parent.add(group);
+    placed.set(light.id, group);
   }
   roomLightCount = lights.length;
+  return placed;
 }
 
 /** Quarter-turns match `yawConvention: "y-up-90"`. 90° sends model +X to world −Z. */
@@ -740,7 +751,7 @@ export function placeWallModel(template: THREE.Object3D, wall: ArenaView["walls"
   return group;
 }
 
-export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Promise<{ templates: CharacterTemplates; fallbacks: number; propMixers: THREE.AnimationMixer[]; placements: PlacementVisibility; mapSamples: MapSample[]; doors: Map<string, DoorRig> }> {
+export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Promise<{ templates: CharacterTemplates; fallbacks: number; propMixers: THREE.AnimationMixer[]; placements: PlacementVisibility; mapSamples: MapSample[]; doors: Map<string, DoorRig>; lights: Map<string, THREE.Object3D> }> {
   let fallbacks = 0;
   const propMixers: THREE.AnimationMixer[] = [];
   const placements = createPlacementVisibility();
@@ -761,7 +772,13 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
   const castsShadow = view.shadows !== undefined && view.shadows.quality !== "off";
   roomLightReceivers.length = 0;
   arena.camera.layers.enable(ROOM_LIGHT_LAYER);
-  placeRoomLights(view.lights ?? [], arena.scene);
+  const lights = placeRoomLights(view.lights ?? [], arena.scene);
+  roomModelUris.clear();
+  for (const cab of view.elevators ?? []) {
+    if (!cab.room) continue;
+    const model = view.buildings.find((building) => building.id === cab.room)?.model;
+    if (model) roomModelUris.add(model);
+  }
   if (view.floor) {
     const floorMap = await texture(view.floor.texture);
     if (!floorMap) fallbacks += 1;
@@ -975,12 +992,18 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
       markShadowCasters(frame, castsShadow);
       arena.content.add(frame);
     }
+    // Instance index matches `doors` order: one slot per opening, per frame mesh.
+    doors.forEach((door, index) => {
+      for (const frame of frames) placements.addInstance(door.id, frame, index);
+    });
     noteInstances(frames, doors.map((door) => ({ id: door.id, kind: "door" as const, expectedYaw: door.yaw })));
     for (const door of doors) {
       // No static frame meshes (a skinned file): clone the whole door.
       // Otherwise the leaf is the only clone. The frame draw is the InstancedMesh above.
       const group = placeDoorModel(template, door, frames.length === 0 ? undefined : { frameMeshes: false });
       markShadowCasters(group, castsShadow);
+      // The group is already named `door.id`. The map skips the hinge and the leaf node.
+      placements.addClone(door.id, group);
       arena.content.add(group);
       doorRigs.set(door.id, { hinge: door.hinge, group });
       // The hinge swings the leaf. The map keeps the frame yaw, not the open angle.
@@ -993,7 +1016,10 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
     markShadowCasters(panel, castsShadow);
     arena.content.add(panel);
     const door = cloneDoors.find((item) => item.id === panel.name);
-    if (door) doorRigs.set(door.id, { hinge: door.hinge, group: panel });
+    if (door) {
+      placements.addClone(door.id, panel);
+      doorRigs.set(door.id, { hinge: door.hinge, group: panel });
+    }
     noteObject(panel.name, "door", panel, door?.yaw, ["hinge", "door"]);
   }
 
@@ -1117,5 +1143,5 @@ export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Prom
       scale: character.scale,
     });
   }
-  return { templates, fallbacks, propMixers, placements, mapSamples, doors: doorRigs };
+  return { templates, fallbacks, propMixers, placements, mapSamples, doors: doorRigs, lights };
 }

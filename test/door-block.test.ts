@@ -24,7 +24,7 @@ function near(a: number, b: number, label: string, tol = 1e-6): void {
   assert.ok(Math.abs(a - b) < tol, `${label}: ${a} != ${b}`);
 }
 
-function arena(doors: Door[], held = new Map<number, Set<string>>()) {
+function arena(doors: Door[], held = new Map<number, Set<string>>(), log?: (line: string) => void) {
   const world = new AuthoritativeWorld({ worldVersion: "t" });
   world.pawnHeight = HEIGHT;
   // Wall either side of each opening and a sill under the elevated one, like the stamped bake.
@@ -52,6 +52,7 @@ function arena(doors: Door[], held = new Map<number, Set<string>>()) {
     ownedPawn: () => pawn,
     sessionId: () => 1,
     blockers,
+    log,
   });
   let tick = 1n;
   let seq = 0;
@@ -67,7 +68,7 @@ function arena(doors: Door[], held = new Map<number, Set<string>>()) {
     return world.store.view(pawn)!.position;
   };
   const use = () => host.onFrame(7, { t: "use", v: 1, seq: ++seq });
-  return { world, pawn, frames, blockers, place, walk, use };
+  return { world, pawn, frames, blockers, place, walk, use, host };
 }
 
 test("the leaf box spans the panel from the hinge, sits on the outer face, and runs sill..sill+height", () => {
@@ -146,4 +147,36 @@ test("a shut leaf is not a floor and an open one does not catch shots", () => {
   assert.deepEqual(a.frames.at(-1), { t: "door", id: "ground", open: true, locked: false });
   const open = traceHitscan(eye, { x: 1, y: 0, z: 0 }, a.world.listObstacles(), []);
   assert.notEqual(open.hitId, a.blockers.obstacleId("ground"), "open: the beam goes through the doorway");
+});
+
+test("offset lifts a shut leaf, force broadcasts once, and a held door refuses use", () => {
+  const logs: string[] = [];
+  const a = arena([ground], new Map(), (line) => logs.push(line));
+  const id = a.blockers.obstacleId("ground");
+  assert.ok(id !== undefined);
+  const box = () => a.world.listObstacles().find((item) => item.id === id)!;
+  const minY = box().minY ?? 0;
+  const maxY = box().maxY ?? 0;
+  a.host.offset("ground", 3);
+  near(box().minY ?? NaN, minY + 3, "offset minY");
+  near(box().maxY ?? NaN, maxY + 3, "offset maxY");
+
+  const before = a.frames.length;
+  a.host.force("ground", true);
+  assert.equal(a.frames.length, before + 1);
+  assert.deepEqual(a.frames.at(-1), { t: "door", id: "ground", open: true, locked: false });
+  a.host.force("ground", true);
+  assert.equal(a.frames.length, before + 1);
+
+  a.host.force("ground", false);
+  assert.equal(a.host.snapshot()[0]?.open, false);
+  // The leaf is still 3 m up. Put it back so the ground pawn overlaps the use volume.
+  a.host.offset("ground", 0);
+  a.host.hold("ground", true);
+  a.place(-10.2, 0, 37.1);
+  const frames = a.frames.length;
+  assert.equal(a.use(), true);
+  assert.equal(a.host.snapshot()[0]?.open, false);
+  assert.equal(a.frames.length, frames);
+  assert.ok(logs.some((line) => line.includes("ground rides a moving lift")));
 });

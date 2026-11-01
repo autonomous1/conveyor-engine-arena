@@ -235,6 +235,9 @@ export async function startArenaServer(port = Number(process.env.PORT ?? 4173), 
   });
   const elevatorHost = createArenaElevators({
     elevators: loaded.view.elevators ?? [],
+    aabbs: loaded.view.aabbs,
+    doors: doorHost,
+    doorIds: loaded.view.doors.map((door) => door.id),
     world: loaded.world,
     pawns: () => pawnBodies(loaded.world, health),
     ownedPawn(clientId) {

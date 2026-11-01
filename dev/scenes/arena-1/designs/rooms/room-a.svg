@@ -30,11 +30,11 @@
      inkscape:cx="18.509442"
      inkscape:cy="10.8132"
      inkscape:document-units="mm"
-     inkscape:current-layer="layer12"
+     inkscape:current-layer="layer1"
      showgrid="false"
-     inkscape:window-width="2812"
+     inkscape:window-width="2807"
      inkscape:window-height="1549"
-     inkscape:window-x="68"
+     inkscape:window-x="73"
      inkscape:window-y="34"
      inkscape:window-maximized="1" />
   <metadata
@@ -71,31 +71,31 @@
     <image
        sodipodi:absref="/home/tim/dev/conveyor-engine-arena/dev/scenes/arena-1/designs/rooms/textures/wall-8-crop1.png"
        xlink:href="textures/wall-8-crop1.png"
-       y="297"
+       y="297.00003"
        x="0"
        id="image20092"
        preserveAspectRatio="none"
-       height="4"
+       height="2.9000001"
        width="9.8149996"
        inkscape:label="back" />
     <image
        sodipodi:absref="/home/tim/dev/conveyor-engine-arena/dev/scenes/arena-1/designs/rooms/textures/wall-7-crop1.png"
        xlink:href="textures/wall-7-crop1.png"
-       y="287.27802"
+       y="288.37802"
        x="0"
        id="image20138"
        preserveAspectRatio="none"
-       height="4"
+       height="2.9000001"
        width="9.8149996"
        inkscape:label="front" />
     <image
        sodipodi:absref="/home/tim/dev/conveyor-engine-arena/dev/scenes/arena-1/designs/rooms/textures/wall-6.png"
        xlink:href="textures/wall-6.png"
-       y="1.7762178e-14"
+       y="2.4663412e-14"
        x="291.27802"
        id="image20200"
        preserveAspectRatio="none"
-       height="4"
+       height="2.9000001"
        width="5.7220001"
        transform="rotate(90)"
        inkscape:label="left" />
@@ -106,7 +106,7 @@
        x="-297.00003"
        id="image20262"
        preserveAspectRatio="none"
-       height="4"
+       height="2.9000001"
        width="5.7220001"
        transform="rotate(-90)"
        inkscape:label="right" />
@@ -131,19 +131,6 @@
      inkscape:groupmode="layer"
      id="layer12"
      inkscape:label="doors">
-    <rect
-       style="color:#000000;display:inline;overflow:visible;opacity:1;vector-effect:none;fill:#3edbf2;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:0.09764519;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:0.39058077, 0.09764519;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
-       id="door-1-1-9-22"
-       width="0.49405965"
-       height="1.073"
-       x="-0.25488102"
-       y="293.43823"
-       model="door1.glb"
-       inkscape:label="model:door-1"
-       data-key="key"
-       data-locked="true"
-       data-wall="left"
-       data-width="1.073" />
     <rect
        style="color:#000000;display:inline;overflow:visible;opacity:1;vector-effect:none;fill:#3edbf2;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:0.09764519;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:0.39058077, 0.09764519;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
        id="door-1-1-9-22-5"

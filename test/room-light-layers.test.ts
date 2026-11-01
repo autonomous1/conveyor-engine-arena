@@ -165,6 +165,50 @@ test("room lamps leave layer 0 and only room roots join layer 1", async () => {
   });
 });
 
+test("a bound elevator-1 model joins the room light layer and an unbound one does not", async () => {
+  const source = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial());
+  const pose = {
+    id: "cab",
+    model: "/assets/models/elevator-1.glb",
+    position: [0, 0, 0] as [number, number, number],
+    yaw: 0,
+    scale: 1,
+  };
+  const quiet = view();
+  quiet.props = [];
+  quiet.staticModels = [];
+  quiet.floor = undefined;
+  quiet.lights = [];
+  const unbound = bareArena();
+  await loadArenaVisuals(quiet, unbound);
+  const dark = placeBuildingModel(source, pose);
+  dark.traverse((node) => assert.equal(node.layers.isEnabled(1), false, node.type));
+
+  const boundView = view();
+  boundView.props = [];
+  boundView.staticModels = [];
+  boundView.floor = undefined;
+  boundView.lights = [];
+  boundView.buildings = [pose];
+  boundView.elevators = [{
+    id: "e1",
+    room: "cab",
+    building: "bldg",
+    stops: [0, 3],
+    speed: 1,
+    waitS: 0,
+    polygon: [[0, 0], [1, 0], [1, 1]],
+    landings: [[2, 0, 0.5], [2, 3, 0.5]],
+  }];
+  const bound = bareArena();
+  await loadArenaVisuals(boundView, bound);
+  const lit = placeBuildingModel(source, pose);
+  lit.traverse((node) => {
+    assert.equal(node.layers.isEnabled(0), true, node.type);
+    assert.equal(node.layers.isEnabled(1), true, node.type);
+  });
+});
+
 test("the room-lamp pass can split direct light out of the standard shader", () => {
   const glsl = readFileSync(
     new URL("../node_modules/three/src/renderers/shaders/ShaderLib/meshphysical.glsl.js", import.meta.url),

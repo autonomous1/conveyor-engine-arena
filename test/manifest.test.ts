@@ -546,7 +546,20 @@ test("scene.elevators path compiles and an absent field omits the key", () => {
     assert.ok(row.polygon.length >= 3, row.id);
     assert.ok(row.speed > 0, row.id);
     assert.ok(row.waitS >= 0, row.id);
+    assert.equal(row.room, `${row.building}.elevator-1-1`);
   }
+
+  const strippedSources = readManifestSources(projectRoot(), withPath)!;
+  const strippedDoc = JSON.parse(loaded.elevatorsFile.text) as { elevators: Array<{ room?: string }> };
+  for (const row of strippedDoc.elevators) delete row.room;
+  strippedSources.elevatorsFile = {
+    path: "./web/game/elevators.json",
+    text: JSON.stringify(strippedDoc),
+  };
+  const stripped = compile(withPath, read, strippedSources);
+  assert.equal(stripped.authoritativeHash, compiled.authoritativeHash);
+  assert.equal(stripped.presentationHash, compiled.presentationHash);
+  for (const row of stripped.view.elevators ?? []) assert.equal(row.room, undefined);
 
   const emptySources = readManifestSources(projectRoot(), withPath)!;
   emptySources.elevatorsFile = {
@@ -579,4 +592,51 @@ test("scene.elevators path compiles and an absent field omits the key", () => {
     assert.ok(err.issues.some((issue) => issue.path.includes("bad-cab")));
     return true;
   });
+});
+
+test("a non-string elevator room is a GameIssue and an unknown room is dropped", () => {
+  const files = filesFromDisk();
+  const read = (uri: string) => files.get(uri);
+  const withPath = structuredClone(document()) as { scene: Record<string, unknown> };
+  withPath.scene.elevators = "./web/game/elevators.json";
+  const base = readManifestSources(projectRoot(), withPath)!;
+  const doc = JSON.parse(base.elevatorsFile!.text) as { elevators: Array<Record<string, unknown>> };
+  const file = (rows: { elevators: Array<Record<string, unknown>> }) => {
+    const sources = readManifestSources(projectRoot(), withPath)!;
+    sources.elevatorsFile = { path: "./web/game/elevators.json", text: JSON.stringify(rows) };
+    return sources;
+  };
+
+  const badType = structuredClone(doc);
+  badType.elevators[0]!.room = 4;
+  assert.throws(() => compile(withPath, read, file(badType)), (err: unknown) => {
+    assert.ok(err instanceof GameManifestError);
+    assert.ok(err.issues.some((issue) => issue.path.endsWith(".room") && issue.message === "must be a non-empty string"));
+    return true;
+  });
+
+  const badBuilding = structuredClone(doc);
+  badBuilding.elevators[0]!.building = "";
+  assert.throws(() => compile(withPath, read, file(badBuilding)), (err: unknown) => {
+    assert.ok(err instanceof GameManifestError);
+    assert.ok(err.issues.some((issue) => issue.path.endsWith(".building") && issue.message === "must be a non-empty string"));
+    return true;
+  });
+
+  const unknown = structuredClone(doc);
+  const cabId = String(unknown.elevators[0]!.id);
+  unknown.elevators[0]!.room = "no-such-room";
+  const warnings: string[] = [];
+  const orig = console.warn;
+  console.warn = (line?: unknown) => { warnings.push(String(line)); };
+  try {
+    const game = compile(withPath, read, file(unknown));
+    const row = game.view.elevators?.find((item) => item.id === cabId);
+    assert.ok(row, "the cab still rides");
+    assert.equal(row.room, undefined);
+    assert.ok(warnings.some((line) => line === `scene.elevators.${cabId}.room: unknown room placement "no-such-room"`));
+    assert.equal(game.authoritativeHash, compile(withPath, read, file(doc)).authoritativeHash);
+  } finally {
+    console.warn = orig;
+  }
 });

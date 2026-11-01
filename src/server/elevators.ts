@@ -5,7 +5,7 @@
  * shielded by the wander loop so a hall slab cannot push them out of the shaft.
  */
 import type { AuthoritativeWorld } from "conveyor-engine-world";
-import type { ArenaElevator } from "../shared/arena-view.js";
+import type { ArenaElevator, ArenaView } from "../shared/arena-view.js";
 import {
   callElevator,
   elevatorFrame,
@@ -25,14 +25,36 @@ import { placePawn } from "./game.js";
 
 type FloorBox = { minX: number; maxX: number; minZ: number; maxZ: number; maxY?: number };
 
+type LiveBox = { id: number; minY?: number; maxY?: number };
+
+/** Door host surface a bound cab uses while it rides. */
+export type ElevatorDoors = {
+  /** Shift a door's runtime position to home y + dy and re-sync its blocker. */
+  offset(id: string, dy: number): void;
+  /** Set open/closed, sync the blocker, broadcast a door frame. No-op if unchanged. */
+  force(id: string, open: boolean): void;
+  /** While held, use presses on this door are refused. */
+  hold(id: string, held: boolean): void;
+};
+
+type RoomRider = {
+  offset(dy: number): void;
+};
+
 type Cab = {
   def: ArenaElevator;
   rt: ElevatorRuntime;
   riders: number[];
+  roomRider?: RoomRider;
+  roomDoors: string[];
 };
 
 export function createArenaElevators(opts: {
   elevators: readonly ArenaElevator[];
+  aabbs: ArenaView["aabbs"];
+  /** Door placement ids. A room door's id starts with `${room}.`. */
+  doorIds?: readonly string[];
+  doors?: ElevatorDoors;
   world: AuthoritativeWorld;
   pawns(): PawnBody[];
   ownedPawn(clientId: number): number | undefined;
@@ -40,7 +62,17 @@ export function createArenaElevators(opts: {
   sendAll(frame: ElevatorState): void;
   log?(line: string): void;
 }) {
-  const cabs: Cab[] = opts.elevators.map((def) => ({ def, rt: seedElevator(def), riders: [] }));
+  const doorIds = opts.doorIds ?? [];
+  const cabs: Cab[] = opts.elevators.map((def) => {
+    const room = def.room;
+    return {
+      def,
+      rt: seedElevator(def),
+      riders: [],
+      roomDoors: room ? doorIds.filter((id) => id.startsWith(`${room}.`)) : [],
+      ...(room ? { roomRider: createRoomRider(opts.world, opts.aabbs, room, opts.log) } : {}),
+    };
+  });
   const byId = new Map(cabs.map((cab) => [cab.def.id, cab]));
   warnMissingFloors(opts.elevators, opts.world, opts.log);
 
@@ -121,10 +153,26 @@ export function createArenaElevators(opts: {
       for (const cab of cabs) {
         const before = cab.rt.phase;
         const event = stepElevator(cab.rt, cab.def, dt);
-        if (event === "departed") cab.riders = capture(cab);
+        if (event === "departed") {
+          cab.riders = capture(cab);
+          for (const door of cab.roomDoors) {
+            opts.doors?.force(door, false);
+            opts.doors?.hold(door, true);
+          }
+        }
         cab.riders = cab.riders.filter(living);
         if (cab.rt.phase === "moving" || event === "arrived") {
+          const home = cab.def.stops[0] ?? 0;
+          const dy = cab.rt.y - home;
+          cab.roomRider?.offset(dy);
+          for (const door of cab.roomDoors) opts.doors?.offset(door, dy);
           for (const id of cab.riders) moveRider(cab, id);
+        }
+        if (event === "arrived") {
+          for (const door of cab.roomDoors) {
+            opts.doors?.hold(door, false);
+            opts.doors?.force(door, true);
+          }
         }
         if (event !== undefined || cab.rt.phase === "moving" || (before === "dwell" && cab.rt.phase === "idle")) {
           opts.sendAll(elevatorFrame(cab.rt));
@@ -133,6 +181,42 @@ export function createArenaElevators(opts: {
         if (event === "arrived") cab.riders = [];
       }
       return carried;
+    },
+  };
+}
+
+/**
+ * Live wall boxes whose source id starts with `${room}.`. `offset` rewrites
+ * minY/maxY in place. A box with no height is full-height and stays put.
+ */
+function createRoomRider(
+  world: { listObstacles(): readonly LiveBox[] },
+  aabbs: readonly { id: number; source?: string }[],
+  room: string,
+  log?: (line: string) => void,
+): RoomRider {
+  const live = world.listObstacles();
+  const rows: Array<{ box: LiveBox; minY: number; maxY: number }> = [];
+  let warned = false;
+  for (const aabb of aabbs) {
+    if (!aabb.source?.startsWith(`${room}.`)) continue;
+    const box = live.find((item) => item.id === aabb.id);
+    if (!box) continue;
+    if (typeof box.minY !== "number" || typeof box.maxY !== "number") {
+      if (!warned) {
+        warned = true;
+        log?.(`[elevator] ${room} obstacle ${aabb.source} has no height; it stays put`);
+      }
+      continue;
+    }
+    rows.push({ box, minY: box.minY, maxY: box.maxY });
+  }
+  return {
+    offset(dy: number) {
+      for (const row of rows) {
+        row.box.minY = row.minY + dy;
+        row.box.maxY = row.maxY + dy;
+      }
     },
   };
 }

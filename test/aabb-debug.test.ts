@@ -280,6 +280,26 @@ test("a box inside a building is hidden by the wall and visible through the gap"
   assert.equal(fragmentShows(material, debug.group, camera, walls, behindWall), false);
 });
 
+test("offsetY moves only meshes whose source starts with the prefix", () => {
+  const debug = createAabbDebug([
+    { source: "room.front.0", minX: 0, maxX: 1, minY: 0, maxY: 2, minZ: 0, maxZ: 1 },
+    { source: "other.front.0", minX: 4, maxX: 5, minY: 1, maxY: 3, minZ: 4, maxZ: 5 },
+  ]);
+  const [room, other] = debug.group.children;
+  assert.ok(room && other);
+  debug.offsetY("room.", 3);
+  debug.offsetY("room.", 3);
+  const roomBox = worldBox(room);
+  const otherBox = worldBox(other);
+  assertNear(roomBox.min.y, 3, "room minY");
+  assertNear(roomBox.max.y, 5, "room maxY");
+  assertNear(otherBox.min.y, 1, "other minY");
+  assertNear(otherBox.max.y, 3, "other maxY");
+  debug.offsetY("room.", 0);
+  assertNear(worldBox(room).min.y, 0, "room home minY");
+  assertNear(worldBox(room).max.y, 2, "room home maxY");
+});
+
 /** A debug fragment shows when the group is drawn after the scene and the depth test passes. */
 function fragmentShows(
   material: THREE.LineBasicMaterial,

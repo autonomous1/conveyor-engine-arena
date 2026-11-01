@@ -5,8 +5,15 @@ const HIDDEN = new THREE.Matrix4().makeScale(0, 0, 0);
 type Slot = {
   mesh: THREE.InstancedMesh;
   index: number;
+  /** Placed matrix, without the cab offset. */
   matrix: THREE.Matrix4;
+  /** World-up shift applied on top of `matrix`. Kept while the slot is hidden. */
+  dy: number;
+  visible: boolean;
 };
+
+const OFFSET = new THREE.Matrix4();
+const COMPOSED = new THREE.Matrix4();
 
 /**
  * Show or hide one placement. Clones use `visible`. An instanced prop keeps
@@ -14,7 +21,22 @@ type Slot = {
  */
 export function createPlacementVisibility() {
   const clones = new Map<string, THREE.Object3D>();
+  const cloneHomeY = new Map<string, number>();
   const instances = new Map<string, Slot[]>();
+  const dirty = new Set<THREE.InstancedMesh>();
+  const writeSlot = (slot: Slot) => {
+    if (!slot.visible) {
+      slot.mesh.setMatrixAt(slot.index, HIDDEN);
+    } else if (slot.dy === 0) {
+      slot.mesh.setMatrixAt(slot.index, slot.matrix);
+    } else {
+      OFFSET.makeTranslation(0, slot.dy, 0);
+      COMPOSED.multiplyMatrices(OFFSET, slot.matrix);
+      slot.mesh.setMatrixAt(slot.index, COMPOSED);
+    }
+    slot.mesh.instanceMatrix.needsUpdate = true;
+    dirty.add(slot.mesh);
+  };
   return {
     addClone(id: string, object: THREE.Object3D) {
       object.name = id;
@@ -24,8 +46,33 @@ export function createPlacementVisibility() {
       const matrix = new THREE.Matrix4();
       mesh.getMatrixAt(index, matrix);
       const slots = instances.get(id) ?? [];
-      slots.push({ mesh, index, matrix: matrix.clone() });
+      slots.push({ mesh, index, matrix: matrix.clone(), dy: 0, visible: true });
       instances.set(id, slots);
+    },
+    /**
+     * Shift one placement up by `dy` metres from where it was loaded.
+     * An instance composes world `T(0, dy, 0)` on the placed matrix.
+     * A clone stores its home `position.y` on the first call.
+     */
+    setOffsetY(id: string, dy: number) {
+      const clone = clones.get(id);
+      if (clone) {
+        const home = cloneHomeY.get(id);
+        const y0 = home === undefined ? clone.position.y : home;
+        if (home === undefined) cloneHomeY.set(id, y0);
+        clone.position.y = y0 + dy;
+      }
+      const slots = instances.get(id);
+      if (!slots) return;
+      for (const slot of slots) {
+        slot.dy = dy;
+        writeSlot(slot);
+      }
+    },
+    /** Recompute the bounding sphere of each instanced batch shifted since the last flush. */
+    flushBounds() {
+      for (const mesh of dirty) mesh.computeBoundingSphere();
+      dirty.clear();
     },
     setVisible(id: string, visible: boolean) {
       const clone = clones.get(id);
@@ -33,8 +80,8 @@ export function createPlacementVisibility() {
       const slots = instances.get(id);
       if (!slots) return;
       for (const slot of slots) {
-        slot.mesh.setMatrixAt(slot.index, visible ? slot.matrix : HIDDEN);
-        slot.mesh.instanceMatrix.needsUpdate = true;
+        slot.visible = visible;
+        writeSlot(slot);
       }
     },
     hidden(id: string): boolean {

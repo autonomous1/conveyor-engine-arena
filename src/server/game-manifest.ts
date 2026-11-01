@@ -638,8 +638,29 @@ function parseElevator(value: unknown, index: number, issues: GameIssue[]): Aren
     issues.push({ path: `${path}.landings`, message: "must match stops" });
     ok = false;
   }
+  const room = optionalName(value.room, `${path}.room`, issues);
+  const building = optionalName(value.building, `${path}.building`, issues);
   if (!ok || !id || !stops || !polygon || !landings || speed === undefined || waitS === undefined) return undefined;
-  return { id, stops, speed, waitS, polygon, landings };
+  return {
+    id,
+    stops,
+    speed,
+    waitS,
+    polygon,
+    landings,
+    ...(room ? { room } : {}),
+    ...(building ? { building } : {}),
+  };
+}
+
+/** Absent is fine. Anything else must be a non-empty string. */
+function optionalName(value: unknown, path: string, issues: GameIssue[]): string | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== "string" || value.length === 0) {
+    issues.push({ path, message: "must be a non-empty string" });
+    return undefined;
+  }
+  return value;
 }
 
 function numList(value: unknown, path: string, issues: GameIssue[]): number[] | undefined {
@@ -1324,6 +1345,18 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
 
   const lights = sceneLights(scene, sources, issues);
   const elevators = sceneElevators(scene, sources, issues);
+  const buildingIds = new Set(bakedBuildings.map((building) => building.id));
+  for (const cab of elevators) {
+    if (!cab.room) continue;
+    if (buildingIds.has(cab.room)) continue;
+    // A bad id does not fail the manifest. The cab still rides with no room, as in 16a.
+    const issue: GameIssue = {
+      path: `scene.elevators.${cab.id}.room`,
+      message: `unknown room placement "${cab.room}"`,
+    };
+    console.warn(`${issue.path}: ${issue.message}`);
+    delete cab.room;
+  }
 
   const facesReady = !walls || faceOrder.every((face) => {
     const placed = facePlacements[face];

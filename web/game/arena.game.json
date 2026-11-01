@@ -122,6 +122,71 @@
       }
     },
     {
+      "id": "brutalist-building-1-cbake.floor-6.hall",
+      "kind": "model",
+      "type": "floor",
+      "instance": "static",
+      "uri": "/assets/models/brutalist-building-1-cbake.floor-6.hall.glb",
+      "mediaType": "model/gltf-binary",
+      "license": { "id": "unspecified", "status": "unknown" },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Elevated hall floor baked from brutalist-building-1-cbake.floors.svg. Albedo is the floor-texture pattern."
+      }
+    },
+    {
+      "id": "brutalist-building-1-cbake.floor-7.hall",
+      "kind": "model",
+      "type": "floor",
+      "instance": "static",
+      "uri": "/assets/models/brutalist-building-1-cbake.floor-7.hall.glb",
+      "mediaType": "model/gltf-binary",
+      "license": { "id": "unspecified", "status": "unknown" },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Elevated hall floor baked from brutalist-building-1-cbake.floors.svg. Albedo is the floor-texture pattern."
+      }
+    },
+    {
+      "id": "brutalist-building-1-cbake.floor-8.hall",
+      "kind": "model",
+      "type": "floor",
+      "instance": "static",
+      "uri": "/assets/models/brutalist-building-1-cbake.floor-8.hall.glb",
+      "mediaType": "model/gltf-binary",
+      "license": { "id": "unspecified", "status": "unknown" },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Elevated hall floor baked from brutalist-building-1-cbake.floors.svg. Albedo is the floor-texture pattern."
+      }
+    },
+    {
+      "id": "brutalist-building-1-cbake.floor-9.hall",
+      "kind": "model",
+      "type": "floor",
+      "instance": "static",
+      "uri": "/assets/models/brutalist-building-1-cbake.floor-9.hall.glb",
+      "mediaType": "model/gltf-binary",
+      "license": { "id": "unspecified", "status": "unknown" },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Elevated hall floor baked from brutalist-building-1-cbake.floors.svg. Albedo is the floor-texture pattern."
+      }
+    },
+    {
+      "id": "brutalist-building-1-cbake.floor-10.hall",
+      "kind": "model",
+      "type": "floor",
+      "instance": "static",
+      "uri": "/assets/models/brutalist-building-1-cbake.floor-10.hall.glb",
+      "mediaType": "model/gltf-binary",
+      "license": { "id": "unspecified", "status": "unknown" },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Elevated hall floor baked from brutalist-building-1-cbake.floors.svg. Albedo is the floor-texture pattern."
+      }
+    },
+    {
       "id": "brutalist-building-2-cbake",
       "kind": "model",
       "type": "building",

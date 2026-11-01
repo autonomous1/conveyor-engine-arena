@@ -18,6 +18,7 @@ import { advanceGrenadeClock, type GrenadePose } from "../shared/grenade.js";
 import { advanceFireClock, LASER_MS, traceHitscan, type TraceCapsule } from "../shared/hitscan.js";
 import { createAabbDebug } from "./aabb-debug.js";
 import { applyDoorSwing, attachKtx2Loader, createArenaScene, loadArenaVisuals, tickDoorSwing } from "./arena-scene.js";
+import { createElevatorRooms } from "./elevator-room.js";
 import { createGrenadeProps } from "./grenade.js";
 import { createHitMarker } from "./hit-marker.js";
 import { createHud, localHealthLabel } from "./hud.js";
@@ -42,10 +43,15 @@ hud.setStatus("loading arena");
 const arena = createArenaScene(view.shadows?.quality ?? "off");
 const collisionDebug = createAabbDebug(view.aabbs);
 arena.scene.add(collisionDebug.group);
+const CAB_BOX_H = 0.1;
+const cabDebug = createCabMeshes(view.elevators ?? [], arena.scene);
 const sceneMap = createSceneMap();
 let pushModel: (id: string) => void = () => {};
 const options = createOptionsDialog(
-  (on) => collisionDebug.setVisible(on),
+  (on) => {
+    collisionDebug.setVisible(on);
+    cabDebug.group.visible = on;
+  },
   undefined,
   (on) => sceneMap.setVisible(on),
   {
@@ -60,7 +66,7 @@ const visuals = await loadArenaVisuals(view, arena);
 const doorOpen = new Map((view.doors ?? []).map((door) => [door.id, door.open === true && door.locked !== true]));
 const cabState = new Map<string, ElevatorState>();
 const cabPick = new Map<string, number>();
-const cabMeshes = createCabMeshes(view.elevators ?? [], arena.scene);
+const elevatorRooms = createElevatorRooms(view, visuals, collisionDebug);
 
 sceneMap.setWorld({
   bounds: view.bounds,
@@ -368,6 +374,10 @@ function drawFrame(now: number) {
     fireDebug.socket(link.socketState());
   }
   sawFiniteCamera = camOk;
+  elevatorRooms.tick(
+    now,
+    owned ? { x: owned.position.x, y: owned.position.y, z: owned.position.z } : undefined,
+  );
   const look = input.locked ? "look locked" : "click to look";
   const mine = ownedId === undefined ? undefined : pawnVital.get(ownedId);
   const hpLabel = localHealthLabel(mine);
@@ -413,9 +423,11 @@ function drawFrame(now: number) {
 }
 requestAnimationFrame(frame);
 
-const CAB_BOX_H = 0.1;
-
-function createCabMeshes(elevators: readonly ArenaElevator[], scene: THREE.Scene): Map<string, THREE.Mesh> {
+function createCabMeshes(elevators: readonly ArenaElevator[], scene: THREE.Scene): { group: THREE.Group; meshes: Map<string, THREE.Mesh> } {
+  const group = new THREE.Group();
+  group.name = "cab-debug";
+  group.visible = false;
+  scene.add(group);
   const meshes = new Map<string, THREE.Mesh>();
   for (const def of elevators) {
     const bounds = elevatorPolygonBounds(def.polygon);
@@ -429,16 +441,20 @@ function createCabMeshes(elevators: readonly ArenaElevator[], scene: THREE.Scene
     const y = def.stops[0] ?? 0;
     mesh.position.set((bounds.minX + bounds.maxX) / 2, y + 0.02 - CAB_BOX_H / 2, (bounds.minZ + bounds.maxZ) / 2);
     mesh.name = def.id;
-    scene.add(mesh);
+    // A bound room is the cab. Its footprint shows only with collision debug.
+    // An unbound shaft keeps the 16a box in normal play.
+    if (def.room) group.add(mesh);
+    else scene.add(mesh);
     meshes.set(def.id, mesh);
   }
-  return meshes;
+  return { group, meshes };
 }
 
 function applyCab(row: ElevatorState): void {
   cabState.set(row.id, row);
-  const mesh = cabMeshes.get(row.id);
+  const mesh = cabDebug.meshes.get(row.id);
   if (mesh) mesh.position.y = row.y + 0.02 - CAB_BOX_H / 2;
+  elevatorRooms.onCab(row);
   if (cabPick.get(row.id) === row.stop && row.doorsOpen) cabPick.delete(row.id);
 }
 

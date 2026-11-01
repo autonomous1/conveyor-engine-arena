@@ -6,6 +6,7 @@
  * Changes are broadcast by the caller on the socket, not as a snap envelope.
  */
 import type { ArenaView } from "../shared/arena-view.js";
+import type { ElevatorDoors } from "./elevators.js";
 import {
   doorFrame,
   doorLeafBox,
@@ -87,12 +88,38 @@ export function createArenaDoors(opts: {
   log?(line: string): void;
 }) {
   const state = new Map<string, DoorRuntime>();
+  const homeY = new Map<string, number>();
   for (const door of opts.doors) {
     if (typeof door.id !== "string" || door.id.length === 0) continue;
-    state.set(door.id, seedDoor(door));
+    const seeded = seedDoor(door);
+    state.set(door.id, seeded);
+    homeY.set(door.id, seeded.position[1]);
   }
   for (const door of state.values()) opts.blockers?.sync(door);
   const gates = new Map<number, DoorGate>();
+  const held = new Set<string>();
+
+  const ride: ElevatorDoors = {
+    offset(id, dy) {
+      const door = state.get(id);
+      const y0 = homeY.get(id);
+      if (!door || y0 === undefined) return;
+      const y = y0 + dy;
+      if (door.position[1] !== y) door.position = [door.position[0], y, door.position[2]];
+      opts.blockers?.sync(door);
+    },
+    force(id, open) {
+      const door = state.get(id);
+      if (!door || door.open === open) return;
+      door.open = open;
+      opts.blockers?.sync(door);
+      opts.sendAll(doorFrame(door.id, door.open, door.locked));
+    },
+    hold(id, on) {
+      if (on) held.add(id);
+      else held.delete(id);
+    },
+  };
 
   return {
     /** Current open/locked rows, sorted by id. Welcome attaches this list. */
@@ -132,6 +159,10 @@ export function createArenaDoors(opts: {
         opts.log?.(`[door] use ${at}: no door in reach${nearestNote([...state.values()], pawn)}`);
         return false;
       }
+      if (held.has(door.id)) {
+        opts.log?.(`[door] use ${at}: ${door.id} rides a moving lift`);
+        return true;
+      }
       const next = tryUseDoor(door, pawnId, opts.keys);
       if (!next) {
         opts.log?.(`[door] use ${at}: ${door.id} is locked; this pawn does not hold "${door.key ?? ""}"`);
@@ -142,6 +173,9 @@ export function createArenaDoors(opts: {
       opts.sendAll(doorFrame(next.id, next.open, next.locked));
       return true;
     },
+    offset: ride.offset,
+    force: ride.force,
+    hold: ride.hold,
   };
 }
 
@@ -172,7 +206,7 @@ function seedDoor(door: ArenaView["doors"][number]): DoorRuntime {
     open: locked ? false : door.open === true,
     locked,
     ...(key ? { key } : {}),
-    position: door.position,
+    position: [door.position[0], door.position[1], door.position[2]],
     size: door.size,
     yaw: door.yaw,
   };
