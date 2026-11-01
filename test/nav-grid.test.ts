@@ -196,6 +196,38 @@ test("short steps climb onto a deck and a one metre box does not", () => {
   assert.equal(blocked, undefined);
 });
 
+test("a stairs to landing crossing stands on the landing slab", () => {
+  const stairs: ScenePlace = {
+    ...room("b.s1a", 0, 2, 0, 2),
+    kind: "stairs",
+    y: 0,
+    top: 1.5,
+    width: 1.2,
+    run: 2,
+    landings: { bottom: [1, 0, 0.4], top: [1, 1.5, 2.2] },
+    joins: { to: "b.mid" },
+  };
+  const landing = { ...room("b.mid", 0, 4, 2, 4, 1.5), kind: "landing" as const };
+  const graph = emptyGraph([stairs, landing]);
+  const up = specForCrossing(graph, "b.s1a", "b.mid");
+  const down = specForCrossing(graph, "b.mid", "b.s1a");
+  assert.ok(up);
+  assert.ok(down);
+  assert.equal(up.baseY, 1.5);
+  assert.equal(down.baseY, 1.5);
+  const hall = { ...room("hall", -2, 6, -2, 6, 3), kind: "hall" as const };
+  const beside = specForCrossing(emptyGraph([stairs, hall]), "b.s1a", "hall");
+  assert.equal(beside?.baseY, 0);
+  const slab = { minX: -1, maxX: 5, minZ: 1, maxZ: 5, minY: 1.4, maxY: 1.5 };
+  const path = findLocalPath(
+    gridOf(up.area, [slab], { baseY: up.baseY, radius: 0.3 }),
+    { x: 1, z: 1.8 },
+    { x: 2, z: 3.2 },
+  );
+  assert.ok(path);
+  for (const point of path) assert.ok(Math.abs(point[1] - 1.5) < 1e-3, String(point[1]));
+});
+
 test("an elevated place does not drop off the slab or climb a setback above", () => {
   const slab = { minX: 0, maxX: 5, minZ: 0, maxZ: 5, minY: 2.9, maxY: 3 };
   const above = { minX: 7, maxX: 9, minZ: 1, maxZ: 4, minY: 6, maxY: 6.1 };

@@ -60,6 +60,33 @@ test("parseSceneGraph accepts the hall-b fixture, including a null join hole", (
   assert.equal(stored.joins[1], undefined);
 });
 
+test("parseSceneGraph keeps a landing place and a portal onto it", () => {
+  const copy = structuredClone(fixture);
+  copy.places.push({
+    id: "b.s1-mid",
+    kind: "landing",
+    building: "b",
+    floor: "1",
+    y: 1.5,
+    polygon: [[0, 0], [2, 0], [2, 2], [0, 2]],
+    bounds: { minX: 0, maxX: 2, minZ: 0, maxZ: 2 },
+  });
+  copy.portals.push({
+    id: "b.s1a:top",
+    kind: "landing",
+    a: "hall-b.floor-1.hall",
+    b: "b.s1-mid",
+    at: { a: [1, 1.5, 1], b: [1, 1.5, 1] },
+    width: 1,
+    cost: 1,
+  });
+  const parsed = parseSceneGraph(copy, door(true, "key"));
+  assert.equal(parsed.issues.length, 0, JSON.stringify(parsed.issues));
+  assert.equal(parsed.graph?.placeById.get("b.s1-mid")?.kind, "landing");
+  assert.equal(parsed.graph?.placeById.get("b.s1-mid")?.y, 1.5);
+  assert.ok(parsed.graph && portalsOf(parsed.graph, "b.s1-mid").some((portal) => portal.id === "b.s1a:top"));
+});
+
 test("parseSceneGraph rejects a bad portal, a duplicate id, a missing door, and a missing stop", () => {
   const unknown = structuredClone(fixture);
   unknown.portals[0]!.b = "no-such-place";

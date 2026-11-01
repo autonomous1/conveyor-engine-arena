@@ -137,7 +137,12 @@ export function specForCrossing(graph: SceneGraph, fromId: string, toId: string)
   const to = graph.placeById.get(toId);
   const area = crossingGridArea(graph, fromId, toId);
   if (!from || !to || !area) return undefined;
-  const baseY = from.kind === "stairs" ? from.y : to.kind === "stairs" ? to.y : from.y;
+  // A stair place's y is the bottom of the run. Crossing onto a landing stands on the landing.
+  const baseY = from.kind === "landing" && to.kind === "stairs"
+    ? from.y
+    : to.kind === "landing" && from.kind === "stairs"
+      ? to.y
+      : from.kind === "stairs" ? from.y : to.kind === "stairs" ? to.y : from.y;
   return { area, baseY, block: shaftBlocks(graph, area, [fromId, toId]) };
 }
 

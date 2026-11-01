@@ -8,7 +8,7 @@ import { pointInPolygon, RIDE_Y_TOL_M, type ElevatorPhase } from "./elevators.js
 
 export type Vec3 = [number, number, number];
 
-export type PlaceKind = "room" | "hall" | "platform" | "stairs" | "elevator";
+export type PlaceKind = "room" | "hall" | "platform" | "stairs" | "elevator" | "landing";
 
 /** One walkable region. Stairs and elevators add the fields on {@link StairsPlace} and {@link ElevatorPlace}. */
 export type ScenePlace = {
@@ -107,7 +107,7 @@ export type SceneGraph = SceneGraphFile & {
 
 type Issue = { path: string; message: string };
 
-const PLACE_KINDS = new Set<string>(["room", "hall", "platform", "stairs", "elevator", "outside"]);
+const PLACE_KINDS = new Set<string>(["room", "hall", "platform", "stairs", "elevator", "landing", "outside"]);
 const PORTAL_KINDS = new Set<string>(["door", "landing", "elevator", "opening"]);
 const NO_PORTALS: ScenePortal[] = [];
 
@@ -365,8 +365,10 @@ function readPlace(
   if (kind === "elevator" && Object.prototype.hasOwnProperty.call(value, "stops")) {
     return readShaft(value, path, base, issues);
   }
-  if (kind !== "room" && kind !== "hall" && kind !== "platform" && kind !== "elevator") return undefined;
-  return { ...base, kind };
+  if (kind === "room" || kind === "hall" || kind === "platform" || kind === "elevator" || kind === "landing") {
+    return { ...base, kind };
+  }
+  return undefined;
 }
 
 function readStairs(

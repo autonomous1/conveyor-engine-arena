@@ -150,6 +150,102 @@ function hallGraph(elevatorCost = 1): SceneGraph {
   return graph;
 }
 
+function rectPlace(
+  id: string,
+  kind: ScenePlace["kind"],
+  y: number,
+  minX: number,
+  maxX: number,
+  minZ: number,
+  maxZ: number,
+): ScenePlace {
+  return {
+    id,
+    kind,
+    y,
+    polygon: [[minX, minZ], [maxX, minZ], [maxX, maxZ], [minX, maxZ]],
+    bounds: { minX, maxX, minZ, maxZ },
+  };
+}
+
+/** Two flights joined by a mid landing. The halls do not touch the landing polygon. */
+function switchbackRoute(): SceneGraph {
+  const hall1 = rectPlace("b.floor-1.hall", "hall", 0, 0, 4, 0, 4);
+  const mid = rectPlace("b.s1-mid", "landing", 1.5, 6, 10, 2, 5);
+  const hall2 = rectPlace("b.floor-2.hall", "hall", 3, 0, 4, 6, 10);
+  const s1a: ScenePlace = {
+    ...rectPlace("b.s1a", "stairs", 0, 6, 8, 0, 2),
+    top: 1.5,
+    width: 1.2,
+    run: 2,
+    landings: { bottom: [7, 0, 0.4], top: [7, 1.5, 2.4] },
+    joins: { from: "b.floor-1.hall", to: "b.s1-mid" },
+  };
+  const s1b: ScenePlace = {
+    ...rectPlace("b.s1b", "stairs", 1.5, 6, 8, 6, 8),
+    top: 3,
+    width: 1.2,
+    run: 2,
+    landings: { bottom: [7, 1.5, 5.6], top: [7, 3, 8.4] },
+    joins: { from: "b.s1-mid", to: "b.floor-2.hall" },
+  };
+  const outside = rectPlace("outside", "outside", 0, -100, 100, -100, 100);
+  const places = [outside, hall1, s1a, mid, s1b, hall2];
+  const portals: ScenePortal[] = [
+    portal({
+      id: "b.s1a:bottom",
+      kind: "landing",
+      a: "b.floor-1.hall",
+      b: "b.s1a",
+      at: { a: [2, 0, 2], b: [7, 0, 0.4] },
+      width: 1.2,
+      cost: 0.5,
+    }),
+    portal({
+      id: "b.s1a:top",
+      kind: "landing",
+      a: "b.s1a",
+      b: "b.s1-mid",
+      at: { a: [7, 1.5, 2.4], b: [7, 1.5, 3] },
+      width: 1.2,
+      cost: 2,
+    }),
+    portal({
+      id: "b.s1b:bottom",
+      kind: "landing",
+      a: "b.s1-mid",
+      b: "b.s1b",
+      at: { a: [7, 1.5, 4], b: [7, 1.5, 5.6] },
+      width: 1.2,
+      cost: 0.5,
+    }),
+    portal({
+      id: "b.s1b:top",
+      kind: "landing",
+      a: "b.s1b",
+      b: "b.floor-2.hall",
+      at: { a: [7, 3, 8.4], b: [2, 3, 8] },
+      width: 1.2,
+      cost: 2,
+    }),
+  ];
+  const linked = new Map<string, ScenePortal[]>();
+  for (const item of portals) {
+    pushLink(linked, item.a, item);
+    if (item.b !== item.a) pushLink(linked, item.b, item);
+  }
+  return {
+    formatVersion: 1,
+    units: "meters",
+    places,
+    portals,
+    placeById: new Map(places.map((place) => [place.id, place])),
+    portalsOf: linked,
+    shafts: [],
+    skip: new Set(),
+  };
+}
+
 function pushLink(map: Map<string, ScenePortal[]>, id: string, item: ScenePortal): void {
   const list = map.get(id);
   if (list) list.push(item);
@@ -184,6 +280,23 @@ test("a locked room door is a blocker, and a held key uses it", () => {
   assert.equal(held.steps[1]?.from, "hall-b.floor-1.hall");
   assert.equal(held.steps[1]?.to, "hall-b.room-1");
   assert.equal(held.lockedAlternative, undefined);
+});
+
+test("floor-1 hall reaches floor-2 through a landing between two stairs", () => {
+  const graph = switchbackRoute();
+  assert.equal(placeAt(graph, 1, 0, 1).id, "b.floor-1.hall");
+  assert.equal(placeAt(graph, 7, 1.5, 3).id, "b.s1-mid");
+  const route = planRoute(graph, { x: 1, y: 0, z: 1 }, "b.floor-2.hall", () => "open");
+  assert.equal(route.ok, true);
+  if (!route.ok) return;
+  assert.deepEqual(route.places, [
+    "b.floor-1.hall",
+    "b.s1a",
+    "b.s1-mid",
+    "b.s1b",
+    "b.floor-2.hall",
+  ]);
+  assert.deepEqual(ids(route), ["b.s1a:bottom", "b.s1a:top", "b.s1b:bottom", "b.s1b:top"]);
 });
 
 test("outside to the roof crosses the s1 landings", () => {
