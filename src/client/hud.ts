@@ -1,5 +1,12 @@
 import { MAX_HP, MIN_HP } from "../shared/health.ts";
 
+function shortPadId(id: string): string {
+  const trimmed = id.trim();
+  const paren = trimmed.indexOf("(");
+  const cut = (paren > 0 ? trimmed.slice(0, paren) : trimmed).trim();
+  return cut.length > 0 ? cut : trimmed;
+}
+
 /** Local health from a `{ t: "health" }` frame. Dead stays until a respawn frame clears it. */
 export function localHealthLabel(vital: { hp: number; dead: boolean } | undefined): string {
   if (!vital || !Number.isFinite(vital.hp)) return "";
@@ -28,7 +35,10 @@ export function createHud() {
     "border:1px solid #3c4454", "border-radius:4px", "background:#1c2230",
     "color:inherit", "font:inherit", "cursor:pointer", "vertical-align:baseline",
   ].join(";");
-  status.append(label, profileButton);
+  const padLabel = document.createElement("span");
+  padLabel.id = "gamepad-pad";
+  padLabel.style.cssText = "margin-left:12px;";
+  status.append(label, profileButton, padLabel);
   const cross = document.createElement("div");
   cross.id = "crosshair";
   cross.style.cssText = [
@@ -71,6 +81,20 @@ export function createHud() {
     },
     setProfile(name: string) {
       profileButton.textContent = name;
+    },
+    setPad(pad: { id: string; mapping: string } | null, profile: string) {
+      if (!pad) {
+        padLabel.textContent = "";
+        padLabel.style.color = "";
+        return;
+      }
+      if (pad.mapping !== "standard" && profile === "standard") {
+        padLabel.textContent = "⚠ pad not in standard mapping (set F310 switch to X)";
+        padLabel.style.color = "#ffb020";
+        return;
+      }
+      padLabel.textContent = `pad: ${shortPadId(pad.id)}`;
+      padLabel.style.color = "";
     },
     onProfileToggle(handler: () => void) {
       onProfileToggle = handler;

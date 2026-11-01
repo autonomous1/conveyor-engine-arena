@@ -5,7 +5,7 @@ import { createLaserBeams } from "../src/client/laser.ts";
 import { createRateWindow } from "../src/client/rates.ts";
 import { formatFireLog, presentShot } from "../src/client/shot-view.ts";
 import { createHostSocketPaths } from "../src/server/host-path.ts";
-import { aimDirection, EYE_HEIGHT, gamepadFireButton, PITCH_LIMIT } from "../src/shared/look.ts";
+import { aimDirection, EYE_HEIGHT, gamepadBindings, PITCH_LIMIT } from "../src/shared/look.ts";
 import {
   admitFire,
   FIRE_INTERVAL_MS,
@@ -37,8 +37,8 @@ test("a repeated seq is ignored and a faster repeat is dropped", () => {
   assert.equal(fire?.seq, 4);
   assert.equal(fire?.yaw, 0.25);
   assert.equal(fire?.pitch, 4);
-  assert.equal(gamepadFireButton("standard"), undefined);
-  assert.equal(gamepadFireButton("jumper-t"), undefined);
+  assert.equal(gamepadBindings("standard").fire, 7);
+  assert.equal(gamepadBindings("jumper-t").fire, undefined);
 });
 
 test("aim direction is the camera direction through the crosshair", () => {

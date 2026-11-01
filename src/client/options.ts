@@ -2,10 +2,11 @@
  * Options dialog. F2 or the Options button toggles the panel.
  * The button is not the canvas click, so it does not request pointer lock.
  * Escape is not handled here; the browser still unlocks the pointer.
- * Show collision, Fire debug, and Scene map stay in localStorage and are not part of the input message.
+ * Show collision, Fire debug, Scene map, and Invert look Y stay in localStorage and are not part of the input message.
  * Noclip is localStorage too. The client sends it on the existing input `buttons` field, and only when the host set `view.noclip`.
  * The model select is sessionStorage. It is sent on hello and again when the choice changes.
  * Host fire counters are painted here. They are not part of the crosshair HUD.
+ * A gamepad can move a focus outline and activate the focused row. Mouse and F2 are unchanged.
  */
 
 import { emptyAudit, formatAudit, type AuditCounters } from "../shared/audit.ts";
@@ -14,7 +15,13 @@ export const SHOW_COLLISION_STORAGE_KEY = "arena.showCollision.v1";
 export const FIRE_DEBUG_STORAGE_KEY = "arena.fireDebug.v1";
 export const SHOW_SCENE_MAP_STORAGE_KEY = "arena.showSceneMap.v1";
 export const NOCLIP_STORAGE_KEY = "arena.noclip.v1";
+export const INVERT_Y_STORAGE_KEY = "arena.invertY.v1";
 export const MODEL_CHOICE_STORAGE_KEY = "arena.modelChoice.v1";
+
+export type FocusRow = {
+  activate(): void;
+  adjust(delta: number): void;
+};
 
 export type KeyValueStorage = {
   getItem(key: string): string | null;
@@ -28,11 +35,22 @@ export type OptionsModel = {
   readonly showSceneMap: boolean;
   /** False when the host did not set `view.noclip`, even if storage says on. */
   readonly showNoclip: boolean;
+  /** Right-stick forward looks down when this is on. Default off. */
+  readonly invertY: boolean;
+  readonly focusIndex: number;
   toggleDialog(): void;
   toggleShowCollision(): void;
   toggleFireDebug(): void;
   toggleShowSceneMap(): void;
   toggleNoclip(): void;
+  toggleInvertY(): void;
+  /** Wrap within the focusable rows. */
+  moveFocus(delta: number): void;
+  activateFocused(): void;
+  adjustFocused(delta: number): void;
+  /** Pad open lands on the first row. Mouse and F2 do not call this. */
+  resetFocus(): void;
+  appendFocusRow(row: FocusRow): void;
   /** F2 toggles the dialog. Every other key, including Escape, is left alone. */
   onKey(code: string): boolean;
 };
@@ -41,6 +59,7 @@ export type OptionsDialog = OptionsModel & {
   setAudit(counters: AuditCounters): void;
   /** Selected character id. Empty when the dialog was built without model choices. */
   readonly modelChoice: string;
+  repaint(): void;
 };
 
 export function loadShowCollision(storage: KeyValueStorage | null | undefined): boolean {
@@ -115,6 +134,24 @@ export function saveNoclip(storage: KeyValueStorage | null | undefined, on: bool
   }
 }
 
+export function loadInvertY(storage: KeyValueStorage | null | undefined): boolean {
+  if (!storage) return false;
+  try {
+    return storage.getItem(INVERT_Y_STORAGE_KEY) === "on";
+  } catch {
+    return false;
+  }
+}
+
+export function saveInvertY(storage: KeyValueStorage | null | undefined, on: boolean): void {
+  if (!storage) return;
+  try {
+    storage.setItem(INVERT_Y_STORAGE_KEY, on ? "on" : "off");
+  } catch {
+    // The in-memory switch still applies for this session.
+  }
+}
+
 /** First id in `choices`, or the saved id when it is still in the list. */
 export function loadModelChoice(storage: KeyValueStorage | null | undefined, choices: readonly string[]): string {
   const first = choices[0] ?? "";
@@ -150,10 +187,46 @@ export function createOptionsModel(
   let fireDebug = loadFireDebug(storage);
   let showSceneMap = loadShowSceneMap(storage);
   let noclipOn = loadNoclip(storage);
+  let invertY = loadInvertY(storage);
+  let focusIndex = 0;
+  const focusRows: FocusRow[] = [];
   onShowCollision(showCollision);
   onFireDebug(fireDebug);
   onShowMap(showSceneMap);
   onNoclip(noclipAllowed && noclipOn);
+  const toggleShowCollision = () => {
+    showCollision = !showCollision;
+    saveShowCollision(storage, showCollision);
+    onShowCollision(showCollision);
+  };
+  const toggleFireDebug = () => {
+    fireDebug = !fireDebug;
+    saveFireDebug(storage, fireDebug);
+    onFireDebug(fireDebug);
+  };
+  const toggleShowSceneMap = () => {
+    showSceneMap = !showSceneMap;
+    saveShowSceneMap(storage, showSceneMap);
+    onShowMap(showSceneMap);
+  };
+  const toggleNoclip = () => {
+    if (!noclipAllowed) return;
+    noclipOn = !noclipOn;
+    saveNoclip(storage, noclipOn);
+    onNoclip(noclipOn);
+  };
+  const toggleInvertY = () => {
+    invertY = !invertY;
+    saveInvertY(storage, invertY);
+  };
+  const idle = { activate() {}, adjust(_delta: number) {} };
+  focusRows.push(
+    { activate: toggleShowCollision, adjust: idle.adjust },
+    { activate: toggleFireDebug, adjust: idle.adjust },
+    { activate: toggleShowSceneMap, adjust: idle.adjust },
+    { activate: toggleInvertY, adjust: idle.adjust },
+  );
+  if (noclipAllowed) focusRows.push({ activate: toggleNoclip, adjust: idle.adjust });
   return {
     get open() {
       return open;
@@ -170,29 +243,41 @@ export function createOptionsModel(
     get showNoclip() {
       return noclipAllowed && noclipOn;
     },
+    get invertY() {
+      return invertY;
+    },
+    get focusIndex() {
+      return focusIndex;
+    },
     toggleDialog() {
       open = !open;
     },
-    toggleShowCollision() {
-      showCollision = !showCollision;
-      saveShowCollision(storage, showCollision);
-      onShowCollision(showCollision);
+    toggleShowCollision,
+    toggleFireDebug,
+    toggleShowSceneMap,
+    toggleNoclip,
+    toggleInvertY,
+    moveFocus(delta: number) {
+      const count = focusRows.length;
+      if (count <= 0 || !Number.isFinite(delta) || delta === 0) return;
+      focusIndex = (focusIndex + delta) % count;
+      if (focusIndex < 0) focusIndex += count;
     },
-    toggleFireDebug() {
-      fireDebug = !fireDebug;
-      saveFireDebug(storage, fireDebug);
-      onFireDebug(fireDebug);
+    activateFocused() {
+      const row = focusRows[focusIndex];
+      if (!row) return;
+      row.activate();
     },
-    toggleShowSceneMap() {
-      showSceneMap = !showSceneMap;
-      saveShowSceneMap(storage, showSceneMap);
-      onShowMap(showSceneMap);
+    adjustFocused(delta: number) {
+      const row = focusRows[focusIndex];
+      if (!row || !Number.isFinite(delta) || delta === 0) return;
+      row.adjust(delta);
     },
-    toggleNoclip() {
-      if (!noclipAllowed) return;
-      noclipOn = !noclipOn;
-      saveNoclip(storage, noclipOn);
-      onNoclip(noclipOn);
+    resetFocus() {
+      focusIndex = 0;
+    },
+    appendFocusRow(row: FocusRow) {
+      focusRows.push(row);
     },
     onKey(code: string) {
       if (code !== "F2") return false;
@@ -293,6 +378,12 @@ export function createOptionsDialog(
   mapSwitch.setAttribute("role", "switch");
   mapSwitch.style.cssText = `${switchStyle};margin-top:8px`;
 
+  const invertSwitch = document.createElement("button");
+  invertSwitch.id = "invert-y";
+  invertSwitch.type = "button";
+  invertSwitch.setAttribute("role", "switch");
+  invertSwitch.style.cssText = `${switchStyle};margin-top:8px`;
+
   const noclipSwitch = document.createElement("button");
   noclipSwitch.id = "noclip";
   noclipSwitch.type = "button";
@@ -314,6 +405,7 @@ export function createOptionsDialog(
   const choices = (extras.modelChoices ?? []).filter((id) => id.length > 0);
   let modelChoice = "";
   let modelLabel: HTMLLabelElement | undefined;
+  let modelSelect: HTMLSelectElement | undefined;
   if (choices.length > 0) {
     const store = extras.modelStorage !== undefined ? extras.modelStorage : browserSession();
     modelChoice = loadModelChoice(store, choices);
@@ -321,9 +413,10 @@ export function createOptionsDialog(
     modelLabel.setAttribute("for", "model-choice");
     modelLabel.textContent = "Model";
     modelLabel.style.cssText = "display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:8px;";
-    const modelSelect = document.createElement("select");
-    modelSelect.id = "model-choice";
-    modelSelect.style.cssText = [
+    const select = document.createElement("select");
+    modelSelect = select;
+    select.id = "model-choice";
+    select.style.cssText = [
       "pointer-events:auto", "background:#1c2230", "color:inherit",
       "border:1px solid #3c4454", "border-radius:4px", "font:inherit",
     ].join(";");
@@ -331,23 +424,40 @@ export function createOptionsDialog(
       const option = document.createElement("option");
       option.value = id;
       option.textContent = id;
-      modelSelect.append(option);
+      select.append(option);
     }
-    modelSelect.value = modelChoice;
-    modelSelect.addEventListener("change", () => {
-      const next = modelSelect.value;
+    select.value = modelChoice;
+    select.addEventListener("change", () => {
+      const next = select.value;
       if (!choices.includes(next) || next === modelChoice) return;
       modelChoice = next;
       saveModelChoice(store, next);
       extras.onModel?.(next);
     });
-    modelLabel.append(modelSelect);
+    modelLabel.append(select);
   }
 
-  panel.append(title, collisionSwitch, fireSwitch, mapSwitch, noclipSwitch);
+  panel.append(title, collisionSwitch, fireSwitch, mapSwitch, invertSwitch, noclipSwitch);
   if (modelLabel) panel.append(modelLabel);
   panel.append(auditView);
 
+  const focusEls: HTMLElement[] = [collisionSwitch, fireSwitch, mapSwitch, invertSwitch];
+  if (noclipAllowed) focusEls.push(noclipSwitch);
+  if (modelLabel && modelSelect) {
+    const select = modelSelect;
+    focusEls.push(modelLabel);
+    model.appendFocusRow({
+      activate() {},
+      adjust(delta: number) {
+        const count = select.options.length;
+        if (count === 0) return;
+        const next = Math.min(count - 1, Math.max(0, select.selectedIndex + delta));
+        if (next === select.selectedIndex) return;
+        select.selectedIndex = next;
+        select.dispatchEvent(new Event("change"));
+      },
+    });
+  }
   const paintSwitch = (el: HTMLButtonElement, on: boolean, label: string) => {
     el.setAttribute("aria-checked", on ? "true" : "false");
     el.textContent = on ? `${label}: on` : `${label}: off`;
@@ -359,9 +469,15 @@ export function createOptionsDialog(
     paintSwitch(collisionSwitch, model.showCollision, "Show collision");
     paintSwitch(fireSwitch, model.fireDebug, "Fire debug");
     paintSwitch(mapSwitch, model.showSceneMap, "Scene map");
+    paintSwitch(invertSwitch, model.invertY, "Invert look Y");
     paintSwitch(noclipSwitch, model.showNoclip, "Noclip");
     noclipSwitch.hidden = !noclipAllowed;
     noclipSwitch.disabled = !noclipAllowed;
+    focusEls.forEach((el, index) => {
+      const focused = model.open && index === model.focusIndex;
+      el.style.outline = focused ? "2px solid #d7e3ff" : "";
+      el.style.outlineOffset = focused ? "2px" : "";
+    });
     auditView.textContent = formatAudit(audit);
   };
   paint();
@@ -390,6 +506,7 @@ export function createOptionsDialog(
   onSwitch(collisionSwitch, () => model.toggleShowCollision());
   onSwitch(fireSwitch, () => model.toggleFireDebug());
   onSwitch(mapSwitch, () => model.toggleShowSceneMap());
+  onSwitch(invertSwitch, () => model.toggleInvertY());
   if (noclipAllowed) onSwitch(noclipSwitch, () => model.toggleNoclip());
 
   const onKeyDown = (ev: KeyboardEvent) => {
@@ -410,6 +527,9 @@ export function createOptionsDialog(
       return modelChoice;
     },
   });
+  dialog.repaint = () => {
+    paint();
+  };
   dialog.setAudit = (next) => {
     if (sameAudit(audit, next)) return;
     audit = {

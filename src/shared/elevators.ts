@@ -164,6 +164,17 @@ export function nextStopUp(rt: ElevatorRuntime, def: ArenaElevator): number {
   return next < def.stops.length ? next : 0;
 }
 
+/** Move `delta` stops and clamp to `[0, count - 1]`. Does not wrap. */
+export function stepStop(current: number, delta: number, count: number): number {
+  if (!(count > 0)) return 0;
+  const base = Number.isFinite(current) ? current : 0;
+  const shift = Number.isFinite(delta) ? delta : 0;
+  const next = base + shift;
+  if (next < 0) return 0;
+  if (next > count - 1) return count - 1;
+  return next;
+}
+
 export function parseElevatorCall(frame: unknown): ElevatorCall | undefined {
   if (!frame || typeof frame !== "object") return undefined;
   const rec = frame as Record<string, unknown>;

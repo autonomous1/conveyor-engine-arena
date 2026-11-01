@@ -10,6 +10,7 @@ import {
   nextStopUp,
   seedElevator,
   stepElevator,
+  stepStop,
   stopForKey,
   type ElevatorRuntime,
 } from "../src/shared/elevators.ts";
@@ -28,6 +29,14 @@ const cab: ArenaElevator = {
 function fresh(): ElevatorRuntime {
   return seedElevator(cab);
 }
+
+test("stepStop clamps at the ends and does not wrap", () => {
+  assert.equal(stepStop(0, -1, 5), 0);
+  assert.equal(stepStop(4, 1, 5), 4);
+  assert.equal(stepStop(1, 1, 5), 2);
+  assert.equal(stepStop(2, -1, 5), 1);
+  assert.equal(stepStop(0, 3, 4), 3);
+});
 
 test("stopForKey maps digit keys onto stop indexes", () => {
   assert.equal(stopForKey("Digit1", 10), 0);

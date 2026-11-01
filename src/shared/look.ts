@@ -92,15 +92,19 @@ export function eyeLook(
 /**
  * Client gamepad profiles. One `GamepadInput` reads the pad; these functions
  * only interpret axes that `stick()` already deadzoned (axial 0.1, no rescale).
- * Face buttons, triggers, and shoulders stay unbound. Nothing here is sent
- * to the server. The 20 Hz message is still `{ moveX, moveZ, yaw, buttons, seq, entity }`.
+ * Button indexes live in `gamepadBindings`. Nothing here is sent to the
+ * server. The 20 Hz message is still `{ moveX, moveZ, yaw, buttons, seq, entity }`.
  *
- * `standard` (W3C), the default for a new session:
+ * `standard` (W3C), the default for a new session, matches an F310 in X mode:
  * - Axis 0 left/right, axis 1 up/down: move. Stick-up is already negative.
  *   `axesFromStick` negates Y once, so up matches W. No second negation.
- * - Axis 2 left/right, axis 3 up/down: look. Up is pitch up, right is yaw
- *   right, through the same `lookFromStick` signs as the mouse. The caller
- *   clamps pitch with `clampPitch`, same as the pointer.
+ * - Axis 2 left/right, axis 3 up/down: look. Forward is pitch up, right is yaw
+ *   right, through the same `lookFromStick` signs as the mouse. `invertY`
+ *   flips the pitch sign. The caller clamps pitch with `clampPitch`.
+ * - RT fires, LT throws one grenade, A uses a door, X calls a landing,
+ *   LB/RB are noclip down/up, Back toggles the scene map, Start toggles
+ *   options. D-pad up/down picks a cab stop or moves the options highlight.
+ * `jumper-t` keeps its stick map and binds no buttons.
  *
  * `jumper-t` is the mapping this tree already used. A Jumper T-series radio
  * (T-Lite, T-Pro, T16, T18) in EdgeTX/OpenTX classic USB joystick mode,
@@ -117,7 +121,7 @@ export function eyeLook(
  * Move reads axis 3 as horizontal and axis 2 as vertical, then negates both
  * (`jumperStick`). Y is negated because this stick reports up as negative.
  * Look reads axis 0 and axis 1 with no extra negation; `lookFromStick`
- * negates Y so stick-up is pitch-up.
+ * negates Y so stick-up is pitch-up. `invertY` flips that pitch for both profiles.
  *
  * The throttle has no return spring. It rests at the bottom stop, which this
  * transmitter reports as -1 (CH3 at -100%). That full-back position reverses,
@@ -133,12 +137,42 @@ const MOVE_KEYS = ["KeyW", "KeyA", "KeyS", "KeyD", "ArrowUp", "ArrowDown", "Arro
 
 export type GamepadProfileName = "standard" | "jumper-t";
 
-/**
- * Gamepad button index that fires, or absent when that profile does not bind one.
- * Neither `standard` nor `jumper-t` binds a face button or a trigger.
- */
-export function gamepadFireButton(_profile: GamepadProfileName): number | undefined {
-  return undefined;
+export type GamepadBindings = {
+  fire?: number;
+  grenade?: number;
+  use?: number;
+  select?: number;
+  back?: number;
+  callLanding?: number;
+  descend?: number;
+  ascend?: number;
+  map?: number;
+  menu?: number;
+  up?: number;
+  down?: number;
+  left?: number;
+  right?: number;
+};
+
+/** Standard-map indexes. `jumper-t` binds none. Same numbers as `STD` in gamepad-map. */
+export function gamepadBindings(profile: GamepadProfileName): GamepadBindings {
+  if (profile !== "standard") return {};
+  return {
+    fire: 7,
+    grenade: 6,
+    use: 0,
+    select: 0,
+    back: 1,
+    callLanding: 2,
+    descend: 4,
+    ascend: 5,
+    map: 8,
+    menu: 9,
+    up: 12,
+    down: 13,
+    left: 14,
+    right: 15,
+  };
 }
 
 export type ProfileStorage = {
@@ -201,16 +235,28 @@ export function gamepadPlanar(profile: GamepadProfileName, axes: readonly number
   return axesFromStick(padAxis(axes, 0), padAxis(axes, 1));
 }
 
-/** Look deltas for one tick. Pitch clamp stays with the caller, shared with the mouse. */
-export function gamepadLook(profile: GamepadProfileName, axes: readonly number[], dt: number): { yaw: number; pitch: number } {
+/**
+ * Look deltas for one tick. Pitch clamp stays with the caller, shared with the mouse.
+ * `invertY` flips pitch only. Stick forward stays pitch-up when it is false.
+ */
+export function gamepadLook(
+  profile: GamepadProfileName,
+  axes: readonly number[],
+  dt: number,
+  invertY = false,
+): { yaw: number; pitch: number } {
+  let look: { yaw: number; pitch: number };
   if (profile === "jumper-t") {
     const looked = jumperStick(JUMPER_LOOK_Y, {
       x: padAxis(axes, JUMPER_LOOK_X),
       y: padAxis(axes, JUMPER_LOOK_Y),
     });
-    return lookFromStick(looked.x, looked.y, dt, LOOK_YAW_RATE, LOOK_PITCH_RATE);
+    look = lookFromStick(looked.x, looked.y, dt, LOOK_YAW_RATE, LOOK_PITCH_RATE);
+  } else {
+    look = lookFromStick(padAxis(axes, 2), padAxis(axes, 3), dt, LOOK_YAW_RATE, LOOK_PITCH_RATE);
   }
-  return lookFromStick(padAxis(axes, 2), padAxis(axes, 3), dt, LOOK_YAW_RATE, LOOK_PITCH_RATE);
+  if (!invertY) return look;
+  return { yaw: look.yaw, pitch: -look.pitch };
 }
 
 export function sampleMove(

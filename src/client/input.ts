@@ -1,9 +1,9 @@
 import { GamepadInput } from "three-gamepad-controls";
+import { createPadReader, type PadFrame, type PadActions } from "../shared/gamepad-map.ts";
 import {
   type GamepadProfileName,
   type ProfileStorage,
   clampPitch,
-  gamepadFireButton,
   gamepadLook,
   isMoveKey,
   loadGamepadProfile,
@@ -25,8 +25,17 @@ import {
  * Digit0–Digit9 and Numpad0–Numpad9 call an elevator floor while the pointer
  * is locked. A repeat does not call again. They do not fire or use a door.
  * Space ascends and Control descends. Both are held, like WASD, and do not fire.
- * A gamepad fire button is included only when that profile already binds one.
- * Neither profile binds a grenade button or a use button.
+ *
+ * A standard pad (F310 switch on X) does not need pointer lock. It does need
+ * window focus, and gameplay actions pause while the options panel is open.
+ * RT fires (held). LT throws one grenade per squeeze. A uses a door and, when
+ * no door overlaps, confirms a cab stop or calls a landing. X calls a landing.
+ * LB descends and RB ascends (noclip only; the host flag still gates the send).
+ * Back toggles the scene map. Start toggles options. D-pad up raises the cab
+ * pick; D-pad down lowers it. In the options panel, D-pad and the left stick
+ * move the highlight, A toggles the row, and B closes the panel.
+ * `jumper-t` keeps its sticks and binds no buttons.
+ * The 20 Hz message is still `{ moveX, moveZ, yaw, buttons, seq, entity }`.
  */
 
 export type PlaySample = {
@@ -34,16 +43,22 @@ export type PlaySample = {
   strafe: number;
   yaw: number;
   pitch: number;
-  /** F is down while locked, or a tap landed since the previous sample. */
+  /** F is down while locked, or RT is held, or a tap landed since the previous sample. */
   firing: boolean;
-  /** P is down while locked, or a tap landed since the previous sample. */
+  /** P or an LT squeeze landed since the previous sample. */
   grenade: boolean;
-  /** E was pressed once while locked. A hold does not repeat. */
+  /** E or A was pressed once. A hold does not repeat. */
   using: boolean;
   /** Digit or numpad code pressed once while locked. Absent when none. */
   digit?: string;
-  /** Space is +1, ControlLeft or ControlRight is -1, both or neither is 0. */
+  /** Space or RB is +1, Control or LB is -1, both or neither is 0. Keyboard wins. */
   ascend: -1 | 0 | 1;
+  /** D-pad up is +1 (higher cab stop). One step, including repeat. */
+  cabNav: -1 | 0 | 1;
+  /** A was pressed once. Main prefers a door, then a cab confirm, then a landing. */
+  cabConfirm: boolean;
+  /** X was pressed once. Calls the landing the pawn is standing on. */
+  callLanding: boolean;
 };
 
 /** Space up, Control down. Both held cancel. */
@@ -54,13 +69,20 @@ export function ascendFromKeys(held: { has(code: string): boolean }): -1 | 0 | 1
   return up ? 1 : -1;
 }
 
+export type PadStatus = { readonly id: string; readonly mapping: string };
+
+export type PadMenuEvent = "toggle" | "map" | "back" | "select" | "up" | "down" | "left" | "right";
+
 export type PlayInput = {
   update(dt: number): void;
   sample(): PlaySample;
   setYaw(yaw: number): void;
   toggleProfile(): void;
+  setMenuOpen(open: boolean): void;
+  onPadMenu(handler: (ev: PadMenuEvent) => void): void;
   readonly locked: boolean;
   readonly profile: GamepadProfileName;
+  readonly padStatus: PadStatus | null;
 };
 
 function browserProfileStorage(): ProfileStorage | null {
@@ -72,10 +94,47 @@ function browserProfileStorage(): ProfileStorage | null {
   }
 }
 
+function pageFocused(): boolean {
+  try {
+    const doc = globalThis.document as { hasFocus?: () => boolean } | undefined;
+    if (!doc || typeof doc.hasFocus !== "function") return true;
+    return doc.hasFocus();
+  } catch {
+    return true;
+  }
+}
+
+/** Up on the pad is nav −1. Cab stops count the other way, so up is +1. */
+function cabDelta(nav: -1 | 0 | 1): -1 | 0 | 1 {
+  if (nav === -1) return 1;
+  if (nav === 1) return -1;
+  return 0;
+}
+
+function frameFromGamepad(gamepad: Gamepad | null): PadFrame {
+  if (!gamepad || gamepad.connected !== true) {
+    return { connected: false, mapping: "", buttons: [], axes: [] };
+  }
+  const buttons: PadFrame["buttons"] = [];
+  for (const button of gamepad.buttons) {
+    const value = typeof button?.value === "number" && Number.isFinite(button.value) ? button.value : 0;
+    buttons.push({ pressed: button?.pressed === true, value });
+  }
+  const axes: number[] = [];
+  for (const axis of gamepad.axes) axes.push(typeof axis === "number" && Number.isFinite(axis) ? axis : 0);
+  return {
+    connected: true,
+    mapping: typeof gamepad.mapping === "string" ? gamepad.mapping : "",
+    buttons,
+    axes,
+  };
+}
+
 export function attachPlayInput(
   dom: HTMLElement,
   storage: ProfileStorage | null = browserProfileStorage(),
   onFirePress: () => void = () => {},
+  getInvertY: () => boolean = () => false,
 ): PlayInput {
   const keys = new Set<string>();
   let yaw = 0;
@@ -88,11 +147,86 @@ export function attachPlayInput(
   let useQueued = false;
   let digitQueued: string | undefined;
   let profile = loadGamepadProfile(storage);
+  let menuOpen = false;
+  let padFireHeld = false;
+  let padFireQueued = false;
+  let padGrenadeQueued = false;
+  let padUseQueued = false;
+  let padCabConfirmQueued = false;
+  let padCallQueued = false;
+  let padAscend: -1 | 0 | 1 = 0;
+  let padCabNav: -1 | 0 | 1 = 0;
+  let sticksLive = false;
+  let padStatus: PadStatus | null = null;
+  let padIndex: number | null = null;
+  let onMenu: (ev: PadMenuEvent) => void = () => {};
   const pad = new GamepadInput();
+  const padReader = createPadReader();
 
   const persist = (next: GamepadProfileName) => {
     profile = next;
     saveGamepadProfile(storage, next);
+  };
+
+  const clearPadGameplay = () => {
+    padFireHeld = false;
+    padFireQueued = false;
+    padGrenadeQueued = false;
+    padUseQueued = false;
+    padCabConfirmQueued = false;
+    padCallQueued = false;
+    padAscend = 0;
+    padCabNav = 0;
+  };
+
+  const releasePad = () => {
+    padReader.reset();
+    clearPadGameplay();
+    sticksLive = false;
+  };
+
+  const dropPad = () => {
+    releasePad();
+    padStatus = null;
+    padIndex = null;
+  };
+
+  const notePad = (gamepad: Gamepad) => {
+    const mapping = typeof gamepad.mapping === "string" ? gamepad.mapping : "";
+    const next = { id: gamepad.id, mapping };
+    if (!padStatus || padStatus.id !== next.id || padStatus.mapping !== next.mapping) {
+      console.info("gamepad", next.id, next.mapping);
+    }
+    padStatus = next;
+    padIndex = gamepad.index;
+  };
+
+  const applyActions = (actions: PadActions) => {
+    if (actions.fire.pressed) {
+      padFireQueued = true;
+      onFirePress();
+    }
+    padFireHeld = actions.fire.held;
+    if (actions.grenade.pressed) padGrenadeQueued = true;
+    if (actions.use.pressed) {
+      padUseQueued = true;
+      padCabConfirmQueued = true;
+    }
+    if (actions.callLanding.pressed) padCallQueued = true;
+    padAscend = actions.ascend;
+    if (actions.nav !== 0) padCabNav = cabDelta(actions.nav);
+  };
+
+  const emitMenu = (actions: PadActions, menu: boolean) => {
+    if (actions.menuToggle.pressed) onMenu("toggle");
+    if (actions.mapToggle.pressed) onMenu("map");
+    if (!menu) return;
+    if (actions.back.pressed) onMenu("back");
+    if (actions.select.pressed) onMenu("select");
+    if (actions.nav < 0) onMenu("up");
+    if (actions.nav > 0) onMenu("down");
+    if (actions.navX < 0) onMenu("left");
+    if (actions.navX > 0) onMenu("right");
   };
 
   const onKey = (ev: KeyboardEvent, down: boolean) => {
@@ -188,11 +322,25 @@ export function attachPlayInput(
     grenadeQueued = false;
     useQueued = false;
     digitQueued = undefined;
+    releasePad();
+  };
+  const onPadConnected = (ev: Event) => {
+    const gamepad = (ev as GamepadEvent).gamepad;
+    if (!gamepad || gamepad.connected !== true) return;
+    if (padIndex !== null && gamepad.index !== padIndex) return;
+    notePad(gamepad);
+  };
+  const onPadDisconnected = (ev: Event) => {
+    const gamepad = (ev as GamepadEvent).gamepad;
+    if (padIndex !== null && gamepad && gamepad.index !== padIndex) return;
+    dropPad();
   };
 
   window.addEventListener("keydown", down);
   window.addEventListener("keyup", up);
   window.addEventListener("blur", onBlur);
+  window.addEventListener("gamepadconnected", onPadConnected);
+  window.addEventListener("gamepaddisconnected", onPadDisconnected);
   document.addEventListener("mousemove", onMouse);
   document.addEventListener("pointerlockchange", onLock);
   dom.addEventListener("mousedown", onMouseDown);
@@ -205,34 +353,67 @@ export function attachPlayInput(
     get profile() {
       return profile;
     },
+    get padStatus() {
+      return padStatus;
+    },
     toggleProfile() {
       persist(nextGamepadProfile(profile));
+    },
+    setMenuOpen(open: boolean) {
+      menuOpen = open;
+    },
+    onPadMenu(handler: (ev: PadMenuEvent) => void) {
+      onMenu = handler;
     },
     setYaw(next: number) {
       yaw = next;
     },
     update(dt: number) {
       pad.update();
-      if (!pad.connected) return;
-      const look = gamepadLook(profile, readDeadzonedAxes(pad), dt);
+      const raw = pad.rawGamepad;
+      if (!raw || raw.connected !== true) {
+        dropPad();
+        return;
+      }
+      if (!pageFocused()) {
+        releasePad();
+        return;
+      }
+      notePad(raw);
+      const menu = menuOpen;
+      sticksLive = !menu;
+      const actions = padReader.step(frameFromGamepad(raw), dt * 1000, profile, menu);
+      if (sticksLive && profile === "standard") applyActions(actions);
+      else clearPadGameplay();
+      if (profile === "standard") emitMenu(actions, menu);
+      if (!sticksLive) return;
+      const look = gamepadLook(profile, readDeadzonedAxes(pad), dt, getInvertY());
       yaw += look.yaw;
       pitch = clampPitch(pitch + look.pitch);
     },
     sample() {
       const move = sampleMove(profile, keys, {
-        connected: pad.connected,
-        axes: pad.connected ? readDeadzonedAxes(pad) : [],
+        connected: sticksLive && pad.connected,
+        axes: sticksLive && pad.connected ? readDeadzonedAxes(pad) : [],
       });
-      const button = gamepadFireButton(profile);
-      const padFire = button !== undefined && pad.connected && pad.isPressed(button);
-      const firing = (document.pointerLockElement === dom && (fireDown || fireQueued)) || padFire;
-      const grenade = document.pointerLockElement === dom && (grenadeDown || grenadeQueued);
-      const using = document.pointerLockElement === dom && useQueued;
+      const keyAscend = ascendFromKeys(keys);
+      const firing = (document.pointerLockElement === dom && (fireDown || fireQueued)) || padFireHeld || padFireQueued;
+      const grenade = (document.pointerLockElement === dom && (grenadeDown || grenadeQueued)) || padGrenadeQueued;
+      const using = (document.pointerLockElement === dom && useQueued) || padUseQueued;
       const digit = digitQueued;
+      const cabNav = padCabNav;
+      const cabConfirm = padCabConfirmQueued;
+      const callLanding = padCallQueued;
       fireQueued = false;
       grenadeQueued = false;
       useQueued = false;
       digitQueued = undefined;
+      padFireQueued = false;
+      padGrenadeQueued = false;
+      padUseQueued = false;
+      padCabConfirmQueued = false;
+      padCallQueued = false;
+      padCabNav = 0;
       return {
         forward: move.forward,
         strafe: move.strafe,
@@ -241,7 +422,10 @@ export function attachPlayInput(
         firing,
         grenade,
         using,
-        ascend: ascendFromKeys(keys),
+        ascend: keyAscend !== 0 ? keyAscend : padAscend,
+        cabNav,
+        cabConfirm,
+        callLanding,
         ...(digit ? { digit } : {}),
       };
     },

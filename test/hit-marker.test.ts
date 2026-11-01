@@ -98,8 +98,8 @@ function markerDocument() {
   };
 }
 
-function pressedPad() {
-  const buttons = Array.from({ length: 17 }, () => ({ pressed: true, touched: true, value: 1 }));
+function idlePad() {
+  const buttons = Array.from({ length: 17 }, () => ({ pressed: false, touched: false, value: 0 }));
   return { index: 0, connected: true, mapping: "standard", axes: [0, 0, 0, 0], buttons, id: "test-pad", timestamp: 0 };
 }
 
@@ -129,7 +129,7 @@ function installDom() {
   Object.defineProperty(globalThis, "navigator", {
     configurable: true,
     writable: true,
-    value: { getGamepads: () => [pressedPad()] },
+    value: { getGamepads: () => [idlePad()] },
   });
   return {
     document,

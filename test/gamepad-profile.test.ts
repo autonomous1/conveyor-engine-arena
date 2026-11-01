@@ -80,6 +80,16 @@ test("jumper-t profile negates Y and matches the previous move and look signs", 
   assert.ok(looked.pitch > 0);
 });
 
+test("right stick forward looks up unless invert Y is on", () => {
+  const up = gamepadLook("standard", [0, 0, 0, -1], 1);
+  assert.ok(up.pitch > 0);
+  assert.equal(up.pitch, LOOK_PITCH_RATE);
+  const inverted = gamepadLook("standard", [0, 0, 0, -1], 1, true);
+  assert.ok(inverted.pitch < 0);
+  assert.equal(inverted.pitch, -up.pitch);
+  assert.equal(inverted.yaw, up.yaw);
+});
+
 test("absent or garbage gamepad profile falls back to standard", () => {
   assert.equal(gamepadProfileFromStored(null), "standard");
   assert.equal(gamepadProfileFromStored(undefined), "standard");

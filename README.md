@@ -41,9 +41,38 @@ Static files come from `dist/web`. `/arena.json` is generated in memory from the
 | Drag (pointer locked) | Look |
 | E | Use / open the overlapping door |
 | Primary mouse | Fire (while pointer locked; first click locks the pointer) |
-| Gamepad | Same camera fly; right stick look is inverted vs `three-gamepad-controls` default |
+| Gamepad | F10 cycles `standard` and `jumper-t`. Maps below. |
 
-Pawn intent is driven on the server. A status line at the top shows the connection and how many pawn meshes fell back to capsules.
+Set the F310 switch on the back to X. The browser then reports the standard mapping. A standard pad does not need pointer lock. It does need the window focused. While Options is open the pad does not move, look, fire, throw, or use. Right-stick forward looks up unless Invert look Y is on. D-pad up and down repeat while held, in a cab and in Options. In Options, left-stick up and down repeat the same way: one step on press, then again after a short delay.
+
+| F310 (XInput) | Index | In play | Options open |
+| --- | --- | --- | --- |
+| RT | button 7 | Fire, held | — |
+| LT | button 6 | Grenade, once per squeeze | — |
+| A | button 0 | Use the overlapping door. Otherwise, in a cab, confirm the picked stop. Otherwise, on a landing, call the cab | Toggle the focused row |
+| B | button 1 | — | Close |
+| X | button 2 | Call the cab at the landing | — |
+| Y | button 3 | — | — |
+| LB / RB | buttons 4 / 5 | Noclip down / up, when noclip is on | — |
+| Back | button 8 | Toggle the scene map | Toggle the scene map |
+| Start | button 9 | Open or close Options | Close |
+| L3 / R3 | buttons 10 / 11 | — | — |
+| D-pad up / down | buttons 12 / 13 | In a cab, pick the next higher or lower stop | Move the highlight |
+| D-pad left / right | buttons 14 / 15 | — | Change the model choice |
+| Logitech button | not reported | — | — |
+| Left stick | axes 0 / 1 | Move | Up / down also moves the highlight |
+| Right stick | axes 2 / 3 | Look. Forward looks up unless Invert look Y is on | — |
+
+`jumper-t` is a Jumper T-series radio in EdgeTX/OpenTX Mode 2 (AETR). It uses this stick map and binds no buttons. Stick-up looks up unless Invert look Y is on. The throttle has no spring and rests at full back, which moves backward. Full up moves forward.
+
+| Axis | Stick | Use |
+| --- | --- | --- |
+| 0 | Right, left / right | Look yaw |
+| 1 | Right, up / down | Look pitch |
+| 3 | Left, left / right | Strafe |
+| 2 | Left, up / down | Forward / back |
+
+Pawn intent is driven on the server. A status line at the top shows the connection and how many pawn meshes fell back to capsules. A connected pad shows `pad: …`. If that pad is not in the standard mapping while the standard profile is on, the line warns to set the F310 switch to X.
 
 ## Scene bake
 

@@ -6,6 +6,7 @@ import {
   elevatorPolygonBounds,
   inCab,
   landingAt,
+  stepStop,
   stopForKey,
   type ElevatorRuntime,
   type ElevatorState,
@@ -13,7 +14,7 @@ import {
 import { encodeMoveButtons } from "../shared/movements.js";
 import { dropPickupAabb } from "../shared/pickups.js";
 import { clientFaultText, createFireDebugLog } from "../shared/fire-debug.js";
-import { doorLeafBox } from "../shared/doors.js";
+import { doorLeafBox, pickDoorForUse } from "../shared/doors.js";
 import { advanceGrenadeClock, type GrenadePose } from "../shared/grenade.js";
 import { advanceFireClock, LASER_MS, traceHitscan, type TraceCapsule } from "../shared/hitscan.js";
 import { createAabbDebug } from "./aabb-debug.js";
@@ -99,6 +100,29 @@ function showWeapon(weaponId: string | undefined) {
 const pawns = createPawnLayer(arena.content, visuals.templates, view.pawnHeight);
 const input = attachPlayInput(arena.renderer.domElement, undefined, () => {
   fireDebug.keydown();
+}, () => options.invertY);
+input.onPadMenu((ev) => {
+  if (ev === "toggle") {
+    const opening = !options.open;
+    options.toggleDialog();
+    if (opening) options.resetFocus();
+  } else if (ev === "map") {
+    options.toggleShowSceneMap();
+  } else if (ev === "back") {
+    if (options.open) options.toggleDialog();
+  } else if (ev === "select") {
+    options.activateFocused();
+  } else if (ev === "up") {
+    options.moveFocus(-1);
+  } else if (ev === "down") {
+    options.moveFocus(1);
+  } else if (ev === "left") {
+    options.adjustFocused(-1);
+  } else if (ev === "right") {
+    options.adjustFocused(1);
+  }
+  options.repaint();
+  input.setMenuOpen(options.open);
 });
 hud.onProfileToggle(() => input.toggleProfile());
 hud.setProfile(input.profile);
@@ -258,6 +282,7 @@ function drawFrame(now: number) {
   last = now;
   for (const mixer of visuals.propMixers) mixer.update(dt);
   let debugShot = false;
+  input.setMenuOpen(options.open);
   input.update(dt);
   const sample = input.sample();
   const render = client.renderSnapshot();
@@ -279,13 +304,35 @@ function drawFrame(now: number) {
       const seq = grenadeSeq + 1;
       if (link.sendGrenade(seq, sample.yaw, sample.pitch)) grenadeSeq = seq;
     }
-    if (sample.using) {
+    const atDoor = overlapsDoor(pawn);
+    if ((sample.using && !sample.cabConfirm) || (sample.cabConfirm && atDoor)) {
       const seq = useSeq + 1;
       if (link.sendUse(seq)) useSeq = seq;
+    }
+    if (sample.cabNav !== 0) {
+      const cab = cabAt(pawn);
+      if (cab) {
+        const current = cabPick.get(cab.def.id) ?? cab.rt.at;
+        cabPick.set(cab.def.id, stepStop(current, sample.cabNav, cab.def.stops.length));
+      }
     }
     if (sample.digit) {
       const call = elevatorCall(pawn, sample.digit);
       if (call && link.sendElevator(call.id, call.stop) && call.inCab) cabPick.set(call.id, call.stop);
+    }
+    if (sample.cabConfirm && !atDoor) {
+      const cab = cabAt(pawn);
+      if (cab) {
+        const pick = cabPick.get(cab.def.id);
+        if (pick !== undefined) link.sendElevator(cab.def.id, pick);
+      } else {
+        const call = elevatorCall(pawn, { landing: true });
+        if (call) link.sendElevator(call.id, call.stop);
+      }
+    }
+    if (sample.callLanding) {
+      const call = elevatorCall(pawn, { landing: true });
+      if (call) link.sendElevator(call.id, call.stop);
     }
     if (clock.due) {
       pendingFireLog = {
@@ -387,6 +434,7 @@ function drawFrame(now: number) {
     hud.setStatus(`${statusText} · ${look}${hpText} · meshes ${pawns.count} models ${pawns.count - pawns.fallbacks} fallback ${pawns.fallbacks + visuals.fallbacks}${liftText}`);
   }
   hud.setProfile(input.profile);
+  hud.setPad(input.padStatus, input.profile);
   arena.renderer.render(arena.scene, arena.camera);
   const info = arena.renderer.info;
   const calls = info.render.calls;
@@ -471,21 +519,60 @@ function cabRuntime(def: ArenaElevator): ElevatorRuntime {
   };
 }
 
+function cabAt(pawn: { x: number; y: number; z: number }): { def: ArenaElevator; rt: ElevatorRuntime } | undefined {
+  for (const def of view.elevators ?? []) {
+    const rt = cabRuntime(def);
+    if (inCab(def, rt, pawn.x, pawn.y, pawn.z)) return { def, rt };
+  }
+  return undefined;
+}
+
+function overlapsDoor(pawn: { x: number; y: number; z: number }): boolean {
+  const doors = (view.doors ?? []).map((door) => ({
+    id: door.id,
+    hinge: door.hinge,
+    open: doorOpen.get(door.id) === true,
+    locked: door.locked === true,
+    key: door.key,
+    position: door.position,
+    size: door.size,
+    yaw: door.yaw,
+  }));
+  return pickDoorForUse(doors, {
+    id: 0,
+    x: pawn.x,
+    y: pawn.y,
+    z: pawn.z,
+    radius: view.pawnRadius,
+    height: view.pawnHeight,
+    alive: true,
+  }) !== undefined;
+}
+
 function elevatorCall(
   pawn: { x: number; y: number; z: number },
-  digit: string,
+  request: string | { stop?: number; landing?: boolean },
 ): { id: string; stop: number; inCab: boolean } | undefined {
+  const digit = typeof request === "string" ? request : undefined;
+  const landingOnly = typeof request !== "string" && request.landing === true;
+  const explicit = typeof request !== "string" && typeof request.stop === "number" ? request.stop : undefined;
   const elevators = view.elevators ?? [];
-  for (const def of elevators) {
-    if (!inCab(def, cabRuntime(def), pawn.x, pawn.y, pawn.z)) continue;
-    const stop = stopForKey(digit, def.stops.length);
-    if (stop === undefined) return undefined;
-    return { id: def.id, stop, inCab: true };
+  if (!landingOnly) {
+    for (const def of elevators) {
+      if (!inCab(def, cabRuntime(def), pawn.x, pawn.y, pawn.z)) continue;
+      const stop = explicit !== undefined
+        ? (explicit >= 0 && explicit < def.stops.length ? explicit : undefined)
+        : (digit ? stopForKey(digit, def.stops.length) : undefined);
+      if (stop === undefined) return undefined;
+      return { id: def.id, stop, inCab: true };
+    }
   }
-  for (const def of elevators) {
-    const stop = landingAt(def, pawn.x, pawn.y, pawn.z);
-    if (stop === undefined) continue;
-    return { id: def.id, stop, inCab: false };
+  if (landingOnly || digit) {
+    for (const def of elevators) {
+      const stop = landingAt(def, pawn.x, pawn.y, pawn.z);
+      if (stop === undefined) continue;
+      return { id: def.id, stop, inCab: false };
+    }
   }
   return undefined;
 }

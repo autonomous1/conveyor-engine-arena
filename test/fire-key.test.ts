@@ -10,7 +10,7 @@ import {
   parseFire,
   type FireFrame,
 } from "../src/shared/hitscan.ts";
-import { clampPitch, gamepadFireButton, lookFromMouse } from "../src/shared/look.ts";
+import { clampPitch, gamepadBindings, lookFromMouse } from "../src/shared/look.ts";
 
 /**
  * Click only locks the pointer. F sends one fire frame per press while that
@@ -56,8 +56,8 @@ function createTarget() {
   };
 }
 
-function pressedPad() {
-  const buttons = Array.from({ length: 17 }, () => ({ pressed: true, touched: true, value: 1 }));
+function idlePad() {
+  const buttons = Array.from({ length: 17 }, () => ({ pressed: false, touched: false, value: 0 }));
   return { index: 0, connected: true, mapping: "standard", axes: [0, 0, 0, 0], buttons, id: "test-pad", timestamp: 0 };
 }
 
@@ -101,7 +101,7 @@ function installDom() {
   Object.defineProperty(globalThis, "navigator", {
     configurable: true,
     writable: true,
-    value: { getGamepads: () => [pressedPad()] },
+    value: { getGamepads: () => [idlePad()] },
   });
   return {
     dom: dom as unknown as HTMLElement,
@@ -152,8 +152,8 @@ function drive(input: PlayInput) {
 test("click locks the pointer and does not fire; F fires once and a hold stays at 8 Hz", () => {
   assert.equal(FIRE_HZ, 8);
   assert.equal(FIRE_INTERVAL_MS, 125);
-  assert.equal(gamepadFireButton("standard"), undefined);
-  assert.equal(gamepadFireButton("jumper-t"), undefined);
+  assert.equal(gamepadBindings("standard").fire, 7);
+  assert.equal(gamepadBindings("jumper-t").fire, undefined);
 
   const rig = installDom();
   const input = attachPlayInput(rig.dom, rig.storage);
