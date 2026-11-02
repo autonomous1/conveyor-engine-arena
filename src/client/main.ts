@@ -430,6 +430,10 @@ function drawFrame(now: number) {
   const hpLabel = localHealthLabel(mine);
   const hpText = hpLabel === "" ? "" : ` · ${hpLabel}`;
   const liftText = owned ? liftLabel(owned.position) : "";
+  sceneMap.setSelf(
+    owned ? { x: owned.position.x, y: owned.position.y, z: owned.position.z, yaw: yawFromQuat(owned.rotation) } : undefined,
+    view.elevators,
+  );
   if (!pinnedError) {
     hud.setStatus(`${statusText} · ${look}${hpText} · meshes ${pawns.count} models ${pawns.count - pawns.fallbacks} fallback ${pawns.fallbacks + visuals.fallbacks}${liftText}`);
   }

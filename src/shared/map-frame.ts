@@ -1,5 +1,6 @@
 /**
- * World XZ to map pixels. +X is right and +Z is up, matching the plan toolbar.
+ * World XZ to map pixels. +X is right and −Z is up: the true top-down
+ * view seen from above in game and in Blender's top view.
  * The panel uses a fixed 18px pad. A bake at another resolution scales that pad
  * by `size / SCENE_MAP_SIZE` so the image and the panel show the same window.
  */
@@ -14,6 +15,9 @@ export const MAP_BAKE_PX = 2048;
 
 /** URL the client loads. The file is `web/assets/map-bake.png`. */
 export const MAP_BAKE_URL = "/assets/map-bake.png";
+
+/** Bake clear colour. Dark so roofs and floors stand out; no ground plane is drawn. */
+export const MAP_BAKE_BACKGROUND = 0x1b1f24;
 
 export const MAP_BAKE_PATH = "web/assets/map-bake.png";
 
@@ -49,11 +53,11 @@ export function mapFrame(
   const originY = (height - worldD * scale) / 2;
   const toPixel = (x: number, z: number): [number, number] => [
     originX + (x - bounds.minX) * scale,
-    originY + (bounds.maxZ - z) * scale,
+    originY + (z - bounds.minZ) * scale,
   ];
   const toWorld = (px: number, py: number): [number, number] => [
     bounds.minX + (px - originX) / scale,
-    bounds.maxZ - (py - originY) / scale,
+    bounds.minZ + (py - originY) / scale,
   ];
   return {
     width,
@@ -63,8 +67,8 @@ export function mapFrame(
     originY,
     viewMinX: bounds.minX - originX / scale,
     viewMaxX: bounds.minX + (width - originX) / scale,
-    viewMaxZ: bounds.maxZ + originY / scale,
-    viewMinZ: bounds.maxZ - (height - originY) / scale,
+    viewMinZ: bounds.minZ - originY / scale,
+    viewMaxZ: bounds.minZ + (height - originY) / scale,
     toPixel,
     toWorld,
   };

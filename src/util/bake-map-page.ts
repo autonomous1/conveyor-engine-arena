@@ -5,7 +5,7 @@
 
 import * as THREE from "three";
 import type { ArenaView } from "../shared/arena-view.ts";
-import { MAP_BAKE_PX } from "../shared/map-frame.ts";
+import { MAP_BAKE_BACKGROUND, MAP_BAKE_PX } from "../shared/map-frame.ts";
 import { buildMapScene } from "./bake-scene.ts";
 import { topDownCamera } from "./map-camera.ts";
 
@@ -37,7 +37,7 @@ try {
   renderer.setSize(MAP_BAKE_PX, MAP_BAKE_PX, false);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.setClearColor(0x8eb8d4);
+  renderer.setClearColor(MAP_BAKE_BACKGROUND);
   const scene = await buildMapScene(view, renderer);
   const camera = topDownCamera(view.bounds, MAP_BAKE_PX, MAP_BAKE_PX);
   if (!camera) throw new Error("scene bounds are empty");
@@ -59,9 +59,9 @@ try {
   console.log("meshes", meshes);
   if (meshes < 2) throw new Error(`scene has ${meshes} meshes`);
   status("upload");
-  // Vertical flip. The camera's up is world −Z so roofs keep their front faces.
-  // After the flip, world +Z is the top of the PNG, matching mapImagePixel.
-  const blob = await flippedPng(renderer.domElement);
+  // No flip. The camera's up is world −Z, so the canvas already shows the true
+  // top-down view: world −Z at the top, +X right, matching mapImagePixel.
+  const blob = await canvasPng(renderer.domElement);
   if (!blob) throw new Error("png encode failed");
   const posted = await fetch("/png", { method: "POST", body: blob });
   if (!posted.ok) throw new Error(`png post ${posted.status}`);
@@ -71,16 +71,8 @@ try {
   console.error(err);
 }
 
-function flippedPng(glCanvas: HTMLCanvasElement): Promise<Blob | null> {
-  const out = document.createElement("canvas");
-  out.width = glCanvas.width;
-  out.height = glCanvas.height;
-  const ctx = out.getContext("2d");
-  if (!ctx) return Promise.resolve(null);
-  ctx.translate(0, out.height);
-  ctx.scale(1, -1);
-  ctx.drawImage(glCanvas, 0, 0);
-  return new Promise((resolve) => out.toBlob((blob) => resolve(blob), "image/png"));
+function canvasPng(glCanvas: HTMLCanvasElement): Promise<Blob | null> {
+  return new Promise((resolve) => glCanvas.toBlob((blob) => resolve(blob), "image/png"));
 }
 
 function sampleContrast(gl: WebGLRenderingContext | WebGL2RenderingContext): number {

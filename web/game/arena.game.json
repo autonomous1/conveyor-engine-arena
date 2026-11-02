@@ -77,7 +77,10 @@
       "instance": "static",
       "uri": "/assets/models/brutalist-building-1-cbake.floor-2.hall.glb",
       "mediaType": "model/gltf-binary",
-      "license": { "id": "unspecified", "status": "unknown" },
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
       "provenance": {
         "origin": "procedural",
         "notes": "Elevated hall floor baked from brutalist-building-1-cbake.floors.svg. Albedo is the floor-texture pattern."
@@ -90,7 +93,10 @@
       "instance": "static",
       "uri": "/assets/models/brutalist-building-1-cbake.floor-3.hall.glb",
       "mediaType": "model/gltf-binary",
-      "license": { "id": "unspecified", "status": "unknown" },
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
       "provenance": {
         "origin": "procedural",
         "notes": "Elevated hall floor baked from brutalist-building-1-cbake.floors.svg. Albedo is the floor-texture pattern."
@@ -103,7 +109,10 @@
       "instance": "static",
       "uri": "/assets/models/brutalist-building-1-cbake.floor-4.hall.glb",
       "mediaType": "model/gltf-binary",
-      "license": { "id": "unspecified", "status": "unknown" },
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
       "provenance": {
         "origin": "procedural",
         "notes": "Elevated hall floor baked from brutalist-building-1-cbake.floors.svg. Albedo is the floor-texture pattern."
@@ -116,7 +125,10 @@
       "instance": "static",
       "uri": "/assets/models/brutalist-building-1-cbake.floor-5.hall.glb",
       "mediaType": "model/gltf-binary",
-      "license": { "id": "unspecified", "status": "unknown" },
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
       "provenance": {
         "origin": "procedural",
         "notes": "Elevated hall floor baked from brutalist-building-1-cbake.floors.svg. Albedo is the floor-texture pattern."
@@ -129,7 +141,10 @@
       "instance": "static",
       "uri": "/assets/models/brutalist-building-1-cbake.floor-6.hall.glb",
       "mediaType": "model/gltf-binary",
-      "license": { "id": "unspecified", "status": "unknown" },
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
       "provenance": {
         "origin": "procedural",
         "notes": "Elevated hall floor baked from brutalist-building-1-cbake.floors.svg. Albedo is the floor-texture pattern."
@@ -142,7 +157,10 @@
       "instance": "static",
       "uri": "/assets/models/brutalist-building-1-cbake.floor-7.hall.glb",
       "mediaType": "model/gltf-binary",
-      "license": { "id": "unspecified", "status": "unknown" },
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
       "provenance": {
         "origin": "procedural",
         "notes": "Elevated hall floor baked from brutalist-building-1-cbake.floors.svg. Albedo is the floor-texture pattern."
@@ -155,7 +173,10 @@
       "instance": "static",
       "uri": "/assets/models/brutalist-building-1-cbake.floor-8.hall.glb",
       "mediaType": "model/gltf-binary",
-      "license": { "id": "unspecified", "status": "unknown" },
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
       "provenance": {
         "origin": "procedural",
         "notes": "Elevated hall floor baked from brutalist-building-1-cbake.floors.svg. Albedo is the floor-texture pattern."
@@ -168,7 +189,10 @@
       "instance": "static",
       "uri": "/assets/models/brutalist-building-1-cbake.floor-9.hall.glb",
       "mediaType": "model/gltf-binary",
-      "license": { "id": "unspecified", "status": "unknown" },
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
       "provenance": {
         "origin": "procedural",
         "notes": "Elevated hall floor baked from brutalist-building-1-cbake.floors.svg. Albedo is the floor-texture pattern."
@@ -181,7 +205,10 @@
       "instance": "static",
       "uri": "/assets/models/brutalist-building-1-cbake.floor-10.hall.glb",
       "mediaType": "model/gltf-binary",
-      "license": { "id": "unspecified", "status": "unknown" },
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
       "provenance": {
         "origin": "procedural",
         "notes": "Elevated hall floor baked from brutalist-building-1-cbake.floors.svg. Albedo is the floor-texture pattern."
@@ -344,7 +371,7 @@
         },
         "run": {
           "clip": "zombie walk",
-          "referenceSpeed":0.65238566,
+          "referenceSpeed": 0.65238566,
           "speed": 2
         },
         "fall": {
@@ -384,7 +411,7 @@
         },
         "run": {
           "clip": "zombie walk",
-          "referenceSpeed":0.65238566,
+          "referenceSpeed": 0.65238566,
           "speed": 2
         },
         "fall": {
@@ -606,7 +633,7 @@
       "id": "door-1",
       "kind": "model",
       "type": "door",
-      "action":"yaw",
+      "action": "yaw",
       "instance": "static",
       "uri": "/assets/models/door1.glb",
       "mediaType": "model/gltf-binary",
@@ -623,7 +650,7 @@
       "id": "door-2",
       "kind": "model",
       "type": "door",
-      "action":"yaw",
+      "action": "yaw",
       "instance": "static",
       "uri": "/assets/models/door2.glb",
       "mediaType": "model/gltf-binary",
@@ -640,7 +667,7 @@
       "id": "elevator-1-door",
       "kind": "model",
       "type": "door",
-      "action":"yaw",
+      "action": "yaw",
       "instance": "static",
       "uri": "/assets/models/elevator-1-door.glb",
       "mediaType": "model/gltf-binary",
@@ -657,7 +684,7 @@
       "id": "elevator-1-door-2",
       "kind": "model",
       "type": "door",
-      "action":"yaw",
+      "action": "yaw",
       "instance": "static",
       "uri": "/assets/models/elevator-1-door-2.glb",
       "mediaType": "model/gltf-binary",
@@ -668,6 +695,98 @@
       "provenance": {
         "origin": "procedural",
         "notes": "Generated with blueprint-sceen prop --shape door"
+      }
+    },
+    {
+      "id": "brutalist-building-2-cbake.l1.landing",
+      "kind": "model",
+      "type": "floor",
+      "instance": "static",
+      "uri": "/assets/models/brutalist-building-2-cbake.l1.landing.glb",
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "CC0-1.0",
+        "status": "spdx"
+      },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Generated with blueprint-sceen bake"
+      }
+    },
+    {
+      "id": "brutalist-building-2-cbake.s1.stairs",
+      "kind": "model",
+      "type": "floor",
+      "instance": "static",
+      "uri": "/assets/models/brutalist-building-2-cbake.s1.stairs.glb",
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
+      "provenance": {
+        "origin": "procedural"
+      }
+    },
+    {
+      "id": "brutalist-building-2-cbake.s2.stairs",
+      "kind": "model",
+      "type": "floor",
+      "instance": "static",
+      "uri": "/assets/models/brutalist-building-2-cbake.s2.stairs.glb",
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
+      "provenance": {
+        "origin": "procedural"
+      }
+    },
+    {
+      "id": "brutalist-building-2-cbake.l2.1.landing",
+      "kind": "model",
+      "type": "floor",
+      "instance": "static",
+      "uri": "/assets/models/brutalist-building-2-cbake.l2.1.landing.glb",
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "CC0-1.0",
+        "status": "spdx"
+      },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Generated with blueprint-sceen bake"
+      }
+    },
+    {
+      "id": "brutalist-building-2-cbake.s2.1.stairs",
+      "kind": "model",
+      "type": "floor",
+      "instance": "static",
+      "uri": "/assets/models/brutalist-building-2-cbake.s2.1.stairs.glb",
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
+      "provenance": {
+        "origin": "procedural"
+      }
+    },
+    {
+      "id": "brutalist-building-2-cbake.s2.2.stairs",
+      "kind": "model",
+      "type": "floor",
+      "instance": "static",
+      "uri": "/assets/models/brutalist-building-2-cbake.s2.2.stairs.glb",
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
+      "provenance": {
+        "origin": "procedural"
       }
     },
     {
@@ -722,7 +841,7 @@
       "id": "szukalski-centerpiece",
       "kind": "model",
       "type": "crate",
-      "scale":6,
+      "scale": 6,
       "instance": "static",
       "uri": "/assets/models/szukalski-centerpiece.glb",
       "mediaType": "model/gltf-binary",
@@ -750,7 +869,7 @@
         "origin": "procedural",
         "notes": "Generated with blueprint-sceen prop --shape crate"
       }
-    },    
+    },
     {
       "id": "room-b",
       "kind": "model",

@@ -1,7 +1,8 @@
 /**
  * Static arena for the map bake. Placements go through the same helpers as
  * the live scene (`placeBuildingModel`, `placeStaticInstances`, door frames).
- * Sky and cityscape are omitted: from above they cover the room. Pawns are
+ * Sky, cityscape and the ground plane are omitted: from above they cover the
+ * room or blend with the roofs. Pawns are
  * omitted so the picture stays a background.
  */
 
@@ -30,20 +31,8 @@ export async function buildMapScene(view: ArenaView, renderer?: THREE.WebGLRende
   scene.add(key.target);
   scene.add(key);
 
-  if (view.floor) {
-    const floorMap = await loadTexture(view.floor.texture);
-    floorMap.repeat.set(12, 12);
-    const width = view.bounds.maxX - view.bounds.minX;
-    const depth = view.bounds.maxZ - view.bounds.minZ;
-    const floor = new THREE.Mesh(
-      new THREE.PlaneGeometry(width * 2, depth * 2, 1, 1),
-      new THREE.MeshStandardMaterial({ map: floorMap, color: 0xffffff, roughness: 0.95 }),
-    );
-    floor.name = "floor";
-    floor.rotation.x = -Math.PI / 2;
-    floor.position.y = view.floor.y;
-    scene.add(floor);
-  }
+  // No ground plane: it is low contrast with the roofs. The bake clears to
+  // MAP_BAKE_BACKGROUND instead. The live scene still draws its floor.
 
   const content = new THREE.Group();
   content.name = "map-content";

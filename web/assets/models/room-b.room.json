@@ -165,18 +165,5 @@
       "drawnDepth": 0.489
     }
   ],
-  "lights": [
-    {
-      "id": "lamp",
-      "type": "point",
-      "position": [
-        0.097554,
-        2.75,
-        0.32345
-      ],
-      "color": "#ffd9a0",
-      "intensity": 8,
-      "range": 3.5
-    }
-  ]
+  "lights": []
 }

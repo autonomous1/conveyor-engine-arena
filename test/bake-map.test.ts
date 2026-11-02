@@ -6,7 +6,7 @@ import { mapImagePixel, topDownCamera } from "../src/util/map-camera.ts";
 
 const ROOM = { minX: -10, maxX: 30, minZ: -8, maxZ: 12 };
 
-test("the top-down camera matches the panel: +X right, +Z up", () => {
+test("the top-down camera matches the panel: +X right, −Z up", () => {
   const frame = mapFrame(ROOM, SCENE_MAP_SIZE, SCENE_MAP_SIZE);
   const camera = topDownCamera(ROOM, SCENE_MAP_SIZE, SCENE_MAP_SIZE);
   assert.ok(frame);
@@ -16,7 +16,7 @@ test("the top-down camera matches the panel: +X right, +Z up", () => {
   assert.ok(dir.y < -0.999, `look y ${dir.y}`);
   const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0);
   assert.ok(right.x > 0.999 && Math.abs(right.z) < 1e-3, `right ${right.x},${right.z}`);
-  // Local +Y stays world −Z. The PNG flip, not the frustum, puts +Z on top.
+  // Local +Y stays world −Z. The PNG is written unflipped, so −Z is on top.
   const localUp = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1);
   assert.ok(localUp.z < -0.999, `local up z ${localUp.z}`);
   assert.ok(camera.top > camera.bottom, "frustum keeps a positive winding");
@@ -39,13 +39,21 @@ test("the bake image uses the same window as the 360px panel", () => {
   const camera = topDownCamera(bounds, MAP_BAKE_PX, MAP_BAKE_PX);
   assert.ok(panel);
   assert.ok(camera);
-  const [px, py] = panel.toPixel(bounds.minX, bounds.maxZ);
+  const [px, py] = panel.toPixel(bounds.minX, bounds.minZ);
   assert.ok(Math.abs(px - MAP_PAD) < 1e-6, `pad x ${px}`);
   assert.ok(Math.abs(py - MAP_PAD) < 1e-6, `pad y ${py}`);
-  const [bx, by] = mapImagePixel(camera, bounds.minX, bounds.maxZ, MAP_BAKE_PX, MAP_BAKE_PX);
+  const [bx, by] = mapImagePixel(camera, bounds.minX, bounds.minZ, MAP_BAKE_PX, MAP_BAKE_PX);
   const nx = bx / MAP_BAKE_PX;
   const ny = by / MAP_BAKE_PX;
   assert.ok(Math.abs(nx - px / SCENE_MAP_SIZE) < 1e-4, `norm x ${nx}`);
   assert.ok(Math.abs(ny - py / SCENE_MAP_SIZE) < 1e-4, `norm y ${ny}`);
   assert.equal(SCENE_MAP_SIZE, 360);
+});
+
+test("a pawn facing −Z draws its heading arrow up", () => {
+  const frame = mapFrame({ minX: -5, maxX: 5, minZ: -5, maxZ: 5 }, SCENE_MAP_SIZE, SCENE_MAP_SIZE);
+  assert.ok(frame);
+  const [, y0] = frame.toPixel(0, 0);
+  const [, y1] = frame.toPixel(0, -1);
+  assert.ok(y1 < y0, `−Z y ${y1} should be above origin ${y0}`);
 });

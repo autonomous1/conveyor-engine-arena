@@ -63,7 +63,7 @@ test("yaw marks use the short arc, and 270° matches −90°", () => {
   assert.equal(yawMark(0, undefined), "unknown");
 });
 
-test("world +Z is up on the map and +X is to the right", () => {
+test("world −Z is up on the map and +X is to the right", () => {
   const layout = layoutSceneMap({
     bounds: { minX: -10, maxX: 10, minZ: -5, maxZ: 5 },
     samples: [],
@@ -73,7 +73,7 @@ test("world +Z is up on the map and +X is to the right", () => {
   const south = layout.toPixel(0, -5);
   const east = layout.toPixel(10, 0);
   const west = layout.toPixel(-10, 0);
-  assert.ok(north[1] < south[1], `+Z pixel y ${north[1]} should be above −Z ${south[1]}`);
+  assert.ok(south[1] < north[1], `−Z pixel y ${south[1]} should be above +Z ${north[1]}`);
   assert.ok(east[0] > west[0], `+X pixel x ${east[0]} should be right of −X ${west[0]}`);
   const [x, z] = layout.toWorld(north[0], north[1]);
   assert.ok(Math.abs(x) < 1e-6, `round trip x ${x}`);
@@ -130,7 +130,8 @@ test("a child node turned 90° is red against file yaw 0 and the long axis follo
   assert.ok(fills.some((fill) => fill.includes("255, 90, 106")), fills.join(" | "));
   const meshArrow = lines.find((line) => line.color === "#ffffff");
   const fileArrow = lines.find((line) => line.dash);
-  assert.ok(meshArrow && meshArrow.dy > 1 && Math.abs(meshArrow.dx) < meshArrow.dy, `mesh arrow ${JSON.stringify(meshArrow)}`);
+  // Yaw 90° sends local +X to world −Z, which is up on the map.
+  assert.ok(meshArrow && meshArrow.dy < -1 && Math.abs(meshArrow.dx) < -meshArrow.dy, `mesh arrow ${JSON.stringify(meshArrow)}`);
   assert.ok(fileArrow && fileArrow.dx > 1 && Math.abs(fileArrow.dy) < fileArrow.dx, `file arrow ${JSON.stringify(fileArrow)}`);
 });
 

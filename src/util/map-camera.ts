@@ -4,10 +4,10 @@
  * The camera looks down world −Y. `camera.up` is (0, 0, −1), so local +X is
  * world +X and local +Y is world −Z. The frustum keeps top above bottom.
  * Swapping them would reverse triangle winding and cull the floor and the
- * roofs. The PNG is flipped vertically after the render (`mapImagePixel`),
- * which puts world +Z at the top without touching winding.
+ * roofs. The PNG is written as rendered, so world −Z is the top of the image
+ * (the true top-down view, as in Blender's top view).
  *
- * Check: world +X projects to +NDC x. Before the flip, world +Z is −NDC y.
+ * Check: world +X projects to +NDC x, and world −Z to +NDC y.
  */
 
 import * as THREE from "three";
@@ -40,7 +40,7 @@ export function topDownCamera(bounds: MapBounds, width: number, height: number):
 
 /**
  * Pixel in the written PNG. NDC +Y is the top of the framebuffer, which is
- * world −Z for this camera. The bake flips that image vertically, so world +Z
+ * world −Z for this camera. The bake writes the canvas unflipped, so world −Z
  * is the top of the file and matches `mapFrame`.
  */
 export function mapImagePixel(
@@ -51,5 +51,5 @@ export function mapImagePixel(
   height: number,
 ): [number, number] {
   const ndc = new THREE.Vector3(x, 0, z).project(camera);
-  return [(ndc.x * 0.5 + 0.5) * width, (ndc.y * 0.5 + 0.5) * height];
+  return [(ndc.x * 0.5 + 0.5) * width, (0.5 - ndc.y * 0.5) * height];
 }

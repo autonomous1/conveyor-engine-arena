@@ -26,8 +26,8 @@
      borderopacity="1.0"
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
-     inkscape:zoom="29.633333"
-     inkscape:cx="11.304837"
+     inkscape:zoom="157.8901"
+     inkscape:cx="9.5124511"
      inkscape:cy="11.338583"
      inkscape:document-units="mm"
      inkscape:current-layer="layer17"
@@ -190,17 +190,5 @@
      inkscape:groupmode="layer"
      id="layer17"
      inkscape:label="lights"
-     style="display:inline">
-    <circle
-       style="color:#000000;overflow:visible;opacity:1;vector-effect:none;fill:#ffff00;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:0.02645833;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
-       id="light-1"
-       cx="3.0975535"
-       cy="293.89554"
-       r="0.25253814"
-       inkscape:label="light:lamp"
-       data-color="#FFD9A0"
-       data-intensity="8"
-       z="2.75"
-       data-range="3.5" />
-  </g>
+     style="display:inline" />
 </svg>

@@ -3,6 +3,60 @@
   "units": "meters",
   "placements": [
     {
+      "id": "brutalist-building-2-cbake.door-1-1-9",
+      "model": "door-1",
+      "type": "door",
+      "position": [
+        30.957727,
+        0,
+        0.05298
+      ],
+      "yaw": 180,
+      "hinge": "left",
+      "size": [
+        1.047216,
+        2.1,
+        0.08
+      ],
+      "open": false
+    },
+    {
+      "id": "brutalist-building-2-cbake-1.door-1-1-9",
+      "model": "door-1",
+      "type": "door",
+      "position": [
+        33.758657,
+        0,
+        39.411101
+      ],
+      "yaw": 90,
+      "hinge": "left",
+      "size": [
+        1.047216,
+        2.1,
+        0.08
+      ],
+      "open": false
+    },
+    {
+      "id": "brutalist-building-2-cbake-3.door-1-1-9",
+      "model": "door-1",
+      "type": "door",
+      "position": [
+        -27.205132,
+        0,
+        4.05017
+      ],
+      "yaw": 0,
+      "hinge": "left",
+      "size": [
+        1.047216,
+        2.1,
+        0.08
+      ],
+      "open": false
+    },
+    {
       "id": "brutalist-building-1-cbake.door-1-1-9-22",
       "model": "door-1",
       "type": "door",

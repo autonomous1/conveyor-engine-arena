@@ -26,15 +26,15 @@
      borderopacity="1.0"
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
-     inkscape:zoom="25.914618"
-     inkscape:cx="18.509442"
-     inkscape:cy="10.8132"
+     inkscape:zoom="30.862672"
+     inkscape:cx="18.548031"
+     inkscape:cy="10.81313"
      inkscape:document-units="mm"
-     inkscape:current-layer="layer1"
+     inkscape:current-layer="layer12"
      showgrid="false"
-     inkscape:window-width="2807"
+     inkscape:window-width="2812"
      inkscape:window-height="1549"
-     inkscape:window-x="73"
+     inkscape:window-x="68"
      inkscape:window-y="34"
      inkscape:window-maximized="1" />
   <metadata
@@ -56,13 +56,13 @@
     <image
        sodipodi:absref="/home/tim/dev/conveyor-engine-arena/dev/scenes/arena-1/designs/rooms/textures/floor.png"
        xlink:href="textures/floor.png"
-       y="291.27802"
-       x="0"
-       id="image19968"
-       preserveAspectRatio="none"
-       height="5.7220001"
+       inkscape:label="floor"
        width="9.8149996"
-       inkscape:label="floor" />
+       height="5.7220001"
+       preserveAspectRatio="none"
+       id="image19968"
+       x="0"
+       y="291.27802" />
   </g>
   <g
      inkscape:label="walls"
@@ -71,45 +71,45 @@
     <image
        sodipodi:absref="/home/tim/dev/conveyor-engine-arena/dev/scenes/arena-1/designs/rooms/textures/wall-8-crop1.png"
        xlink:href="textures/wall-8-crop1.png"
-       y="297.00003"
-       x="0"
-       id="image20092"
-       preserveAspectRatio="none"
-       height="2.9000001"
+       inkscape:label="back"
        width="9.8149996"
-       inkscape:label="back" />
+       height="2.9000001"
+       preserveAspectRatio="none"
+       id="image20092"
+       x="0"
+       y="297.00003" />
     <image
        sodipodi:absref="/home/tim/dev/conveyor-engine-arena/dev/scenes/arena-1/designs/rooms/textures/wall-7-crop1.png"
        xlink:href="textures/wall-7-crop1.png"
-       y="288.37802"
-       x="0"
-       id="image20138"
-       preserveAspectRatio="none"
-       height="2.9000001"
+       inkscape:label="front"
        width="9.8149996"
-       inkscape:label="front" />
+       height="2.9000001"
+       preserveAspectRatio="none"
+       id="image20138"
+       x="0"
+       y="288.37802" />
     <image
        sodipodi:absref="/home/tim/dev/conveyor-engine-arena/dev/scenes/arena-1/designs/rooms/textures/wall-6.png"
        xlink:href="textures/wall-6.png"
-       y="2.4663412e-14"
-       x="291.27802"
-       id="image20200"
-       preserveAspectRatio="none"
-       height="2.9000001"
-       width="5.7220001"
+       inkscape:label="left"
        transform="rotate(90)"
-       inkscape:label="left" />
+       width="5.7220001"
+       height="2.9000001"
+       preserveAspectRatio="none"
+       id="image20200"
+       x="291.27802"
+       y="2.4663412e-14" />
     <image
        sodipodi:absref="/home/tim/dev/conveyor-engine-arena/dev/scenes/arena-1/designs/rooms/textures/wall-2.png"
        xlink:href="textures/wall-2.png"
-       y="9.8149996"
-       x="-297.00003"
-       id="image20262"
-       preserveAspectRatio="none"
-       height="2.9000001"
-       width="5.7220001"
+       inkscape:label="right"
        transform="rotate(-90)"
-       inkscape:label="right" />
+       width="5.7220001"
+       height="2.9000001"
+       preserveAspectRatio="none"
+       id="image20262"
+       x="-297.00003"
+       y="9.8149996" />
   </g>
   <g
      inkscape:groupmode="layer"
@@ -119,13 +119,13 @@
     <image
        sodipodi:absref="/home/tim/dev/conveyor-engine-arena/dev/scenes/arena-1/designs/rooms/textures/ceiling.png"
        xlink:href="textures/ceiling.png"
-       y="291.27802"
-       x="0"
-       id="image20324"
-       preserveAspectRatio="none"
-       height="5.7220001"
+       inkscape:label="ceiling"
        width="9.8149996"
-       inkscape:label="ceiling" />
+       height="5.7220001"
+       preserveAspectRatio="none"
+       id="image20324"
+       x="0"
+       y="291.27802" />
   </g>
   <g
      inkscape:groupmode="layer"
@@ -137,7 +137,7 @@
        width="0.49405965"
        height="1.073"
        x="296.78006"
-       y="-5.2475362"
+       y="-8.4225359"
        model="door2.glb"
        inkscape:label="model:door-2"
        data-key="key"

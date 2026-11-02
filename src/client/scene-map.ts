@@ -1,7 +1,7 @@
 /**
  * Scene map panel. The picture is the baked top-down image from `npm run bake:map`.
- * The canvas over it stays empty so pawn markers can be drawn later.
- * World +X is panel right and world +Z is panel up, the same frame as the bake.
+ * The canvas over it draws the local player marker (`setSelf`).
+ * World +X is panel right and world −Z is panel up, the same frame as the bake.
  * `layoutSceneMap` is that mapping. The footprint helpers stay for tests and a
  * yaw check. The panel does not paint them, and nothing here runs in the WebGL frame.
  */
@@ -10,6 +10,7 @@ import * as THREE from "three";
 import type { ProfileRing } from "../shared/building-profile.ts";
 import { aimDirection, yawFromQuat } from "../shared/look.ts";
 import { MAP_BAKE_URL, SCENE_MAP_SIZE, mapFrame } from "../shared/map-frame.ts";
+import { SELF_DOT_R, floorLabel, selfMarker, selfMoved, type FloorSource, type SelfPose } from "./map-marker.ts";
 
 export { MAP_BAKE_URL, SCENE_MAP_SIZE };
 export const YAW_MATCH_DEGREES = 5;
@@ -95,6 +96,7 @@ export type MapLayout = {
   toPixel(x: number, z: number): [number, number];
   toWorld(px: number, py: number): [number, number];
   floor: Array<[number, number]>;
+  /** Label anchor for −Z, the top edge of the map. */
   plusZ: [number, number];
   plusX: [number, number];
   entities: Array<MapEntity & {
@@ -243,7 +245,7 @@ export function layoutSceneMap(world: SceneMapWorld, width = SCENE_MAP_SIZE, hei
     tip: tipOf(entity),
   }));
   entities.sort((a, b) => KIND_RANK[a.kind] - KIND_RANK[b.kind] || a.id.localeCompare(b.id));
-  const north = toPixel((bounds.minX + bounds.maxX) / 2, bounds.maxZ);
+  const north = toPixel((bounds.minX + bounds.maxX) / 2, bounds.minZ);
   const east = toPixel(bounds.maxX, (bounds.minZ + bounds.maxZ) / 2);
   return {
     width,
@@ -296,7 +298,7 @@ export function paintSceneMap(layout: MapLayout, draw: MapDraw): void {
       const radius = Math.max(2.5, layout.scale * 0.4);
       draw.circle(px, py, radius, "#f2f6fb");
       const len = layout.scale * 1.5;
-      draw.line(px, py, px + entity.axisZ[0] * len, py - entity.axisZ[1] * len, "#f2f6fb", false);
+      draw.line(px, py, px + entity.axisZ[0] * len, py + entity.axisZ[1] * len, "#f2f6fb", false);
       continue;
     }
     const color = YAW_COLOR[entity.mark];
@@ -312,13 +314,13 @@ export function paintSceneMap(layout: MapLayout, draw: MapDraw): void {
     if (entity.kind === "spawn" || entity.pixel.length < 3) continue;
     const [px, py] = layout.toPixel(entity.x, entity.z);
     const len = Math.max(layout.scale * 0.75, arrowReach(entity) * layout.scale);
-    draw.line(px, py, px + entity.axisX[0] * len, py - entity.axisX[1] * len, "#ffffff", false);
+    draw.line(px, py, px + entity.axisX[0] * len, py + entity.axisX[1] * len, "#ffffff", false);
     if (entity.expectedYaw !== undefined && (entity.mark === "small" || entity.mark === "large")) {
       const expected = yawBasis(entity.expectedYaw).axisX;
-      draw.line(px, py, px + expected[0] * len, py - expected[1] * len, "#ffd27a", true);
+      draw.line(px, py, px + expected[0] * len, py + expected[1] * len, "#ffd27a", true);
     }
   }
-  draw.text("+Z", layout.plusZ[0], layout.plusZ[1], "center");
+  draw.text("−Z", layout.plusZ[0], layout.plusZ[1], "center");
   draw.text("+X", layout.plusX[0], layout.plusX[1], "right");
 }
 
@@ -328,6 +330,8 @@ export type SceneMap = {
   setWorld(world: SceneMapWorld): void;
   /** Panel mapping for a later pawn layer. Absent until `setWorld`. */
   layout(): MapLayout | undefined;
+  /** Local player marker. `undefined` clears it. Cheap: repaints only when visible and moved. */
+  setSelf(pose: SelfPose | undefined, lifts?: readonly FloorSource[]): void;
 };
 
 export function createSceneMap(): SceneMap {
@@ -352,7 +356,7 @@ export function createSceneMap(): SceneMap {
   canvas.width = SCENE_MAP_SIZE;
   canvas.height = SCENE_MAP_SIZE;
   // index.html sizes every canvas to the viewport. The inline size keeps this one in the corner.
-  // The bitmap stays blank. Pawn markers use `layout()` and draw here later.
+  // Backing store follows devicePixelRatio; drawing stays in CSS pixels.
   canvas.setAttribute("data-role", "pawn-overlay");
   canvas.style.cssText = `position:absolute;inset:0;width:${SCENE_MAP_SIZE}px;height:${SCENE_MAP_SIZE}px;display:block;`;
   root.append(image, canvas);
@@ -365,6 +369,61 @@ export function createSceneMap(): SceneMap {
 
   let visible = false;
   let world: SceneMapWorld | undefined;
+  let cached: MapLayout | undefined;
+  let self: SelfPose | undefined;
+  let selfLabel = "";
+  let painted: SelfPose | undefined;
+  let paintedLabel = "";
+  let dirty = true;
+  let ctx: CanvasRenderingContext2D | null | undefined;
+  const paintSelf = () => {
+    // No marker yet and nothing on the canvas: leave the context untouched.
+    if (!self && !painted) return;
+    if (ctx === undefined) ctx = canvas.getContext?.("2d") ?? null;
+    if (!ctx) return;
+    const dpr = typeof devicePixelRatio === "number" && devicePixelRatio > 0 ? devicePixelRatio : 1;
+    const px = Math.round(SCENE_MAP_SIZE * dpr);
+    if (canvas.width !== px || canvas.height !== px) {
+      canvas.width = px;
+      canvas.height = px;
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, SCENE_MAP_SIZE, SCENE_MAP_SIZE);
+    painted = self;
+    paintedLabel = selfLabel;
+    dirty = false;
+    if (!self || !cached) return;
+    const m = selfMarker(cached, self);
+    const [cx, cy] = m.center;
+    ctx.lineJoin = "round";
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "#111";
+    ctx.fillStyle = "#ffb020";
+    ctx.beginPath();
+    ctx.moveTo(m.wedge[0][0], m.wedge[0][1]);
+    ctx.lineTo(m.wedge[1][0], m.wedge[1][1]);
+    ctx.lineTo(m.wedge[2][0], m.wedge[2][1]);
+    ctx.closePath();
+    ctx.stroke();
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(cx, cy, SELF_DOT_R, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = "#ffe14a";
+    ctx.fill();
+    if (selfLabel) {
+      ctx.font = "bold 11px system-ui, sans-serif";
+      ctx.textBaseline = "middle";
+      const right = cx < SCENE_MAP_SIZE - 50;
+      ctx.textAlign = right ? "left" : "right";
+      const tx = cx + (right ? 9 : -9);
+      const ty = cy - 9;
+      ctx.lineWidth = 3;
+      ctx.strokeText(selfLabel, tx, ty);
+      ctx.fillStyle = "#ffe14a";
+      ctx.fillText(selfLabel, tx, ty);
+    }
+  };
 
   return {
     get visible() {
@@ -373,13 +432,29 @@ export function createSceneMap(): SceneMap {
     setVisible(on: boolean) {
       visible = on;
       root.hidden = !on;
+      if (on) paintSelf();
     },
     setWorld(next: SceneMapWorld) {
       world = next;
+      cached = layoutSceneMap(next, SCENE_MAP_SIZE, SCENE_MAP_SIZE);
+      dirty = true;
+      if (visible) paintSelf();
     },
     layout() {
       if (!world) return undefined;
       return layoutSceneMap(world, SCENE_MAP_SIZE, SCENE_MAP_SIZE);
+    },
+    setSelf(pose, lifts) {
+      self = pose;
+      selfLabel = pose ? floorLabel(pose, lifts) : "";
+      if (!visible) return;
+      const dpr = typeof devicePixelRatio === "number" && devicePixelRatio > 0 ? devicePixelRatio : 1;
+      if (canvas.width !== Math.round(SCENE_MAP_SIZE * dpr)) dirty = true;
+      if (!pose) {
+        if (painted) paintSelf();
+        return;
+      }
+      if (dirty || selfMoved(painted, pose, selfLabel, paintedLabel)) paintSelf();
     },
   };
 }
