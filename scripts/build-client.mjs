@@ -14,6 +14,7 @@ await build({
   legalComments: "none",
 });
 await cp("web/index.html", "dist/web/index.html");
+await cp("web/landing-page.html", "dist/web/landing-page.html");
 await rm("dist/web/assets", { recursive: true, force: true });
 await cp("web/assets", "dist/web/assets", { recursive: true });
 const basis = "node_modules/three/examples/jsm/libs/basis";
