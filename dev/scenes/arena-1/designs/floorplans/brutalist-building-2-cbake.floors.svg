@@ -594,6 +594,28 @@
   </g>
   <g
      inkscape:groupmode="layer"
+     id="floor-1-texture"
+     inkscape:label="floor-1-texture"
+     style="display:none">
+    <path
+       id="floor-1-texture-shape"
+       inkscape:label="floor-texture"
+       d="M 0 0 L 10 0 L 10 10 L 0 10 Z"
+       style="fill:url(#pattern1471-3)" />
+  </g>
+  <g
+     inkscape:groupmode="layer"
+     id="floor-2-texture"
+     inkscape:label="floor-2-texture"
+     style="display:none">
+    <path
+       id="floor-2-texture-shape"
+       inkscape:label="floor-texture"
+       d="M 0 0 L 10 0 L 10 10 L 0 10 Z"
+       style="fill:url(#pattern1471-3)" />
+  </g>
+  <g
+     inkscape:groupmode="layer"
      id="layer1"
      inkscape:label="floor-3-texture"
      style="display:none">
@@ -604,6 +626,7 @@
        z="6">
       <path
          id="b2-exact-outline-6-5"
+         inkscape:label="floor-texture"
          transform="scale(0.26458333)"
          d="m 0.11328125,1010.4023 v 112.0039 H 40.478516 v -22.6777 H 18.851562 v -26.0039 H 3.5136719 v -14.7734 H 18.851562 v -26.8926 h 32.550782 v -21.6563 z"
          style="fill:url(#pattern1471-3);fill-opacity:1;stroke:none;stroke-width:0.22677188"

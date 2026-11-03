@@ -26,15 +26,15 @@
      borderopacity="1.0"
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
-     inkscape:zoom="155.72893"
-     inkscape:cx="-0.082624088"
+     inkscape:zoom="256"
+     inkscape:cx="-1.1919991"
      inkscape:cy="-0.04435149"
      inkscape:document-units="mm"
      inkscape:current-layer="layer1"
      showgrid="false"
-     inkscape:window-width="2807"
+     inkscape:window-width="2812"
      inkscape:window-height="1549"
-     inkscape:window-x="73"
+     inkscape:window-x="68"
      inkscape:window-y="34"
      inkscape:window-maximized="1" />
   <metadata
@@ -45,7 +45,7 @@
         <dc:format>image/svg+xml</dc:format>
         <dc:type
            rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
-        <dc:title></dc:title>
+        <dc:title />
       </cc:Work>
     </rdf:RDF>
   </metadata>
@@ -80,12 +80,14 @@
     <image
        sodipodi:absref="/home/tim/dev/conveyor-engine-arena/dev/scenes/arena-1/designs/elevator-1-door-2.png"
        xlink:href="elevator-1-door-2.png"
-       inkscape:label="data-part-texture"
-       width="1.1040334"
-       height="2.0970459"
-       preserveAspectRatio="none"
-       id="data-part-texture"
+       data-sides="single"
+       data-alpha-mode="BLEND"
+       y="295.87149"
        x="-0.5874027"
-       y="295.87149" />
+       id="data-part-texture"
+       preserveAspectRatio="none"
+       height="2.0970459"
+       width="1.1040334"
+       inkscape:label="data-part-texture" />
   </g>
 </svg>
