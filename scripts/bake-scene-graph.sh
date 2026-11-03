@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-./node_modules/blueprint-scene/bin/blueprint-scene scene-graph \
+./node_modules/.bin/blueprint-scene scene-graph \
 --buildings ./web/game/buildings.placements.json \
 --floors ./dev/scenes/arena-1/designs/floorplans \
 --rooms ./web/assets/models \
