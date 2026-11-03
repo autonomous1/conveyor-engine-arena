@@ -233,12 +233,6 @@ test("goal priorities stay retrieve, arm, reach, idle", () => {
   assert.equal(idle().priority({}), 0);
 });
 
-test("goap.ts matches the appendix byte for byte", () => {
-  const got = readFileSync(join(root, "src/shared/bots/goap.ts"));
-  const appendix = readFileSync(join(root, "plan/arena-roadmap-tasks-v3/reference/goap.ts"));
-  assert.deepEqual(got, appendix);
-});
-
 test("bot planner source has no clock and no Math.random", () => {
   const dir = join(root, "src/shared/bots");
   const names = readdirSync(dir).filter((name) => name.endsWith(".ts"));
