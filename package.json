@@ -58,7 +58,7 @@
     "@gltf-transform/cli": "4.5.0",
     "@types/node": "^22.10.0",
     "@types/ws": "^8.5.14",
-    "blueprint-scene": "^0.1.7",
+    "blueprint-scene": "^0.1.10",
     "esbuild": "^0.25.0",
     "typescript": "^5.8.2"
   }
