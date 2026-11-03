@@ -655,8 +655,8 @@ test("scene.sceneGraph is optional, a missing file is an issue, and invalid json
   const read = (uri: string) => files.get(uri);
   const withPath = structuredClone(document()) as { scene: Record<string, unknown> };
   const loaded = compile(withPath, read);
-  assert.equal(loaded.sceneGraph?.places.length, 150);
-  assert.equal(loaded.sceneGraph?.portals.length, 288);
+  assert.equal(loaded.sceneGraph?.places.length, 174);
+  assert.equal(loaded.sceneGraph?.portals.length, 321);
   assert.equal("sceneGraph" in loaded.view, false);
   assert.equal("places" in loaded.view, false);
   assert.equal("portals" in loaded.view, false);
@@ -704,7 +704,7 @@ test("scene.sceneGraph is optional, a missing file is an issue, and invalid json
   console.warn = (line?: unknown) => { warnings.push(String(line)); };
   try {
     const game = compile(withPath, read, drifted);
-    assert.equal(game.sceneGraph?.places.length, 150);
+    assert.equal(game.sceneGraph?.places.length, 174);
     assert.ok(warnings.some((line) => line === "scene.sceneGraph.places.brutalist-building-1-cbake-0.e1: stops or landings differ from scene.elevators"));
   } finally {
     console.warn = orig;

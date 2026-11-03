@@ -148,8 +148,8 @@ test("placeAt prefers the smallest place and names elevator stops", () => {
 
 test("the baked graph loads, and placeAt names the floor-3 cab and hall", () => {
   const loaded = loadArena();
-  assert.equal(loaded.sceneGraph?.places.length, 150);
-  assert.equal(loaded.sceneGraph?.portals.length, 288);
+  assert.equal(loaded.sceneGraph?.places.length, 174);
+  assert.equal(loaded.sceneGraph?.portals.length, 321);
   const graphFile = loaded.sceneGraph;
   assert.ok(graphFile);
   const baked = JSON.parse(readFileSync(new URL("../web/game/scene-graph.json", import.meta.url), "utf8")) as {

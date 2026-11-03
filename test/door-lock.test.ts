@@ -408,7 +408,7 @@ test("door and use frames parse, and only a shut leaf seals the gap", () => {
   const world = loaded.world;
   const placed = loaded.view.doors;
   assert.ok(placed.length > 0);
-  const interiorId = "brutalist-building-2-cbake.room-b-1-3.door-1-1-9-22-5";
+  const interiorId = "brutalist-building-2-cbake.rect3557.door-1-1-9-22-5";
   const doorsFile = JSON.parse(readFileSync(path.join(root, "web/game/doors.placements.json"), "utf8")) as {
     placements: Array<{ id: string }>;
   };
