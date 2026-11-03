@@ -831,6 +831,198 @@
       "scale": 1
     },
     {
+      "id": "brutalist-building-2-cbake.rect13030-3",
+      "model": "step",
+      "type": "crate",
+      "position": [
+        30.131001,
+        0,
+        19.14828
+      ],
+      "yaw": 0,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-2-cbake.rect13030-1-6",
+      "model": "step",
+      "type": "crate",
+      "position": [
+        29.731001,
+        0.25,
+        19.14828
+      ],
+      "yaw": 0,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-2-cbake.rect13030-8-7",
+      "model": "step",
+      "type": "crate",
+      "position": [
+        29.331003,
+        0.5,
+        19.14828
+      ],
+      "yaw": 0,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-2-cbake.rect13030-5-5",
+      "model": "step",
+      "type": "crate",
+      "position": [
+        28.931005,
+        0.75,
+        19.14828
+      ],
+      "yaw": 0,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-2-cbake.rect13030-7-3",
+      "model": "step",
+      "type": "crate",
+      "position": [
+        28.531006,
+        1,
+        19.14828
+      ],
+      "yaw": 0,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-2-cbake.rect13030-1-5-5",
+      "model": "step",
+      "type": "crate",
+      "position": [
+        28.131007,
+        1.25,
+        19.14828
+      ],
+      "yaw": 0,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-2-cbake.rect13030-8-3-6",
+      "model": "step",
+      "type": "crate",
+      "position": [
+        27.731007,
+        1.5,
+        19.14828
+      ],
+      "yaw": 0,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-2-cbake.rect13030-5-8-2",
+      "model": "step",
+      "type": "crate",
+      "position": [
+        27.331007,
+        1.75,
+        19.14828
+      ],
+      "yaw": 0,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-2-cbake.rect13030-83-9",
+      "model": "step",
+      "type": "crate",
+      "position": [
+        26.931008,
+        2,
+        19.14828
+      ],
+      "yaw": 0,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-2-cbake.rect13030-1-1-1",
+      "model": "step",
+      "type": "crate",
+      "position": [
+        26.531008,
+        2.25,
+        19.14828
+      ],
+      "yaw": 0,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-2-cbake.rect13030-8-8-2",
+      "model": "step",
+      "type": "crate",
+      "position": [
+        26.131009,
+        2.5,
+        19.14828
+      ],
+      "yaw": 0,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-2-cbake.rect13030-5-9-7",
+      "model": "step",
+      "type": "crate",
+      "position": [
+        25.731008,
+        2.5,
+        19.14828
+      ],
+      "yaw": 0,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-2-cbake.rect13030-5-9-9-0",
+      "model": "step",
+      "type": "crate",
+      "position": [
+        25.331008,
+        2.5,
+        19.14828
+      ],
+      "yaw": 0,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-2-cbake.rect13030-5-9-0-9",
+      "model": "step",
+      "type": "crate",
+      "position": [
+        24.931007,
+        2.5,
+        19.14828
+      ],
+      "yaw": 0,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-2-cbake.rect13030-5-9-2-3",
+      "model": "step",
+      "type": "crate",
+      "position": [
+        24.531007,
+        2.5,
+        19.14828
+      ],
+      "yaw": 0,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-2-cbake.rect13030-5-9-8-6",
+      "model": "step",
+      "type": "crate",
+      "position": [
+        24.131007,
+        2.5,
+        19.14828
+      ],
+      "yaw": 0,
+      "scale": 1
+    },
+    {
       "id": "brutalist-building-2-cbake.rect21094-3-6.cover-crate-2-1",
       "model": "ammo-box",
       "type": "ammo",
@@ -1167,6 +1359,198 @@
       "scale": 1
     },
     {
+      "id": "brutalist-building-2-cbake-1.rect13030-3",
+      "model": "step",
+      "type": "crate",
+      "position": [
+        14.663357,
+        0,
+        38.584375
+      ],
+      "yaw": 270,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-2-cbake-1.rect13030-1-6",
+      "model": "step",
+      "type": "crate",
+      "position": [
+        14.663357,
+        0.25,
+        38.184375
+      ],
+      "yaw": 270,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-2-cbake-1.rect13030-8-7",
+      "model": "step",
+      "type": "crate",
+      "position": [
+        14.663357,
+        0.5,
+        37.784377
+      ],
+      "yaw": 270,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-2-cbake-1.rect13030-5-5",
+      "model": "step",
+      "type": "crate",
+      "position": [
+        14.663357,
+        0.75,
+        37.384379
+      ],
+      "yaw": 270,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-2-cbake-1.rect13030-7-3",
+      "model": "step",
+      "type": "crate",
+      "position": [
+        14.663357,
+        1,
+        36.98438
+      ],
+      "yaw": 270,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-2-cbake-1.rect13030-1-5-5",
+      "model": "step",
+      "type": "crate",
+      "position": [
+        14.663357,
+        1.25,
+        36.584381
+      ],
+      "yaw": 270,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-2-cbake-1.rect13030-8-3-6",
+      "model": "step",
+      "type": "crate",
+      "position": [
+        14.663357,
+        1.5,
+        36.184381
+      ],
+      "yaw": 270,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-2-cbake-1.rect13030-5-8-2",
+      "model": "step",
+      "type": "crate",
+      "position": [
+        14.663357,
+        1.75,
+        35.784381
+      ],
+      "yaw": 270,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-2-cbake-1.rect13030-83-9",
+      "model": "step",
+      "type": "crate",
+      "position": [
+        14.663357,
+        2,
+        35.384382
+      ],
+      "yaw": 270,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-2-cbake-1.rect13030-1-1-1",
+      "model": "step",
+      "type": "crate",
+      "position": [
+        14.663357,
+        2.25,
+        34.984382
+      ],
+      "yaw": 270,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-2-cbake-1.rect13030-8-8-2",
+      "model": "step",
+      "type": "crate",
+      "position": [
+        14.663357,
+        2.5,
+        34.584383
+      ],
+      "yaw": 270,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-2-cbake-1.rect13030-5-9-7",
+      "model": "step",
+      "type": "crate",
+      "position": [
+        14.663357,
+        2.5,
+        34.184382
+      ],
+      "yaw": 270,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-2-cbake-1.rect13030-5-9-9-0",
+      "model": "step",
+      "type": "crate",
+      "position": [
+        14.663357,
+        2.5,
+        33.784382
+      ],
+      "yaw": 270,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-2-cbake-1.rect13030-5-9-0-9",
+      "model": "step",
+      "type": "crate",
+      "position": [
+        14.663357,
+        2.5,
+        33.384381
+      ],
+      "yaw": 270,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-2-cbake-1.rect13030-5-9-2-3",
+      "model": "step",
+      "type": "crate",
+      "position": [
+        14.663357,
+        2.5,
+        32.984381
+      ],
+      "yaw": 270,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-2-cbake-1.rect13030-5-9-8-6",
+      "model": "step",
+      "type": "crate",
+      "position": [
+        14.663357,
+        2.5,
+        32.584381
+      ],
+      "yaw": 270,
+      "scale": 1
+    },
+    {
       "id": "brutalist-building-2-cbake-1.rect21094-3-6.cover-crate-2-1",
       "model": "ammo-box",
       "type": "ammo",
@@ -1500,6 +1884,198 @@
         16.11655
       ],
       "yaw": 0,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-2-cbake-3.rect13030-3",
+      "model": "step",
+      "type": "crate",
+      "position": [
+        -26.378406,
+        0,
+        -15.04513
+      ],
+      "yaw": 180,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-2-cbake-3.rect13030-1-6",
+      "model": "step",
+      "type": "crate",
+      "position": [
+        -25.978406,
+        0.25,
+        -15.04513
+      ],
+      "yaw": 180,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-2-cbake-3.rect13030-8-7",
+      "model": "step",
+      "type": "crate",
+      "position": [
+        -25.578408,
+        0.5,
+        -15.04513
+      ],
+      "yaw": 180,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-2-cbake-3.rect13030-5-5",
+      "model": "step",
+      "type": "crate",
+      "position": [
+        -25.17841,
+        0.75,
+        -15.04513
+      ],
+      "yaw": 180,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-2-cbake-3.rect13030-7-3",
+      "model": "step",
+      "type": "crate",
+      "position": [
+        -24.778411,
+        1,
+        -15.04513
+      ],
+      "yaw": 180,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-2-cbake-3.rect13030-1-5-5",
+      "model": "step",
+      "type": "crate",
+      "position": [
+        -24.378412,
+        1.25,
+        -15.04513
+      ],
+      "yaw": 180,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-2-cbake-3.rect13030-8-3-6",
+      "model": "step",
+      "type": "crate",
+      "position": [
+        -23.978412,
+        1.5,
+        -15.04513
+      ],
+      "yaw": 180,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-2-cbake-3.rect13030-5-8-2",
+      "model": "step",
+      "type": "crate",
+      "position": [
+        -23.578412,
+        1.75,
+        -15.04513
+      ],
+      "yaw": 180,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-2-cbake-3.rect13030-83-9",
+      "model": "step",
+      "type": "crate",
+      "position": [
+        -23.178413,
+        2,
+        -15.04513
+      ],
+      "yaw": 180,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-2-cbake-3.rect13030-1-1-1",
+      "model": "step",
+      "type": "crate",
+      "position": [
+        -22.778413,
+        2.25,
+        -15.04513
+      ],
+      "yaw": 180,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-2-cbake-3.rect13030-8-8-2",
+      "model": "step",
+      "type": "crate",
+      "position": [
+        -22.378414,
+        2.5,
+        -15.04513
+      ],
+      "yaw": 180,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-2-cbake-3.rect13030-5-9-7",
+      "model": "step",
+      "type": "crate",
+      "position": [
+        -21.978413,
+        2.5,
+        -15.04513
+      ],
+      "yaw": 180,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-2-cbake-3.rect13030-5-9-9-0",
+      "model": "step",
+      "type": "crate",
+      "position": [
+        -21.578413,
+        2.5,
+        -15.04513
+      ],
+      "yaw": 180,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-2-cbake-3.rect13030-5-9-0-9",
+      "model": "step",
+      "type": "crate",
+      "position": [
+        -21.178412,
+        2.5,
+        -15.04513
+      ],
+      "yaw": 180,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-2-cbake-3.rect13030-5-9-2-3",
+      "model": "step",
+      "type": "crate",
+      "position": [
+        -20.778412,
+        2.5,
+        -15.04513
+      ],
+      "yaw": 180,
+      "scale": 1
+    },
+    {
+      "id": "brutalist-building-2-cbake-3.rect13030-5-9-8-6",
+      "model": "step",
+      "type": "crate",
+      "position": [
+        -20.378412,
+        2.5,
+        -15.04513
+      ],
+      "yaw": 180,
       "scale": 1
     },
     {
@@ -3575,6 +4151,230 @@
       ]
     },
     {
+      "id": "brutalist-building-2-cbake.rect13030-3-box",
+      "kind": "aabb",
+      "min": [
+        29.931001,
+        0,
+        18.39828
+      ],
+      "max": [
+        30.331002,
+        0.25,
+        19.89828
+      ]
+    },
+    {
+      "id": "brutalist-building-2-cbake.rect13030-1-6-box",
+      "kind": "aabb",
+      "min": [
+        29.531001,
+        0.25,
+        18.39828
+      ],
+      "max": [
+        29.931001,
+        0.5,
+        19.89828
+      ]
+    },
+    {
+      "id": "brutalist-building-2-cbake.rect13030-8-7-box",
+      "kind": "aabb",
+      "min": [
+        29.131003,
+        0.5,
+        18.39828
+      ],
+      "max": [
+        29.531003,
+        0.75,
+        19.89828
+      ]
+    },
+    {
+      "id": "brutalist-building-2-cbake.rect13030-5-5-box",
+      "kind": "aabb",
+      "min": [
+        28.731005,
+        0.75,
+        18.39828
+      ],
+      "max": [
+        29.131005,
+        1,
+        19.89828
+      ]
+    },
+    {
+      "id": "brutalist-building-2-cbake.rect13030-7-3-box",
+      "kind": "aabb",
+      "min": [
+        28.331006,
+        1,
+        18.39828
+      ],
+      "max": [
+        28.731006,
+        1.25,
+        19.89828
+      ]
+    },
+    {
+      "id": "brutalist-building-2-cbake.rect13030-1-5-5-box",
+      "kind": "aabb",
+      "min": [
+        27.931006,
+        1.25,
+        18.39828
+      ],
+      "max": [
+        28.331007,
+        1.5,
+        19.89828
+      ]
+    },
+    {
+      "id": "brutalist-building-2-cbake.rect13030-8-3-6-box",
+      "kind": "aabb",
+      "min": [
+        27.531006,
+        1.5,
+        18.39828
+      ],
+      "max": [
+        27.931007,
+        1.75,
+        19.89828
+      ]
+    },
+    {
+      "id": "brutalist-building-2-cbake.rect13030-5-8-2-box",
+      "kind": "aabb",
+      "min": [
+        27.131007,
+        1.75,
+        18.39828
+      ],
+      "max": [
+        27.531008,
+        2,
+        19.89828
+      ]
+    },
+    {
+      "id": "brutalist-building-2-cbake.rect13030-83-9-box",
+      "kind": "aabb",
+      "min": [
+        26.731008,
+        2,
+        18.39828
+      ],
+      "max": [
+        27.131008,
+        2.25,
+        19.89828
+      ]
+    },
+    {
+      "id": "brutalist-building-2-cbake.rect13030-1-1-1-box",
+      "kind": "aabb",
+      "min": [
+        26.331008,
+        2.25,
+        18.39828
+      ],
+      "max": [
+        26.731008,
+        2.5,
+        19.89828
+      ]
+    },
+    {
+      "id": "brutalist-building-2-cbake.rect13030-8-8-2-box",
+      "kind": "aabb",
+      "min": [
+        25.931008,
+        2.5,
+        18.39828
+      ],
+      "max": [
+        26.331009,
+        2.75,
+        19.89828
+      ]
+    },
+    {
+      "id": "brutalist-building-2-cbake.rect13030-5-9-7-box",
+      "kind": "aabb",
+      "min": [
+        25.531008,
+        2.5,
+        18.39828
+      ],
+      "max": [
+        25.931008,
+        2.75,
+        19.89828
+      ]
+    },
+    {
+      "id": "brutalist-building-2-cbake.rect13030-5-9-9-0-box",
+      "kind": "aabb",
+      "min": [
+        25.131007,
+        2.5,
+        18.39828
+      ],
+      "max": [
+        25.531008,
+        2.75,
+        19.89828
+      ]
+    },
+    {
+      "id": "brutalist-building-2-cbake.rect13030-5-9-0-9-box",
+      "kind": "aabb",
+      "min": [
+        24.731007,
+        2.5,
+        18.39828
+      ],
+      "max": [
+        25.131007,
+        2.75,
+        19.89828
+      ]
+    },
+    {
+      "id": "brutalist-building-2-cbake.rect13030-5-9-2-3-box",
+      "kind": "aabb",
+      "min": [
+        24.331007,
+        2.5,
+        18.39828
+      ],
+      "max": [
+        24.731007,
+        2.75,
+        19.89828
+      ]
+    },
+    {
+      "id": "brutalist-building-2-cbake.rect13030-5-9-8-6-box",
+      "kind": "aabb",
+      "min": [
+        23.931006,
+        2.5,
+        18.39828
+      ],
+      "max": [
+        24.331007,
+        2.75,
+        19.89828
+      ]
+    },
+    {
       "id": "brutalist-building-2-cbake.rect21094-3-6.cover-crate-2-1-box",
       "kind": "aabb",
       "min": [
@@ -3967,6 +4767,230 @@
       ]
     },
     {
+      "id": "brutalist-building-2-cbake-1.rect13030-3-box",
+      "kind": "aabb",
+      "min": [
+        13.913357,
+        0,
+        38.384375
+      ],
+      "max": [
+        15.413357,
+        0.25,
+        38.784376
+      ]
+    },
+    {
+      "id": "brutalist-building-2-cbake-1.rect13030-1-6-box",
+      "kind": "aabb",
+      "min": [
+        13.913357,
+        0.25,
+        37.984375
+      ],
+      "max": [
+        15.413357,
+        0.5,
+        38.384375
+      ]
+    },
+    {
+      "id": "brutalist-building-2-cbake-1.rect13030-8-7-box",
+      "kind": "aabb",
+      "min": [
+        13.913357,
+        0.5,
+        37.584377
+      ],
+      "max": [
+        15.413357,
+        0.75,
+        37.984377
+      ]
+    },
+    {
+      "id": "brutalist-building-2-cbake-1.rect13030-5-5-box",
+      "kind": "aabb",
+      "min": [
+        13.913357,
+        0.75,
+        37.184379
+      ],
+      "max": [
+        15.413357,
+        1,
+        37.584379
+      ]
+    },
+    {
+      "id": "brutalist-building-2-cbake-1.rect13030-7-3-box",
+      "kind": "aabb",
+      "min": [
+        13.913357,
+        1,
+        36.78438
+      ],
+      "max": [
+        15.413357,
+        1.25,
+        37.18438
+      ]
+    },
+    {
+      "id": "brutalist-building-2-cbake-1.rect13030-1-5-5-box",
+      "kind": "aabb",
+      "min": [
+        13.913357,
+        1.25,
+        36.38438
+      ],
+      "max": [
+        15.413357,
+        1.5,
+        36.784381
+      ]
+    },
+    {
+      "id": "brutalist-building-2-cbake-1.rect13030-8-3-6-box",
+      "kind": "aabb",
+      "min": [
+        13.913357,
+        1.5,
+        35.98438
+      ],
+      "max": [
+        15.413357,
+        1.75,
+        36.384381
+      ]
+    },
+    {
+      "id": "brutalist-building-2-cbake-1.rect13030-5-8-2-box",
+      "kind": "aabb",
+      "min": [
+        13.913357,
+        1.75,
+        35.584381
+      ],
+      "max": [
+        15.413357,
+        2,
+        35.984382
+      ]
+    },
+    {
+      "id": "brutalist-building-2-cbake-1.rect13030-83-9-box",
+      "kind": "aabb",
+      "min": [
+        13.913357,
+        2,
+        35.184382
+      ],
+      "max": [
+        15.413357,
+        2.25,
+        35.584382
+      ]
+    },
+    {
+      "id": "brutalist-building-2-cbake-1.rect13030-1-1-1-box",
+      "kind": "aabb",
+      "min": [
+        13.913357,
+        2.25,
+        34.784382
+      ],
+      "max": [
+        15.413357,
+        2.5,
+        35.184382
+      ]
+    },
+    {
+      "id": "brutalist-building-2-cbake-1.rect13030-8-8-2-box",
+      "kind": "aabb",
+      "min": [
+        13.913357,
+        2.5,
+        34.384382
+      ],
+      "max": [
+        15.413357,
+        2.75,
+        34.784383
+      ]
+    },
+    {
+      "id": "brutalist-building-2-cbake-1.rect13030-5-9-7-box",
+      "kind": "aabb",
+      "min": [
+        13.913357,
+        2.5,
+        33.984382
+      ],
+      "max": [
+        15.413357,
+        2.75,
+        34.384382
+      ]
+    },
+    {
+      "id": "brutalist-building-2-cbake-1.rect13030-5-9-9-0-box",
+      "kind": "aabb",
+      "min": [
+        13.913357,
+        2.5,
+        33.584381
+      ],
+      "max": [
+        15.413357,
+        2.75,
+        33.984382
+      ]
+    },
+    {
+      "id": "brutalist-building-2-cbake-1.rect13030-5-9-0-9-box",
+      "kind": "aabb",
+      "min": [
+        13.913357,
+        2.5,
+        33.184381
+      ],
+      "max": [
+        15.413357,
+        2.75,
+        33.584381
+      ]
+    },
+    {
+      "id": "brutalist-building-2-cbake-1.rect13030-5-9-2-3-box",
+      "kind": "aabb",
+      "min": [
+        13.913357,
+        2.5,
+        32.784381
+      ],
+      "max": [
+        15.413357,
+        2.75,
+        33.184381
+      ]
+    },
+    {
+      "id": "brutalist-building-2-cbake-1.rect13030-5-9-8-6-box",
+      "kind": "aabb",
+      "min": [
+        13.913357,
+        2.5,
+        32.38438
+      ],
+      "max": [
+        15.413357,
+        2.75,
+        32.784381
+      ]
+    },
+    {
       "id": "brutalist-building-2-cbake-1.rect21094-3-6.cover-crate-2-1-box",
       "kind": "aabb",
       "min": [
@@ -4356,6 +5380,230 @@
         -26.69463,
         2.75,
         16.86655
+      ]
+    },
+    {
+      "id": "brutalist-building-2-cbake-3.rect13030-3-box",
+      "kind": "aabb",
+      "min": [
+        -26.578407,
+        0,
+        -15.79513
+      ],
+      "max": [
+        -26.178406,
+        0.25,
+        -14.29513
+      ]
+    },
+    {
+      "id": "brutalist-building-2-cbake-3.rect13030-1-6-box",
+      "kind": "aabb",
+      "min": [
+        -26.178406,
+        0.25,
+        -15.79513
+      ],
+      "max": [
+        -25.778406,
+        0.5,
+        -14.29513
+      ]
+    },
+    {
+      "id": "brutalist-building-2-cbake-3.rect13030-8-7-box",
+      "kind": "aabb",
+      "min": [
+        -25.778408,
+        0.5,
+        -15.79513
+      ],
+      "max": [
+        -25.378408,
+        0.75,
+        -14.29513
+      ]
+    },
+    {
+      "id": "brutalist-building-2-cbake-3.rect13030-5-5-box",
+      "kind": "aabb",
+      "min": [
+        -25.37841,
+        0.75,
+        -15.79513
+      ],
+      "max": [
+        -24.97841,
+        1,
+        -14.29513
+      ]
+    },
+    {
+      "id": "brutalist-building-2-cbake-3.rect13030-7-3-box",
+      "kind": "aabb",
+      "min": [
+        -24.978411,
+        1,
+        -15.79513
+      ],
+      "max": [
+        -24.578411,
+        1.25,
+        -14.29513
+      ]
+    },
+    {
+      "id": "brutalist-building-2-cbake-3.rect13030-1-5-5-box",
+      "kind": "aabb",
+      "min": [
+        -24.578412,
+        1.25,
+        -15.79513
+      ],
+      "max": [
+        -24.178411,
+        1.5,
+        -14.29513
+      ]
+    },
+    {
+      "id": "brutalist-building-2-cbake-3.rect13030-8-3-6-box",
+      "kind": "aabb",
+      "min": [
+        -24.178412,
+        1.5,
+        -15.79513
+      ],
+      "max": [
+        -23.778411,
+        1.75,
+        -14.29513
+      ]
+    },
+    {
+      "id": "brutalist-building-2-cbake-3.rect13030-5-8-2-box",
+      "kind": "aabb",
+      "min": [
+        -23.778413,
+        1.75,
+        -15.79513
+      ],
+      "max": [
+        -23.378412,
+        2,
+        -14.29513
+      ]
+    },
+    {
+      "id": "brutalist-building-2-cbake-3.rect13030-83-9-box",
+      "kind": "aabb",
+      "min": [
+        -23.378413,
+        2,
+        -15.79513
+      ],
+      "max": [
+        -22.978413,
+        2.25,
+        -14.29513
+      ]
+    },
+    {
+      "id": "brutalist-building-2-cbake-3.rect13030-1-1-1-box",
+      "kind": "aabb",
+      "min": [
+        -22.978413,
+        2.25,
+        -15.79513
+      ],
+      "max": [
+        -22.578413,
+        2.5,
+        -14.29513
+      ]
+    },
+    {
+      "id": "brutalist-building-2-cbake-3.rect13030-8-8-2-box",
+      "kind": "aabb",
+      "min": [
+        -22.578414,
+        2.5,
+        -15.79513
+      ],
+      "max": [
+        -22.178413,
+        2.75,
+        -14.29513
+      ]
+    },
+    {
+      "id": "brutalist-building-2-cbake-3.rect13030-5-9-7-box",
+      "kind": "aabb",
+      "min": [
+        -22.178413,
+        2.5,
+        -15.79513
+      ],
+      "max": [
+        -21.778413,
+        2.75,
+        -14.29513
+      ]
+    },
+    {
+      "id": "brutalist-building-2-cbake-3.rect13030-5-9-9-0-box",
+      "kind": "aabb",
+      "min": [
+        -21.778413,
+        2.5,
+        -15.79513
+      ],
+      "max": [
+        -21.378412,
+        2.75,
+        -14.29513
+      ]
+    },
+    {
+      "id": "brutalist-building-2-cbake-3.rect13030-5-9-0-9-box",
+      "kind": "aabb",
+      "min": [
+        -21.378412,
+        2.5,
+        -15.79513
+      ],
+      "max": [
+        -20.978412,
+        2.75,
+        -14.29513
+      ]
+    },
+    {
+      "id": "brutalist-building-2-cbake-3.rect13030-5-9-2-3-box",
+      "kind": "aabb",
+      "min": [
+        -20.978412,
+        2.5,
+        -15.79513
+      ],
+      "max": [
+        -20.578412,
+        2.75,
+        -14.29513
+      ]
+    },
+    {
+      "id": "brutalist-building-2-cbake-3.rect13030-5-9-8-6-box",
+      "kind": "aabb",
+      "min": [
+        -20.578412,
+        2.5,
+        -15.79513
+      ],
+      "max": [
+        -20.178411,
+        2.75,
+        -14.29513
       ]
     },
     {

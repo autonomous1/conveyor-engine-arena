@@ -66,11 +66,11 @@
      borderopacity="1.0"
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
-     inkscape:zoom="11.988807"
-     inkscape:cx="23.211961"
-     inkscape:cy="56.052283"
+     inkscape:zoom="60.34724"
+     inkscape:cx="22.677928"
+     inkscape:cy="-4.2753471"
      inkscape:document-units="mm"
-     inkscape:current-layer="g2684"
+     inkscape:current-layer="layer6"
      showgrid="false"
      inkscape:window-width="2812"
      inkscape:window-height="1549"
@@ -131,7 +131,7 @@
      inkscape:groupmode="layer"
      id="layer6"
      inkscape:label="stairs-external"
-     style="display:none">
+     style="display:inline">
     <rect
        style="color:#000000;display:inline;overflow:visible;opacity:1;vector-effect:none;fill:#b3bdbe;fill-opacity:1;fill-rule:nonzero;stroke:#000000;stroke-width:0.02645833;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
        id="rect13030"
@@ -275,6 +275,154 @@
        y="265.85312"
        inkscape:label="model:step"
        z="2.5" />
+    <g
+       style="display:inline"
+       id="g1511"
+       transform="rotate(180,5.1947025,297.87422)">
+      <rect
+         inkscape:label="model:step"
+         y="297.23364"
+         x="7.2919517"
+         height="1.5"
+         width="0.40000001"
+         id="rect13030-3"
+         style="color:#000000;display:inline;overflow:visible;opacity:1;vector-effect:none;fill:#b3bdbe;fill-opacity:1;fill-rule:nonzero;stroke:#000000;stroke-width:0.02645833;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke" />
+      <rect
+         z="0.25"
+         inkscape:label="model:step"
+         y="297.23364"
+         x="6.8919511"
+         height="1.5"
+         width="0.40000001"
+         id="rect13030-1-6"
+         style="color:#000000;display:inline;overflow:visible;opacity:1;vector-effect:none;fill:#b3bdbe;fill-opacity:1;fill-rule:nonzero;stroke:#000000;stroke-width:0.02645833;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke" />
+      <rect
+         z="0.5"
+         inkscape:label="model:step"
+         y="297.23364"
+         x="6.4919534"
+         height="1.5"
+         width="0.40000001"
+         id="rect13030-8-7"
+         style="color:#000000;display:inline;overflow:visible;opacity:1;vector-effect:none;fill:#b3bdbe;fill-opacity:1;fill-rule:nonzero;stroke:#000000;stroke-width:0.02645833;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke" />
+      <rect
+         z="0.75"
+         inkscape:label="model:step"
+         y="297.23364"
+         x="6.0919552"
+         height="1.5"
+         width="0.40000001"
+         id="rect13030-5-5"
+         style="color:#000000;display:inline;overflow:visible;opacity:1;vector-effect:none;fill:#b3bdbe;fill-opacity:1;fill-rule:nonzero;stroke:#000000;stroke-width:0.02645833;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke" />
+      <rect
+         z="1"
+         inkscape:label="model:step"
+         y="297.23364"
+         x="5.6919565"
+         height="1.5"
+         width="0.40000001"
+         id="rect13030-7-3"
+         style="color:#000000;display:inline;overflow:visible;opacity:1;vector-effect:none;fill:#b3bdbe;fill-opacity:1;fill-rule:nonzero;stroke:#000000;stroke-width:0.02645833;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke" />
+      <rect
+         z="1.25"
+         inkscape:label="model:step"
+         y="297.23364"
+         x="5.2919569"
+         height="1.5"
+         width="0.40000001"
+         id="rect13030-1-5-5"
+         style="color:#000000;display:inline;overflow:visible;opacity:1;vector-effect:none;fill:#b3bdbe;fill-opacity:1;fill-rule:nonzero;stroke:#000000;stroke-width:0.02645833;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke" />
+      <rect
+         z="1.5"
+         inkscape:label="model:step"
+         y="297.23364"
+         x="4.8919568"
+         height="1.5"
+         width="0.40000001"
+         id="rect13030-8-3-6"
+         style="color:#000000;display:inline;overflow:visible;opacity:1;vector-effect:none;fill:#b3bdbe;fill-opacity:1;fill-rule:nonzero;stroke:#000000;stroke-width:0.02645833;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke" />
+      <rect
+         z="1.75"
+         inkscape:label="model:step"
+         y="297.23364"
+         x="4.4919577"
+         height="1.5"
+         width="0.40000001"
+         id="rect13030-5-8-2"
+         style="color:#000000;display:inline;overflow:visible;opacity:1;vector-effect:none;fill:#b3bdbe;fill-opacity:1;fill-rule:nonzero;stroke:#000000;stroke-width:0.02645833;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke" />
+      <rect
+         z="2"
+         inkscape:label="model:step"
+         y="297.23364"
+         x="4.091958"
+         height="1.5"
+         width="0.40000001"
+         id="rect13030-83-9"
+         style="color:#000000;display:inline;overflow:visible;opacity:1;vector-effect:none;fill:#b3bdbe;fill-opacity:1;fill-rule:nonzero;stroke:#000000;stroke-width:0.02645833;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke" />
+      <rect
+         z="2.25"
+         inkscape:label="model:step"
+         y="297.23364"
+         x="3.6919584"
+         height="1.5"
+         width="0.40000001"
+         id="rect13030-1-1-1"
+         style="color:#000000;display:inline;overflow:visible;opacity:1;vector-effect:none;fill:#b3bdbe;fill-opacity:1;fill-rule:nonzero;stroke:#000000;stroke-width:0.02645833;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke" />
+      <rect
+         z="2.5"
+         inkscape:label="model:step"
+         y="297.23364"
+         x="3.2919588"
+         height="1.5"
+         width="0.40000001"
+         id="rect13030-8-8-2"
+         style="color:#000000;display:inline;overflow:visible;opacity:1;vector-effect:none;fill:#b3bdbe;fill-opacity:1;fill-rule:nonzero;stroke:#000000;stroke-width:0.02645833;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke" />
+      <rect
+         z="2.5"
+         inkscape:label="model:step"
+         y="297.23364"
+         x="2.8919585"
+         height="1.5"
+         width="0.40000001"
+         id="rect13030-5-9-7"
+         style="color:#000000;display:inline;overflow:visible;opacity:1;vector-effect:none;fill:#b3bdbe;fill-opacity:1;fill-rule:nonzero;stroke:#000000;stroke-width:0.02645833;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke" />
+      <rect
+         z="2.5"
+         inkscape:label="model:step"
+         y="297.23364"
+         x="2.4919579"
+         height="1.5"
+         width="0.40000001"
+         id="rect13030-5-9-9-0"
+         style="color:#000000;display:inline;overflow:visible;opacity:1;vector-effect:none;fill:#b3bdbe;fill-opacity:1;fill-rule:nonzero;stroke:#000000;stroke-width:0.02645833;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke" />
+      <rect
+         z="2.5"
+         inkscape:label="model:step"
+         y="297.23364"
+         x="2.0919573"
+         height="1.5"
+         width="0.40000001"
+         id="rect13030-5-9-0-9"
+         style="color:#000000;display:inline;overflow:visible;opacity:1;vector-effect:none;fill:#b3bdbe;fill-opacity:1;fill-rule:nonzero;stroke:#000000;stroke-width:0.02645833;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke" />
+      <rect
+         z="2.5"
+         inkscape:label="model:step"
+         y="297.23364"
+         x="1.6919572"
+         height="1.5"
+         width="0.40000001"
+         id="rect13030-5-9-2-3"
+         style="color:#000000;display:inline;overflow:visible;opacity:1;vector-effect:none;fill:#b3bdbe;fill-opacity:1;fill-rule:nonzero;stroke:#000000;stroke-width:0.02645833;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke" />
+      <rect
+         z="2.5"
+         inkscape:label="model:step"
+         y="297.23364"
+         x="1.2919569"
+         height="1.5"
+         width="0.40000001"
+         id="rect13030-5-9-8-6"
+         style="color:#000000;display:inline;overflow:visible;opacity:1;vector-effect:none;fill:#b3bdbe;fill-opacity:1;fill-rule:nonzero;stroke:#000000;stroke-width:0.02645833;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke" />
+    </g>
   </g>
   <g
      style="display:inline"
