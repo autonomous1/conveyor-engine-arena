@@ -66,11 +66,11 @@
      borderopacity="1.0"
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
-     inkscape:zoom="11.98869"
-     inkscape:cx="24.307236"
-     inkscape:cy="56.040338"
+     inkscape:zoom="11.988807"
+     inkscape:cx="23.211961"
+     inkscape:cy="56.052283"
      inkscape:document-units="mm"
-     inkscape:current-layer="layer4"
+     inkscape:current-layer="g2684"
      showgrid="false"
      inkscape:window-width="2812"
      inkscape:window-height="1549"
@@ -93,7 +93,8 @@
      inkscape:groupmode="layer"
      id="layer3"
      inkscape:label="ignore"
-     style="display:none">
+     style="display:inline"
+     sodipodi:insensitive="true">
     <rect
        style="color:#000000;overflow:visible;opacity:1;vector-effect:none;fill:#65e993;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:0.02681858;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
        id="room-b-1-3"
@@ -102,19 +103,6 @@
        x="0.11329181"
        y="267.42572"
        inkscape:label="model:room-b" />
-    <g
-       id="brutalist-building-2-cbake-group"
-       data-model="brutalist-building-2-cbake"
-       inkscape:label="model:brutalist-building-2-cbake"
-       style="display:inline;opacity:1;vector-effect:none;fill:none;fill-opacity:1;stroke:#0000ff;stroke-width:0.00088194;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
-       transform="matrix(0,30.000063,-29.999998,0,6.0132287,282.1695)"
-       z="2.75">
-      <path
-         d="M -0.493908,0.2 H 0.493908 V -0.133367 H 0.3 V 0.05 h -0.602903 v -0.279713 h -0.191005 z"
-         id="path2-4"
-         style="vector-effect:none;fill:none;fill-opacity:1;fill-rule:evenodd;stroke:#0000ff;stroke-width:0.00088194;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
-         inkscape:connector-curvature="0" />
-    </g>
     <rect
        style="color:#000000;display:inline;overflow:visible;opacity:1;vector-effect:none;fill:none;fill-opacity:1;fill-rule:nonzero;stroke:#000000;stroke-width:0.02562737;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
        id="room-a-1-5-8-8"
@@ -124,6 +112,20 @@
        y="291.24127"
        inkscape:label="model:room-a"
        z="0.1" />
+    <g
+       id="brutalist-building-2-cbake-group-6"
+       data-model="brutalist-building-2-cbake"
+       inkscape:label="model:brutalist-building-2-cbake"
+       style="display:inline;opacity:1;vector-effect:none;fill:none;fill-opacity:1;stroke:#0000ff;stroke-width:0.0019491;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
+       transform="matrix(0,30.000062,-29.999998,0,6.0293232,282.15348)"
+       z="0">
+      <path
+         d="m -0.30290424,-0.24972573 h -0.19101292 v 0.44972205 h 0.19101292 z m 0.36557585,0.44934558 2e-8,-0.16638501 -0.17484402,1.224e-5 -5.95e-6,0.16647999 z m 0.23377778,-2.0919e-4 0.19745912,5.8933e-4 -1.484e-5,-0.35335905 H 0.29644939 Z"
+         id="path2-4-0"
+         style="vector-effect:none;fill:none;fill-opacity:1;fill-rule:evenodd;stroke:#0000ff;stroke-width:0.0019491;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
+         inkscape:connector-curvature="0"
+         sodipodi:nodetypes="ccccccccccccccc" />
+    </g>
   </g>
   <g
      inkscape:groupmode="layer"
@@ -275,28 +277,14 @@
        z="2.5" />
   </g>
   <g
-     style="display:none"
+     style="display:inline"
      inkscape:label="floor-1"
      id="g2684"
      inkscape:groupmode="layer">
-    <g
-       id="brutalist-building-2-cbake-group-6"
-       data-model="brutalist-building-2-cbake"
-       inkscape:label="model:brutalist-building-2-cbake"
-       style="display:inline;opacity:1;vector-effect:none;fill:none;fill-opacity:1;stroke:#0000ff;stroke-width:0.00088194;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
-       transform="matrix(0,30.000062,-29.999998,0,6.0132286,282.1695)"
-       z="0">
-      <path
-         d="m -0.30290424,-0.22971052 h -0.19101292 v 0.42970684 h 0.19101292 z m 0.36557585,0.42933037 2e-8,-0.14970912 -0.17484402,1.224e-5 -5.95e-6,0.1498041 z m 0.23712482,-2.0919e-4 0.19411208,5.8933e-4 -1.484e-5,-0.33336839 H 0.29979643 Z"
-         id="path2-4-0"
-         style="vector-effect:none;fill:none;fill-opacity:1;fill-rule:evenodd;stroke:#0000ff;stroke-width:0.00088194;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
-         inkscape:connector-curvature="0"
-         sodipodi:nodetypes="ccccccccccccccc" />
-    </g>
     <rect
        inkscape:label="model:room-b"
-       y="267.35196"
-       x="0.0133394"
+       y="267.452"
+       x="0.113"
        height="5.5619998"
        width="6"
        id="rect21094-3-6"
@@ -304,8 +292,8 @@
     <rect
        z="0.1"
        inkscape:label="model:room-a"
-       y="291.16342"
-       x="0.030909199"
+       y="291.19107"
+       x="0.113"
        height="5.6959162"
        width="9.7888937"
        id="room-a-1-5-8-6-2"
@@ -341,13 +329,22 @@
        width="1.8068024"
        id="stairs-s2-6-8"
        style="color:#000000;display:inline;overflow:visible;opacity:1;vector-effect:none;fill:#fb9e50;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:0.02604873;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke" />
+    <g
+       id="brutalist-building-2-cbake-group"
+       data-model="brutalist-building-2-cbake"
+       transform="matrix(0,30.000063,-29.999998,0,6.6922187,282.1695)">
+      <path
+         id="path2-4"
+         d="m -0.493908,0.222633 h 0.987816 v -0.356 h -0.2 v 0.190734 h -0.596811 v -0.28708 h -0.191005 z"
+         style="fill:none;stroke:#0000ff;stroke-width:0.00088194"
+         inkscape:connector-curvature="0" />
+    </g>
   </g>
   <g
      inkscape:groupmode="layer"
      id="g3569"
      inkscape:label="floor-2"
-     style="display:none"
-     sodipodi:insensitive="true">
+     style="display:none">
     <rect
        style="color:#000000;display:inline;overflow:visible;opacity:1;vector-effect:none;fill:#65e993;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:0.02669493;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
        id="rect3557"
@@ -366,31 +363,31 @@
        inkscape:label="model:room-a"
        z="0.1" />
     <rect
-       style="color:#000000;display:inline;overflow:visible;opacity:1;vector-effect:none;fill:#fbda50;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:0.02376197;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
+       style="color:#000000;display:inline;overflow:visible;opacity:1;vector-effect:none;fill:#fbda50;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:0.02703327;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
        id="rect3561"
-       width="3"
-       height="1.2766831"
-       x="1.4738872"
+       width="3.5999999"
+       height="1.377"
+       x="0.8738873"
        y="282.64499"
        inkscape:label="landing:l2.1"
        data-elevation="4.5" />
     <rect
        data-top="4.5"
-       style="color:#000000;display:inline;overflow:visible;opacity:1;vector-effect:none;fill:#fb9e50;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:0.02373432;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
+       style="color:#000000;display:inline;overflow:visible;opacity:1;vector-effect:none;fill:#fb9e50;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:0.02599964;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
        id="rect3563"
-       width="1.5"
+       width="1.8"
        height="2.5040584"
-       x="1.4738872"
+       x="0.87388706"
        y="280.14093"
        inkscape:label="stairs:s2.1"
        data-up="+y"
        data-bottom="3" />
     <rect
-       style="color:#000000;display:inline;overflow:visible;opacity:1;vector-effect:none;fill:#fb9e50;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:0.02373432;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
+       style="color:#000000;display:inline;overflow:visible;opacity:1;vector-effect:none;fill:#fb9e50;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:0.02599964;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
        id="rect3565"
-       width="1.5"
+       width="1.8"
        height="2.5040584"
-       x="2.9738872"
+       x="2.673887"
        y="280.14093"
        inkscape:label="stairs:s2.2"
        data-up="-y"
@@ -404,7 +401,7 @@
        transform="matrix(0,30.000062,-29.999998,0,5.9712088,282.17279)"
        z="3">
       <path
-         d="m -0.30290424,-0.22971052 h -0.19101292 v 0.42970684 h 0.19101292 z m 0.23517556,0.42933037 2e-8,-0.14970912 -0.04444373,1.224e-5 -5.95e-6,0.1498041 z m 0.36752511,-2.0919e-4 0.19411208,5.8933e-4 -1.484e-5,-0.33336839 H 0.29979643 Z"
+         d="m -0.30290424,-0.25305972 h -0.19101292 v 0.45305604 h 0.19101292 z m 0.23517556,0.44934642 2e-8,-0.16305252 -0.04444373,1.224e-5 -5.95e-6,0.1631475 z m 0.36420173,0.003124 0.19743546,5.8933e-4 -1.484e-5,-0.35335975 H 0.29647305 Z"
          id="path2-4-0-2"
          style="vector-effect:none;fill:none;fill-opacity:1;fill-rule:evenodd;stroke:#0000ff;stroke-width:0.00088194;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
          inkscape:connector-curvature="0"
@@ -415,18 +412,7 @@
      inkscape:groupmode="layer"
      id="layer4"
      inkscape:label="floor-3"
-     style="display:inline">
-    <g
-       id="g5067"
-       inkscape:label="model:brutalist-building-2-cbake"
-       z="6">
-      <path
-         inkscape:connector-curvature="0"
-         id="path2-9"
-         transform="scale(0.26458333)"
-         d="m 0.05078125,1010.4648 v 112.004 H 37.849609 v -21.9864 H 17.058594 v -27.5097 H 5.5703125 v -14.1719 H 17.058594 v -26.6778 h 31.714844 v -21.6582 z"
-         style="vector-effect:none;fill:none;fill-opacity:1;fill-rule:evenodd;stroke:#0000ff;stroke-width:0.09999949;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke" />
-    </g>
+     style="display:none">
     <rect
        style="color:#000000;display:inline;overflow:visible;opacity:1;vector-effect:none;fill:#65e993;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:0.02669493;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
        id="rect3557-2"
@@ -446,18 +432,35 @@
        inkscape:label="model:room-a"
        z="0.1"
        transform="scale(-1)" />
+    <g
+       id="g4068"
+       inkscape:label="model:brutalist-building-2-cbake"
+       z="6">
+      <path
+         id="b2-exact-outline-6"
+         transform="scale(0.26458333)"
+         d="m 0.11328125,1010.4023 v 112.0039 H 40.478516 v -22.6777 H 18.851562 v -26.0039 H 3.5136719 v -14.7734 H 18.851562 v -26.8926 h 32.550782 v -21.6563 z"
+         style="fill:none;stroke:#ff00ff;stroke-width:0.22677165;stroke-miterlimit:4;stroke-dasharray:none"
+         inkscape:connector-curvature="0" />
+    </g>
   </g>
   <g
      inkscape:groupmode="layer"
      id="layer1"
      inkscape:label="floor-3-texture"
      style="display:none">
-    <path
-       inkscape:connector-curvature="0"
-       style="display:inline;vector-effect:none;fill:url(#pattern1471-3);fill-opacity:1;fill-rule:evenodd;stroke:url(#pattern1471-3);stroke-width:0.0264582;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
-       d="m 0.01343587,267.35214 v 29.63439 H 10.014376 V 291.1693 H 4.5134196 v -7.27861 H 1.4738119 v -3.74965 h 3.0396077 v -7.0585 h 8.3912194 v -5.7304 z"
-       id="path2-9-8"
-       inkscape:label="floor-texture" />
+    <g
+       style="display:inline;fill:url(#pattern1471-3);fill-opacity:1;stroke:none"
+       id="g4068-7"
+       inkscape:label="model:brutalist-building-2-cbake"
+       z="6">
+      <path
+         id="b2-exact-outline-6-5"
+         transform="scale(0.26458333)"
+         d="m 0.11328125,1010.4023 v 112.0039 H 40.478516 v -22.6777 H 18.851562 v -26.0039 H 3.5136719 v -14.7734 H 18.851562 v -26.8926 h 32.550782 v -21.6563 z"
+         style="fill:url(#pattern1471-3);fill-opacity:1;stroke:none;stroke-width:0.22677188"
+         inkscape:connector-curvature="0" />
+    </g>
   </g>
   <g
      inkscape:groupmode="layer"
