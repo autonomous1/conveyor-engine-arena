@@ -23,6 +23,7 @@
     "test": "node --test test/*.test.ts",
     "codemap:check": "node scripts/codemap.ts --check",
     "start": "node dist/server/main.js",
+    "token": "node dist/server/auth/token-cli.js",
     "dev": "npm run build && npm run start",
     "codemap": "node scripts/codemap.ts",
     "start:arena": "node dist/run.js arena",
@@ -48,6 +49,7 @@
     "conveyor-engine-three": "^0.1.1",
     "conveyor-engine-transport-ws": "^0.1.1",
     "conveyor-engine-world": "^0.1.1",
+    "jose": "^6.2.15",
     "three": "~0.186.0",
     "three-gamepad-controls": "^0.24.0",
     "ws": "^8.18.0"

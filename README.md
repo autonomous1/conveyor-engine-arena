@@ -116,6 +116,7 @@ Each asset keeps its own license id and provenance origin.
 | `npm run build` | Clean `dist/`, compile the server with `tsc`, bundle the client with esbuild |
 | `npm run typecheck` | Typecheck server, client, and util without emitting |
 | `npm test` | Node’s test runner. Requires a prior `npm run build` |
+| `npm run token` | Keygen, mint, list, and revoke Ed25519 access tokens |
 | `npm run bake:scene` | Run `scripts/bake.sh` (blueprint-scene → `web/game` + cut models) |
 | `npm run bake:map` | Top-down PNG of the arena into `web/assets/map-bake.png` |
 | `npm run start:arena` | Headless arena for 8 ticks (`npm run start:arena-wall` runs 40) |
@@ -127,6 +128,44 @@ Each asset keeps its own license id and provenance origin.
 | `npm run record:arena` | Record a wander trace |
 
 `node scripts/make-placeholders.mjs` writes original procedural stand-ins under `web/assets` when needed. The game file is what the server loads; point an asset `uri` at a new file for it to appear in the scene.
+
+## Auth
+
+Access tokens are Ed25519-signed JWTs (`jose`, algorithm `EdDSA`). They are signed, not encrypted. The claims are `sub`, `role`, `scope`, `jti`, `iat`, and `exp`. Issuer and audience are both `ce-arena`. Verification allows 30 seconds of clock skew. A `jti` on the revocation list is rejected.
+
+Roles are `player`, `bot`, `qa`, and `admin`. Scopes are `play`, `spectate`, `scene-graph`, `qa`, `teleport`, `chat`, `voice`, and `admin`. Minting starts from the role's default scopes and adds any `--scope` values.
+
+| Role | Default scopes |
+| --- | --- |
+| `player` | `play`, `chat`, `voice` |
+| `bot` | `play`, `chat` |
+| `qa` | `play`, `spectate`, `scene-graph`, `qa` |
+| `admin` | every scope |
+
+The private key stays outside this repo. The default directory is `~/.config/ce-arena/`. Set `ARENA_CONFIG_DIR` to move it. The other paths below default to files in that directory.
+
+| Variable | Default | Use |
+| --- | --- | --- |
+| `ARENA_CONFIG_DIR` | `~/.config/ce-arena` | Base directory. Also holds `issued.jsonl`. |
+| `ARENA_SIGNING_KEY_FILE` | `$ARENA_CONFIG_DIR/ed25519.key.pem` | Private key used to mint. |
+| `ARENA_VERIFY_KEY_FILE` | `$ARENA_CONFIG_DIR/ed25519.pub.pem` | Public key the host uses to verify. |
+| `ARENA_REVOKED_FILE` | `$ARENA_CONFIG_DIR/revoked.json` | JSON array of revoked `jti` values. A missing file revokes nothing. |
+
+`issued.jsonl` records one JSON object per mint: `jti`, `sub`, `role`, `scope`, and `exp`. The token itself is not stored.
+
+Build once, then:
+
+```bash
+npm run token -- keygen --out ~/.config/ce-arena/ed25519
+npm run token -- mint --role bot --sub bot-1 --scope scene-graph,teleport --days 30
+npm run token -- mint --role qa --sub qa-1 --hours 12 --out /tmp/qa.token
+npm run token -- list
+npm run token -- revoke <jti>
+```
+
+`keygen` writes `<out>.key.pem` and `<out>.pub.pem`, both mode `0600`. It refuses a path inside this working tree. `mint` prints the token, or writes that file with mode `0600` when `--out` is set. The default lifetime is 30 days. Pass `--days` or `--hours`, not both. `list` prints each issued record with its expiry and whether that `jti` is revoked.
+
+The WebSocket `hello` path does not check a token yet.
 
 ## Layout
 
