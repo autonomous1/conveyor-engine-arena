@@ -1,0 +1,10 @@
+{
+  "bounds": {
+    "minX": -70.933441,
+    "maxX": 72.644729,
+    "minZ": -45.455960000000005,
+    "maxZ": 47.24244999999999
+  },
+  "px": 2048,
+  "svg": "dev/scenes/arena-1/designs/arena-1.svg"
+}

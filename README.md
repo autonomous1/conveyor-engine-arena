@@ -1,6 +1,6 @@
 # Conveyor Engine Arena
 
-![Arena, eight buildings, door openings](docs/arena-screenshot-10-5-2026.png)
+![Arena, eight buildings, door openings](docs/arena-screenshot-11-4-2026.png)
 
 A browser arena for [Conveyor Engine](https://github.com/autonomous1/conveyor-engine-packages). A Node host owns the simulation and publishes snapshots over a same-origin WebSocket. A Three.js client renders those snapshots: a cityscape bounds, sky, static building placements (often Tripo-derived GLBs), floors and rooms from [blueprint-scene](https://github.com/autonomous1/blueprint-scene) bake output, doors, cover props, and wandering characters.
 

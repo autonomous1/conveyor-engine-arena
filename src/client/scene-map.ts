@@ -9,10 +9,31 @@
 import * as THREE from "three";
 import type { ProfileRing } from "../shared/building-profile.ts";
 import { aimDirection, yawFromQuat } from "../shared/look.ts";
-import { MAP_BAKE_URL, SCENE_MAP_SIZE, mapFrame } from "../shared/map-frame.ts";
+import { MAP_BAKE_META_URL, MAP_BAKE_URL, SCENE_MAP_SIZE, mapFrame } from "../shared/map-frame.ts";
 import { SELF_DOT_R, floorLabel, selfMarker, selfMoved, type FloorSource, type SelfPose } from "./map-marker.ts";
 
 export { MAP_BAKE_URL, SCENE_MAP_SIZE };
+
+/**
+ * World XZ bounds the baked PNG was framed on (`map-bake.json`, written by
+ * bake:map from the SVG bounds layer). Undefined when absent or malformed, so
+ * the caller falls back to the scene bounds.
+ */
+export async function loadMapBakeBounds(url = MAP_BAKE_META_URL): Promise<SceneMapWorld["bounds"] | undefined> {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return undefined;
+    const meta = await res.json() as { bounds?: Record<string, unknown> };
+    const b = meta.bounds;
+    if (!b) return undefined;
+    const { minX, maxX, minZ, maxZ } = b;
+    if (![minX, maxX, minZ, maxZ].every((v) => typeof v === "number" && Number.isFinite(v))) return undefined;
+    if (!((maxX as number) > (minX as number)) || !((maxZ as number) > (minZ as number))) return undefined;
+    return { minX: minX as number, maxX: maxX as number, minZ: minZ as number, maxZ: maxZ as number };
+  } catch {
+    return undefined;
+  }
+}
 export const YAW_MATCH_DEGREES = 5;
 export const YAW_LARGE_DEGREES = 45;
 
@@ -342,7 +363,8 @@ export function createSceneMap(): SceneMap {
   root.style.cssText = [
     "position:fixed", "right:12px", "bottom:12px", "z-index:3",
     `width:${SCENE_MAP_SIZE}px`, `height:${SCENE_MAP_SIZE}px`,
-    "background:#12151ccc", "border:1px solid #3c4454", "border-radius:6px",
+    // Same translucent background as the stats panel (hud.ts).
+    "background:#12151c88", "border:1px solid #3c4454", "border-radius:6px",
     "overflow:hidden", "pointer-events:auto",
   ].join(";");
   const image = document.createElement("img");

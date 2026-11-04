@@ -28,7 +28,7 @@ import { createLaserBeams } from "./laser.js";
 import { connectLive, type LaserNotice } from "./net.js";
 import { createViewModel } from "./viewmodel.js";
 import { createOptionsDialog } from "./options.js";
-import { createSceneMap } from "./scene-map.js";
+import { createSceneMap, loadMapBakeBounds } from "./scene-map.js";
 import { createPawnLayer } from "./presentation.js";
 import { createRateWindow, formatOverlay } from "./rates.js";
 import { formatFireLog, presentShot } from "./shot-view.js";
@@ -69,8 +69,9 @@ const cabState = new Map<string, ElevatorState>();
 const cabPick = new Map<string, number>();
 const elevatorRooms = createElevatorRooms(view, visuals, collisionDebug);
 
+// The baked PNG is framed on the SVG bounds rect; pawns must use the same window.
 sceneMap.setWorld({
-  bounds: view.bounds,
+  bounds: (await loadMapBakeBounds()) ?? view.bounds,
   samples: visuals.mapSamples,
   spawns: view.spawns,
 });

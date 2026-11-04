@@ -32,12 +32,13 @@ try {
   if (!res.ok) throw new Error(`view.json ${res.status}`);
   const view = await res.json() as ArenaView;
   status("scene");
-  const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, premultipliedAlpha: false, preserveDrawingBuffer: true });
   renderer.setPixelRatio(1);
   renderer.setSize(MAP_BAKE_PX, MAP_BAKE_PX, false);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.setClearColor(MAP_BAKE_BACKGROUND);
+  // Alpha 0: the PNG background is transparent so the panel shows through.
+  renderer.setClearColor(MAP_BAKE_BACKGROUND, 0);
   const scene = await buildMapScene(view, renderer);
   const camera = topDownCamera(view.bounds, MAP_BAKE_PX, MAP_BAKE_PX);
   if (!camera) throw new Error("scene bounds are empty");

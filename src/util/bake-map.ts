@@ -8,14 +8,15 @@
 import { build as bundle } from "esbuild";
 import { spawn, type ChildProcess } from "node:child_process";
 import { createReadStream, existsSync } from "node:fs";
-import { mkdir, mkdtemp, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { createServer as createNetServer } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, extname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import type { ArenaView } from "../shared/arena-view.ts";
-import { MAP_BAKE_PATH, MAP_BAKE_PX } from "../shared/map-frame.ts";
+import { MAP_BAKE_META_PATH, MAP_BAKE_PATH, MAP_BAKE_PX, MAP_DESIGN_SVG } from "../shared/map-frame.ts";
+import { svgMapBounds } from "../shared/svg-bounds.ts";
 
 const PNG_LIMIT = 32 * 1024 * 1024;
 const BAKE_MS = 300_000;
@@ -36,6 +37,13 @@ const TYPES: Record<string, string> = {
 const root = repoRoot();
 
 const view = await loadView(root);
+// Map extents come from the bounds rect in the design SVG, not the scene AABB.
+// `--svg <file>` overrides the default design.
+const svgArg = process.argv.indexOf("--svg");
+const svgPath = resolve(root, svgArg >= 0 && process.argv[svgArg + 1] ? process.argv[svgArg + 1]! : MAP_DESIGN_SVG);
+const mapBounds = svgMapBounds(await readFile(svgPath, "utf8"));
+view.bounds = { ...view.bounds, ...mapBounds };
+console.log(`map bounds from ${relative(root, svgPath)}: x ${mapBounds.minX}..${mapBounds.maxX}, z ${mapBounds.minZ}..${mapBounds.maxZ}`);
 const pageJs = await bundlePage();
 const png = await renderInChrome(view, pageJs);
 if (png.length < 8 || png[0] !== 0x89 || png.toString("ascii", 1, 4) !== "PNG") {
@@ -44,8 +52,13 @@ if (png.length < 8 || png[0] !== 0x89 || png.toString("ascii", 1, 4) !== "PNG") 
 const out = join(root, MAP_BAKE_PATH);
 await mkdir(dirname(out), { recursive: true });
 await writeFile(out, png);
+const meta = JSON.stringify({ bounds: mapBounds, px: MAP_BAKE_PX, svg: relative(root, svgPath) }, null, 2) + "\n";
+await writeFile(join(root, MAP_BAKE_META_PATH), meta);
 const served = join(root, "dist/web/assets");
-if (existsSync(served)) await writeFile(join(served, "map-bake.png"), png);
+if (existsSync(served)) {
+  await writeFile(join(served, "map-bake.png"), png);
+  await writeFile(join(served, "map-bake.json"), meta);
+}
 console.log(`wrote ${MAP_BAKE_PATH} (${png.length} bytes, ${MAP_BAKE_PX}px)`);
 
 function repoRoot(): string {
@@ -152,7 +165,7 @@ function listen(
   posted: Deferred<Buffer>,
 ): Promise<{ http: Server; port: number }> {
   const viewJson = JSON.stringify(arena);
-  const html = `<!doctype html><meta charset="utf-8"><style>html,body{margin:0;background:#000}</style><script type="module" src="/bake.js"></script>`;
+  const html = `<!doctype html><meta charset="utf-8"><style>html,body{margin:0;background:transparent}</style><script type="module" src="/bake.js"></script>`;
   const web = resolve(root, "web");
   const http = createServer((req, res) => {
     void handle(req, res, web, html, script, viewJson, posted).catch((err) => {
