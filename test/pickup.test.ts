@@ -438,11 +438,11 @@ test("a full pawn still clears the next crate, and a building box stays", () => 
 
 test("pickup code does not enqueue a world entity", () => {
   const root = rootDir();
-  for (const rel of ["src/server/main.ts", "src/server/pickups.ts", "src/shared/pickups.ts"]) {
+  for (const rel of ["src/server/main.ts", "src/server/arena-host.ts", "src/server/pickups.ts", "src/shared/pickups.ts"]) {
     const text = readFileSync(path.join(root, rel), "utf8");
     assert.equal(/\bworldEnqueue\b|\.enqueue\(/.test(text), false, rel);
   }
-  const main = readFileSync(path.join(root, "src/server/main.ts"), "utf8");
+  const main = readFileSync(path.join(root, "src/server/arena-host.ts"), "utf8");
   assert.match(main, /JSON\.stringify\(\{ \.\.\.loaded\.view, propClips \}\)/);
   assert.match(main, /startPropAnimation\(loaded\.view\.props\)/);
 });

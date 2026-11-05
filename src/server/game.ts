@@ -224,7 +224,8 @@ export function startWanderLoop(
       })}`);
     }
   }, TICK_MS);
-  timer.unref();
+  const handle = timer as { unref?: () => void };
+  handle.unref?.();
   return () => {
     open = false;
     snaps.close();

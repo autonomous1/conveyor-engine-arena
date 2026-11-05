@@ -1,0 +1,628 @@
+import { EngineClient } from "conveyor-engine-client";
+import * as THREE from "three";
+import type { ArenaElevator, ArenaView } from "../shared/arena-view.js";
+import { aimDirection, eyeLook, INPUT_HZ, moveIntent, yawFromQuat } from "../shared/look.js";
+import {
+  elevatorPolygonBounds,
+  inCab,
+  landingAt,
+  stepStop,
+  stopForKey,
+  type ElevatorRuntime,
+  type ElevatorState,
+} from "../shared/elevators.js";
+import { encodeMoveButtons } from "../shared/movements.js";
+import { dropPickupAabb } from "../shared/pickups.js";
+import { clientFaultText, createFireDebugLog } from "../shared/fire-debug.js";
+import { doorLeafBox, pickDoorForUse } from "../shared/doors.js";
+import { advanceGrenadeClock, type GrenadePose } from "../shared/grenade.js";
+import { advanceFireClock, LASER_MS, traceHitscan, type TraceCapsule } from "../shared/hitscan.js";
+import { createAabbDebug } from "./aabb-debug.js";
+import { applyDoorSwing, attachKtx2Loader, createArenaScene, loadArenaVisuals, tickDoorSwing } from "./arena-scene.js";
+import { createElevatorRooms } from "./elevator-room.js";
+import { createGrenadeProps } from "./grenade.js";
+import { createHitMarker } from "./hit-marker.js";
+import { createHud, localHealthLabel } from "./hud.js";
+import { attachPlayInput } from "./input.js";
+import { createLaserBeams } from "./laser.js";
+import { assetBase } from "../shared/asset-base.js";
+import { connectLive, type LaserNotice, type OpenSocket } from "./net.js";
+import { createViewModel } from "./viewmodel.js";
+import { createOptionsDialog } from "./options.js";
+import { createSceneMap, loadMapBakeBounds } from "./scene-map.js";
+import { createPawnLayer } from "./presentation.js";
+import { createRateWindow, formatOverlay } from "./rates.js";
+import { formatFireLog, presentShot } from "./shot-view.js";
+
+export async function boot(view: ArenaView, open: () => OpenSocket, opts?: { auth?: boolean }): Promise<void> {
+  const hud = createHud();
+  const hitMarker = createHitMarker();
+  hud.setStatus("loading arena");
+  const arena = createArenaScene(view.shadows?.quality ?? "off");
+  const collisionDebug = createAabbDebug(view.aabbs);
+  arena.scene.add(collisionDebug.group);
+  const CAB_BOX_H = 0.1;
+  const cabDebug = createCabMeshes(view.elevators ?? [], arena.scene);
+  const sceneMap = createSceneMap();
+  let pushModel: (id: string) => void = () => {};
+  const options = createOptionsDialog(
+    (on) => {
+      collisionDebug.setVisible(on);
+      cabDebug.group.visible = on;
+    },
+    undefined,
+    (on) => sceneMap.setVisible(on),
+    {
+      noclipAllowed: view.noclip === true,
+      modelChoices: view.modelChoices ?? [],
+      onModel: (id) => pushModel(id),
+    },
+  );
+  const fireDebug = createFireDebugLog(() => options.fireDebug);
+  const visuals = await loadArenaVisuals(view, arena);
+  /** Open state per door, from the file then from host frames. A shut leaf stops the predicted beam like the host shot. */
+  const doorOpen = new Map((view.doors ?? []).map((door) => [door.id, door.open === true && door.locked !== true]));
+  const cabState = new Map<string, ElevatorState>();
+  const cabPick = new Map<string, number>();
+  const elevatorRooms = createElevatorRooms(view, visuals, collisionDebug);
+
+  // The baked PNG is framed on the SVG bounds rect; pawns must use the same window.
+  sceneMap.setWorld({
+    bounds: (await loadMapBakeBounds()) ?? view.bounds,
+    samples: visuals.mapSamples,
+    spawns: view.spawns,
+  });
+  const pickupIds = new Set((view.pickups ?? []).map((pickup) => pickup.id));
+  for (const id of pickupIds) visuals.placements.setVisible(id, false);
+  const viewmodel = createViewModel(arena.camera, arena.scene, arena.renderer);
+  function dropBox(id: string) {
+    dropPickupAabb(view.aabbs, id);
+    collisionDebug.remove(id);
+  }
+  function showRemaining(ids: readonly string[]) {
+    const left = new Set(ids);
+    for (const id of pickupIds) {
+      const visible = left.has(id);
+      visuals.placements.setVisible(id, visible);
+      if (!visible) dropBox(id);
+    }
+  }
+  function showWeapon(weaponId: string | undefined) {
+    if (!weaponId) {
+      viewmodel.clear();
+      return;
+    }
+    const model = view.pickups?.find((pickup) => pickup.weapon === weaponId)?.model;
+    if (model) void viewmodel.show(weaponId, model);
+  }
+  const pawns = createPawnLayer(arena.content, visuals.templates, view.pawnHeight);
+  const input = attachPlayInput(arena.renderer.domElement, undefined, () => {
+    fireDebug.keydown();
+  }, () => options.invertY);
+  input.onPadMenu((ev) => {
+    if (ev === "toggle") {
+      const opening = !options.open;
+      options.toggleDialog();
+      if (opening) options.resetFocus();
+    } else if (ev === "map") {
+      options.toggleShowSceneMap();
+    } else if (ev === "back") {
+      if (options.open) options.toggleDialog();
+    } else if (ev === "select") {
+      options.activateFocused();
+    } else if (ev === "up") {
+      options.moveFocus(-1);
+    } else if (ev === "down") {
+      options.moveFocus(1);
+    } else if (ev === "left") {
+      options.adjustFocused(-1);
+    } else if (ev === "right") {
+      options.adjustFocused(1);
+    }
+    options.repaint();
+    input.setMenuOpen(options.open);
+  });
+  hud.onProfileToggle(() => input.toggleProfile());
+  hud.setProfile(input.profile);
+  const lasers = createLaserBeams(arena.scene);
+  const grenades = createGrenadeProps(arena.scene, async () => {
+    const url = view.grenade ?? `${assetBase()}assets/models/grenade-launched.glb`;
+    const { GLTFLoader } = await import("three/addons/loaders/GLTFLoader.js");
+    const loader = new GLTFLoader();
+    attachKtx2Loader(loader, arena.renderer);
+    try {
+      const gltf = await loader.loadAsync(url);
+      return gltf.scene;
+    } catch (err) {
+      console.warn("grenade", err);
+      return undefined;
+    }
+  });
+  const client = new EngineClient(1, { delayMs: 80, extraMs: 0, predictOwned: false });
+  let statusText = "connecting";
+  let aimedPawn: number | undefined;
+  let fireSeq = 0;
+  let nextFireAt = 0;
+  let grenadeSeq = 0;
+  let nextGrenadeAt = 0;
+  let useSeq = 0;
+  let pinnedError: string | undefined;
+  let pendingFireLog: { socketClosed: boolean; camBefore: { x: number; y: number; z: number } } | undefined;
+  let awaitFireReply = false;
+  let loggedFireSnap = false;
+  let debugPawn: number | undefined;
+  let debugPawnWatch = false;
+  let sawFiniteCamera = true;
+  const laserQueue: LaserNotice[] = [];
+  const grenadeQueue: GrenadePose[] = [];
+  const pawnVital = new Map<number, { hp: number; dead: boolean }>();
+
+  const link = connectLive({
+    bundleId: view.bundleId,
+    authoritativeHash: view.authoritativeHash,
+    world: view.world,
+    client,
+    fireDebug: () => options.fireDebug,
+    onStatus: (status) => {
+      statusText = status.text;
+      resyncs = status.resyncs;
+    },
+    onApplied: () => { },
+    onLaser: (laser) => {
+      laserQueue.push(laser);
+    },
+    onGrenade: (grenade) => {
+      grenadeQueue.push(grenade);
+    },
+    onHealth: (health) => {
+      pawnVital.set(health.entity, { hp: health.hp, dead: health.dead });
+    },
+    onAudit: (audit) => {
+      options.setAudit(audit);
+    },
+    onPickupSet: (ids) => {
+      showRemaining(ids);
+    },
+    onPickup: (pickup) => {
+      visuals.placements.setVisible(pickup.id, false);
+      dropBox(pickup.id);
+    },
+    onDoor: (door) => swingDoor(door.id, door.open),
+    onDoors: (doors) => {
+      for (const door of doors) swingDoor(door.id, door.open);
+    },
+    onElevator: (row) => applyCab(row),
+    onElevators: (rows) => {
+      for (const row of rows) applyCab(row);
+    },
+    onLoadout: (loadout) => {
+      showWeapon(loadout.weapon);
+    },
+    onInbound(summary) {
+      if (!options.fireDebug || !awaitFireReply) return;
+      const laser = summary.startsWith("laser");
+      const control = summary.startsWith("welcome") || summary.startsWith("reject") || summary.startsWith("error");
+      if (laser || control) {
+        fireDebug.frameReceived(summary);
+        awaitFireReply = false;
+        return;
+      }
+      if (summary.startsWith("snapshot") && !loggedFireSnap) {
+        fireDebug.frameReceived(summary);
+        loggedFireSnap = true;
+      }
+    },
+    onFault(err) {
+      pinnedError = clientFaultText(err);
+      fireDebug.thrown("socket", err);
+      hud.setStatus(`frame error ${pinnedError}`);
+    },
+    model: () => options.modelChoice || undefined,
+    open,
+    auth: opts?.auth,
+  });
+  pushModel = (id) => {
+    link.sendModel(id);
+  };
+
+  let last = performance.now();
+  let sendAcc = 0;
+  let seenSnaps = 0;
+  let resyncs = 0;
+  const rates = createRateWindow(500);
+  const sendDt = 1 / INPUT_HZ;
+  let lastDoorTick = 0;
+
+  function frame(now: number) {
+    let threw = false;
+    try {
+      drawFrame(now);
+    } catch (err) {
+      threw = true;
+      pinnedError = clientFaultText(err);
+      console.error(err);
+      console.error("frame threw", pinnedError);
+      fireDebug.thrown("frame", err);
+      const camera = arena.camera.position;
+      fireDebug.camera({ x: camera.x, y: camera.y, z: camera.z });
+      fireDebug.pawn(client.ownedEntity);
+      fireDebug.socket(link.socketState());
+      hud.setStatus(`frame error ${pinnedError}`);
+      laserQueue.length = 0;
+      lasers.drop();
+      grenadeQueue.length = 0;
+      grenades.drop();
+      try {
+        arena.renderer.render(arena.scene, arena.camera);
+      } catch (renderErr) {
+        console.error(renderErr);
+      }
+    }
+    hitMarker.tick(now);
+    const doorDt = lastDoorTick ? Math.min(0.1, (now - lastDoorTick) / 1000) : 0;
+    lastDoorTick = now;
+    for (const rig of visuals.doors.values()) tickDoorSwing(rig.group, doorDt);
+    if (pendingFireLog) {
+      if (options.fireDebug) {
+        const camera = arena.camera.position;
+        console.log(formatFireLog({
+          socketClosed: pendingFireLog.socketClosed || link.socketClosed(),
+          frameThrew: threw,
+          camBefore: pendingFireLog.camBefore,
+          camAfter: { x: camera.x, y: camera.y, z: camera.z },
+        }));
+      }
+      pendingFireLog = undefined;
+    }
+    if (pinnedError) hud.setStatus(`frame error ${pinnedError}`);
+    requestAnimationFrame(frame);
+  }
+  function drawFrame(now: number) {
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    for (const mixer of visuals.propMixers) mixer.update(dt);
+    let debugShot = false;
+    input.setMenuOpen(options.open);
+    input.update(dt);
+    const sample = input.sample();
+    const render = client.renderSnapshot();
+    const ownedId = client.ownedEntity;
+    const owned = ownedId === undefined ? undefined : render.entities.find((entity) => entity.id === ownedId);
+    if (owned && ownedId !== aimedPawn) {
+      input.setYaw(yawFromQuat(owned.rotation));
+      aimedPawn = ownedId;
+    }
+    if (owned && ownedId !== undefined) {
+      const pawn = { x: owned.position.x, y: owned.position.y, z: owned.position.z };
+      let shotFrom: { x: number; y: number; z: number } | undefined;
+      let shotTo: { x: number; y: number; z: number } | undefined;
+      const clock = advanceFireClock(sample.firing, now, nextFireAt);
+      nextFireAt = clock.nextAt;
+      const thrown = advanceGrenadeClock(sample.grenade, now, nextGrenadeAt);
+      nextGrenadeAt = thrown.nextAt;
+      if (thrown.due) {
+        const seq = grenadeSeq + 1;
+        if (link.sendGrenade(seq, sample.yaw, sample.pitch)) grenadeSeq = seq;
+      }
+      const atDoor = overlapsDoor(pawn);
+      if ((sample.using && !sample.cabConfirm) || (sample.cabConfirm && atDoor)) {
+        const seq = useSeq + 1;
+        if (link.sendUse(seq)) useSeq = seq;
+      }
+      if (sample.cabNav !== 0) {
+        const cab = cabAt(pawn);
+        if (cab) {
+          const current = cabPick.get(cab.def.id) ?? cab.rt.at;
+          cabPick.set(cab.def.id, stepStop(current, sample.cabNav, cab.def.stops.length));
+        }
+      }
+      if (sample.digit) {
+        const call = elevatorCall(pawn, sample.digit);
+        if (call && link.sendElevator(call.id, call.stop) && call.inCab) cabPick.set(call.id, call.stop);
+      }
+      if (sample.cabConfirm && !atDoor) {
+        const cab = cabAt(pawn);
+        if (cab) {
+          const pick = cabPick.get(cab.def.id);
+          if (pick !== undefined) link.sendElevator(cab.def.id, pick);
+        } else {
+          const call = elevatorCall(pawn, { landing: true });
+          if (call) link.sendElevator(call.id, call.stop);
+        }
+      }
+      if (sample.callLanding) {
+        const call = elevatorCall(pawn, { landing: true });
+        if (call) link.sendElevator(call.id, call.stop);
+      }
+      if (clock.due) {
+        pendingFireLog = {
+          socketClosed: link.socketClosed(),
+          camBefore: { x: arena.camera.position.x, y: arena.camera.position.y, z: arena.camera.position.z },
+        };
+        const seq = fireSeq + 1;
+        const sent = link.sendFire(seq, sample.yaw, sample.pitch);
+        hitMarker.note({ kind: "fire", sent }, now);
+        if (sent) {
+          fireSeq = seq;
+          if (options.fireDebug) {
+            fireDebug.frameSent(seq, sample.yaw, sample.pitch);
+            awaitFireReply = true;
+            loggedFireSnap = false;
+            debugShot = true;
+            debugPawnWatch = true;
+            debugPawn = ownedId;
+          }
+          const aim = eyeLook(pawn, sample.yaw, sample.pitch);
+          const predicted = traceHitscan(
+            aim.position,
+            aimDirection(sample.yaw, sample.pitch),
+            [...view.aabbs, ...shutLeafBoxes()],
+            shotCapsules(render.entities, ownedId, view.pawnRadius, view.pawnHeight),
+          );
+          shotFrom = predicted.from;
+          shotTo = predicted.to;
+        } else if (options.fireDebug) {
+          fireDebug.pawn(ownedId);
+          fireDebug.socket(link.socketState());
+        }
+      }
+      presentShot({
+        camera: arena.camera,
+        pawn,
+        yaw: sample.yaw,
+        pitch: sample.pitch,
+        from: shotFrom,
+        to: shotTo,
+        show(from, to) {
+          lasers.show(ownedId, from, to, now + LASER_MS);
+        },
+      });
+      if (debugShot) {
+        const camera = arena.camera.position;
+        fireDebug.camera({ x: camera.x, y: camera.y, z: camera.z });
+        fireDebug.pawn(ownedId);
+        fireDebug.socket(link.socketState());
+        sawFiniteCamera = Number.isFinite(camera.x) && Number.isFinite(camera.y) && Number.isFinite(camera.z);
+      }
+    }
+    for (const laser of laserQueue) {
+      hitMarker.note({ kind: "laser", shooter: laser.shooter, ownedId }, now);
+      const remain = laser.until - Date.now();
+      if (!(remain > 0)) continue;
+      lasers.show(laser.shooter, laser.from, laser.to, now + remain);
+    }
+    laserQueue.length = 0;
+    lasers.expire(now);
+    for (const pose of grenadeQueue) grenades.place(pose, now);
+    grenadeQueue.length = 0;
+    grenades.expire(now);
+    pawns.apply(render, dt, (id) => client.authoritative(id)?.action, ownedId);
+    sendAcc += dt;
+    if (sendAcc >= sendDt) {
+      sendAcc = Math.min(sendAcc - sendDt, sendDt);
+      const move = moveIntent(sample.yaw, sample.forward, sample.strafe);
+      // predictOwned stays false, so this send is the only client move. The host
+      // integrates it with the same noclip step when the switch is on.
+      const fly = view.noclip === true && options.showNoclip;
+      link.sendInput(move.moveX, move.moveZ, sample.yaw, fly ? encodeMoveButtons(true, sample.ascend) : 0);
+    }
+    if (!debugShot && debugPawnWatch && options.fireDebug && client.ownedEntity !== debugPawn) {
+      const camera = arena.camera.position;
+      fireDebug.camera({ x: camera.x, y: camera.y, z: camera.z });
+      fireDebug.pawn(client.ownedEntity);
+      fireDebug.socket(link.socketState());
+      debugPawn = client.ownedEntity;
+    }
+    const camNow = arena.camera.position;
+    const camOk = Number.isFinite(camNow.x) && Number.isFinite(camNow.y) && Number.isFinite(camNow.z);
+    if (options.fireDebug && sawFiniteCamera && !camOk) {
+      fireDebug.camera({ x: camNow.x, y: camNow.y, z: camNow.z });
+      fireDebug.pawn(client.ownedEntity);
+      fireDebug.socket(link.socketState());
+    }
+    sawFiniteCamera = camOk;
+    elevatorRooms.tick(
+      now,
+      owned ? { x: owned.position.x, y: owned.position.y, z: owned.position.z } : undefined,
+    );
+    const look = input.locked ? "look locked" : "click to look";
+    const mine = ownedId === undefined ? undefined : pawnVital.get(ownedId);
+    const hpLabel = localHealthLabel(mine);
+    const hpText = hpLabel === "" ? "" : ` · ${hpLabel}`;
+    const liftText = owned ? liftLabel(owned.position) : "";
+    sceneMap.setSelf(
+      owned ? { x: owned.position.x, y: owned.position.y, z: owned.position.z, yaw: yawFromQuat(owned.rotation) } : undefined,
+      view.elevators,
+    );
+    if (!pinnedError) {
+      hud.setStatus(`${statusText} · ${look}${hpText} · meshes ${pawns.count} models ${pawns.count - pawns.fallbacks} fallback ${pawns.fallbacks + visuals.fallbacks}${liftText}`);
+    }
+    hud.setProfile(input.profile);
+    hud.setPad(input.padStatus, input.profile);
+    arena.renderer.render(arena.scene, arena.camera);
+    const info = arena.renderer.info;
+    const calls = info.render.calls;
+    const tris = info.render.triangles;
+    const geoms = info.memory.geometries;
+    const tex = info.memory.textures;
+    if (!info.autoReset) info.reset();
+    const snaps = client.metrics.snapshotReceive;
+    const snapTick = snaps === 0 ? undefined : Number(render.serverTick);
+    const sampleRates = rates.push(now, snaps !== seenSnaps ? snapTick : undefined);
+    seenSnaps = snaps;
+    if (hud.statsVisible) {
+      hud.setStats(formatOverlay({
+        fps: sampleRates.fps,
+        tickPerSec: sampleRates.tickPerSec,
+        tick: snapTick,
+        snaps,
+        resyncs,
+        seq: snaps === 0 ? undefined : render.snapshotSeq,
+        calls,
+        tris: Math.round(tris),
+        geoms,
+        tex,
+        shadows: arena.renderer.shadowMap.enabled ? "on" : "off",
+        shadowMap: arena.renderer.shadowMap.type,
+        tone: arena.renderer.toneMapping,
+        exposure: arena.renderer.toneMappingExposure,
+        pawns: pawns.count,
+        owned: client.ownedEntity,
+        positions: pawns.positionLine(),
+        hp: mine?.hp,
+      }));
+    }
+  }
+  requestAnimationFrame(frame);
+
+  function createCabMeshes(elevators: readonly ArenaElevator[], scene: THREE.Scene): { group: THREE.Group; meshes: Map<string, THREE.Mesh> } {
+    const group = new THREE.Group();
+    group.name = "cab-debug";
+    group.visible = false;
+    scene.add(group);
+    const meshes = new Map<string, THREE.Mesh>();
+    for (const def of elevators) {
+      const bounds = elevatorPolygonBounds(def.polygon);
+      const width = bounds.maxX - bounds.minX;
+      const depth = bounds.maxZ - bounds.minZ;
+      if (!(width > 0) || !(depth > 0)) continue;
+      const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(width, CAB_BOX_H, depth),
+        new THREE.MeshStandardMaterial({ color: 0xb7b1a6, roughness: 0.8 }),
+      );
+      const y = def.stops[0] ?? 0;
+      mesh.position.set((bounds.minX + bounds.maxX) / 2, y + 0.02 - CAB_BOX_H / 2, (bounds.minZ + bounds.maxZ) / 2);
+      mesh.name = def.id;
+      // A bound room is the cab. Its footprint shows only with collision debug.
+      // An unbound shaft keeps the 16a box in normal play.
+      if (def.room) group.add(mesh);
+      else scene.add(mesh);
+      meshes.set(def.id, mesh);
+    }
+    return { group, meshes };
+  }
+
+  function applyCab(row: ElevatorState): void {
+    cabState.set(row.id, row);
+    const mesh = cabDebug.meshes.get(row.id);
+    if (mesh) mesh.position.y = row.y + 0.02 - CAB_BOX_H / 2;
+    elevatorRooms.onCab(row);
+    if (cabPick.get(row.id) === row.stop && row.doorsOpen) cabPick.delete(row.id);
+  }
+
+  function cabRuntime(def: ArenaElevator): ElevatorRuntime {
+    const state = cabState.get(def.id);
+    const at = state?.stop ?? 0;
+    return {
+      id: def.id,
+      at,
+      queue: [],
+      phase: state?.doorsOpen === false ? "moving" : "idle",
+      t: 0,
+      y: state?.y ?? def.stops[at] ?? def.stops[0] ?? 0,
+    };
+  }
+
+  function cabAt(pawn: { x: number; y: number; z: number }): { def: ArenaElevator; rt: ElevatorRuntime } | undefined {
+    for (const def of view.elevators ?? []) {
+      const rt = cabRuntime(def);
+      if (inCab(def, rt, pawn.x, pawn.y, pawn.z)) return { def, rt };
+    }
+    return undefined;
+  }
+
+  function overlapsDoor(pawn: { x: number; y: number; z: number }): boolean {
+    const doors = (view.doors ?? []).map((door) => ({
+      id: door.id,
+      hinge: door.hinge,
+      open: doorOpen.get(door.id) === true,
+      locked: door.locked === true,
+      key: door.key,
+      position: door.position,
+      size: door.size,
+      yaw: door.yaw,
+    }));
+    return pickDoorForUse(doors, {
+      id: 0,
+      x: pawn.x,
+      y: pawn.y,
+      z: pawn.z,
+      radius: view.pawnRadius,
+      height: view.pawnHeight,
+      alive: true,
+    }) !== undefined;
+  }
+
+  function elevatorCall(
+    pawn: { x: number; y: number; z: number },
+    request: string | { stop?: number; landing?: boolean },
+  ): { id: string; stop: number; inCab: boolean } | undefined {
+    const digit = typeof request === "string" ? request : undefined;
+    const landingOnly = typeof request !== "string" && request.landing === true;
+    const explicit = typeof request !== "string" && typeof request.stop === "number" ? request.stop : undefined;
+    const elevators = view.elevators ?? [];
+    if (!landingOnly) {
+      for (const def of elevators) {
+        if (!inCab(def, cabRuntime(def), pawn.x, pawn.y, pawn.z)) continue;
+        const stop = explicit !== undefined
+          ? (explicit >= 0 && explicit < def.stops.length ? explicit : undefined)
+          : (digit ? stopForKey(digit, def.stops.length) : undefined);
+        if (stop === undefined) return undefined;
+        return { id: def.id, stop, inCab: true };
+      }
+    }
+    if (landingOnly || digit) {
+      for (const def of elevators) {
+        const stop = landingAt(def, pawn.x, pawn.y, pawn.z);
+        if (stop === undefined) continue;
+        return { id: def.id, stop, inCab: false };
+      }
+    }
+    return undefined;
+  }
+
+  function liftLabel(pawn: { x: number; y: number; z: number }): string {
+    for (const def of view.elevators ?? []) {
+      const rt = cabRuntime(def);
+      if (!inCab(def, rt, pawn.x, pawn.y, pawn.z)) continue;
+      const at = rt.at + 1;
+      const picked = cabPick.get(def.id);
+      if (picked !== undefined && picked !== rt.at) return ` · lift ${at}→${picked + 1}`;
+      return ` · lift ${at}`;
+    }
+    return "";
+  }
+
+  function shutLeafBoxes(): Array<{ id: number; minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number }> {
+    const out: Array<{ id: number; minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number }> = [];
+    (view.doors ?? []).forEach((door, index) => {
+      if (doorOpen.get(door.id)) return;
+      out.push({ id: -1 - index, ...doorLeafBox(door) });
+    });
+    return out;
+  }
+
+  function swingDoor(id: string, open: boolean): void {
+    doorOpen.set(id, open);
+    const rig = visuals.doors.get(id);
+    if (!rig) return;
+    applyDoorSwing(rig.group, rig.hinge, open, true);
+  }
+
+  /** The eye sits inside the shooter's capsule, so that pawn is not a target. */
+  function shotCapsules(
+    entities: ReadonlyArray<{ id: unknown; position: { x: number; y: number; z: number }; lifecycle?: string }>,
+    shooter: number,
+    radius: number,
+    height: number,
+  ): TraceCapsule[] {
+    if (!(radius > 0) || !Number.isFinite(height)) return [];
+    const out: TraceCapsule[] = [];
+    for (const entity of entities) {
+      const id = Number(entity.id);
+      if (!Number.isFinite(id) || id === shooter || entity.lifecycle === "despawned") continue;
+      out.push({ id, x: entity.position.x, y: entity.position.y, z: entity.position.z, radius, height });
+    }
+    return out;
+  }
+}

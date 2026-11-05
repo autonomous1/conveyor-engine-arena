@@ -1,4 +1,5 @@
 import { AuthoritativeWorld, applyStaticWorldDefinition } from "conveyor-engine-world";
+import type { GameFiles } from "./game-files.js";
 import { loadInstalledGame } from "./load-game.js";
 import type { ArenaView } from "../shared/arena-view.js";
 import type { Movement } from "../shared/movements.js";
@@ -24,8 +25,8 @@ export type LoadedArena = {
   sceneGraph?: SceneGraph;
 };
 
-export function loadArena(): LoadedArena {
-  const game = loadInstalledGame();
+export function loadArena(files?: GameFiles, env?: Record<string, string | undefined>): LoadedArena {
+  const game = loadInstalledGame(files, env);
   const world = new AuthoritativeWorld({ worldVersion: game.view.world });
   world.pawnHeight = game.view.pawnHeight;
   applyStaticWorldDefinition(world, game.definition);

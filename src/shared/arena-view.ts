@@ -218,6 +218,12 @@ export type ArenaView = {
   /** Thrown grenade mesh. Absent when the manifest has no `grenade` model. */
   grenade?: string;
   /**
+   * Multiplayer socket for a static client. `ws:` or `wss:` only.
+   * Absent: the page origin. The solo build ignores it and uses an in-tab host.
+   * Not part of either content hash.
+   */
+  wsUrl?: string;
+  /**
    * Set when the host process was started with `ARENA_NOCLIP=1`.
    * The client shows the Noclip switch only then. Not part of either content hash.
    */

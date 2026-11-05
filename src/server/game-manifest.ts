@@ -302,10 +302,14 @@ function str(value: unknown, path: string, issues: GameIssue[]): string | undefi
   return value;
 }
 
+function isPublicAssetPath(uri: string): boolean {
+  return uri.charCodeAt(0) === 47 && uri.startsWith("assets/", 1);
+}
+
 function publicAssetUri(value: unknown, path: string, issues: GameIssue[]): string | undefined {
   const uri = str(value, path, issues);
   if (!uri) return undefined;
-  if (!uri.startsWith("/assets/") || uri.includes("..") || uri.includes("\\") || uri.includes("\0")) {
+  if (!isPublicAssetPath(uri) || uri.includes("..") || uri.includes("\\") || uri.includes("\0")) {
     issues.push({ path, message: "must be a /assets/ path inside the web root" });
     return undefined;
   }
@@ -933,6 +937,15 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
   const bundleVersion = str(doc.bundleVersion, "bundleVersion", issues);
   if (doc.units !== "meters") issues.push({ path: "units", message: "must be meters" });
   if (doc.coordinateSystem !== "y-up") issues.push({ path: "coordinateSystem", message: "must be y-up" });
+  let wsUrl: string | undefined;
+  if (Object.prototype.hasOwnProperty.call(doc, "wsUrl")) {
+    const value = doc.wsUrl;
+    if (typeof value !== "string" || !(value.startsWith("wss:") || value.startsWith("ws:"))) {
+      issues.push({ path: "wsUrl", message: "must be a ws: or wss: url" });
+    } else {
+      wsUrl = value;
+    }
+  }
 
   const scene = isObject(doc.scene) ? doc.scene : undefined;
   if (!scene) issues.push({ path: "scene", message: "required object" });
@@ -1642,6 +1655,7 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
     lights,
     ...(elevators.length ? { elevators } : {}),
     ...(grenadeModel ? { grenade: grenadeModel } : {}),
+    ...(wsUrl ? { wsUrl } : {}),
   };
 
   return {

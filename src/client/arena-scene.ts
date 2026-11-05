@@ -3,6 +3,7 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { KTX2Loader } from "three/addons/loaders/KTX2Loader.js";
 import { RectAreaLightUniformsLib } from "three/addons/lights/RectAreaLightUniformsLib.js";
 import { clone as cloneWithSkeleton } from "three/addons/utils/SkeletonUtils.js";
+import { assetBase } from "../shared/asset-base.ts";
 import { propClipName, type ArenaView, type BackdropShape, type CharacterAnimation } from "../shared/arena-view.ts";
 import { findClip, type Movement } from "../shared/movements.ts";
 import { shadowSettings, type ShadowQuality } from "../shared/shadows.ts";
@@ -28,7 +29,7 @@ export type CharacterVisual = {
 
 export type CharacterTemplates = Map<string, CharacterVisual>;
 
-const BASIS_TRANSCODER = "/assets/basis/";
+const BASIS_TRANSCODER = `${assetBase()}assets/basis/`;
 let basisLoader: KTX2Loader | undefined;
 
 /**

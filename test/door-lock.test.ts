@@ -395,13 +395,14 @@ test("door and use frames parse, and only a shut leaf seals the gap", () => {
   // no splice (ARENA-02), no kernel import, no snap envelopes.
   const doors = readFileSync(path.join(root, "src/server/doors.ts"), "utf8");
   const shared = readFileSync(path.join(root, "src/shared/doors.ts"), "utf8");
-  const main = readFileSync(path.join(root, "src/server/main.ts"), "utf8");
+  const main = readFileSync(path.join(root, "src/server/arena-host.ts"), "utf8");
+  const entry = readFileSync(path.join(root, "src/server/main.ts"), "utf8");
   assert.equal(/\.splice\(/.test(doors), false);
   assert.equal(/conveyor-engine-world|setClip|enqueue/.test(doors + shared), false);
   assert.match(main, /blockers: createDoorBlockers\(loaded\.world\)/);
   assert.match(main, /welcome\.doors = doorHost\.snapshot\(\)/);
   assert.match(main, /doorHost\.drop\(clientId\)/);
-  assert.equal(/envelopes\.get/.test(doors + main), false);
+  assert.equal(/envelopes\.get/.test(doors + main + entry), false);
 
   // The installed arena: baked static boxes leave every doorway open.
   const loaded = loadArena();

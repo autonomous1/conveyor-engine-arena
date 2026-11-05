@@ -32,6 +32,32 @@ export type HealthNotice = {
   dead: boolean;
 };
 
+/**
+ * Socket factory result. A browser `WebSocket` satisfies it, and so does the
+ * solo adapter. Handler fields stay `unknown` so both function shapes fit.
+ */
+export type OpenSocket = {
+  readyState: number;
+  send(data: string): void;
+  close(): void;
+  onopen: unknown;
+  onmessage: unknown;
+  onclose: unknown;
+  onerror: unknown;
+};
+
+/** Handler view used after `open()`. */
+export type WebSocketLike = {
+  readyState: number;
+  readonly OPEN: number;
+  send(data: string): void;
+  close(): void;
+  onopen: ((ev: unknown) => void) | null;
+  onmessage: ((ev: { data: unknown }) => void) | null;
+  onclose: ((ev: unknown) => void) | null;
+  onerror: ((ev: unknown) => void) | null;
+};
+
 export type LiveLink = {
   sendInput(moveX: number, moveZ: number, yaw: number, buttons?: number): void;
   /** Arena frame. Returns false when the socket has no owned pawn yet. */
@@ -135,8 +161,13 @@ export function connectLive(opts: {
   onFault?: (err: unknown) => void;
   /** Read when hello is sent. Empty omits the field. */
   model?: () => string | undefined;
+  /** Opens one socket. Solo passes the in-tab pair. Multiplayer passes a WebSocket. */
+  open: () => OpenSocket;
+  /** When false, hello carries no token and welcome does not store one. Solo passes false. */
+  auth?: boolean;
 }): LiveLink {
-  const ws = new WebSocket(`${location.origin.replace(/^http/, "ws")}/`);
+  const ws = opts.open() as WebSocketLike;
+  const useAuth = opts.auth !== false;
   let lastSeq = 0;
   let lastSnapAt = 0;
   let inputSeq = 1;
@@ -168,8 +199,8 @@ export function connectLive(opts: {
     requestResync();
   };
   document.addEventListener("visibilitychange", onVisibility);
-  ws.addEventListener("open", () => {
-    const token = sessionStorage.getItem(TOKEN_KEY) ?? undefined;
+  ws.onopen = () => {
+    const token = useAuth ? sessionStorage.getItem(TOKEN_KEY) ?? undefined : undefined;
     const model = opts.model?.();
     ws.send(JSON.stringify({
       v: 1,
@@ -182,14 +213,14 @@ export function connectLive(opts: {
       ...(typeof model === "string" && model.length > 0 ? { model } : {}),
     }));
     opts.onStatus({ phase: "hello", text: "hello sent", resyncs });
-  });
-  ws.addEventListener("error", () => opts.onStatus({ phase: "error", text: "socket error", ownedEntityId: ownedId, resyncs }));
-  ws.addEventListener("close", () => {
+  };
+  ws.onerror = () => opts.onStatus({ phase: "error", text: "socket error", ownedEntityId: ownedId, resyncs });
+  ws.onclose = () => {
     closed = true;
     console.log("socket closed");
     opts.onStatus({ phase: "error", text: "socket closed", ownedEntityId: ownedId, resyncs });
-  });
-  ws.addEventListener("message", (ev) => {
+  };
+  ws.onmessage = (ev) => {
     let msg: Record<string, unknown>;
     try {
       const text = typeof ev.data === "string" ? ev.data : new TextDecoder().decode(ev.data as ArrayBuffer);
@@ -232,7 +263,7 @@ export function connectLive(opts: {
     try {
       if (msg.type === "welcome") {
         const token = typeof msg.reconnectToken === "string" ? msg.reconnectToken : undefined;
-        if (token) sessionStorage.setItem(TOKEN_KEY, token);
+        if (token && useAuth) sessionStorage.setItem(TOKEN_KEY, token);
         const owned = Number(msg.ownedEntityId);
         const clientId = Number(msg.clientId) || 1;
         const nextOwned = Number.isFinite(owned) ? owned : undefined;
@@ -303,7 +334,7 @@ export function connectLive(opts: {
       });
       requestResync();
     }
-  });
+  };
   return {
     sendInput(moveX, moveZ, yaw, buttons = 0) {
       if (ownedId === undefined || ws.readyState !== WebSocket.OPEN) return;

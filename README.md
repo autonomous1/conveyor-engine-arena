@@ -31,6 +31,19 @@ Open that URL. The host binds to `127.0.0.1`. Set `PORT` to use another port. Af
 
 Static files come from `dist/web`. `/arena.json` is generated in memory from the compiled game file. Paths outside that bundle, including source maps, `node_modules`, and `/pkg`, respond with 404.
 
+## Solo / static deploy
+
+`npm run build:solo` writes a static site to `dist/solo/`. The authoritative host runs in the page and talks to the client through an in-memory socket. There is no Node process and no WebSocket. Serve that directory with any static host:
+
+```bash
+npm run build:solo
+npx serve dist/solo
+```
+
+Open the URL with no query flag. Assets are relative (`./assets/`, `./game/`), so the same build works under a subpath when the URL ends with a slash (`npx serve dist`, then open `/solo/`). `?noclip=1` turns noclip on for that tab.
+
+`npm run build` is unchanged: `dist/web/` plus the Node host. That client bundle does not contain the host. Set `wsUrl` in `web/game/arena.game.json` to a `ws:` or `wss:` URL when the page and the host are on different origins. `?ws=` overrides it for one tab. Omit `wsUrl` and the client uses the page origin, which is what `npm start` does.
+
 ## Controls
 
 | Input | Action |
@@ -113,7 +126,8 @@ Each asset keeps its own license id and provenance origin.
 | --- | --- |
 | `npm run dev` | Build, then start the live host |
 | `npm start` | Start `dist/server/main.js` |
-| `npm run build` | Clean `dist/`, compile the server with `tsc`, bundle the client with esbuild |
+| `npm run build` | Clean `dist/`, compile the server with `tsc`, bundle the client with esbuild, then check the web bundle |
+| `npm run build:solo` | Static `dist/solo/` with the host inside the page. Not part of `build` |
 | `npm run typecheck` | Typecheck server, client, and util without emitting |
 | `npm test` | Node’s test runner. Requires a prior `npm run build` |
 | `npm run token` | Keygen, mint, list, and revoke Ed25519 access tokens |

@@ -1,6 +1,3 @@
-import { existsSync, realpathSync } from "node:fs";
-import { isAbsolute, relative, resolve, sep } from "node:path";
-
 /** First free id for baked obstacles. Hand-authored collision stays below this. */
 export const PLACEMENT_ID_START = 100;
 
@@ -42,37 +39,6 @@ export type BakedDoor = {
   /** Pickup placement id. Read when `locked` is true. */
   key?: string;
 };
-
-/**
- * Resolve `scene.placements` against the arena root.
- * The file may live in this repo or in the sibling `blueprint-scene` checkout.
- * Absolute paths and anything outside those two trees are rejected.
- */
-export function resolvePlacementsPath(root: string, ref: string): string {
-  const trimmed = ref.trim();
-  if (!trimmed || trimmed.includes("\0") || isAbsolute(trimmed)) {
-    throw new Error("must be a relative path");
-  }
-  const file = resolve(root, trimmed);
-  const bases = [resolve(root)];
-  const sibling = resolve(root, "..", "blueprint-scene");
-  if (existsSync(sibling)) bases.push(sibling);
-  if (!bases.some((base) => inside(base, file))) {
-    throw new Error(`path is outside the arena and blueprint-scene trees: ${trimmed}`);
-  }
-  if (!existsSync(file)) throw new Error(`file not found: ${trimmed}`);
-  const realFile = realpathSync(file);
-  const realBases = bases.map((base) => realpathSync(base));
-  if (!realBases.some((base) => inside(base, realFile))) {
-    throw new Error(`path is outside the arena and blueprint-scene trees: ${trimmed}`);
-  }
-  return realFile;
-}
-
-function inside(base: string, file: string): boolean {
-  const rel = relative(base, file);
-  return rel !== "" && rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel);
-}
 
 /**
  * Turn a blueprint-scene placements file into building instances and numbered AABBs.

@@ -73,12 +73,12 @@ test("alien-weapon-1 plays rotate and a still prop gets no mixer", async () => {
 
   const host = startPropAnimation.toString();
   assert.equal(/\benqueue\b|setClip|AuthoritativeWorld|worldEnqueue/.test(host), false);
-  const main = readFileSync(path.join(root, "src/server/main.ts"), "utf8");
+  const main = readFileSync(path.join(root, "src/server/arena-host.ts"), "utf8");
   assert.match(main, /startPropAnimation\(loaded\.view\.props\)/);
   assert.match(main, /JSON\.stringify\(\{ \.\.\.loaded\.view, propClips \}\)/);
   assert.equal(/startPropAnimation\([^)\n]*world/.test(main), false);
   assert.equal(/AnimationMixer|mixer\.update/.test(main), false);
-  const client = readFileSync(path.join(root, "src/client/main.ts"), "utf8");
+  const client = readFileSync(path.join(root, "src/client/boot.ts"), "utf8");
   assert.match(client, /for \(const mixer of visuals\.propMixers\) mixer\.update\(dt\)/);
 });
 

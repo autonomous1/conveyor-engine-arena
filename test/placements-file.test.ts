@@ -4,7 +4,7 @@ import { register } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { interpretPlacements, resolvePlacementsPath } from "../src/server/placements-file.ts";
+import { interpretPlacements } from "../src/server/placements-file.ts";
 
 // Server modules import siblings as `.js`. Strip-types loads this file from
 // source, so those specifiers resolve to the `.ts` files.
@@ -23,6 +23,8 @@ register(
       }
     `),
 );
+
+const { resolvePlacementsPath } = await import("../src/server/game-files-node.ts");
 
 const models = new Set(["brutalist-urban-1", "brutalist-urban-2", "brutalist-urban-3", "brutalist-urban-4"]);
 
