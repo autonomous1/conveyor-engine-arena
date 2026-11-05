@@ -126,8 +126,8 @@ Each asset keeps its own license id and provenance origin.
 | --- | --- |
 | `npm run dev` | Build, then start the live host |
 | `npm start` | Start `dist/server/main.js` |
-| `npm run build` | Clean `dist/`, compile the server with `tsc`, bundle the client with esbuild, then check the web bundle |
-| `npm run build:solo` | Static `dist/solo/` with the host inside the page. Not part of `build` |
+| `npm run build` | Clean `dist/`, compile the server with `tsc`, bundle the client with esbuild, check the web bundle, then build the solo site |
+| `npm run build:solo` | Static `dist/solo/` with the host inside the page. `npm run build` runs this too |
 | `npm run typecheck` | Typecheck server, client, and util without emitting |
 | `npm test` | Node’s test runner. Requires a prior `npm run build` |
 | `npm run token` | Keygen, mint, list, and revoke Ed25519 access tokens |

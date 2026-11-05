@@ -12,7 +12,13 @@
     "allowImportingTsExtensions": true,
     "skipLibCheck": true,
     "sourceMap": true,
-    "types": []
+    "types": [],
+    "baseUrl": ".",
+    // Solo's server import chain uses node: builtins. Keep types empty so browser
+    // files do not gain Node globals; paths resolve only explicit node: imports.
+    "paths": {
+      "node:*": ["node_modules/@types/node/*"]
+    }
   },
   "include": [
     "src/client",
