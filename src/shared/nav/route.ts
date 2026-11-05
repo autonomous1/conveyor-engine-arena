@@ -65,6 +65,71 @@ type Dir = {
   loose: number;
 };
 
+/** Compiled portals for one graph and one gate snapshot. */
+export type RoadNet = { readonly roads: Roads };
+
+export type RoadCache = {
+  /** Times `compile` ran. A repeat with the same gate results does not increment. */
+  compiles: number;
+  net(gate: (portal: ScenePortal) => Gate, elevators?: boolean): RoadNet;
+};
+
+/**
+ * One compiled net per gate signature.
+ * `plan` asks for hundreds of routes under the same doors; compiling each one is the hang.
+ */
+export function createRoadCache(graph: SceneGraph): RoadCache {
+  const bucket = new Map<string, Roads>();
+  const cache: RoadCache = {
+    compiles: 0,
+    net(gate, elevators = false) {
+      const sig = `${elevators ? "1" : "0"}\0${gateSignature(graph, gate)}`;
+      const hit = bucket.get(sig);
+      if (hit) return { roads: hit };
+      const built = compile(graph, gate, elevators);
+      cache.compiles += 1;
+      bucket.set(sig, built);
+      return { roads: built };
+    },
+  };
+  return cache;
+}
+
+const SHARED_NETS = new WeakMap<SceneGraph, RoadCache>();
+
+function sharedNet(graph: SceneGraph, gate: (portal: ScenePortal) => Gate, elevators: boolean): Roads {
+  let cache = SHARED_NETS.get(graph);
+  if (!cache) {
+    cache = createRoadCache(graph);
+    SHARED_NETS.set(graph, cache);
+  }
+  return cache.net(gate, elevators).roads;
+}
+
+function gateSignature(graph: SceneGraph, gate: (portal: ScenePortal) => Gate): string {
+  let sig = "";
+  for (const portal of graph.portals) {
+    sig += gate(portal);
+    sig += "\0";
+  }
+  return sig;
+}
+
+/**
+ * Strict metres from `from` to every reachable place.
+ * One Dijkstra. The origin place is 0. Missing ids are unreachable.
+ * `net` already baked the gate, so several origins share one compile.
+ */
+export function routePlaceCosts(
+  graph: SceneGraph,
+  from: Vec3Like,
+  net: RoadNet,
+  cabs?: readonly CabState[],
+): ReadonlyMap<string, number> {
+  const origin = onFoot(graph, placeAt(graph, from.x, from.y, from.z, cabs), from, cabs);
+  return costsFrom(net.roads, origin);
+}
+
 export function planRoute(
   graph: SceneGraph,
   from: Vec3Like,
@@ -81,7 +146,7 @@ export function planRoute(
     return { ok: true, steps: [], places: [origin.id], cost };
   }
 
-  const roads = compile(graph, gate, opts.elevators === true);
+  const roads = sharedNet(graph, gate, opts.elevators === true);
   const strict = search(roads, origin, goal, false);
   const loose = roads.locked ? search(roads, origin, goal, true) : strict;
   const lockedAlternative = alternative(strict, loose, gate, opts.elevators === true);
@@ -272,6 +337,66 @@ function search(
 
   if (bestState < 0) return undefined;
   return { ...trace(bestState, prev, via, place, roads), cost: bestTotal };
+}
+
+/** Min strict arrival cost at each place. Same edge weights as `search` with locks closed. */
+function costsFrom(roads: Roads, origin: { id: string; point: Point }): Map<string, number> {
+  const out = new Map<string, number>();
+  const originIndex = roads.index.get(origin.id);
+  if (originIndex === undefined) return out;
+
+  const bestAt = new Float64Array(roads.placeIds.length);
+  bestAt.fill(Infinity);
+  const cost: number[] = [0];
+  const place: number[] = [originIndex];
+  const px: number[] = [origin.point.x];
+  const py: number[] = [origin.point.y];
+  const pz: number[] = [origin.point.z];
+  const via: number[] = [-1];
+  const seq: number[] = [0];
+  const best = new Float64Array(roads.dirs.length);
+  best.fill(Infinity);
+  const heap: number[] = [0];
+  let stamp = 0;
+
+  while (heap.length > 0) {
+    const state = pop(heap, cost, place, seq, roads.order);
+    const stateCost = cost[state]!;
+    const arrived = via[state]!;
+    if (arrived >= 0 && stateCost > best[arrived]!) continue;
+    const here = place[state]!;
+    if (stateCost < bestAt[here]!) bestAt[here] = stateCost;
+
+    const exits = roads.out[here];
+    if (!exits) continue;
+    for (const dirId of exits) {
+      const edge = roads.dirs[dirId]!;
+      const cross = edge.strict;
+      if (!Number.isFinite(cross)) continue;
+      const dx = px[state]! - edge.enter[0];
+      const dy = py[state]! - edge.enter[1];
+      const dz = pz[state]! - edge.enter[2];
+      const nextCost = stateCost + Math.hypot(dx, dy, dz) + cross;
+      if (!(nextCost < best[dirId]!)) continue;
+      best[dirId] = nextCost;
+      stamp += 1;
+      const id = cost.length;
+      cost.push(nextCost);
+      place.push(edge.to);
+      px.push(edge.exit[0]);
+      py.push(edge.exit[1]);
+      pz.push(edge.exit[2]);
+      via.push(dirId);
+      seq.push(stamp);
+      push(heap, id, cost, place, seq, roads.order);
+    }
+  }
+
+  for (let i = 0; i < bestAt.length; i += 1) {
+    const metres = bestAt[i]!;
+    if (Number.isFinite(metres)) out.set(roads.placeIds[i]!, metres);
+  }
+  return out;
 }
 
 function alternative(

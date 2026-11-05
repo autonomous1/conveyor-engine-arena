@@ -3,8 +3,8 @@
  * Node-free: the same loop can run in the browser. The CLI owns sockets and argv.
  */
 import type { BotCtx } from "../../../src/shared/bots/actions.js";
-import { createBotContext, groundActions } from "../../../src/shared/bots/actions.js";
-import type { Goal, Plan, WorldState } from "../../../src/shared/bots/goap.js";
+import { createBotContext, estimateSeconds, groundActions } from "../../../src/shared/bots/actions.js";
+import type { Goal, Plan, PlanOptions, WorldState } from "../../../src/shared/bots/goap.js";
 import { chooseGoal } from "../../../src/shared/bots/goap.js";
 import { buildWorldState, type WorldSnapshot } from "../../../src/shared/bots/state.js";
 import { reach } from "../../../src/shared/bots/goals.js";
@@ -34,6 +34,9 @@ export type BrainOptions = {
   log?: (line: string) => void;
   error?: (line: string) => void;
   onTick?: () => void;
+  /** Passed to `plan`. A huge expand budget still stops at `timeoutMs`. */
+  maxExpand?: number;
+  maxEvaluations?: number;
 };
 
 type TickStatus = "running" | "done" | "failed" | "stuck";
@@ -90,6 +93,7 @@ export async function runBrain(session: BotSession, goal: Goal, opts: BrainOptio
   let sticky: string | undefined;
   let actions: ReturnType<typeof groundActions> = [];
   let ctx: BotCtx | undefined;
+  let placements: ReturnType<BotSession["world"]["pickupPlacements"]> = [];
   let grounded = "";
   let plan: Plan | undefined;
   let exec: Running | undefined;
@@ -108,8 +112,8 @@ export async function runBrain(session: BotSession, goal: Goal, opts: BrainOptio
     if (!graph) return false;
     const hash = session.world.sceneGraphHash() ?? "local";
     if (ctx && hash === grounded) return true;
-    const placements = session.world.pickupPlacements();
-    actions = groundActions(graph, placements);
+    placements = session.world.pickupPlacements();
+    actions = groundActions(graph, placements, [goal]);
     ctx = createBotContext(graph, placements);
     grounded = hash;
     return true;
@@ -431,8 +435,25 @@ export async function runBrain(session: BotSession, goal: Goal, opts: BrainOptio
     else if (parts.pickups !== watchPickups && !activePickup) reason = "pickup";
 
     if (reason) {
+      const groundedCtx = ctx;
+      if (!groundedCtx) return 2;
+      // A macrotask between replans so the timeout and the socket can run.
+      await delay(0);
+      if (Date.now() >= deadline) return 3;
       if (reason !== "initial") log(`replan ${reason} t=${secs()}s`);
-      plan = chooseGoal(state, [goal], actions, ctx);
+      const planOpts: PlanOptions = {
+        minCost: groundedCtx.minActionS,
+        heuristic: estimateSeconds(goal, groundedCtx, placements),
+        deadlineMs: deadline,
+        now: () => Date.now(),
+        ...(opts.maxExpand !== undefined ? { maxExpand: opts.maxExpand } : {}),
+        ...(opts.maxEvaluations !== undefined ? { maxEvaluations: opts.maxEvaluations } : {}),
+      };
+      log("plan start");
+      const planStarted = Date.now();
+      plan = chooseGoal(state, [goal], actions, groundedCtx, planOpts);
+      const planMs = Date.now() - planStarted;
+      log(`plan done ${planMs}ms steps=${plan?.steps.length ?? 0} expanded=${plan?.expanded ?? 0}`);
       exec = undefined;
       stuckCount = 0;
       watchDoors = parts.doors;
