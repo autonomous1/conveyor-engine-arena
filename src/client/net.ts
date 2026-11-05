@@ -1,12 +1,14 @@
-import { EngineClient, type IncomingSnapshot } from "conveyor-engine-client";
+import { EngineClient } from "conveyor-engine-client";
 import { fireShotFrame, summarizeInbound } from "../shared/fire-debug.js";
 import { parseAudit, type AuditCounters } from "../shared/audit.js";
 import { parseHealth } from "../shared/health.js";
 import { parseDoor, parseDoorSet, useFrame, type DoorFrame } from "../shared/doors.js";
 import { parseElevatorSet, parseElevatorState, type ElevatorState } from "../shared/elevators.js";
 import { parseGrenadePose, grenadeFrame, type GrenadePose } from "../shared/grenade.js";
+import { parseLaser } from "../shared/hitscan.js";
 import { modelFrame } from "../shared/model-choice.js";
 import { parseLoadout, parsePickup, parsePickupSet, type LoadoutFrame, type PickupFrame } from "../shared/pickups.js";
+import { asSnapshot, revive } from "../shared/wire.js";
 import { isArenaSolo, loadKey } from "./auth-key.js";
 
 const TOKEN_KEY = "ce-arena-token";
@@ -90,53 +92,10 @@ function closeInfo(ev: unknown): { code?: number; reason: string } {
   };
 }
 
-function revive(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(revive);
-  if (value && typeof value === "object") {
-    const record = value as Record<string, unknown>;
-    if (typeof record.$i === "string" && Object.keys(record).length === 1) return BigInt(record.$i);
-    const out: Record<string, unknown> = {};
-    for (const [key, item] of Object.entries(record)) out[key] = revive(item);
-    return out;
-  }
-  return value;
-}
-
-function asVec(value: unknown): { x: number; y: number; z: number } | undefined {
-  if (!value || typeof value !== "object") return undefined;
-  const rec = value as { x?: unknown; y?: unknown; z?: unknown };
-  if (typeof rec.x !== "number" || typeof rec.y !== "number" || typeof rec.z !== "number") return undefined;
-  if (!Number.isFinite(rec.x) || !Number.isFinite(rec.y) || !Number.isFinite(rec.z)) return undefined;
-  return { x: rec.x, y: rec.y, z: rec.z };
-}
-
-function asLaser(msg: Record<string, unknown>): LaserNotice | undefined {
-  if (msg.t !== "laser") return undefined;
-  const shooter = Number(msg.shooter);
-  const from = asVec(msg.from);
-  const to = asVec(msg.to);
-  const until = Number(msg.until);
-  if (!Number.isFinite(shooter) || !from || !to || !Number.isFinite(until)) return undefined;
-  return { shooter, from, to, until };
-}
-
 function asHealth(msg: Record<string, unknown>): HealthNotice | undefined {
   const frame = parseHealth(msg);
   if (!frame) return undefined;
   return { entity: frame.entity, hp: frame.hp, dead: frame.dead };
-}
-
-function asSnapshot(envelope: Record<string, unknown>): IncomingSnapshot {
-  const tick = envelope.tick;
-  return {
-    kind: envelope.kind === "full" ? "full" : "delta",
-    seq: Number(envelope.seq),
-    tick: typeof tick === "bigint" ? tick : BigInt(Number(tick ?? 0)),
-    lastProcessedInput: Number(envelope.lastProcessedInput ?? 0),
-    spawns: (envelope.spawns as IncomingSnapshot["spawns"]) ?? [],
-    updates: (envelope.updates as IncomingSnapshot["updates"]) ?? [],
-    despawns: (envelope.despawns as IncomingSnapshot["despawns"]) ?? [],
-  };
 }
 
 export function connectLive(opts: {
@@ -267,7 +226,7 @@ export function connectLive(opts: {
       opts.onFault?.(err);
     }
     if (typeof msg.t === "string") {
-      const laser = asLaser(msg);
+      const laser = parseLaser(msg);
       if (laser) opts.onLaser?.(laser);
       const grenade = parseGrenadePose(msg);
       if (grenade) opts.onGrenade?.(grenade);

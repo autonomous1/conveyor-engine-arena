@@ -67,6 +67,27 @@ export type LaserFrame = {
   until: number;
 };
 
+function asVec(value: unknown): Vec3 | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const rec = value as { x?: unknown; y?: unknown; z?: unknown };
+  if (typeof rec.x !== "number" || typeof rec.y !== "number" || typeof rec.z !== "number") return undefined;
+  if (!Number.isFinite(rec.x) || !Number.isFinite(rec.y) || !Number.isFinite(rec.z)) return undefined;
+  return { x: rec.x, y: rec.y, z: rec.z };
+}
+
+/** Host laser segment. `shooter` is coerced with `Number`, matching the client. */
+export function parseLaser(frame: unknown): LaserFrame | undefined {
+  if (!frame || typeof frame !== "object") return undefined;
+  const msg = frame as Record<string, unknown>;
+  if (msg.t !== "laser") return undefined;
+  const shooter = Number(msg.shooter);
+  const from = asVec(msg.from);
+  const to = asVec(msg.to);
+  const until = Number(msg.until);
+  if (!Number.isFinite(shooter) || !from || !to || !Number.isFinite(until)) return undefined;
+  return { t: "laser", shooter, from, to, until };
+}
+
 export type FireGate = {
   lastSeq: number;
   lastAt: number;

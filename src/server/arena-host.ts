@@ -5,6 +5,7 @@ import { createPawnHealth, type SpawnPick } from "../shared/health.js";
 import { helloModel, parseModelFrame } from "../shared/model-choice.js";
 import { createPawnKit, createPickupHost } from "../shared/pickups.js";
 import { decodeMoveButtons } from "../shared/movements.js";
+import { canonicalJson, sceneGraphPayload, sha256Hex } from "../shared/scene-graph.js";
 import { createArenaDoors, createDoorBlockers } from "./doors.js";
 import { createArenaElevators } from "./elevators.js";
 import { createArenaFire } from "./fire.js";
@@ -14,6 +15,19 @@ import { createHostSocketPaths } from "./host-path.js";
 import { pawnBodies, releasePickupObstacle } from "./pickups.js";
 import type { LoadedArena } from "./world-loader.js";
 
+/**
+ * Verified access claims. Same fields as `Claims` in `auth/tokens.ts`.
+ * Declared here so this module does not import the Node token signer.
+ */
+export type HostClaims = {
+  sub: string;
+  role: string;
+  scope: readonly string[];
+  jti: string;
+  iat: number;
+  exp: number;
+};
+
 /** A duplex the host can attach. The Node wrapper adapts `ws`. Solo adapts `memoryPair`. */
 export type HostConn = {
   send(text: string): void;
@@ -21,10 +35,28 @@ export type HostConn = {
   onText(handler: (text: string) => void): void;
   onClose(handler: () => void): void;
   isOpen(): boolean;
+  /** Verified hello claims. The Node gate sets this. Solo leaves it unset. */
+  claims?: HostClaims;
+};
+
+export type ArenaHostOptions = {
+  holdNpcs?: boolean;
+  /**
+   * In-tab solo passes true. There is no JWT. `build:solo` copies `web/game`
+   * into `dist/solo/game`, so `scene-graph.json` is public next to the page.
+   * Secrecy applies to the hosted build: that build sends the frame only when
+   * verified claims include the `scene-graph` scope.
+   */
+  grantSceneGraph?: boolean;
 };
 
 export type ArenaSession = {
   arenaJson: string;
+  /** Canonical scene-graph JSON. Absent when the manifest has no graph. */
+  sceneGraphJson?: string;
+  /** Hex SHA-256 of {@link sceneGraphJson}. Set when {@link sceneGraphReady} resolves. */
+  sceneGraphHash?: string;
+  sceneGraphReady: Promise<void>;
   attach(conn: HostConn): void;
   stop(): void;
 };
@@ -33,8 +65,12 @@ export type ArenaSession = {
  * Authoritative arena host with no Node imports. `main.ts` serves it over HTTP.
  * The solo page attaches a `memoryPair` server socket instead.
  */
-export function createArenaHost(loaded: LoadedArena, opts: { holdNpcs?: boolean } = {}): ArenaSession {
+export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}): ArenaSession {
   const holdNpcs = opts.holdNpcs ?? false;
+  const grantSceneGraph = opts.grantSceneGraph === true;
+  const sceneGraphJson = loaded.sceneGraph ? canonicalJson(sceneGraphPayload(loaded.sceneGraph)) : undefined;
+  let sceneGraphHash: string | undefined;
+  const sceneWaiters: HostConn[] = [];
   const held = createHeldInputs();
   /** Pads chosen since the last commit. The next hello treats them as occupied. */
   const reservedPads = new Map<number, SpawnPick>();
@@ -43,7 +79,7 @@ export function createArenaHost(loaded: LoadedArena, opts: { holdNpcs?: boolean 
   const pickupHost = createPickupHost(loaded.view.pickups ?? []);
   const audit = createAudit();
   for (const agent of loaded.agents) health.note(agent.id);
-  const attachPickupWelcome = (text: string): string => {
+  const attachPickupWelcome = (text: string, claims?: HostClaims): string => {
     let frame: unknown;
     try {
       frame = JSON.parse(text);
@@ -63,9 +99,36 @@ export function createArenaHost(loaded: LoadedArena, opts: { holdNpcs?: boolean 
       const ammo = kit.ammoOf(owned);
       if (weapon) welcome.weapon = weapon;
       if (ammo > 0) welcome.ammo = ammo;
+      welcome.keys = pickupHost.getHeldItems(owned);
+    }
+    if (claims) {
+      welcome.role = claims.role;
+      welcome.scope = [...claims.scope];
     }
     return JSON.stringify(welcome);
   };
+  const pushSceneGraph = (conn: HostConn): void => {
+    if (!sceneGraphJson || !conn.isOpen()) return;
+    const allowed = grantSceneGraph || conn.claims?.scope.includes("scene-graph") === true;
+    if (!allowed) return;
+    if (!sceneGraphHash) {
+      sceneWaiters.push(conn);
+      return;
+    }
+    conn.send(encodeFrame({
+      t: "sceneGraph",
+      v: 1,
+      hash: sceneGraphHash,
+      graph: JSON.parse(sceneGraphJson),
+    }));
+  };
+  const sceneGraphReady: Promise<void> = sceneGraphJson
+    ? sha256Hex(sceneGraphJson).then((hex) => {
+      sceneGraphHash = hex;
+      const pending = sceneWaiters.splice(0);
+      for (const conn of pending) pushSceneGraph(conn);
+    })
+    : Promise.resolve();
   const refused = new Set<number>();
   const engine: EngineWsServer = new EngineWsServer({
     compatibility: { protocol: 1, world: loaded.view.world },
@@ -175,6 +238,7 @@ export function createArenaHost(loaded: LoadedArena, opts: { holdNpcs?: boolean 
       for (const clientId of engine.connected) {
         engine.session(clientId)?.socket.send(gone);
       }
+      if (grant.kind === "key") sendInventory(grant.pawnId);
       if (!grant.loadout) continue;
       const loadout = encodeFrame(grant.loadout);
       for (const clientId of engine.connected) {
@@ -196,8 +260,22 @@ export function createArenaHost(loaded: LoadedArena, opts: { holdNpcs?: boolean 
   });
   const arenaJson = JSON.stringify({ ...loaded.view, propClips });
 
+  function sendInventory(pawnId: number): void {
+    // Keys survive respawn today. Death dropping keys is later, so this list is not cleared.
+    const frame = encodeFrame({ t: "inventory", keys: pickupHost.getHeldItems(pawnId) });
+    for (const clientId of engine.connected) {
+      if (engine.replicator.get(clientId)?.ownedEntity !== pawnId) continue;
+      engine.session(clientId)?.socket.send(frame);
+    }
+  }
+
   return {
     arenaJson,
+    sceneGraphJson,
+    get sceneGraphHash() {
+      return sceneGraphHash;
+    },
+    sceneGraphReady,
     attach(conn) {
       const socket = socketFromConn(conn, refused, (clientId) => engine.disconnect(clientId), (sock, frame) => {
         const clientId = clientIdFor(engine, sock);
@@ -231,7 +309,7 @@ export function createArenaHost(loaded: LoadedArena, opts: { holdNpcs?: boolean 
         } catch (err) {
           console.error("door threw", err);
         }
-      }, attachPickupWelcome);
+      }, (text) => attachPickupWelcome(text, conn.claims), () => pushSceneGraph(conn));
       socket.onClose(() => {
         const clientId = clientIdFor(engine, socket);
         if (clientId !== undefined) doorHost.drop(clientId);
@@ -250,6 +328,7 @@ export function socketFromConn(
   drop: (clientId: number) => void,
   onArena: (socket: TransportSocket, frame: unknown) => void,
   stamp: (text: string) => string,
+  afterWelcome?: () => void,
 ): TransportSocket {
   const messages: Array<(text: string) => void> = [];
   const closes: Array<() => void> = [];
@@ -260,6 +339,7 @@ export function socketFromConn(
       const clientId = refusedWelcome(text, refused);
       if (clientId === undefined) {
         conn.send(stamp(text));
+        if (afterWelcome && isWelcomeText(text)) afterWelcome();
         return;
       }
       refused.delete(clientId);
@@ -303,6 +383,15 @@ function clientIdFor(engine: EngineWsServer, socket: TransportSocket): number | 
     if (engine.session(clientId)?.socket === socket) return clientId;
   }
   return undefined;
+}
+
+function isWelcomeText(text: string): boolean {
+  try {
+    const frame = JSON.parse(text) as { type?: unknown };
+    return !!frame && typeof frame === "object" && frame.type === "welcome";
+  } catch {
+    return false;
+  }
 }
 
 function refusedWelcome(text: string, refused: Set<number>): number | undefined {

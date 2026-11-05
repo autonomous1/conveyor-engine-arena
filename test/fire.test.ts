@@ -345,7 +345,9 @@ test("a second client receives the laser and the segment matches the host hit", 
     assert.equal(group?.children.length, 1);
     drawn.expire(first.until);
     assert.equal(group?.children.length, 0);
-    const left = FIRE_INTERVAL_MS - (Date.now() - started) + 20;
+    // The host stamps the gate when it admits, which is after `started`. Measure the
+    // 8 Hz gap from the observed laser so a slow first shot is not still inside that window.
+    const left = FIRE_INTERVAL_MS - (Date.now() - seenAt) + 20;
     if (left > 0) await delay(left);
     send(3);
     const second = await waitFor(2000, () => (b.lasers.length >= 2 ? b.lasers[1] : undefined));

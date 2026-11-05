@@ -16,6 +16,14 @@ function textFiles(dir: string): string[] {
   return out;
 }
 
+test("hosted web build has no scene graph and solo publishes it", () => {
+  assert.equal(existsSync("dist/web/client.js"), true, "dist/web is missing; run npm run build");
+  assert.equal(existsSync("dist/web/scene-graph.json"), false);
+  assert.equal(existsSync("dist/web/game"), false);
+  assert.equal(existsSync("dist/web/game/scene-graph.json"), false);
+  assert.equal(existsSync("dist/solo/game/scene-graph.json"), true, "dist/solo/game/scene-graph.json is missing; run npm run build:solo");
+});
+
 test("landing page ships the play form and solo strips it", () => {
   const web = "dist/web/landing-page.html";
   assert.equal(existsSync(web), true, "dist/web/landing-page.html is missing; run npm run build");

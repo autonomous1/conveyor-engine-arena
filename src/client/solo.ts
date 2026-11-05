@@ -14,7 +14,8 @@ export async function startSolo(): Promise<{ view: ArenaView; open: () => WebSoc
   const files = await preloadGameFiles("./");
   const loaded = loadArena(files, { ARENA_NOCLIP: params.get("noclip") ?? undefined });
   rewriteAssetUris(loaded.view);
-  const host = createArenaHost(loaded);
+  // Solo has no JWT. The scene graph is public in dist/solo/game.
+  const host = createArenaHost(loaded, { grantSceneGraph: true });
   const view = JSON.parse(host.arenaJson) as ArenaView;
   const pair = memoryPair();
   host.attach(hostConn(pair.server));

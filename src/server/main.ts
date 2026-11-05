@@ -4,7 +4,7 @@ import { homedir } from "node:os";
 import path, { extname, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { WebSocketServer, type WebSocket } from "ws";
-import { authMode, checkHelloAuth, type AuthMode } from "./auth/gate.js";
+import { authMode, checkHelloAuth, checkSceneGraphAuth, type AuthMode } from "./auth/gate.js";
 import { createRevocationList, loadVerifier, type RevocationList } from "./auth/tokens.js";
 import { createArenaHost, type HostConn } from "./arena-host.js";
 import { loadArena } from "./world-loader.js";
@@ -35,8 +35,14 @@ function fileUnderWeb(rel: string): string | undefined {
   return file;
 }
 
-function send(res: ServerResponse, status: number, body: string | Uint8Array, contentType: string): void {
-  res.writeHead(status, { "content-type": contentType, "cache-control": "no-store" });
+function send(
+  res: ServerResponse,
+  status: number,
+  body: string | Uint8Array,
+  contentType: string,
+  extra?: Record<string, string>,
+): void {
+  res.writeHead(status, { "content-type": contentType, "cache-control": "no-store", ...extra });
   res.end(body);
 }
 
@@ -69,13 +75,15 @@ function peerIp(req: IncomingMessage): string {
  */
 export async function openAuthGate(env: NodeJS.ProcessEnv = process.env): Promise<AuthGate> {
   const mode = authMode(env);
-  if (mode === "off") return { mode, revoked: { has: () => false } };
   const keyFile = env.ARENA_VERIFY_KEY_FILE?.trim() ?? "";
-  if (keyFile === "") throw new Error("ARENA_AUTH=required needs ARENA_VERIFY_KEY_FILE");
+  if (mode === "required" && keyFile === "") throw new Error("ARENA_AUTH=required needs ARENA_VERIFY_KEY_FILE");
+  // Auth-off still loads a key when one is set, so GET /scene-graph.json can verify a Bearer.
+  if (keyFile === "") return { mode, revoked: { has: () => false } };
   let pub: CryptoKey;
   try {
     pub = await loadVerifier(keyFile);
   } catch (err) {
+    if (mode === "off") return { mode, revoked: { has: () => false } };
     const detail = err instanceof Error ? err.message : String(err);
     throw new Error(`ARENA_AUTH=required could not load ARENA_VERIFY_KEY_FILE (${keyFile}): ${detail}`);
   }
@@ -117,12 +125,30 @@ function connFromWs(ws: WebSocket, gate: AuthGate, ip: string): HostConn {
       // The peer already went away.
     }
   };
-  const admit = (sub?: string, role?: string) => {
+  const conn: HostConn = {
+    send(text) {
+      if (ws.readyState === ws.OPEN) ws.send(text);
+    },
+    close() {
+      if (ws.readyState === ws.OPEN || ws.readyState === ws.CONNECTING) ws.close();
+    },
+    onText(handler) {
+      texts.push(handler);
+    },
+    onClose(handler) {
+      closes.push(handler);
+    },
+    isOpen() {
+      return ws.readyState === ws.OPEN;
+    },
+  };
+  const admit = (claims?: HostConn["claims"]) => {
     if (closed || admitted) return;
     admitted = true;
     disarm();
-    if (sub !== undefined && role !== undefined) {
-      console.log(`[auth] ok sub=${logField(sub)} role=${logField(role)}`);
+    if (claims) {
+      conn.claims = claims;
+      console.log(`[auth] ok sub=${logField(claims.sub)} role=${logField(claims.role)}`);
     }
     const pending = queued.splice(0);
     for (const text of pending) deliver(text);
@@ -141,7 +167,7 @@ function connFromWs(ws: WebSocket, gate: AuthGate, ip: string): HostConn {
         fail(result.code, result.reason);
         return;
       }
-      admit(result.claims?.sub, result.claims?.role);
+      admit(result.claims);
     }).catch(() => {
       checking = false;
       fail(4401, "bad-claims");
@@ -167,23 +193,7 @@ function connFromWs(ws: WebSocket, gate: AuthGate, ip: string): HostConn {
     disarm();
     for (const handler of closes) handler();
   });
-  return {
-    send(text) {
-      if (ws.readyState === ws.OPEN) ws.send(text);
-    },
-    close() {
-      if (ws.readyState === ws.OPEN || ws.readyState === ws.CONNECTING) ws.close();
-    },
-    onText(handler) {
-      texts.push(handler);
-    },
-    onClose(handler) {
-      closes.push(handler);
-    },
-    isOpen() {
-      return ws.readyState === ws.OPEN;
-    },
-  };
+  return conn;
 }
 
 export type ArenaHost = {
@@ -196,12 +206,29 @@ export async function startArenaServer(port = Number(process.env.PORT ?? 4173), 
   const gate = await openAuthGate();
   const loaded = loadArena();
   const host = createArenaHost(loaded, { holdNpcs });
+  await host.sceneGraphReady;
   const arenaJson = withAuthRequired(host.arenaJson, gate.mode === "required");
 
   const httpServer = createServer(async (req, res) => {
     const url = new URL(req.url ?? "/", "http://127.0.0.1");
     if (url.pathname === "/arena.json") {
       send(res, 200, arenaJson, "application/json");
+      return;
+    }
+    if (url.pathname === "/scene-graph.json") {
+      const header = req.headers.authorization;
+      const result = await checkSceneGraphAuth(Array.isArray(header) ? header[0] : header, gate);
+      if (!result.ok) {
+        send(res, result.status, result.status === 401 ? "unauthorized" : "forbidden", "text/plain; charset=utf-8");
+        return;
+      }
+      const body = host.sceneGraphJson;
+      const hash = host.sceneGraphHash;
+      if (!body || !hash) {
+        send(res, 404, "not found", "text/plain; charset=utf-8");
+        return;
+      }
+      send(res, 200, body, "application/json", { etag: `"${hash}"` });
       return;
     }
     const rel = url.pathname === "/" ? "index.html" : url.pathname === "/play" ? "landing-page.html" : url.pathname;

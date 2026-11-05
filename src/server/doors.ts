@@ -86,6 +86,11 @@ export function createArenaDoors(opts: {
   blockers?: DoorBlockers;
   /** One line per accepted use press, with the outcome. */
   log?(line: string): void;
+  /**
+   * A key was consumed for this pawn. Unlock does not consume keys, so
+   * nothing calls this. Wire it only on a future consume path.
+   */
+  onKeysChanged?(pawnId: number): void;
 }) {
   const state = new Map<string, DoorRuntime>();
   const homeY = new Map<string, number>();

@@ -105,6 +105,42 @@ export type SceneGraph = SceneGraphFile & {
   skip: Set<string>;
 };
 
+/** File shape only. Drops the runtime maps on {@link SceneGraph}. */
+export function sceneGraphPayload(graph: SceneGraph): SceneGraphFile {
+  return {
+    formatVersion: graph.formatVersion,
+    units: graph.units,
+    places: graph.places,
+    portals: graph.portals,
+  };
+}
+
+/** Stable JSON: object keys sorted, array order kept, `undefined` omitted. */
+export function canonicalJson(value: unknown): string {
+  return JSON.stringify(canonicalize(value));
+}
+
+function canonicalize(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalize);
+  if (!value || typeof value !== "object") return value;
+  const rec = value as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  for (const key of Object.keys(rec).sort()) {
+    const item = rec[key];
+    if (item === undefined) continue;
+    out[key] = canonicalize(item);
+  }
+  return out;
+}
+
+/** Hex SHA-256. `crypto.subtle` is global in Node 22 and the browser. */
+export async function sha256Hex(text: string): Promise<string> {
+  const digest = await globalThis.crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  let hex = "";
+  for (const byte of new Uint8Array(digest)) hex += byte.toString(16).padStart(2, "0");
+  return hex;
+}
+
 type Issue = { path: string; message: string };
 
 const PLACE_KINDS = new Set<string>(["room", "hall", "platform", "stairs", "elevator", "landing", "outside"]);

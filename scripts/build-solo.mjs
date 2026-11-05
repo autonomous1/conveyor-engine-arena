@@ -43,6 +43,7 @@ await cp("web/index.html", "dist/solo/index.html");
 const landing = await readFile("web/landing-page.html", "utf8");
 await writeFile("dist/solo/landing-page.html", landing.replace(/<!-- play:start -->[\s\S]*?<!-- play:end -->/g, ""));
 await cp("web/assets", "dist/solo/assets", { recursive: true });
+// Solo publishes web/game, including scene-graph.json. The hosted web build does not.
 await cp("web/game", "dist/solo/game", { recursive: true });
 const basis = "node_modules/three/examples/jsm/libs/basis";
 await mkdir("dist/solo/assets/basis", { recursive: true });

@@ -37,6 +37,37 @@ export async function checkHelloAuth(
   }
 }
 
+export type BearerAuth =
+  | { ok: true; claims: Claims }
+  | { ok: false; status: 401 | 403 };
+
+/**
+ * `GET /scene-graph.json`. Missing, bad, or expired is 401.
+ * A verified token whose `scope` omits `scene-graph` is 403.
+ * Auth-off still needs a Bearer that verifies. No public graph.
+ */
+export async function checkSceneGraphAuth(
+  authorization: string | undefined,
+  deps: { pub?: CryptoKey; revoked: RevocationList },
+): Promise<BearerAuth> {
+  if (!deps.pub) return { ok: false, status: 401 };
+  const token = readBearer(authorization);
+  if (!token) return { ok: false, status: 401 };
+  try {
+    const claims = await verify(deps.pub, token, deps.revoked);
+    if (!claims.scope.includes("scene-graph")) return { ok: false, status: 403 };
+    return { ok: true, claims };
+  } catch {
+    return { ok: false, status: 401 };
+  }
+}
+
+function readBearer(header: string | undefined): string | undefined {
+  if (!header) return undefined;
+  const match = /^Bearer\s+(\S+)$/i.exec(header.trim());
+  return match?.[1];
+}
+
 /** Hello `auth` string, or undefined when the frame is not a keyed hello. */
 function readAuth(text: string): string | undefined {
   let frame: unknown;

@@ -17,6 +17,7 @@ if (failures.length) {
 console.log(`check:${which} ok`);
 
 function checkWeb() {
+  checkSharedSources();
   const js = readFileSync("dist/web/client.js", "utf8");
   const meta = JSON.parse(readFileSync("dist/web/meta.json", "utf8"));
   for (const name of ["createArenaHost", "EngineWsServer", "memoryPair", "compileGame", "preloadGameFiles"]) {
@@ -29,7 +30,18 @@ function checkWeb() {
   }
 }
 
+function checkSharedSources() {
+  for (const file of ["src/shared/wire.ts", "src/shared/bot-protocol.ts"]) {
+    const text = readFileSync(file, "utf8");
+    if (text.includes("node:")) failures.push(`${file} contains a node: specifier`);
+    if (text.includes("require(")) failures.push(`${file} contains require(`);
+    if (text.includes("readFileSync")) failures.push(`${file} contains readFileSync`);
+    if (text.includes('from "ws"') || text.includes("from 'ws'")) failures.push(`${file} imports ws`);
+  }
+}
+
 function checkSolo() {
+  checkSharedSources();
   const js = readFileSync("dist/solo/client.js", "utf8");
   const html = readFileSync("dist/solo/index.html", "utf8");
   const meta = JSON.parse(readFileSync("dist/solo/meta.json", "utf8"));
