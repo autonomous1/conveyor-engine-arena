@@ -2,6 +2,7 @@ import { EngineClient } from "conveyor-engine-client";
 import { fireShotFrame, summarizeInbound } from "../shared/fire-debug.js";
 import { parseAudit, type AuditCounters } from "../shared/audit.js";
 import { parseHealth } from "../shared/health.js";
+import { parseSceneGraphFrame, type SceneGraphFrame } from "../shared/bot-protocol.js";
 import { parseDoor, parseDoorSet, useFrame, type DoorFrame } from "../shared/doors.js";
 import { parseElevatorSet, parseElevatorState, type ElevatorState } from "../shared/elevators.js";
 import { parseGrenadePose, grenadeFrame, type GrenadePose } from "../shared/grenade.js";
@@ -120,6 +121,11 @@ export function connectLive(opts: {
   onElevator?: (elevator: ElevatorState) => void;
   /** Full cab list from welcome, so a late joiner matches. */
   onElevators?: (elevators: readonly ElevatorState[]) => void;
+  /**
+   * Privileged scene graph. `undefined` clears the cache (welcome, close, or a
+   * frame that did not parse). The client does not fetch the file.
+   */
+  onSceneGraph?: (frame: SceneGraphFrame | undefined) => void;
   /** This client only. Other clients do not receive a viewmodel. */
   onLoadout?: (loadout: LoadoutFrame) => void;
   /** Read when a shot is sent. The host logs only when this is on. */
@@ -191,6 +197,7 @@ export function connectLive(opts: {
   ws.onclose = (ev) => {
     closed = true;
     console.log("socket closed");
+    opts.onSceneGraph?.(undefined);
     const info = closeInfo(ev);
     if (!isArenaSolo() && (info.code === 4401 || info.code === 4403)) {
       opts.onStatus({
@@ -226,6 +233,10 @@ export function connectLive(opts: {
       opts.onFault?.(err);
     }
     if (typeof msg.t === "string") {
+      if (msg.t === "sceneGraph") {
+        opts.onSceneGraph?.(parseSceneGraphFrame(msg));
+        return;
+      }
       const laser = parseLaser(msg);
       if (laser) opts.onLaser?.(laser);
       const grenade = parseGrenadePose(msg);
@@ -246,6 +257,7 @@ export function connectLive(opts: {
     }
     try {
       if (msg.type === "welcome") {
+        opts.onSceneGraph?.(undefined);
         const token = typeof msg.reconnectToken === "string" ? msg.reconnectToken : undefined;
         if (token && useAuth) sessionStorage.setItem(TOKEN_KEY, token);
         const owned = Number(msg.ownedEntityId);

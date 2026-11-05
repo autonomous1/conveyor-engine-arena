@@ -34,6 +34,8 @@ import {
  * Back toggles the scene map. Start toggles options. D-pad up raises the cab
  * pick; D-pad down lowers it. In the options panel, D-pad and the left stick
  * move the highlight, A toggles the row, and B closes the panel.
+ * I, or Y on a standard pad, inspects the crosshair once per press. A hold
+ * does not repeat. Menus and text fields swallow it. It is not a wire bit.
  * `jumper-t` keeps its sticks and binds no buttons.
  * The 20 Hz message is still `{ moveX, moveZ, yaw, buttons, seq, entity }`.
  */
@@ -59,6 +61,8 @@ export type PlaySample = {
   cabConfirm: boolean;
   /** X was pressed once. Calls the landing the pawn is standing on. */
   callLanding: boolean;
+  /** I or Y was pressed once. Local inspect. A hold does not repeat. Not sent. */
+  info: boolean;
 };
 
 /** Space up, Control down. Both held cancel. */
@@ -135,6 +139,7 @@ export function attachPlayInput(
   storage: ProfileStorage | null = browserProfileStorage(),
   onFirePress: () => void = () => {},
   getInvertY: () => boolean = () => false,
+  getMenuOpen: () => boolean = () => false,
 ): PlayInput {
   const keys = new Set<string>();
   let yaw = 0;
@@ -154,6 +159,8 @@ export function attachPlayInput(
   let padUseQueued = false;
   let padCabConfirmQueued = false;
   let padCallQueued = false;
+  let keyInfoQueued = false;
+  let padInfoQueued = false;
   let padAscend: -1 | 0 | 1 = 0;
   let padCabNav: -1 | 0 | 1 = 0;
   let sticksLive = false;
@@ -163,7 +170,10 @@ export function attachPlayInput(
   const pad = new GamepadInput();
   const padReader = createPadReader();
 
+  const menuIsOpen = () => menuOpen || getMenuOpen();
+
   const persist = (next: GamepadProfileName) => {
+    if (next !== profile) padInfoQueued = false;
     profile = next;
     saveGamepadProfile(storage, next);
   };
@@ -175,6 +185,7 @@ export function attachPlayInput(
     padUseQueued = false;
     padCabConfirmQueued = false;
     padCallQueued = false;
+    padInfoQueued = false;
     padAscend = 0;
     padCabNav = 0;
   };
@@ -213,6 +224,7 @@ export function attachPlayInput(
       padCabConfirmQueued = true;
     }
     if (actions.callLanding.pressed) padCallQueued = true;
+    if (actions.info.pressed) padInfoQueued = true;
     padAscend = actions.ascend;
     if (actions.nav !== 0) padCabNav = cabDelta(actions.nav);
   };
@@ -258,6 +270,13 @@ export function attachPlayInput(
       useQueued = true;
       return;
     }
+    if (ev.code === "KeyI") {
+      if (!down) return;
+      if (ev.repeat || menuIsOpen() || isEditable(ev.target) || isEditable(document.activeElement)) return;
+      if (document.pointerLockElement !== dom) return;
+      keyInfoQueued = true;
+      return;
+    }
     if (/^(?:Digit|Numpad)[0-9]$/.test(ev.code)) {
       if (!down) return;
       if (ev.repeat || document.pointerLockElement !== dom) return;
@@ -299,6 +318,7 @@ export function attachPlayInput(
       grenadeQueued = false;
       useQueued = false;
       digitQueued = undefined;
+      keyInfoQueued = false;
     }
     document.body.style.cursor = locked ? "none" : "default";
   };
@@ -322,6 +342,7 @@ export function attachPlayInput(
     grenadeQueued = false;
     useQueued = false;
     digitQueued = undefined;
+    keyInfoQueued = false;
     releasePad();
   };
   const onPadConnected = (ev: Event) => {
@@ -404,6 +425,7 @@ export function attachPlayInput(
       const cabNav = padCabNav;
       const cabConfirm = padCabConfirmQueued;
       const callLanding = padCallQueued;
+      const info = !menuIsOpen() && (keyInfoQueued || padInfoQueued);
       fireQueued = false;
       grenadeQueued = false;
       useQueued = false;
@@ -413,6 +435,8 @@ export function attachPlayInput(
       padUseQueued = false;
       padCabConfirmQueued = false;
       padCallQueued = false;
+      padInfoQueued = false;
+      keyInfoQueued = false;
       padCabNav = 0;
       return {
         forward: move.forward,
@@ -426,6 +450,7 @@ export function attachPlayInput(
         cabNav,
         cabConfirm,
         callLanding,
+        info,
         ...(digit ? { digit } : {}),
       };
     },
@@ -437,6 +462,14 @@ export function attachPlayInput(
  * Pair order does not matter for that axial deadzone. Returned order is
  * axis 0, 1, 2, 3.
  */
+function isEditable(target: EventTarget | null): boolean {
+  if (!target || typeof target !== "object") return false;
+  const el = target as { tagName?: string; isContentEditable?: boolean };
+  const tag = typeof el.tagName === "string" ? el.tagName.toUpperCase() : "";
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
+  return el.isContentEditable === true;
+}
+
 function readDeadzonedAxes(pad: GamepadInput): number[] {
   const left = pad.stick(0, 1);
   const right = pad.stick(2, 3);

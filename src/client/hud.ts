@@ -50,6 +50,14 @@ export function createHud() {
   const horz = document.createElement("div");
   horz.style.cssText = "position:absolute;left:0;top:7px;width:16px;height:2px;background:#f2f6fb";
   cross.append(vert, horz);
+  const info = document.createElement("div");
+  info.id = "info-probe";
+  info.style.cssText = [
+    "position:fixed", "left:50%", "top:calc(50% + 18px)", "transform:translateX(-50%)",
+    "z-index:3", "max-width:42rem", "padding:6px 8px", "background:#12151ccc", "color:#ffffff",
+    "font:13px/1.4 ui-sans-serif, system-ui", "white-space:pre", "text-align:center",
+    "pointer-events:none", "display:none",
+  ].join(";");
   let onProfileToggle = () => {};
   profileButton.addEventListener("click", (ev) => {
     ev.preventDefault();
@@ -74,7 +82,7 @@ export function createHud() {
     stats.style.display = statsVisible ? "block" : "none";
   };
   window.addEventListener("keydown", onStatsKey);
-  document.body.append(status, stats, cross);
+  document.body.append(status, stats, cross, info);
   return {
     setStatus(text: string) {
       label.textContent = text;
@@ -105,6 +113,11 @@ export function createHud() {
     setStats(text: string) {
       if (!statsVisible) return;
       stats.textContent = text;
+    },
+    /** Crosshair inspect. Empty hides the line. Does not touch status or stats. */
+    setInfo(text: string) {
+      info.textContent = text;
+      info.style.display = text.length > 0 ? "block" : "none";
     },
   };
 }

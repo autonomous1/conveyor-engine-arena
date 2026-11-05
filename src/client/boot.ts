@@ -11,6 +11,7 @@ import {
   type ElevatorRuntime,
   type ElevatorState,
 } from "../shared/elevators.js";
+import type { CabState } from "../shared/scene-graph.js";
 import { encodeMoveButtons } from "../shared/movements.js";
 import { dropPickupAabb } from "../shared/pickups.js";
 import { clientFaultText, createFireDebugLog } from "../shared/fire-debug.js";
@@ -23,6 +24,7 @@ import { createElevatorRooms } from "./elevator-room.js";
 import { createGrenadeProps } from "./grenade.js";
 import { createHitMarker } from "./hit-marker.js";
 import { createHud, localHealthLabel } from "./hud.js";
+import { cameraAim, createInfoProbe, leafAabb, type ProbePawn } from "./info-probe.js";
 import { attachPlayInput } from "./input.js";
 import { createLaserBeams } from "./laser.js";
 import { assetBase } from "../shared/asset-base.js";
@@ -102,7 +104,13 @@ export async function boot(
   const pawns = createPawnLayer(arena.content, visuals.templates, view.pawnHeight);
   const input = attachPlayInput(arena.renderer.domElement, undefined, () => {
     fireDebug.keydown();
-  }, () => options.invertY);
+  }, () => options.invertY, () => options.open);
+  const probe = createInfoProbe({
+    doors: view.doors ?? [],
+    pickups: view.pickups ?? [],
+    props: view.props ?? [],
+    show: (text) => hud.setInfo(text),
+  });
   input.onPadMenu((ev) => {
     if (ev === "toggle") {
       const opening = !options.open;
@@ -186,15 +194,22 @@ export async function boot(
     },
     onPickupSet: (ids) => {
       showRemaining(ids);
+      probe.onPickupSet(ids);
     },
     onPickup: (pickup) => {
       visuals.placements.setVisible(pickup.id, false);
       dropBox(pickup.id);
+      probe.onPickupGone(pickup.id);
     },
-    onDoor: (door) => swingDoor(door.id, door.open),
+    onDoor: (door) => {
+      swingDoor(door.id, door.open);
+      probe.onDoor(door);
+    },
     onDoors: (doors) => {
       for (const door of doors) swingDoor(door.id, door.open);
+      probe.onDoors(doors);
     },
+    onSceneGraph: (frame) => probe.onSceneGraph(frame),
     onElevator: (row) => applyCab(row),
     onElevators: (rows) => {
       for (const row of rows) applyCab(row);
@@ -237,9 +252,14 @@ export async function boot(
   const rates = createRateWindow(500);
   const sendDt = 1 / INPUT_HZ;
   let lastDoorTick = 0;
+  let wantInfo = false;
+  let probeOwn: { x: number; y: number; z: number } | undefined;
+  let probeOwnedId: number | undefined;
+  let probePawns: readonly ProbePawn[] = [];
 
   function frame(now: number) {
     let threw = false;
+    wantInfo = false;
     try {
       drawFrame(now);
     } catch (err) {
@@ -267,6 +287,26 @@ export async function boot(
     const doorDt = lastDoorTick ? Math.min(0.1, (now - lastDoorTick) / 1000) : 0;
     lastDoorTick = now;
     for (const rig of visuals.doors.values()) tickDoorSwing(rig.group, doorDt);
+    if (wantInfo) {
+      const aim = cameraAim(arena.camera);
+      const leaves = new Map<string, ReturnType<typeof leafAabb>>();
+      for (const [id, rig] of visuals.doors) leaves.set(id, leafAabb(rig.group));
+      probe.inspect({
+        now,
+        origin: aim.origin,
+        direction: aim.direction,
+        leaves,
+        volumes: view.aabbs,
+        pawns: probePawns,
+        ownedId: probeOwnedId,
+        radius: view.pawnRadius,
+        height: view.pawnHeight,
+        own: probeOwn,
+        cabs: probeCabs(),
+        pickupHidden: (id) => visuals.placements.hidden(id),
+      });
+    }
+    probe.refresh(now, probeOwn, probeCabs());
     if (pendingFireLog) {
       if (options.fireDebug) {
         const camera = arena.camera.position;
@@ -293,6 +333,10 @@ export async function boot(
     const render = client.renderSnapshot();
     const ownedId = client.ownedEntity;
     const owned = ownedId === undefined ? undefined : render.entities.find((entity) => entity.id === ownedId);
+    wantInfo = sample.info;
+    probeOwnedId = ownedId;
+    probeOwn = owned ? { x: owned.position.x, y: owned.position.y, z: owned.position.z } : undefined;
+    probePawns = render.entities;
     if (owned && ownedId !== aimedPawn) {
       input.setYaw(yawFromQuat(owned.rotation));
       aimedPawn = ownedId;
@@ -513,6 +557,19 @@ export async function boot(
     if (mesh) mesh.position.y = row.y + 0.02 - CAB_BOX_H / 2;
     elevatorRooms.onCab(row);
     if (cabPick.get(row.id) === row.stop && row.doorsOpen) cabPick.delete(row.id);
+  }
+
+  function probeCabs(): CabState[] {
+    return (view.elevators ?? []).map((def) => {
+      const rt = cabRuntime(def);
+      return {
+        id: rt.id,
+        at: rt.at,
+        phase: rt.phase,
+        y: rt.y,
+        ...(rt.target !== undefined ? { target: rt.target } : {}),
+      };
+    });
   }
 
   function cabRuntime(def: ArenaElevator): ElevatorRuntime {

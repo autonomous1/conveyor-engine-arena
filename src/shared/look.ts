@@ -102,6 +102,7 @@ export function eyeLook(
  *   right, through the same `lookFromStick` signs as the mouse. `invertY`
  *   flips the pitch sign. The caller clamps pitch with `clampPitch`.
  * - RT fires, LT throws one grenade, A uses a door, X calls a landing,
+ *   Y inspects the crosshair (local only, not an input bit),
  *   LB/RB are noclip down/up, Back toggles the scene map, Start toggles
  *   options. D-pad up/down picks a cab stop or moves the options highlight.
  * `jumper-t` keeps its stick map and binds no buttons.
@@ -144,6 +145,8 @@ export type GamepadBindings = {
   select?: number;
   back?: number;
   callLanding?: number;
+  /** Crosshair inspect. Standard Y. Absent on `jumper-t`. */
+  info?: number;
   descend?: number;
   ascend?: number;
   map?: number;
@@ -164,6 +167,7 @@ export function gamepadBindings(profile: GamepadProfileName): GamepadBindings {
     select: 0,
     back: 1,
     callLanding: 2,
+    info: 3,
     descend: 4,
     ascend: 5,
     map: 8,

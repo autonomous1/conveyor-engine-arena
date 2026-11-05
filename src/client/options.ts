@@ -437,9 +437,13 @@ export function createOptionsDialog(
     modelLabel.append(select);
   }
 
+  const help = document.createElement("p");
+  help.id = "control-help";
+  help.textContent = "I or Y inspects the crosshair.";
+  help.style.cssText = "margin:10px 0 0;color:#c5ccd8;font:12px/1.4 ui-sans-serif,system-ui;";
   panel.append(title, collisionSwitch, fireSwitch, mapSwitch, invertSwitch, noclipSwitch);
   if (modelLabel) panel.append(modelLabel);
-  panel.append(auditView);
+  panel.append(auditView, help);
 
   const focusEls: HTMLElement[] = [collisionSwitch, fireSwitch, mapSwitch, invertSwitch];
   if (noclipAllowed) focusEls.push(noclipSwitch);

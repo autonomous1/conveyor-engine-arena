@@ -35,6 +35,7 @@ function assertQuiet(actions: PadActions): void {
     grenade: { held: false, pressed: false },
     use: { held: false, pressed: false },
     callLanding: { held: false, pressed: false },
+    info: { held: false, pressed: false },
     ascend: 0,
     menuToggle: { held: false, pressed: false },
     mapToggle: { held: false, pressed: false },

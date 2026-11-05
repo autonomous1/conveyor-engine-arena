@@ -45,6 +45,8 @@ export type PadActions = {
   grenade: PadEdge;
   use: PadEdge;
   callLanding: PadEdge;
+  /** Y, one edge per press. Inspects the crosshair. Not sent to the host. */
+  info: PadEdge;
   ascend: -1 | 0 | 1;
   menuToggle: PadEdge;
   mapToggle: PadEdge;
@@ -168,6 +170,7 @@ function idleActions(): PadActions {
     grenade: quietEdge(),
     use: quietEdge(),
     callLanding: quietEdge(),
+    info: quietEdge(),
     ascend: 0,
     menuToggle: quietEdge(),
     mapToggle: quietEdge(),
@@ -228,6 +231,7 @@ export function createPadReader(): PadReader {
   const use = new ButtonEdge();
   const back = new ButtonEdge();
   const callLanding = new ButtonEdge();
+  const info = new ButtonEdge();
   const menuToggle = new ButtonEdge();
   const mapToggle = new ButtonEdge();
   const navY = new RepeatNav();
@@ -240,6 +244,7 @@ export function createPadReader(): PadReader {
     use.reset();
     back.reset();
     callLanding.reset();
+    info.reset();
     menuToggle.reset();
     mapToggle.reset();
     navY.reset();
@@ -259,6 +264,7 @@ export function createPadReader(): PadReader {
       const confirm = use.step(buttonDown(frame, STD.A));
       const cancel = back.step(buttonDown(frame, STD.B));
       const call = callLanding.step(buttonDown(frame, STD.X));
+      const inspect = info.step(buttonDown(frame, STD.Y));
       const start = menuToggle.step(buttonDown(frame, STD.START));
       const select = mapToggle.step(buttonDown(frame, STD.BACK));
       const stick = menu ? stickY.step(axisValue(frame, 1)) : (stickY.reset(), 0);
@@ -272,6 +278,7 @@ export function createPadReader(): PadReader {
         use: menu ? quietEdge() : confirm,
         select: menu ? confirm : quietEdge(),
         callLanding: menu ? quietEdge() : call,
+        info: menu ? quietEdge() : inspect,
         back: menu ? cancel : quietEdge(),
         menuToggle: start,
         mapToggle: select,
