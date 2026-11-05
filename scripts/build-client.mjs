@@ -13,7 +13,19 @@ const result = await build({
   target: "es2022",
   legalComments: "none",
   metafile: true,
-  define: { __ASSET_BASE__: '"/"' },
+  define: { __ASSET_BASE__: '"/"', __ARENA_SOLO__: "false" },
+});
+await build({
+  entryPoints: ["src/client/auth-key.ts"],
+  bundle: true,
+  format: "esm",
+  minify: true,
+  sourcemap: true,
+  outfile: "dist/web/auth-key.js",
+  platform: "browser",
+  target: "es2022",
+  legalComments: "none",
+  define: { __ARENA_SOLO__: "false" },
 });
 await writeFile("dist/web/meta.json", JSON.stringify(result.metafile));
 await cp("web/index.html", "dist/web/index.html");

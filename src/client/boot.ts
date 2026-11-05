@@ -34,7 +34,11 @@ import { createPawnLayer } from "./presentation.js";
 import { createRateWindow, formatOverlay } from "./rates.js";
 import { formatFireLog, presentShot } from "./shot-view.js";
 
-export async function boot(view: ArenaView, open: () => OpenSocket, opts?: { auth?: boolean }): Promise<void> {
+export async function boot(
+  view: ArenaView,
+  open: () => OpenSocket,
+  opts?: { auth?: boolean; onAuthRejected?: (reason: string) => void },
+): Promise<void> {
   const hud = createHud();
   const hitMarker = createHitMarker();
   hud.setStatus("loading arena");
@@ -220,6 +224,7 @@ export async function boot(view: ArenaView, open: () => OpenSocket, opts?: { aut
     model: () => options.modelChoice || undefined,
     open,
     auth: opts?.auth,
+    onAuthRejected: opts?.onAuthRejected,
   });
   pushModel = (id) => {
     link.sendModel(id);

@@ -532,6 +532,9 @@
     </p>
     <div class="hero-buttons">
       <a class="btn btn-primary" href="#install">▶ &nbsp;Get the Engine</a>
+      <!-- play:start -->
+      <a class="btn btn-secondary" href="#play">▶ &nbsp;Play</a>
+      <!-- play:end -->
       <a class="btn btn-secondary" href="#media">View Media</a>
     </div>
   </div>
@@ -546,6 +549,32 @@
     <span>open source</span> brutalist &nbsp;·&nbsp; arena &nbsp;·&nbsp; elevators &nbsp;·&nbsp; stairs
   </div>
 </div>
+
+<!-- play:start -->
+<section id="play">
+  <p class="section-label">// 000 &nbsp;·&nbsp; Play</p>
+  <h2>Join the<br/>Arena</h2>
+  <p style="color:var(--text-dim); margin-bottom:1.5rem; max-width:36rem;">
+    Paste the player key you were given, then play. The host checks the signature.
+  </p>
+  <div style="max-width:40rem;">
+    <label for="auth-key" style="display:block; font-family:'Share Tech Mono',monospace; font-size:0.75rem; letter-spacing:0.12em; text-transform:uppercase; color:var(--text-dim); margin-bottom:0.5rem;">Auth key</label>
+    <div style="display:flex; gap:1rem; align-items:stretch; margin-bottom:1rem;">
+      <input id="auth-key" type="password" autocomplete="off" spellcheck="false" style="flex:1; min-width:0; background:var(--teal-dark); border:1px solid var(--teal-mid); padding:1.25rem 1.75rem; font-family:'Share Tech Mono',monospace; font-size:0.85rem; color:var(--blue-electric); letter-spacing:0.06em; outline:none;">
+      <button type="button" class="btn btn-secondary" id="auth-show">Show</button>
+    </div>
+    <label style="display:flex; gap:0.6rem; align-items:center; color:var(--text-dim); font-family:'Share Tech Mono',monospace; font-size:0.85rem; margin-bottom:1.5rem;">
+      <input type="checkbox" id="auth-remember"> Remember on this device
+    </label>
+    <div style="display:flex; gap:1rem; flex-wrap:wrap;">
+      <button type="button" class="btn btn-primary" id="auth-play">Play</button>
+      <button type="button" class="btn btn-secondary" id="auth-signout">Sign out</button>
+    </div>
+    <p id="auth-msg" role="status" style="color:var(--text-dim); min-height:1.5rem; margin-top:1rem; font-family:'Share Tech Mono',monospace; font-size:0.85rem;"></p>
+  </div>
+</section>
+<script type="module" src="auth-key.js"></script>
+<!-- play:end -->
 
 <!-- ABOUT -->
 <section id="about">

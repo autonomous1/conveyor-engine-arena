@@ -1,5 +1,5 @@
 import { build } from "esbuild";
-import { cp, mkdir, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 await rm("dist/solo", { recursive: true, force: true });
@@ -18,6 +18,7 @@ const result = await build({
   metafile: true,
   define: {
     __ASSET_BASE__: '"./"',
+    __ARENA_SOLO__: "true",
     // three.js zstddec keeps a Node fallback, Buffer.from(base64). The browser
     // path uses fetch. A literal keeps that string out of client.js.
     "Buffer.from": "null",
@@ -39,6 +40,8 @@ const result = await build({
 });
 await writeFile("dist/solo/meta.json", JSON.stringify(result.metafile));
 await cp("web/index.html", "dist/solo/index.html");
+const landing = await readFile("web/landing-page.html", "utf8");
+await writeFile("dist/solo/landing-page.html", landing.replace(/<!-- play:start -->[\s\S]*?<!-- play:end -->/g, ""));
 await cp("web/assets", "dist/solo/assets", { recursive: true });
 await cp("web/game", "dist/solo/game", { recursive: true });
 const basis = "node_modules/three/examples/jsm/libs/basis";

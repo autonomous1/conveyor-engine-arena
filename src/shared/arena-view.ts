@@ -228,4 +228,9 @@ export type ArenaView = {
    * The client shows the Noclip switch only then. Not part of either content hash.
    */
   noclip?: boolean;
+  /**
+   * True when the host was started with `ARENA_AUTH=required`.
+   * The page asks for a key before opening the socket. Not part of either content hash.
+   */
+  authRequired?: boolean;
 };

@@ -1,4 +1,5 @@
 import type { ArenaView } from "../shared/arena-view.js";
+import { AUTH_MSG, clearKey, isArenaSolo, loadKey } from "./auth-key.js";
 import { boot } from "./boot.js";
 
 const view = await fetch("/arena.json").then((res) => {
@@ -12,4 +13,15 @@ function socketUrl(arena: ArenaView): string {
   return arena.wsUrl ?? `${location.origin.replace(/^http/, "ws")}/`;
 }
 
-await boot(view, () => new WebSocket(socketUrl(view)));
+if (!isArenaSolo() && view.authRequired === true && !loadKey()) {
+  sessionStorage.setItem(AUTH_MSG, "Paste your auth key to play");
+  location.replace("/landing-page.html#play");
+} else {
+  await boot(view, () => new WebSocket(socketUrl(view)), {
+    onAuthRejected(reason) {
+      clearKey();
+      sessionStorage.setItem(AUTH_MSG, reason.length > 0 ? `auth: ${reason}` : "auth rejected");
+      location.replace("/landing-page.html#play");
+    },
+  });
+}

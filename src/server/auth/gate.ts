@@ -1,0 +1,53 @@
+// WebSocket hello gate. The access key arrives in `auth`. `token` stays the reconnect token.
+import { AuthError, isRole, verify, type Claims, type RevocationList } from "./tokens.js";
+
+export type AuthMode = "off" | "required";
+
+/** `"required"` only when ARENA_AUTH is exactly `required`. Anything else is off. */
+export function authMode(env: NodeJS.ProcessEnv = process.env): AuthMode {
+  return env.ARENA_AUTH === "required" ? "required" : "off";
+}
+
+export type HelloAuth =
+  | { ok: true; claims?: Claims }
+  | { ok: false; code: 4401 | 4403; reason: string };
+
+/**
+ * Check the first frame. `mode === "off"` accepts it and does not verify `auth`
+ * (a bad key is ignored). `required` demands a hello whose `auth` verifies,
+ * with role player|bot|qa|admin and scope `play`.
+ */
+export async function checkHelloAuth(
+  text: string,
+  deps: { pub?: CryptoKey; revoked: RevocationList; mode: AuthMode },
+): Promise<HelloAuth> {
+  if (deps.mode === "off") return { ok: true };
+  const auth = readAuth(text);
+  if (!auth) return { ok: false, code: 4401, reason: "missing" };
+  if (!deps.pub) return { ok: false, code: 4401, reason: "bad-claims" };
+  try {
+    const claims = await verify(deps.pub, auth, deps.revoked);
+    if (!isRole(claims.role) || !claims.scope.includes("play")) {
+      return { ok: false, code: 4403, reason: "forbidden" };
+    }
+    return { ok: true, claims };
+  } catch (err) {
+    if (err instanceof AuthError) return { ok: false, code: 4401, reason: err.code };
+    return { ok: false, code: 4401, reason: "bad-claims" };
+  }
+}
+
+/** Hello `auth` string, or undefined when the frame is not a keyed hello. */
+function readAuth(text: string): string | undefined {
+  let frame: unknown;
+  try {
+    frame = JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+  if (!frame || typeof frame !== "object" || Array.isArray(frame)) return undefined;
+  const rec = frame as Record<string, unknown>;
+  if (rec.type !== "hello") return undefined;
+  if (typeof rec.auth !== "string" || rec.auth.length === 0) return undefined;
+  return rec.auth;
+}

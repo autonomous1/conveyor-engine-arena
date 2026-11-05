@@ -7,6 +7,7 @@ import { parseElevatorSet, parseElevatorState, type ElevatorState } from "../sha
 import { parseGrenadePose, grenadeFrame, type GrenadePose } from "../shared/grenade.js";
 import { modelFrame } from "../shared/model-choice.js";
 import { parseLoadout, parsePickup, parsePickupSet, type LoadoutFrame, type PickupFrame } from "../shared/pickups.js";
+import { isArenaSolo, loadKey } from "./auth-key.js";
 
 const TOKEN_KEY = "ce-arena-token";
 
@@ -79,6 +80,15 @@ export type LiveLink = {
   socketState(): string;
   close(): void;
 };
+
+function closeInfo(ev: unknown): { code?: number; reason: string } {
+  if (!ev || typeof ev !== "object") return { reason: "" };
+  const rec = ev as { code?: unknown; reason?: unknown };
+  return {
+    code: typeof rec.code === "number" ? rec.code : undefined,
+    reason: typeof rec.reason === "string" ? rec.reason : "",
+  };
+}
 
 function revive(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(revive);
@@ -165,6 +175,8 @@ export function connectLive(opts: {
   open: () => OpenSocket;
   /** When false, hello carries no token and welcome does not store one. Solo passes false. */
   auth?: boolean;
+  /** Host closed 4401 or 4403. The page clears the key and leaves the game. */
+  onAuthRejected?: (reason: string) => void;
 }): LiveLink {
   const ws = opts.open() as WebSocketLike;
   const useAuth = opts.auth !== false;
@@ -201,6 +213,7 @@ export function connectLive(opts: {
   document.addEventListener("visibilitychange", onVisibility);
   ws.onopen = () => {
     const token = useAuth ? sessionStorage.getItem(TOKEN_KEY) ?? undefined : undefined;
+    const auth = useAuth && !isArenaSolo() ? loadKey() ?? undefined : undefined;
     const model = opts.model?.();
     ws.send(JSON.stringify({
       v: 1,
@@ -210,14 +223,26 @@ export function connectLive(opts: {
       bundleId: opts.bundleId,
       authoritativeHash: opts.authoritativeHash,
       token,
+      auth,
       ...(typeof model === "string" && model.length > 0 ? { model } : {}),
     }));
     opts.onStatus({ phase: "hello", text: "hello sent", resyncs });
   };
   ws.onerror = () => opts.onStatus({ phase: "error", text: "socket error", ownedEntityId: ownedId, resyncs });
-  ws.onclose = () => {
+  ws.onclose = (ev) => {
     closed = true;
     console.log("socket closed");
+    const info = closeInfo(ev);
+    if (!isArenaSolo() && (info.code === 4401 || info.code === 4403)) {
+      opts.onStatus({
+        phase: "reject",
+        text: "auth: " + info.reason,
+        ownedEntityId: ownedId,
+        resyncs,
+      });
+      opts.onAuthRejected?.(info.reason);
+      return;
+    }
     opts.onStatus({ phase: "error", text: "socket closed", ownedEntityId: ownedId, resyncs });
   };
   ws.onmessage = (ev) => {
