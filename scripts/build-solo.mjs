@@ -23,12 +23,6 @@ const result = await build({
     // path uses fetch. A literal keeps that string out of client.js.
     "Buffer.from": "null",
   },
-  alias: {
-    "node:http": "./src/client/node-stub.ts",
-    "ws": "./src/client/node-stub.ts",
-    "node:fs/promises": "./src/client/node-stub.ts",
-    "node:path": "./src/client/node-stub.ts",
-  },
   plugins: [
     {
       name: "stub-game-files-node",
