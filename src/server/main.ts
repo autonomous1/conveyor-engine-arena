@@ -7,6 +7,7 @@ import { WebSocketServer, type WebSocket } from "ws";
 import { authMode, checkHelloAuth, checkSceneGraphAuth, type AuthMode } from "./auth/gate.js";
 import { createRevocationList, loadVerifier, type RevocationList } from "./auth/tokens.js";
 import { createArenaHost, type HostConn } from "./arena-host.js";
+import { nodeGameFiles } from "./game-files-node.js";
 import { loadArena } from "./world-loader.js";
 
 const webRoot = fileURLToPath(new URL("../../dist/web/", import.meta.url));
@@ -202,9 +203,19 @@ export type ArenaHost = {
   close: () => Promise<void>;
 };
 
-export async function startArenaServer(port = Number(process.env.PORT ?? 4173), holdNpcs = false): Promise<ArenaHost> {
+export type ArenaServerOptions = {
+  /** Disk arena root. `ARENA_GAME_ROOT` is the fallback. Omit both to load the installed game. */
+  gameRoot?: string;
+};
+
+export async function startArenaServer(
+  port = Number(process.env.PORT ?? 4173),
+  holdNpcs = false,
+  opts?: ArenaServerOptions,
+): Promise<ArenaHost> {
   const gate = await openAuthGate();
-  const loaded = loadArena();
+  const gameRoot = opts?.gameRoot || process.env.ARENA_GAME_ROOT || undefined;
+  const loaded = gameRoot ? loadArena(nodeGameFiles(gameRoot)) : loadArena();
   const host = createArenaHost(loaded, { holdNpcs });
   await host.sceneGraphReady;
   const arenaJson = withAuthRequired(host.arenaJson, gate.mode === "required");

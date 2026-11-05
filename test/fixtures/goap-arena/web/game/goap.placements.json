@@ -1,0 +1,46 @@
+{
+  "formatVersion": 1,
+  "units": "meters",
+  "placements": [
+    {
+      "id": "door-b",
+      "model": "door-1",
+      "type": "door",
+      "position": [23, 0, 5.2],
+      "yaw": 90,
+      "hinge": "left",
+      "size": [2.4, 2.2, 0.08],
+      "locked": true,
+      "key": "key",
+      "open": false
+    },
+    {
+      "id": "key",
+      "model": "ammo-box",
+      "type": "key",
+      "position": [5, 1, 4],
+      "yaw": 0,
+      "scale": 1
+    },
+    {
+      "id": "prize",
+      "model": "ammo-box",
+      "type": "health",
+      "position": [29, 1, 4],
+      "yaw": 0,
+      "scale": 1
+    }
+  ],
+  "obstacles": [
+    { "id": "wall-west", "kind": "aabb", "min": [-0.5, 0, -0.5], "max": [0, 3, 8.5] },
+    { "id": "wall-east", "kind": "aabb", "min": [34, 0, -0.5], "max": [34.5, 3, 8.5] },
+    { "id": "wall-south", "kind": "aabb", "min": [-0.5, 0, -0.5], "max": [34.5, 3, 0] },
+    { "id": "wall-north", "kind": "aabb", "min": [-0.5, 0, 8], "max": [34.5, 3, 8.5] },
+    { "id": "wall-a-low", "kind": "aabb", "min": [9.7, 0, 0], "max": [10.3, 3, 1] },
+    { "id": "wall-a-high", "kind": "aabb", "min": [9.7, 0, 7], "max": [10.3, 3, 8] },
+    { "id": "wall-b-low", "kind": "aabb", "min": [22.2, 0, 0], "max": [23.8, 3, 3] },
+    { "id": "wall-b-high", "kind": "aabb", "min": [22.2, 0, 5], "max": [23.8, 3, 8] },
+    { "id": "key-box", "kind": "aabb", "min": [4.8, 0.8, 3.8], "max": [5.2, 1.2, 4.2] },
+    { "id": "prize-box", "kind": "aabb", "min": [28.8, 0.8, 3.8], "max": [29.2, 1.2, 4.2] }
+  ]
+}

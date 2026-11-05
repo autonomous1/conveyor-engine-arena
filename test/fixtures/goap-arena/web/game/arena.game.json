@@ -1,0 +1,93 @@
+{
+  "formatVersion": 1,
+  "gameId": "goap-arena",
+  "gameVersion": "0.1.0",
+  "worldVersion": "goap-v1",
+  "bundleId": "goap.arena.v1",
+  "bundleVersion": "1",
+  "units": "meters",
+  "coordinateSystem": "y-up",
+  "scene": {
+    "id": "goap",
+    "bounds": {
+      "minX": -1,
+      "maxX": 36,
+      "minY": 0,
+      "maxY": 4,
+      "minZ": -1,
+      "maxZ": 10
+    },
+    "sceneGraph": "./web/game/scene-graph.json",
+    "placements": [
+      "./web/game/goap.placements.json"
+    ],
+    "playerSpawnPoints": [
+      { "id": "pad-1", "x": 14, "y": 0, "z": 4, "yaw": 0 },
+      { "id": "pad-2", "x": 16, "y": 0, "z": 2, "yaw": 0 },
+      { "id": "pad-3", "x": 18, "y": 0, "z": 6, "yaw": 0 }
+    ]
+  },
+  "assets": [
+    {
+      "id": "player-1",
+      "kind": "model",
+      "type": "character",
+      "uri": "/assets/models/player-2.glb",
+      "scale": 2,
+      "animations": {
+        "idle": { "clip": "idle.001", "speed": 0 },
+        "walk": { "clip": "walk.001", "speed": 1 },
+        "run": { "clip": "run.001", "speed": 2.5 },
+        "fall": { "clip": "fall.001", "speed": 0 },
+        "angry": { "clip": "angry_02.001", "speed": 3 }
+      },
+      "mediaType": "model/gltf-binary",
+      "license": { "id": "CC0-1.0", "status": "spdx" },
+      "provenance": { "origin": "procedural", "notes": "Shared arena character." }
+    },
+    {
+      "id": "grok-bot",
+      "kind": "model",
+      "type": "character",
+      "uri": "/assets/models/grok-bot.glb",
+      "scale": 2,
+      "animations": {
+        "idle": { "clip": "idle", "speed": 0 },
+        "walk": { "clip": "walk", "speed": 1, "referenceSpeed": 0.897262531 },
+        "run": { "clip": "run", "speed": 3, "referenceSpeed": 3.220485679 },
+        "fall": { "clip": "dance_05", "speed": 0 },
+        "angry": { "clip": "dance_05", "speed": 3 }
+      },
+      "mediaType": "model/gltf-binary",
+      "license": { "id": "CC0-1.0", "status": "spdx" },
+      "provenance": { "origin": "procedural", "notes": "Shared arena character." }
+    },
+    {
+      "id": "door-1",
+      "kind": "model",
+      "type": "door",
+      "action": "yaw",
+      "instance": "static",
+      "uri": "/assets/models/door1.glb",
+      "mediaType": "model/gltf-binary",
+      "license": { "id": "CC0-1.0", "status": "spdx" },
+      "provenance": { "origin": "procedural", "notes": "Shared arena door." }
+    },
+    {
+      "id": "ammo-box",
+      "kind": "model",
+      "type": "ammo",
+      "instance": "static",
+      "uri": "/assets/models/ammo-box.glb",
+      "scale": 1,
+      "mediaType": "model/gltf-binary",
+      "license": { "id": "CC0-1.0", "status": "spdx" },
+      "provenance": { "origin": "procedural", "notes": "Shared arena pickup." }
+    }
+  ],
+  "player": {
+    "radius": 0.5,
+    "height": 1.8,
+    "modelChoices": ["grok-bot", "player-1"]
+  }
+}

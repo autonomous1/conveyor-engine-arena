@@ -1,0 +1,57 @@
+{
+  "formatVersion": 1,
+  "units": "meters",
+  "places": [
+    {
+      "id": "room-a",
+      "kind": "room",
+      "y": 0,
+      "polygon": [[0, 0], [10, 0], [10, 8], [0, 8]],
+      "bounds": { "minX": 0, "maxX": 10, "minZ": 0, "maxZ": 8 }
+    },
+    {
+      "id": "hall",
+      "kind": "hall",
+      "y": 0,
+      "polygon": [[10, 0], [22, 0], [22, 8], [10, 8]],
+      "bounds": { "minX": 10, "maxX": 22, "minZ": 0, "maxZ": 8 }
+    },
+    {
+      "id": "room-b",
+      "kind": "room",
+      "y": 0,
+      "polygon": [[24, 0], [34, 0], [34, 8], [24, 8]],
+      "bounds": { "minX": 24, "maxX": 34, "minZ": 0, "maxZ": 8 }
+    },
+    {
+      "id": "outside",
+      "kind": "outside",
+      "y": 0,
+      "polygon": [[-20, -20], [50, -20], [50, 30], [-20, 30]],
+      "bounds": { "minX": -20, "maxX": 50, "minZ": -20, "maxZ": 30 }
+    }
+  ],
+  "portals": [
+    {
+      "id": "room-a.opening",
+      "kind": "opening",
+      "a": "room-a",
+      "b": "hall",
+      "at": { "a": [9, 0.1, 4], "b": [11, 0.1, 4] },
+      "width": 6,
+      "cost": 2
+    },
+    {
+      "id": "door-b",
+      "kind": "door",
+      "a": "hall",
+      "b": "room-b",
+      "door": "door-b",
+      "locked": true,
+      "key": "key",
+      "at": { "a": [21, 0.1, 4], "b": [25, 0.1, 4] },
+      "width": 2,
+      "cost": 4
+    }
+  ]
+}

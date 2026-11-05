@@ -4,6 +4,7 @@
  */
 import type { ArenaView } from "../../../src/shared/arena-view.js";
 import { yawFromQuat } from "../../../src/shared/look.js";
+import type { PickupKind, PickupPlacement } from "../../../src/shared/pickups.js";
 import { placeAt, parseSceneGraph, type SceneGraph } from "../../../src/shared/scene-graph.js";
 
 export type PawnPose = {
@@ -21,11 +22,38 @@ export type ElevatorCab = { id: string; y: number; doorsOpen: boolean; stop: num
 
 export type WorldAabb = ArenaView["aabbs"][number];
 
+/** Leaf geometry from `arena.json`. Open and locked live on `door()`. */
+export type DoorBody = {
+  id: string;
+  model: string;
+  position: [number, number, number];
+  yaw: number;
+  hinge: "left" | "right";
+  size: [number, number, number];
+  key?: string;
+};
+
 export type WorldView = {
   aabbs?: readonly WorldAabb[];
   doors?: ArenaView["doors"];
-  pickups?: readonly { id: string }[];
+  pickups?: readonly WorldPickup[];
   playerSpawns?: readonly { id: string; x: number; z: number; yaw: number }[];
+  pawnRadius?: number;
+  pawnHeight?: number;
+};
+
+type WorldPickup = {
+  id: string;
+  kind?: PickupKind;
+  model?: string;
+  weapon?: string;
+  amount?: number;
+  minX?: number;
+  maxX?: number;
+  minY?: number;
+  maxY?: number;
+  minZ?: number;
+  maxZ?: number;
 };
 
 export type WelcomeState = {
@@ -48,11 +76,17 @@ export type PoseSnapshot = {
 export type BotWorld = {
   readonly aabbs: readonly WorldAabb[];
   readonly playerSpawns: readonly { id: string; x: number; z: number; yaw: number }[];
+  readonly pawnRadius: number;
+  readonly pawnHeight: number;
   self(): PawnPose | undefined;
   others(): PawnPose[];
   door(id: string): DoorState | undefined;
   doors(): DoorState[];
+  /** Placement leaf. Open and locked stay on `door()`. */
+  doorBody(id: string): DoorBody | undefined;
   pickups(): readonly string[];
+  /** Static pickup boxes from the arena view. Gone ids stay here so a plan can still name them. */
+  pickupPlacements(): readonly PickupPlacement[];
   keys(): readonly string[];
   weapon(): string | undefined;
   ammo(): number;
@@ -80,6 +114,21 @@ export function createBotWorld(view: WorldView): BotWorld {
   const aabbs = [...(view.aabbs ?? [])];
   const playerSpawns = [...(view.playerSpawns ?? [])];
   const doorDefs = view.doors ?? [];
+  const doorBodies = new Map<string, DoorBody>();
+  for (const door of doorDefs) {
+    doorBodies.set(door.id, {
+      id: door.id,
+      model: door.model,
+      position: [door.position[0], door.position[1], door.position[2]],
+      yaw: door.yaw,
+      hinge: door.hinge,
+      size: [door.size[0], door.size[1], door.size[2]],
+      ...(typeof door.key === "string" && door.key.length > 0 ? { key: door.key } : {}),
+    });
+  }
+  const placements = placementsFrom(view.pickups ?? []);
+  const pawnRadius = view.pawnRadius !== undefined && view.pawnRadius > 0 ? view.pawnRadius : 0.5;
+  const pawnHeight = view.pawnHeight !== undefined && view.pawnHeight > 0 ? view.pawnHeight : 1.8;
   const pawns = new Map<number, PawnPose>();
   const doorMap = new Map<string, DoorState>();
   const cabs = new Map<string, ElevatorCab>();
@@ -100,6 +149,8 @@ export function createBotWorld(view: WorldView): BotWorld {
   return {
     aabbs,
     playerSpawns,
+    pawnRadius,
+    pawnHeight,
     self,
     others() {
       const rows: PawnPose[] = [];
@@ -115,8 +166,14 @@ export function createBotWorld(view: WorldView): BotWorld {
     doors() {
       return [...doorMap.values()].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
     },
+    doorBody(id: string) {
+      return doorBodies.get(id);
+    },
     pickups() {
       return pickupIds;
+    },
+    pickupPlacements() {
+      return placements;
     },
     keys() {
       return heldKeys;
@@ -213,6 +270,30 @@ export function createBotWorld(view: WorldView): BotWorld {
       }
     },
   };
+}
+
+function placementsFrom(items: readonly WorldPickup[]): PickupPlacement[] {
+  const out: PickupPlacement[] = [];
+  for (const item of items) {
+    if (!item.kind || !item.model) continue;
+    const { minX, maxX, minY, maxY, minZ, maxZ } = item;
+    if (minX === undefined || maxX === undefined || minY === undefined || maxY === undefined || minZ === undefined || maxZ === undefined) continue;
+    if (!Number.isFinite(minX) || !Number.isFinite(maxX) || !Number.isFinite(minY) || !Number.isFinite(maxY) || !Number.isFinite(minZ) || !Number.isFinite(maxZ)) continue;
+    out.push({
+      id: item.id,
+      kind: item.kind,
+      model: item.model,
+      ...(item.weapon ? { weapon: item.weapon } : {}),
+      amount: typeof item.amount === "number" && Number.isFinite(item.amount) ? item.amount : 0,
+      minX,
+      maxX,
+      minY,
+      maxY,
+      minZ,
+      maxZ,
+    });
+  }
+  return out;
 }
 
 function cabStates(cabs: Map<string, ElevatorCab>) {
