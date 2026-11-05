@@ -143,11 +143,17 @@ Each asset keeps its own license id and provenance origin.
 
 `node scripts/make-placeholders.mjs` writes original procedural stand-ins under `web/assets` when needed. The game file is what the server loads; point an asset `uri` at a new file for it to appear in the scene.
 
-## Auth
+## Authentication
 
-Access tokens are Ed25519-signed JWTs (`jose`, algorithm `EdDSA`). They are signed, not encrypted. The claims are `sub`, `role`, `scope`, `jti`, `iat`, and `exp`. Issuer and audience are both `ce-arena`. Verification allows 30 seconds of clock skew. A `jti` on the revocation list is rejected.
+Auth is off by default. Set `ARENA_AUTH=required` (exact value) on the Node host to gate WebSocket joins. Anything else, including unset, leaves the gate off: a bad or missing key is ignored.
 
-Roles are `player`, `bot`, `qa`, and `admin`. Scopes are `play`, `spectate`, `scene-graph`, `qa`, `teleport`, `chat`, `voice`, and `admin`. Minting starts from the role's default scopes and adds any `--scope` values.
+When auth is required, `/arena.json` includes `"authRequired": true`. The browser client (`src/client/main.ts`) then redirects to `/landing-page.html#play` unless sessionStorage (or localStorage, if Remember was checked) holds a usable key under `ce-arena-auth`. The solo bundle defines `__ARENA_SOLO__` as true, never redirects for auth, and never puts `auth` on hello.
+
+### Tokens
+
+Access tokens are Ed25519-signed JWTs (`jose`, algorithm `EdDSA`). They are signed, not encrypted. Claims are `sub`, `role`, `scope`, `jti`, `iat`, and `exp`. Issuer and audience are both `ce-arena`. Verification allows 30 seconds of clock skew. A `jti` on the revocation list is rejected.
+
+Roles are `player`, `bot`, `qa`, and `admin`. Scopes are `play`, `spectate`, `scene-graph`, `qa`, `teleport`, `chat`, `voice`, and `admin`. Minting starts from the role's default scopes and adds any `--scope` values. The hello gate admits only roles in that set whose `scope` includes `play`.
 
 | Role | Default scopes |
 | --- | --- |
@@ -156,30 +162,87 @@ Roles are `player`, `bot`, `qa`, and `admin`. Scopes are `play`, `spectate`, `sc
 | `qa` | `play`, `spectate`, `scene-graph`, `qa` |
 | `admin` | every scope |
 
-The private key stays outside this repo. The default directory is `~/.config/ce-arena/`. Set `ARENA_CONFIG_DIR` to move it. The other paths below default to files in that directory.
+Default token lifetime is **30 days**. Pass `--days N` or `--hours N` (not both).
+
+### Keys and env
+
+Private keys stay outside this repo. The CLI refuses to write inside the working tree. The default directory is `~/.config/ce-arena/`. Set `ARENA_CONFIG_DIR` to move it.
 
 | Variable | Default | Use |
 | --- | --- | --- |
+| `ARENA_AUTH` | (unset = off) | `required` turns the hello gate on. Any other value is off. |
+| `ARENA_VERIFY_KEY_FILE` | **none** (required when auth is on) | Public SPKI PEM the host loads to verify. No built-in path fallback. |
 | `ARENA_CONFIG_DIR` | `~/.config/ce-arena` | Base directory. Also holds `issued.jsonl`. |
-| `ARENA_SIGNING_KEY_FILE` | `$ARENA_CONFIG_DIR/ed25519.key.pem` | Private key used to mint. |
-| `ARENA_VERIFY_KEY_FILE` | `$ARENA_CONFIG_DIR/ed25519.pub.pem` | Public key the host uses to verify. |
-| `ARENA_REVOKED_FILE` | `$ARENA_CONFIG_DIR/revoked.json` | JSON array of revoked `jti` values. A missing file revokes nothing. |
+| `ARENA_SIGNING_KEY_FILE` | `$ARENA_CONFIG_DIR/ed25519.key.pem` | Private PKCS8 PEM used by `npm run token -- mint`. |
+| `ARENA_REVOKED_FILE` | `$ARENA_CONFIG_DIR/revoked.json` | JSON array of revoked `jti` values. A missing file revokes nothing. Unset uses that default path on the host. |
 
 `issued.jsonl` records one JSON object per mint: `jti`, `sub`, `role`, `scope`, and `exp`. The token itself is not stored.
 
-Build once, then:
+### Generate a host keypair
+
+Build so `dist/server/auth/token-cli.js` exists (`npm run build` or at least `npm run build:server`), then:
 
 ```bash
-npm run token -- keygen --out ~/.config/ce-arena/ed25519
+npm run token -- keygen
+# or: npm run token -- keygen --out ~/.config/ce-arena/ed25519
+```
+
+Writes `<prefix>.key.pem` and `<prefix>.pub.pem`, both mode `0600`. Default prefix is `$ARENA_CONFIG_DIR/ed25519`. Point the host at the **public** file only.
+
+### Mint a player token
+
+```bash
+npm run token -- mint --role player --sub alice
 npm run token -- mint --role bot --sub bot-1 --scope scene-graph,teleport --days 30
 npm run token -- mint --role qa --sub qa-1 --hours 12 --out /tmp/qa.token
 npm run token -- list
 npm run token -- revoke <jti>
 ```
 
-`keygen` writes `<out>.key.pem` and `<out>.pub.pem`, both mode `0600`. It refuses a path inside this working tree. `mint` prints the token, or writes that file with mode `0600` when `--out` is set. The default lifetime is 30 days. Pass `--days` or `--hours`, not both. `list` prints each issued record with its expiry and whether that `jti` is revoked.
+`mint` prints the JWT to stdout, or writes it mode `0600` when `--out` is set. `list` prints each issued record with its expiry and whether that `jti` is revoked.
 
-The WebSocket `hello` path does not check a token yet.
+### Start the host with auth required
+
+```bash
+ARENA_AUTH=required ARENA_VERIFY_KEY_FILE=~/.config/ce-arena/ed25519.pub.pem npm start
+```
+
+`openAuthGate` in `src/server/main.ts` throws immediately if `ARENA_AUTH=required` and `ARENA_VERIFY_KEY_FILE` is missing or unreadable:
+
+```text
+Error: ARENA_AUTH=required needs ARENA_VERIFY_KEY_FILE
+```
+
+Local / everyday play: leave `ARENA_AUTH` unset and run `npm run dev` or `npm start` as usual.
+
+### Join via the landing page
+
+1. Open `http://127.0.0.1:4173/landing-page.html` (or `/play`, which serves the same file).
+2. Paste the minted JWT into **Auth key**, optionally check **Remember on this device**, click **Play**.
+3. The page stores the key under `ce-arena-auth` in `sessionStorage` always, and in `localStorage` only when Remember is checked (`src/client/auth-key.ts`). It then navigates to `/`.
+4. On WebSocket `hello`, the client sends that string as `auth` (separate from the reconnect `token` field). The host verifies it before admitting the connection.
+
+Close codes from the gate (`src/server/auth/gate.ts`):
+
+| Code | When |
+| --- | --- |
+| `4401` | Missing `auth`, bad/expired/revoked signature or claims, verify timeout, or queue overflow |
+| `4403` | Verified token whose role is not allowed or whose `scope` lacks `play` |
+
+On `4401` / `4403` the client clears `ce-arena-auth` and returns to `/landing-page.html#play` with a short status message.
+
+`web/index.html` is still the game page. It does not collect a key; with auth required and no stored key it redirects to the landing page. `/` serves `index.html`; `/play` serves `landing-page.html`.
+
+### Solo build
+
+`npm run build:solo` needs no auth. The in-tab host has no WebSocket gate. The solo landing page strips the `<!-- play:start -->` … `<!-- play:end -->` block (no paste form, no `auth-key.js`).
+
+### Troubleshooting
+
+- **`ARENA_AUTH=required needs ARENA_VERIFY_KEY_FILE`** — set `ARENA_VERIFY_KEY_FILE` to the `.pub.pem` from `keygen`, not the private `.key.pem`.
+- **Access denied / bounce to landing after a reject** — mint a fresh player (or bot/qa/admin) token with `play` in scope; confirm the host public key matches the keypair that signed it.
+- **Stale or bad key stuck in the browser** — Sign out on the landing page, or clear site data for the origin (clears `sessionStorage` / `localStorage` `ce-arena-auth`). An expired key is dropped on load by `loadKey`.
+- **Old key still “works” while testing** — auth is probably off. Only `ARENA_AUTH=required` enables the gate.
 
 ## Layout
 
