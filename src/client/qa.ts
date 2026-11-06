@@ -29,6 +29,7 @@ export type QaApi = {
   follow(entityId: number, opts?: { back?: number; up?: number }): void;
   waitFrames(n: number): Promise<void>;
   snapshot(): Promise<string>;
+  upload(): Promise<{ id: string; url: string }>;
   doors(): QaDoor[];
   pickups(): QaPickup[];
   pawns(): QaPawn[];
@@ -67,6 +68,8 @@ export function installQaApi(ctx: {
   doors(): QaDoor[];
   pickups(): QaPickup[];
   pawns(): QaPawn[];
+  /** JWT the page already stored for the websocket. Not read from disk. */
+  token: string;
 }): void {
   ctx.freeze();
   const api: QaApi = {
@@ -109,9 +112,34 @@ export function installQaApi(ctx: {
       ctx.render();
       return ctx.scene.renderer.domElement.toDataURL("image/png");
     },
+    async upload() {
+      const dataUrl = await api.snapshot();
+      const bytes = decodePngDataUrl(dataUrl);
+      const res = await fetch("/qa/snapshots", {
+        method: "POST",
+        headers: { authorization: `Bearer ${ctx.token}`, "content-type": "image/png" },
+        body: bytes,
+      });
+      if (!res.ok) throw new Error(String(res.status));
+      const payload: unknown = await res.json();
+      if (!payload || typeof payload !== "object") throw new Error(String(res.status));
+      const rec = payload as { id?: unknown; url?: unknown };
+      if (typeof rec.id !== "string" || typeof rec.url !== "string") throw new Error(String(res.status));
+      return { id: rec.id, url: rec.url };
+    },
     doors: () => ctx.doors(),
     pickups: () => ctx.pickups(),
     pawns: () => ctx.pawns(),
   };
   (window as QaWindow).__qa = api;
+}
+
+/** `snapshot()` returns a PNG data URL. Upload posts the decoded bytes, not the URL text. */
+function decodePngDataUrl(dataUrl: string): Uint8Array<ArrayBuffer> {
+  const marker = "data:image/png;base64,";
+  if (!dataUrl.startsWith(marker)) throw new Error("snapshot");
+  const binary = atob(dataUrl.slice(marker.length));
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i) & 0xff;
+  return bytes;
 }

@@ -5,6 +5,8 @@ viewer/
 generated/
 node_modules/
 dist/
+web/qa-snaps/*.png
+dist/web/qa-snaps/*.png
 *.log
 *.blend1
 .env

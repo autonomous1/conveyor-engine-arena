@@ -1,10 +1,11 @@
+import { randomUUID } from "node:crypto";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { readFile, stat } from "node:fs/promises";
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import path, { extname, relative, resolve } from "node:path";
+import path, { extname, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { WebSocketServer, type WebSocket } from "ws";
-import { authMode, checkHelloAuth, checkSceneGraphAuth, type AuthMode } from "./auth/gate.js";
+import { authMode, checkHelloAuth, checkQaSnapshotAuth, checkSceneGraphAuth, type AuthMode } from "./auth/gate.js";
 import { createRevocationList, loadVerifier, type RevocationList } from "./auth/tokens.js";
 import { createArenaHost, type HostConn } from "./arena-host.js";
 import { nodeGameFiles } from "./game-files-node.js";
@@ -34,6 +35,67 @@ function fileUnderWeb(rel: string): string | undefined {
   if (fromRoot.startsWith("..") || fromRoot === "") return undefined;
   if (extname(file) === ".map") return undefined;
   return file;
+}
+
+/** Raw PNG uploads. Larger than this is rejected and not written. */
+const QA_SNAP_MAX = 4_000_000;
+
+const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+function isPngContentType(value: string | string[] | undefined): boolean {
+  const raw = Array.isArray(value) ? value[0] : value;
+  if (!raw) return false;
+  return raw.split(";")[0]?.trim().toLowerCase() === "image/png";
+}
+
+function isPng(body: Buffer): boolean {
+  return body.length >= PNG_SIGNATURE.length && body.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE);
+}
+
+/** Read at most `max` bytes. Over the limit, or a socket error, returns undefined and keeps no bytes. */
+function readLimited(req: IncomingMessage, max: number): Promise<Buffer | undefined> {
+  return new Promise((resolve) => {
+    const chunks: Buffer[] = [];
+    let total = 0;
+    let over = false;
+    let done = false;
+    const finish = (body: Buffer | undefined) => {
+      if (done) return;
+      done = true;
+      resolve(body);
+    };
+    req.on("data", (chunk: Buffer | string) => {
+      if (done || over) return;
+      const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      total += buf.length;
+      if (total > max) {
+        over = true;
+        chunks.length = 0;
+        return;
+      }
+      chunks.push(buf);
+    });
+    req.on("end", () => finish(over ? undefined : Buffer.concat(chunks)));
+    req.on("error", () => finish(undefined));
+  });
+}
+
+/** `<webRoot>/qa-snaps/<uuid>.png`. The id is server-chosen. An existing file gets a new id. */
+async function writeQaSnapshot(body: Buffer): Promise<{ id: string; file: string }> {
+  await mkdir(join(webRoot, "qa-snaps"), { recursive: true });
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const id = randomUUID();
+    const file = fileUnderWeb(`qa-snaps/${id}.png`);
+    if (!file) continue;
+    try {
+      await writeFile(file, body, { flag: "wx" });
+      return { id, file };
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === "EEXIST") continue;
+      throw err;
+    }
+  }
+  throw new Error("qa snapshot id");
 }
 
 function send(
@@ -240,6 +302,26 @@ export async function startArenaServer(
         return;
       }
       send(res, 200, body, "application/json", { etag: `"${hash}"` });
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/qa/snapshots") {
+      try {
+        const header = req.headers.authorization;
+        const auth = await checkQaSnapshotAuth(Array.isArray(header) ? header[0] : header, gate);
+        const uploaded = await readLimited(req, QA_SNAP_MAX);
+        if (!auth.ok) {
+          send(res, auth.status, auth.status === 401 ? "unauthorized" : "forbidden", "text/plain; charset=utf-8");
+          return;
+        }
+        if (!isPngContentType(req.headers["content-type"]) || !uploaded || !isPng(uploaded)) {
+          send(res, 400, "invalid", "text/plain; charset=utf-8");
+          return;
+        }
+        const saved = await writeQaSnapshot(uploaded);
+        send(res, 200, JSON.stringify({ ok: true, id: saved.id, url: `/qa-snaps/${saved.id}.png` }), "application/json");
+      } catch {
+        if (!res.headersSent) send(res, 500, "unavailable", "text/plain; charset=utf-8");
+      }
       return;
     }
     const rel = url.pathname === "/" ? "index.html" : url.pathname === "/play" ? "landing-page.html" : url.pathname;

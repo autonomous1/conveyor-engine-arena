@@ -50,12 +50,32 @@ export async function checkSceneGraphAuth(
   authorization: string | undefined,
   deps: { pub?: CryptoKey; revoked: RevocationList },
 ): Promise<BearerAuth> {
+  return checkBearerScope(authorization, deps, "scene-graph");
+}
+
+/**
+ * `POST /qa/snapshots`. Missing, bad, or expired is 401.
+ * A verified token whose `scope` omits `qa` is 403.
+ * Auth-off still needs a Bearer that verifies. Solo has no JWT, so it cannot upload.
+ */
+export async function checkQaSnapshotAuth(
+  authorization: string | undefined,
+  deps: { pub?: CryptoKey; revoked: RevocationList },
+): Promise<BearerAuth> {
+  return checkBearerScope(authorization, deps, "qa");
+}
+
+async function checkBearerScope(
+  authorization: string | undefined,
+  deps: { pub?: CryptoKey; revoked: RevocationList },
+  scope: "scene-graph" | "qa",
+): Promise<BearerAuth> {
   if (!deps.pub) return { ok: false, status: 401 };
   const token = readBearer(authorization);
   if (!token) return { ok: false, status: 401 };
   try {
     const claims = await verify(deps.pub, token, deps.revoked);
-    if (!claims.scope.includes("scene-graph")) return { ok: false, status: 403 };
+    if (!claims.scope.includes(scope)) return { ok: false, status: 403 };
     return { ok: true, claims };
   } catch {
     return { ok: false, status: 401 };

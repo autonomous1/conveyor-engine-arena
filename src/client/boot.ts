@@ -19,6 +19,7 @@ import { doorLeafBox, pickDoorForUse } from "../shared/doors.js";
 import { advanceGrenadeClock, type GrenadePose } from "../shared/grenade.js";
 import { advanceFireClock, LASER_MS, traceHitscan, type TraceCapsule } from "../shared/hitscan.js";
 import { createAabbDebug } from "./aabb-debug.js";
+import { loadKey } from "./auth-key.js";
 import { applyDoorSwing, attachKtx2Loader, createArenaScene, loadArenaVisuals, tickDoorSwing } from "./arena-scene.js";
 import { createElevatorRooms } from "./elevator-room.js";
 import { createGrenadeProps } from "./grenade.js";
@@ -634,6 +635,7 @@ export async function boot(
           }];
         });
       },
+      token: loadKey() ?? "",
     });
   }
   requestAnimationFrame(frame);
