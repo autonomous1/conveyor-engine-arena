@@ -10,6 +10,7 @@ import { parseHealth, type HealthFrame } from "./health.js";
 import { parseLaser, type LaserFrame } from "./hitscan.js";
 import { parseLoadout, parsePickup, parsePickupSet, type LoadoutFrame, type PickupFrame } from "./pickups.js";
 import type { SceneGraphFile } from "./scene-graph.js";
+import { parseBakedRegions, type BakedRegionsFile } from "./nav/regions.js";
 
 export type InventoryFrame = {
   t: "inventory";
@@ -22,6 +23,14 @@ export type SceneGraphFrame = {
   v: 1;
   hash: string;
   graph: SceneGraphFile;
+};
+
+/** `regions` is the baked file (places and portals), not a runtime overlay. */
+export type RegionsFrame = {
+  t: "regions";
+  v: 1;
+  hash: string;
+  regions: BakedRegionsFile;
 };
 
 /** Reply to a client `teleport` frame. Only the sender's connection gets it. */
@@ -83,6 +92,7 @@ export type ArenaFrame =
   | AuditFrame
   | InventoryFrame
   | SceneGraphFrame
+  | RegionsFrame
   | TeleportResultFrame
   | SnapshotResultFrame
   | QaCaptureFrame;
@@ -118,6 +128,7 @@ export function parseArenaFrame(text: string): ArenaFrame | undefined {
   if (t === "audit") return parseAudit(value);
   if (t === "inventory") return parseInventory(value);
   if (t === "sceneGraph") return parseSceneGraphFrame(value);
+  if (t === "regions") return parseRegionsFrame(value);
   if (t === "teleportResult") return parseTeleportResult(value);
   if (t === "snapshotResult") return parseSnapshotResult(value);
   if (t === "qaCapture") return parseQaCapture(value);
@@ -232,6 +243,16 @@ export function parseSceneGraphFrame(frame: unknown): SceneGraphFrame | undefine
   if (file.formatVersion !== 1 || file.units !== "meters") return undefined;
   if (!Array.isArray(file.places) || !Array.isArray(file.portals)) return undefined;
   return { t: "sceneGraph", v: 1, hash: rec.hash, graph: graph as SceneGraphFile };
+}
+
+export function parseRegionsFrame(frame: unknown): RegionsFrame | undefined {
+  if (!frame || typeof frame !== "object" || Array.isArray(frame)) return undefined;
+  const rec = frame as Record<string, unknown>;
+  if (rec.t !== "regions" || rec.v !== 1) return undefined;
+  if (typeof rec.hash !== "string" || !/^[0-9a-f]{64}$/.test(rec.hash)) return undefined;
+  const parsed = parseBakedRegions(rec.regions);
+  if (!parsed.file) return undefined;
+  return { t: "regions", v: 1, hash: rec.hash, regions: parsed.file };
 }
 
 /**

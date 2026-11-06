@@ -5,5 +5,6 @@
 --rooms ./web/assets/models \
 --doors ./web/game/doors.placements.json \
 --room-doors ./web/game/rooms.placements.json \
+--props ./web/game/props.placements.json \
 --bounds ./web/game/bounds.json \
 --out ./web/game/scene-graph.json

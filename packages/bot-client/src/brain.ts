@@ -12,7 +12,8 @@ import { INPUT_HZ } from "../../../src/shared/look.js";
 import type { FloorBox } from "../../../src/shared/movements.js";
 import { createFollower, doorStand, wishTo, type FollowInput, type FollowPawn, type Pose } from "../../../src/shared/nav/follow.js";
 import { buildGrid, findLocalPath, navBoxes, type Grid } from "../../../src/shared/nav/grid.js";
-import { createNavCache, planLegs } from "../../../src/shared/nav/legs.js";
+import { createNavCache, planLegs, type PlanLegsOptions } from "../../../src/shared/nav/legs.js";
+import type { BakedRegionsFile } from "../../../src/shared/nav/regions.js";
 import { planRoute, type Gate } from "../../../src/shared/nav/route.js";
 import { capsuleOverlapsAabb, pickupBoxSource, type PickupPlacement } from "../../../src/shared/pickups.js";
 import { placeAt, type SceneGraph, type ScenePortal } from "../../../src/shared/scene-graph.js";
@@ -340,7 +341,7 @@ export async function runBrain(session: BotSession, goal: Goal, opts: BrainOptio
       }
       return undefined;
     }
-    const legs = planLegs(graph, navView(session, new Set()), route, pose, { cache });
+    const legs = planLegs(graph, navView(session, new Set()), route, pose, legOpts(session, cache));
     if (!legs.ok) return undefined;
     const points = legs.points.map(triple);
     return { points, grid: gridFor(session, graph, points, new Set(), placeY(graph, pose)) };
@@ -361,7 +362,7 @@ export async function runBrain(session: BotSession, goal: Goal, opts: BrainOptio
       if (!route.ok) return undefined;
       if (route.steps.length > 0 && route.steps.every((step) => step.portal.kind === "elevator")) return undefined;
       if (route.steps.some((step) => step.portal.kind === "door" && gate(step.portal) !== "open")) return undefined;
-      const legs = planLegs(graph, navView(session, omit), route, pose, { cache });
+      const legs = planLegs(graph, navView(session, omit), route, pose, legOpts(session, cache));
       if (!legs.ok) return undefined;
       points = legs.points.map(triple);
     }
@@ -624,6 +625,16 @@ function floorBoxes(session: BotSession): FloorBox[] {
     ...(box.minY !== undefined ? { minY: box.minY } : {}),
     ...(box.maxY !== undefined ? { maxY: box.maxY } : {}),
   }));
+}
+
+function bakedRegions(session: BotSession): BakedRegionsFile | undefined {
+  const read = (session.world as { regions?: () => BakedRegionsFile | undefined }).regions;
+  return read ? read() : undefined;
+}
+
+function legOpts(session: BotSession, cache: ReturnType<typeof createNavCache>): PlanLegsOptions {
+  const regions = bakedRegions(session);
+  return regions ? { cache, regions } : { cache };
 }
 
 function navView(session: BotSession, omit: ReadonlySet<string>) {

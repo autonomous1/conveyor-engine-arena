@@ -1,9 +1,15 @@
 #!/usr/bin/env bash
-./node_modules/.bin/blueprint-scene scene-graph \
+if [[ -x ../blueprint-scene/bin/blueprint-scene ]]; then
+  BIN=../blueprint-scene/bin/blueprint-scene
+else
+  BIN=./node_modules/.bin/blueprint-scene
+fi
+"$BIN" scene-graph \
 --buildings ./web/game/buildings.placements.json \
 --floors ./dev/scenes/arena-1/designs/floorplans \
 --rooms ./web/assets/models \
 --doors ./web/game/doors.placements.json \
 --room-doors ./web/game/rooms.placements.json \
+--props ./web/game/props.placements.json \
 --bounds ./web/game/bounds.json \
 --out ./web/game/scene-graph.json

@@ -4,6 +4,7 @@ import { loadInstalledGame } from "./load-game.js";
 import type { ArenaView } from "../shared/arena-view.js";
 import type { Movement } from "../shared/movements.js";
 import type { SceneGraph } from "../shared/scene-graph.js";
+import type { BakedRegionsFile } from "../shared/nav/regions.js";
 
 export type WanderAgent = {
   id: number;
@@ -23,6 +24,8 @@ export type LoadedArena = {
   playerSpawns: ReadonlyArray<{ id: string; x: number; y: number; z: number; yaw: number }>;
   /** Privileged places and portals. Absent when the manifest has no `scene.sceneGraph`. */
   sceneGraph?: SceneGraph;
+  /** Privileged baked regions. Absent when the manifest has no `scene.regions`. */
+  regions?: BakedRegionsFile;
 };
 
 export function loadArena(files?: GameFiles, env?: Record<string, string | undefined>): LoadedArena {
@@ -58,6 +61,7 @@ export function loadArena(files?: GameFiles, env?: Record<string, string | undef
     view: game.view,
     playerSpawns,
     ...(game.sceneGraph ? { sceneGraph: game.sceneGraph } : {}),
+    ...(game.regions ? { regions: game.regions } : {}),
   };
 }
 

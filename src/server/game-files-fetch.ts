@@ -76,7 +76,7 @@ function sceneRefs(doc: unknown): string[] {
   if (!scene || typeof scene !== "object") return [];
   const record = scene as Record<string, unknown>;
   const refs: string[] = [];
-  for (const key of ["bounds", "spawnPoints", "playerSpawnPoints", "lights", "elevators", "sceneGraph"]) {
+  for (const key of ["bounds", "spawnPoints", "playerSpawnPoints", "lights", "elevators", "sceneGraph", "regions"]) {
     if (typeof record[key] === "string") refs.push(record[key]);
   }
   const listed = placementRefsOf(scene);

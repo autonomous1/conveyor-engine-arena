@@ -15,6 +15,7 @@ import {
 import { attachBuildingProfiles } from "../shared/building-profile.js";
 import type { ArenaElevator, ArenaView, CharacterAnimation } from "../shared/arena-view.js";
 import { parseSceneGraph, type ElevatorPlace, type SceneGraph } from "../shared/scene-graph.js";
+import { parseBakedRegions, type BakedRegionsFile } from "../shared/nav/regions.js";
 import { DEFAULT_MOVEMENT_SPEED, MOVEMENTS, type Movement } from "../shared/movements.js";
 import { AMMO_PICKUP, HEALTH_PICKUP, parsePickupKind, type PickupPlacement } from "../shared/pickups.js";
 import { interpretPlacements } from "./placements-file.js";
@@ -45,6 +46,11 @@ export type CompiledGame = {
    * Privileged: not copied onto `view` and not part of either content hash.
    */
   sceneGraph?: SceneGraph;
+  /**
+   * Walkable regions from `scene.regions`. Absent when that field is absent.
+   * Privileged: not copied onto `view` and not part of either content hash.
+   */
+  regions?: BakedRegionsFile;
 };
 
 type AssetRec = {
@@ -358,6 +364,11 @@ export type CompileSources = {
    */
   sceneGraphFile?: PlacementFileSource;
   /**
+   * Set when `scene.regions` is a path. The text is a baked regions file.
+   * Not part of either content hash. Absent means no baked region graph.
+   */
+  regionsFile?: PlacementFileSource;
+  /**
    * `web/game/building-profiles.json`. Outlines for the scene map.
    * Absent when that file was not loaded. Not part of either content hash.
    */
@@ -631,6 +642,46 @@ function sceneGraph(
     console.warn(`scene.sceneGraph: ${result.issues.length} door locks disagree with the door placement (${listed}${more}); the doors file wins`);
   }
   return result.graph;
+}
+
+/**
+ * `scene.regions` is a path to a baked region file. Absent is no graph.
+ * The partition is not rebuilt here.
+ */
+function bakedRegions(
+  scene: Record<string, unknown> | undefined,
+  sources: CompileSources | undefined,
+  pawnRadius: number | undefined,
+  pawnHeight: number | undefined,
+  issues: GameIssue[],
+): BakedRegionsFile | undefined {
+  if (!scene || !Object.prototype.hasOwnProperty.call(scene, "regions")) return undefined;
+  const value = scene.regions;
+  if (typeof value !== "string" || !value.trim()) {
+    issues.push({ path: "scene.regions", message: "must be a path" });
+    return undefined;
+  }
+  const file = sources?.regionsFile;
+  if (!file || file.path !== value) {
+    issues.push({ path: "scene.regions", message: "file was not loaded" });
+    return undefined;
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(file.text);
+  } catch (err) {
+    issues.push({ path: "scene.regions", message: `invalid json: ${err instanceof Error ? err.message : String(err)}` });
+    return undefined;
+  }
+  const result = parseBakedRegions(parsed);
+  if (!result.file) {
+    issues.push(...result.issues);
+    return undefined;
+  }
+  if (pawnRadius !== undefined && pawnHeight !== undefined && (result.file.radius !== pawnRadius || result.file.height !== pawnHeight)) {
+    console.warn(`scene.regions: bake radius ${result.file.radius} height ${result.file.height} differs from player ${pawnRadius} ${pawnHeight}`);
+  }
+  return result.file;
 }
 
 /** Same shaft id should carry the same stops and landings. A difference is a warning. */
@@ -1443,6 +1494,7 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
   const lights = sceneLights(scene, sources, issues);
   const elevators = sceneElevators(scene, sources, issues);
   const graph = sceneGraph(scene, sources, bakedDoors, issues);
+  const regions = bakedRegions(scene, sources, pawnRadius, pawnHeight, issues);
   if (graph && scene && Object.prototype.hasOwnProperty.call(scene, "elevators")) warnShaftDrift(graph, elevators);
   const buildingIds = new Set(bakedBuildings.map((building) => building.id));
   for (const cab of elevators) {
@@ -1668,5 +1720,6 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
     visualBytes,
     bundleVersion,
     ...(graph ? { sceneGraph: graph } : {}),
+    ...(regions ? { regions } : {}),
   };
 }

@@ -86,7 +86,7 @@ function placementPropCount(): number {
 
 function compile(doc: unknown, read: (uri: string) => Uint8Array | undefined, sources?: CompileSources) {
   const scene = doc && typeof doc === "object"
-    ? (doc as { scene?: { lights?: unknown; playerSpawnPoints?: unknown; elevators?: unknown; sceneGraph?: unknown; placements?: unknown } }).scene
+    ? (doc as { scene?: { lights?: unknown; playerSpawnPoints?: unknown; elevators?: unknown; sceneGraph?: unknown; regions?: unknown; placements?: unknown } }).scene
     : undefined;
   const installedPlacements = (document() as { scene?: { placements?: unknown } }).scene?.placements;
   // A placements subset does not include every baked door. Leave the graph off that compile.
@@ -113,6 +113,10 @@ function compile(doc: unknown, read: (uri: string) => Uint8Array | undefined, so
     if (!placementsChanged && !resolved.sceneGraphFile && typeof scene?.sceneGraph === "string") {
       const installed = readManifestSources(projectRoot(), document());
       if (installed?.sceneGraphFile?.path === scene.sceneGraph) resolved.sceneGraphFile = installed.sceneGraphFile;
+    }
+    if (!resolved.regionsFile && typeof scene?.regions === "string") {
+      const installed = readManifestSources(projectRoot(), document());
+      if (installed?.regionsFile?.path === scene.regions) resolved.regionsFile = installed.regionsFile;
     }
   }
   return compileGame(doc, read, resolved);
@@ -660,13 +664,27 @@ test("scene.sceneGraph is optional, a missing file is an issue, and invalid json
   assert.equal("sceneGraph" in loaded.view, false);
   assert.equal("places" in loaded.view, false);
   assert.equal("portals" in loaded.view, false);
+  assert.ok(loaded.regions);
+  assert.equal(loaded.regions.version, 1);
+  assert.equal(loaded.regions.radius, 0.5);
+  assert.equal(loaded.regions.height, 1.8);
+  assert.ok(loaded.regions.places.length > 0);
+  assert.equal("regions" in loaded.view, false);
 
   const bareDoc = structuredClone(withPath);
   delete bareDoc.scene.sceneGraph;
   const bare = compile(bareDoc, read);
   assert.equal(bare.sceneGraph, undefined);
+  assert.equal(bare.regions?.places.length, loaded.regions?.places.length);
   assert.equal(bare.authoritativeHash, loaded.authoritativeHash);
   assert.equal(bare.presentationHash, loaded.presentationHash);
+
+  const noRegions = structuredClone(withPath);
+  delete noRegions.scene.regions;
+  const without = compile(noRegions, read);
+  assert.equal(without.regions, undefined);
+  assert.equal(without.authoritativeHash, loaded.authoritativeHash);
+  assert.equal(without.presentationHash, loaded.presentationHash);
 
   assert.throws(() => readManifestSources(projectRoot(), {
     scene: { sceneGraph: "./web/game/missing-scene-graph.json" },

@@ -45,6 +45,8 @@ export type ConnectBotOptions = {
   openSocket?: (url: string) => SocketLike;
   /** Parsed scene-graph file. A later `sceneGraph` frame replaces it. */
   sceneGraph?: unknown;
+  /** Parsed regions file. A later `regions` frame replaces it. */
+  regions?: unknown;
   onLog?: (line: string) => void;
 };
 
@@ -78,6 +80,10 @@ export async function connectBot(o: ConnectBotOptions): Promise<BotSession> {
   if (o.sceneGraph !== undefined) {
     const reason = world.loadSceneGraph(o.sceneGraph);
     if (reason) o.onLog?.(`scene graph: ${reason}`);
+  }
+  if (o.regions !== undefined) {
+    const reason = world.loadRegions(o.regions);
+    if (reason) o.onLog?.(`regions: ${reason}`);
   }
 
   const open = o.openSocket ?? defaultOpen;
@@ -314,6 +320,9 @@ function applyArenaText(world: BotWorld, text: string, onLog?: (line: string) =>
   else if (frame.t === "sceneGraph") {
     const reason = world.loadSceneGraph(frame.graph, frame.hash);
     if (reason) onLog?.(`scene graph: ${reason}`);
+  } else if (frame.t === "regions") {
+    const reason = world.loadRegions(frame.regions, frame.hash);
+    if (reason) onLog?.(`regions: ${reason}`);
   }
 }
 

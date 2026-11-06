@@ -56,6 +56,10 @@ export type ArenaSession = {
   sceneGraphJson?: string;
   /** Hex SHA-256 of {@link sceneGraphJson}. Set when {@link sceneGraphReady} resolves. */
   sceneGraphHash?: string;
+  /** Canonical baked regions JSON. Absent when the manifest has no regions file. */
+  regionsJson?: string;
+  /** Hex SHA-256 of {@link regionsJson}. Set when {@link sceneGraphReady} resolves. */
+  regionsHash?: string;
   sceneGraphReady: Promise<void>;
   attach(conn: HostConn): void;
   stop(): void;
@@ -69,8 +73,10 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
   const holdNpcs = opts.holdNpcs ?? false;
   const grantSceneGraph = opts.grantSceneGraph === true;
   const sceneGraphJson = loaded.sceneGraph ? canonicalJson(sceneGraphPayload(loaded.sceneGraph)) : undefined;
+  const regionsJson = loaded.regions ? canonicalJson(loaded.regions) : undefined;
   let sceneGraphHash: string | undefined;
-  const sceneWaiters: HostConn[] = [];
+  let regionsHash: string | undefined;
+  const privilegedWaiters: HostConn[] = [];
   const held = createHeldInputs();
   /** Last deny log per client. One line per minute, not an audit counter. */
   const teleportDeniedAt = new Map<number, number>();
@@ -115,28 +121,38 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
     }
     return JSON.stringify(welcome);
   };
-  const pushSceneGraph = (conn: HostConn): void => {
-    if (!sceneGraphJson || !conn.isOpen()) return;
+  const pushPrivileged = (conn: HostConn): void => {
+    if (!conn.isOpen()) return;
     const allowed = grantSceneGraph || conn.claims?.scope.includes("scene-graph") === true;
     if (!allowed) return;
-    if (!sceneGraphHash) {
-      sceneWaiters.push(conn);
+    if ((sceneGraphJson && !sceneGraphHash) || (regionsJson && !regionsHash)) {
+      privilegedWaiters.push(conn);
       return;
     }
-    conn.send(encodeFrame({
-      t: "sceneGraph",
-      v: 1,
-      hash: sceneGraphHash,
-      graph: JSON.parse(sceneGraphJson),
-    }));
+    if (sceneGraphJson && sceneGraphHash) {
+      conn.send(encodeFrame({
+        t: "sceneGraph",
+        v: 1,
+        hash: sceneGraphHash,
+        graph: JSON.parse(sceneGraphJson),
+      }));
+    }
+    if (regionsJson && regionsHash) {
+      conn.send(encodeFrame({
+        t: "regions",
+        v: 1,
+        hash: regionsHash,
+        regions: JSON.parse(regionsJson),
+      }));
+    }
   };
-  const sceneGraphReady: Promise<void> = sceneGraphJson
-    ? sha256Hex(sceneGraphJson).then((hex) => {
-      sceneGraphHash = hex;
-      const pending = sceneWaiters.splice(0);
-      for (const conn of pending) pushSceneGraph(conn);
-    })
-    : Promise.resolve();
+  const sceneGraphReady: Promise<void> = Promise.all([
+    sceneGraphJson ? sha256Hex(sceneGraphJson).then((hex) => { sceneGraphHash = hex; }) : Promise.resolve(),
+    regionsJson ? sha256Hex(regionsJson).then((hex) => { regionsHash = hex; }) : Promise.resolve(),
+  ]).then(() => {
+    const pending = privilegedWaiters.splice(0);
+    for (const conn of pending) pushPrivileged(conn);
+  });
   const refused = new Set<number>();
   const engine: EngineWsServer = new EngineWsServer({
     compatibility: { protocol: 1, world: loaded.view.world },
@@ -294,6 +310,10 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
     get sceneGraphHash() {
       return sceneGraphHash;
     },
+    regionsJson,
+    get regionsHash() {
+      return regionsHash;
+    },
     sceneGraphReady,
     attach(conn) {
       const denyTeleport = (clientId: number): void => {
@@ -424,7 +444,7 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
         } catch (err) {
           console.error("door threw", err);
         }
-      }, (text) => attachPickupWelcome(text, conn.claims), () => pushSceneGraph(conn));
+      }, (text) => attachPickupWelcome(text, conn.claims), () => pushPrivileged(conn));
       socket.onClose(() => {
         const clientId = clientIdFor(engine, socket);
         if (clientId !== undefined) doorHost.drop(clientId);

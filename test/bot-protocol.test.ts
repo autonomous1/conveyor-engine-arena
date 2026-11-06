@@ -143,6 +143,12 @@ test("parseArenaFrame round-trips host frames and drops an unknown t", () => {
       hash: "ab".repeat(32),
       graph: { formatVersion: 1, units: "meters", places: [], portals: [] },
     },
+    {
+      t: "regions",
+      v: 1,
+      hash: "cd".repeat(32),
+      regions: { version: 1, radius: 0.5, height: 1.8, places: [] },
+    },
     { t: "teleportResult", ok: true },
     { t: "teleportResult", ok: false, reason: "blocked" },
     { t: "snapshotResult", ok: true, id: "snap-1", png: "data:image/png;base64,QQ==" },
@@ -297,6 +303,11 @@ test("solo grant sends the scene graph without claims", async () => {
     assert.equal(createHash("sha256").update(host.sceneGraphJson ?? "").digest("hex"), host.sceneGraphHash);
     assert.deepEqual(graph?.graph, JSON.parse(host.sceneGraphJson ?? ""));
     assert.equal(JSON.stringify(graph?.graph).includes("placeById"), false);
+    const regions = frames[welcomeAt + 2];
+    assert.equal(regions?.t, "regions");
+    assert.equal(regions?.v, 1);
+    assert.equal(regions?.hash, host.regionsHash);
+    assert.deepEqual(regions?.regions, JSON.parse(host.regionsJson ?? ""));
   } finally {
     client.close();
     host.stop();
@@ -366,11 +377,15 @@ test("scene graph follows a scoped token and stays off the static host", { timeo
       try {
         const view = await (await fetch(`${host.url}/arena.json`)).json() as Wire & Record<string, unknown>;
         assert.equal("sceneGraph" in view, false);
+        assert.equal("regions" in view, false);
         const frames = await collect(host.url, hello(view), 400);
         assert.equal(frames.some((frame) => frame.type === "welcome"), true);
         assert.equal(frames.some((frame) => frame.t === "sceneGraph"), false);
+        assert.equal(frames.some((frame) => frame.t === "regions"), false);
         assert.equal((await fetch(`${host.url}/scene-graph.json`)).status, 401);
+        assert.equal((await fetch(`${host.url}/regions.json`)).status, 401);
         assert.equal((await fetch(`${host.url}/game/scene-graph.json`)).status, 404);
+        assert.equal((await fetch(`${host.url}/game/regions.json`)).status, 404);
       } finally {
         await host.close();
       }
@@ -400,6 +415,12 @@ test("scene graph follows a scoped token and stays off the static host", { timeo
         assert.equal(res.headers.get("etag"), `"${hash}"`);
         assert.deepEqual(graph?.graph, JSON.parse(body));
         assert.equal(body.includes("placeById"), false);
+        const regionsRes = await fetch(`${host.url}/regions.json`, { headers: { authorization: `Bearer ${bot.token}` } });
+        assert.equal(regionsRes.status, 200);
+        const regionsBody = await regionsRes.text();
+        const regionsHash = createHash("sha256").update(regionsBody).digest("hex");
+        assert.equal(regionsRes.headers.get("etag"), `"${regionsHash}"`);
+        assert.equal(regionsBody.includes("placeById"), false);
 
         const playerFrames = await collect(host.url, hello(view, player.token), 400);
         const playerWelcome = playerFrames.find((frame) => frame.type === "welcome");
@@ -407,14 +428,19 @@ test("scene graph follows a scoped token and stays off the static host", { timeo
         assert.equal(playerWelcome.role, "player");
         assert.deepEqual(playerWelcome.scope, ["play", "chat", "voice"]);
         assert.equal(playerFrames.some((frame) => frame.t === "sceneGraph"), false);
+        assert.equal(playerFrames.some((frame) => frame.t === "regions"), false);
         const denied = await fetch(`${host.url}/scene-graph.json`, { headers: { authorization: `Bearer ${player.token}` } });
         assert.equal(denied.status, 403);
         assert.equal((await denied.text()).includes("places"), false);
+        const regionsDenied = await fetch(`${host.url}/regions.json`, { headers: { authorization: `Bearer ${player.token}` } });
+        assert.equal(regionsDenied.status, 403);
         const missing = await fetch(`${host.url}/scene-graph.json`);
         assert.equal(missing.status, 401);
+        assert.equal((await fetch(`${host.url}/regions.json`)).status, 401);
         const leaked = await fetch(`${host.url}/game/scene-graph.json`);
         assert.equal(leaked.status, 404);
         assert.equal((await leaked.text()).includes("\"places\""), false);
+        assert.equal((await fetch(`${host.url}/game/regions.json`)).status, 404);
       } finally {
         await host.close();
       }

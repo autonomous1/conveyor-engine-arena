@@ -5,6 +5,7 @@
 import type { ArenaView } from "../../../src/shared/arena-view.js";
 import { yawFromQuat } from "../../../src/shared/look.js";
 import type { PickupKind, PickupPlacement } from "../../../src/shared/pickups.js";
+import { parseBakedRegions, type BakedRegionsFile } from "../../../src/shared/nav/regions.js";
 import { placeAt, parseSceneGraph, type SceneGraph } from "../../../src/shared/scene-graph.js";
 
 export type PawnPose = {
@@ -95,6 +96,8 @@ export type BotWorld = {
   scope(): readonly string[] | undefined;
   sceneGraph(): SceneGraph | undefined;
   sceneGraphHash(): string | undefined;
+  regions(): BakedRegionsFile | undefined;
+  regionsHash(): string | undefined;
   placeOf(pos: { x: number; y: number; z: number }): { id: string; kind: string } | undefined;
   summary(): string;
   noteOwned(id: number | undefined): void;
@@ -107,10 +110,14 @@ export type BotWorld = {
   applyLoadout(row: { ammo: number; weapon?: string }): void;
   /** Returns a short reason when the file does not become a graph. */
   loadSceneGraph(file: unknown, hash?: string): string | undefined;
+  /** Returns a short reason when the file is not a baked region graph. */
+  loadRegions(file: unknown, hash?: string): string | undefined;
   applySnapshot(snap: PoseSnapshot): void;
 };
 
 export function createBotWorld(view: WorldView): BotWorld {
+  let regions: BakedRegionsFile | undefined;
+  let regionsHash: string | undefined;
   const aabbs = [...(view.aabbs ?? [])];
   const playerSpawns = [...(view.playerSpawns ?? [])];
   const doorDefs = view.doors ?? [];
@@ -199,6 +206,12 @@ export function createBotWorld(view: WorldView): BotWorld {
     sceneGraphHash() {
       return graphHash;
     },
+    regions() {
+      return regions;
+    },
+    regionsHash() {
+      return regionsHash;
+    },
     placeOf(pos) {
       if (!graph) return undefined;
       const place = placeAt(graph, pos.x, pos.y, pos.z, cabStates(cabs));
@@ -257,6 +270,16 @@ export function createBotWorld(view: WorldView): BotWorld {
       }
       graph = parsed.graph;
       if (hash) graphHash = hash;
+      return undefined;
+    },
+    loadRegions(file, hash) {
+      const parsed = parseBakedRegions(file);
+      if (!parsed.file) {
+        const reason = parsed.issues.map((issue) => `${issue.path}: ${issue.message}`).join("; ");
+        return reason || "regions rejected";
+      }
+      regions = parsed.file;
+      if (hash) regionsHash = hash;
       return undefined;
     },
     applySnapshot(snap) {

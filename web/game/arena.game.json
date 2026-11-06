@@ -30,6 +30,7 @@
     "lights": "./web/game/rooms.lights.json",
     "elevators": "./web/game/elevators.json",
     "sceneGraph": "./web/game/scene-graph.json",
+    "regions": "./web/game/regions.json",
     "placements": [
       "./web/game/buildings.placements.json",
       "./web/game/doors.placements.json",

@@ -304,6 +304,22 @@ export async function startArenaServer(
       send(res, 200, body, "application/json", { etag: `"${hash}"` });
       return;
     }
+    if (url.pathname === "/regions.json") {
+      const header = req.headers.authorization;
+      const result = await checkSceneGraphAuth(Array.isArray(header) ? header[0] : header, gate);
+      if (!result.ok) {
+        send(res, result.status, result.status === 401 ? "unauthorized" : "forbidden", "text/plain; charset=utf-8");
+        return;
+      }
+      const body = host.regionsJson;
+      const hash = host.regionsHash;
+      if (!body || !hash) {
+        send(res, 404, "not found", "text/plain; charset=utf-8");
+        return;
+      }
+      send(res, 200, body, "application/json", { etag: `"${hash}"` });
+      return;
+    }
     if (req.method === "POST" && url.pathname === "/qa/snapshots") {
       try {
         const header = req.headers.authorization;

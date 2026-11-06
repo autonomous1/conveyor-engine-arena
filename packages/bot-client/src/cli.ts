@@ -10,8 +10,8 @@ import { BotAuthRejected, BotRejected, connectBot, type BotSession } from "./con
 import { parseMission } from "./missions.js";
 import { openNodeSocket } from "./node-socket.js";
 
-const HELP = `ce-bot connect --url <ws://host> --token-file <path> [--name <name>] [--model <id>] [--scene-graph <file>] [--role bot|qa|player]
-ce-bot run --url <ws://host> --token-file <path> --goal <mission> [--name <name>] [--model <id>] [--scene-graph <file>] [--role bot|qa] [--count <n>] [--timeout-s <seconds>]
+const HELP = `ce-bot connect --url <ws://host> --token-file <path> [--name <name>] [--model <id>] [--scene-graph <file>] [--regions <file>] [--role bot|qa|player]
+ce-bot run --url <ws://host> --token-file <path> --goal <mission> [--name <name>] [--model <id>] [--scene-graph <file>] [--regions <file>] [--role bot|qa] [--count <n>] [--timeout-s <seconds>]
 
 connect  Open a seat, print a world-model summary every 5s, and stay idle.
 run      Chase a mission until it is met, it cannot be planned, or the timeout.
@@ -28,6 +28,7 @@ Options:
   --name          Display name on hello (default: bot). Ignored when --count > 1.
   --model         Character id (default: arena.json modelChoices[0])
   --scene-graph   Scene graph JSON used before the host frame arrives
+  --regions       Baked regions JSON used before the host frame arrives
   --role          Expected welcome role. connect has no default. run defaults to bot.
   --goal          Mission text (run only)
   --count         Connections to open (run only, default 1). Names are bot-1..bot-N when count > 1.
@@ -47,6 +48,7 @@ type Args = {
   name?: string;
   model?: string;
   sceneGraph?: string;
+  regions?: string;
   role?: Role;
   goal?: string;
   count?: number;
@@ -80,6 +82,7 @@ function parseArgs(argv: readonly string[]): Args {
     else if (arg === "--name") out.name = value();
     else if (arg === "--model") out.model = value();
     else if (arg === "--scene-graph") out.sceneGraph = value();
+    else if (arg === "--regions") out.regions = value();
     else if (arg === "--goal") out.goal = value();
     else if (arg === "--count") {
       const text = value();
@@ -174,9 +177,11 @@ export async function runCli(argv: readonly string[], io: Partial<Io> = {}): Pro
 
   let token = "";
   let sceneGraph: unknown;
+  let regions: unknown;
   try {
     token = readFileSync(args.tokenFile, "utf8").trim();
     if (args.sceneGraph) sceneGraph = JSON.parse(readFileSync(args.sceneGraph, "utf8")) as unknown;
+    if (args.regions) regions = JSON.parse(readFileSync(args.regions, "utf8")) as unknown;
   } catch (err) {
     error(err instanceof Error ? err.message : String(err));
     log(HELP);
@@ -197,6 +202,7 @@ export async function runCli(argv: readonly string[], io: Partial<Io> = {}): Pro
         ...(role ? { role } : {}),
         ...(args.model ? { model: args.model } : {}),
         ...(sceneGraph !== undefined ? { sceneGraph } : {}),
+        ...(regions !== undefined ? { regions } : {}),
         openSocket: openNodeSocket,
         onLog: (line) => error(line),
       });

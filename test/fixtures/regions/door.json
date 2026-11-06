@@ -1,0 +1,1 @@
+{"placeId":"floor","regions":[{"id":"r0","minX":0,"maxX":40,"minZ":0,"maxZ":9,"y":0},{"id":"r1","minX":18.5,"maxX":21.5,"minZ":9,"maxZ":11,"y":0},{"id":"r2","minX":0,"maxX":40,"minZ":11,"maxZ":20,"y":0}],"portals":[{"from":"r0","to":"r1","left":[18.5,0,9],"right":[21.5,0,9],"width":3},{"from":"r1","to":"r2","left":[18.5,0,11],"right":[21.5,0,11],"width":3}]}
