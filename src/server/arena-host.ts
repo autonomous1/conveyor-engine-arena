@@ -273,7 +273,15 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
       }
     }
     grenades.tick();
-  }, loaded.view.noclip === true, loaded.playerSpawns, holdNpcs, elevatorHost);
+  }, loaded.view.noclip === true, loaded.playerSpawns, holdNpcs, elevatorHost, {
+    sceneGraph: loaded.sceneGraph,
+    regions: loaded.regions,
+    aabbs: loaded.view.aabbs,
+    doors: loaded.view.doors,
+    pawnRadius: loaded.view.pawnRadius,
+    pawnHeight: loaded.view.pawnHeight,
+    liveDoors: () => doorHost.snapshot(),
+  });
   const propClips = startPropAnimation(loaded.view.props);
   const fire = createArenaFire({
     world: loaded.world,

@@ -14,6 +14,10 @@ export type WanderAgent = {
   speeds: Record<string, number>;
   /** Human pad. Unset pawns wander on `spawnPoints`. */
   role?: "player";
+  /** Sampled baked-region goal. Absent on the heading roll and while idle after a failed sample. */
+  goal?: { x: number; y: number; z: number };
+  /** Waypoints for `goal`. The follower in the wander loop consumes these. */
+  path?: ReadonlyArray<readonly [number, number, number]>;
 };
 
 export type LoadedArena = {

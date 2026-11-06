@@ -1,15 +1,31 @@
 import type { AuthoritativeWorld } from "conveyor-engine-world";
 import type { EngineWsServer } from "conveyor-engine-transport-ws";
 import type { Audit } from "../shared/audit.js";
+import type { ArenaView } from "../shared/arena-view.js";
+import { propClipName, type Prop } from "../shared/arena-view.js";
+import { doorLeafBox } from "../shared/doors.js";
 import { pawnHitsBox, pickRespawnSpawn, type BlockPawn, type PawnHealth, type SpawnPick } from "../shared/health.js";
 import { capsuleOverlapsAabb } from "../shared/pickups.js";
 import { moveIntent, yawFromQuat } from "../shared/look.js";
 import { approachYaw, commitShielded, enqueueOwnedMove, MOVE_DT, MOVEMENTS, movementIntent, yawQuaternion } from "../shared/movements.js";
+import { createFollower, type FollowPawn, type Pose } from "../shared/nav/follow.js";
+import { pullString } from "../shared/nav/funnel.js";
+import { buildGrid, findLocalPath, navBoxes, specForPlace } from "../shared/nav/grid.js";
+import { createNavCache, planLegs, type NavCache } from "../shared/nav/legs.js";
+import {
+  findRegionPath,
+  indexRegions,
+  overlayShutDoors,
+  regionsOf,
+  type BakedRegionsFile,
+  type Region,
+} from "../shared/nav/regions.js";
+import { planRoute, type Gate } from "../shared/nav/route.js";
+import { placeAt, type SceneGraph, type ScenePortal, type Vec3 } from "../shared/scene-graph.js";
 import { deliverAuditFrame } from "./audit.js";
 import { deliverHealthFrames } from "./health.js";
 import { dispatchHostFrame, hostSnapPath } from "./host-path.js";
 import type { WanderAgent } from "./world-loader.js";
-import { propClipName, type Prop } from "../shared/arena-view.js";
 
 /** 20 Hz. Measured later; not a competitive tick rate. */
 export const TICK_MS = 50;
@@ -111,6 +127,458 @@ export function stepUnownedWander(world: AuthoritativeWorld, agent: WanderAgent)
   return enqueueOwnedMove(world, agent.id, wish.moveX, wish.moveZ, yaw, MOVE_DT);
 }
 
+/** ~20 s at {@link TICK_MS}. A planned walk is not cut off by the old 1–2.5 s heading roll. */
+const WANDER_GOAL_TICKS = 400;
+/** Stand samples and failed plans before the pawn waits for the next retarget. */
+const WANDER_SAMPLE_TRIES = 8;
+/** Close enough that the follower can finish. Farther, and the interior walk is missing. */
+const WANDER_GOAL_XZ = 0.25;
+const WANDER_GOAL_Y = 0.6;
+
+export type WanderNav = {
+  sceneGraph?: SceneGraph;
+  regions?: BakedRegionsFile;
+  aabbs: ArenaView["aabbs"];
+  doors: ArenaView["doors"];
+  pawnRadius: number;
+  pawnHeight: number;
+  /** Live open bits. Absent: `doors[].open` (tests, and a host with no door table). */
+  liveDoors?: () => ReadonlyArray<{ id: string; open: boolean }>;
+};
+
+type WanderWalk = {
+  follow: ReturnType<typeof createFollower>;
+  watched: readonly string[];
+  doorSig: string;
+};
+
+type PlannedWalk = {
+  points: Vec3[];
+  goal: { x: number; y: number; z: number };
+};
+
+type NavView = Pick<ArenaView, "aabbs" | "doors" | "pawnRadius" | "pawnHeight">;
+
+const wanderWalks = new WeakMap<WanderAgent, WanderWalk>();
+
+/** Follower installed by {@link steerUnownedWander}. Tests step this; the loop does too. */
+export function wanderFollower(agent: WanderAgent): WanderWalk["follow"] | undefined {
+  return wanderWalks.get(agent)?.follow;
+}
+
+/**
+ * One unowned tick of goal choice or path following.
+ * With a scene graph and baked regions, the pawn samples a region point and
+ * walks `planRoute` / `planLegs` waypoints. Without them, the old heading roll runs.
+ * Does not apply the wish — {@link stepUnownedWander} still does that.
+ */
+export function steerUnownedWander(
+  world: AuthoritativeWorld,
+  agent: WanderAgent,
+  tick: number,
+  rng: () => number,
+  nav?: WanderNav,
+  cache: NavCache = createNavCache(),
+  others: readonly FollowPawn[] = [],
+): void {
+  const sceneGraph = nav?.sceneGraph;
+  const regions = nav?.regions;
+  if (!nav || !sceneGraph || !regions) {
+    if (tick >= agent.nextTurn) rollHeading(agent, tick, rng);
+    return;
+  }
+  const loaded = { ...nav, sceneGraph, regions };
+  const pose = wanderPose(world, agent);
+  if (!pose) return;
+  const flags = doorFlags(loaded);
+  const walk = wanderWalks.get(agent);
+  const deadline = agent.nextTurn;
+  if (walk && tick >= deadline) {
+    clearWalk(agent);
+  } else if (walk && agent.goal && doorSignature(walk.watched, flags) !== walk.doorSig) {
+    const again = planWanderTo(pose, agent.goal, loaded, cache, flags);
+    if (again) {
+      const goal = agent.goal;
+      installWalk(agent, { points: again, goal }, pose, loaded, flags, tick, rng, others);
+      if (wanderWalks.has(agent)) agent.nextTurn = deadline;
+      return;
+    }
+    clearWalk(agent);
+  } else if (walk) {
+    const step = walk.follow.step(pose, others, tick);
+    agent.heading = step.input.yaw;
+    if (step.status === "running") return;
+    clearWalk(agent);
+  } else if (tick < deadline && agent.gait === "idle") {
+    // A failed sample. A fresh pawn still has its spawn gait and plans now.
+    return;
+  }
+  const chosen = chooseWanderGoal(pose, loaded, rng, cache, flags);
+  if (!chosen) {
+    clearWalk(agent);
+    agent.gait = "idle";
+    agent.nextTurn = tick + WANDER_GOAL_TICKS;
+    return;
+  }
+  installWalk(agent, chosen, pose, loaded, flags, tick, rng, others);
+}
+
+function rollHeading(agent: WanderAgent, tick: number, rng: () => number): void {
+  clearWalk(agent);
+  agent.heading += (unit01(rng) - 0.5) * Math.PI;
+  let gait = MOVEMENTS[Math.floor(unit01(rng) * MOVEMENTS.length)] ?? "idle";
+  if (gait === "fall") gait = "idle";
+  agent.gait = gait;
+  // TODO: remove this log, it is spammy
+  //console.log("agent:",agent.id,gait);
+  //world.triggerAction(agent.id, gait);
+  agent.nextTurn = tick + 20 + Math.floor(unit01(rng) * 30);
+}
+
+function clearWalk(agent: WanderAgent): void {
+  wanderWalks.delete(agent);
+  agent.path = undefined;
+  agent.goal = undefined;
+}
+
+function installWalk(
+  agent: WanderAgent,
+  planned: PlannedWalk,
+  pose: Pose,
+  nav: WanderNav,
+  flags: ReadonlyMap<string, boolean>,
+  tick: number,
+  rng: () => number,
+  others: readonly FollowPawn[],
+): void {
+  const graph = nav.sceneGraph;
+  if (!graph) return;
+  const view = navView(nav, flags);
+  const shut = shutIds(flags);
+  const grid = gridForPath(graph, view, shut, planned.points, pose.y);
+  const follow = createFollower(planned.points, grid, { radius: nav.pawnRadius });
+  const watched = doorsOnPath(view.doors, planned.points);
+  const doorSig = doorSignature(watched, flags);
+  const stepped = follow.step(pose, others, tick);
+  agent.goal = planned.goal;
+  agent.path = planned.points;
+  agent.gait = unit01(rng) < 0.5 ? "walk" : "run";
+  agent.nextTurn = tick + WANDER_GOAL_TICKS;
+  agent.heading = stepped.input.yaw;
+  if (stepped.status === "running") {
+    wanderWalks.set(agent, { follow, watched, doorSig });
+    return;
+  }
+  clearWalk(agent);
+  agent.gait = "idle";
+  agent.nextTurn = tick + 20;
+}
+
+function chooseWanderGoal(
+  pose: Pose,
+  nav: WanderNav & { sceneGraph: SceneGraph; regions: BakedRegionsFile },
+  rng: () => number,
+  cache: NavCache,
+  flags: ReadonlyMap<string, boolean>,
+): PlannedWalk | undefined {
+  for (let attempt = 0; attempt < WANDER_SAMPLE_TRIES; attempt += 1) {
+    const sample = sampleRegionPoint(nav.regions, rng);
+    if (!sample) return undefined;
+    if (!canStand(nav.regions, sample.placeId, sample.x, sample.y, sample.z)) continue;
+    const goal = { x: sample.x, y: sample.y, z: sample.z };
+    const points = planWanderTo(pose, goal, nav, cache, flags);
+    if (!points) continue;
+    return { points, goal };
+  }
+  return undefined;
+}
+
+/**
+ * Waypoints from `pose` to `goal`. Shut doors are unusable: wander does not call `use()`.
+ * Same-place goals walk the baked regions (grid fallback). Cross-place goals use `planLegs`.
+ */
+function planWanderTo(
+  pose: Pose,
+  goal: { x: number; y: number; z: number },
+  nav: WanderNav & { sceneGraph: SceneGraph; regions: BakedRegionsFile },
+  cache: NavCache,
+  flags: ReadonlyMap<string, boolean>,
+): Vec3[] | undefined {
+  const view = navView(nav, flags);
+  const shut = shutIds(flags);
+  const gate = (portal: ScenePortal): Gate => {
+    if (portal.kind !== "door") return "open";
+    const id = portal.door ?? portal.id;
+    return shut.has(id) ? "unusable" : "open";
+  };
+  const from = { x: pose.x, y: pose.y, z: pose.z };
+  const route = planRoute(nav.sceneGraph, from, goal, gate);
+  if (!route.ok) return undefined;
+  if (route.steps.some((step) => step.portal.kind === "door" && gate(step.portal) !== "open")) return undefined;
+  const legs = planLegs(nav.sceneGraph, view, route, from, { cache, regions: nav.regions, doorsShut: shut });
+  if (!legs.ok) return undefined;
+  const points = legs.points.map((point) => [point[0], point[1], point[2]] as Vec3);
+  if (!nearGoal(points, goal) && !appendInterior(nav.sceneGraph, view, nav.regions, cache, shut, points, goal)) {
+    return undefined;
+  }
+  return points.length > 0 ? points : undefined;
+}
+
+function appendInterior(
+  graph: SceneGraph,
+  view: NavView,
+  regions: BakedRegionsFile,
+  cache: NavCache,
+  shut: ReadonlySet<string>,
+  points: Vec3[],
+  goal: { x: number; y: number; z: number },
+): boolean {
+  const end = points[points.length - 1] ?? [goal.x, goal.y, goal.z];
+  const place = placeAt(graph, goal.x, goal.y, goal.z);
+  const fromPlace = placeAt(graph, end[0], end[1], end[2]);
+  if (fromPlace.id !== place.id) return false;
+  const base = indexRegions(regions).get(place.id);
+  if (base && base.regions.length > 0) {
+    const key = `${place.id}|${[...shut].sort().join(",")}`;
+    let overlaid = cache.regions.get(key);
+    if (!overlaid) {
+      overlaid = overlayShutDoors(base, view.doors, shut);
+      cache.regions.set(key, overlaid);
+    }
+    const found = findRegionPath(overlaid, [end[0], end[1], end[2]], [goal.x, goal.y, goal.z]);
+    if (found) {
+      const pulled = pullString(found);
+      if (pulled.length > 0) {
+        appendPoints(points, pulled);
+        return nearGoal(points, goal);
+      }
+    }
+  }
+  const spec = specForPlace(graph, place.id);
+  if (!spec) return false;
+  const grid = buildGrid(spec.area, navBoxes(view, graph, shut), {
+    cell: 0.25,
+    radius: view.pawnRadius,
+    height: view.pawnHeight,
+    baseY: spec.baseY,
+    block: spec.block,
+  });
+  const local = findLocalPath(grid, { x: end[0], z: end[2] }, { x: goal.x, z: goal.z });
+  if (!local) return false;
+  appendPoints(points, local);
+  return nearGoal(points, goal);
+}
+
+function sampleRegionPoint(
+  file: BakedRegionsFile,
+  rng: () => number,
+): { placeId: string; x: number; y: number; z: number } | undefined {
+  const weighted: Array<{ placeId: string; region: Region; area: number }> = [];
+  let total = 0;
+  for (const place of file.places) {
+    for (const region of place.regions) {
+      const area = Math.max(0, region.maxX - region.minX) * Math.max(0, region.maxZ - region.minZ);
+      if (!(area > 0)) continue;
+      weighted.push({ placeId: place.placeId, region, area });
+      total += area;
+    }
+  }
+  if (!(total > 0)) return undefined;
+  let pick = unit01(rng) * total;
+  let chosen = weighted[weighted.length - 1]!;
+  for (const item of weighted) {
+    pick -= item.area;
+    if (pick <= 0) {
+      chosen = item;
+      break;
+    }
+  }
+  const region = chosen.region;
+  const x = region.minX + unit01(rng) * (region.maxX - region.minX);
+  const z = region.minZ + unit01(rng) * (region.maxZ - region.minZ);
+  return { placeId: chosen.placeId, x, y: region.y, z };
+}
+
+function canStand(file: BakedRegionsFile, placeId: string, x: number, y: number, z: number): boolean {
+  const graph = regionsOf(file, placeId);
+  if (!graph) return false;
+  return findRegionPath(graph, [x, y, z], [x, y, z]) !== undefined;
+}
+
+function nearGoal(points: readonly Vec3[], goal: { x: number; y: number; z: number }): boolean {
+  const end = points[points.length - 1];
+  if (!end) return false;
+  return Math.hypot(end[0] - goal.x, end[2] - goal.z) <= WANDER_GOAL_XZ && Math.abs(end[1] - goal.y) < WANDER_GOAL_Y;
+}
+
+function appendPoints(out: Vec3[], extra: readonly Vec3[]): void {
+  for (const point of extra) {
+    const last = out[out.length - 1];
+    if (last && Math.hypot(last[0] - point[0], last[2] - point[2]) < 1e-3) {
+      last[1] = point[1];
+      continue;
+    }
+    out.push([point[0], point[1], point[2]]);
+  }
+}
+
+function doorFlags(nav: WanderNav): Map<string, boolean> {
+  const flags = new Map<string, boolean>();
+  for (const door of nav.doors) flags.set(door.id, door.open === true);
+  const live = nav.liveDoors?.();
+  if (live) {
+    for (const door of live) flags.set(door.id, door.open === true);
+  }
+  return flags;
+}
+
+function shutIds(flags: ReadonlyMap<string, boolean>): Set<string> {
+  const shut = new Set<string>();
+  for (const [id, open] of flags) {
+    if (!open) shut.add(id);
+  }
+  return shut;
+}
+
+function navView(nav: WanderNav, flags: ReadonlyMap<string, boolean>): NavView {
+  return {
+    aabbs: nav.aabbs,
+    doors: nav.doors.map((door) => {
+      const open = flags.get(door.id);
+      return open === undefined || open === door.open ? door : { ...door, open };
+    }),
+    pawnRadius: nav.pawnRadius,
+    pawnHeight: nav.pawnHeight,
+  };
+}
+
+function doorSignature(ids: readonly string[], flags: ReadonlyMap<string, boolean>): string {
+  let sig = "";
+  for (const id of ids) sig += `${id}:${flags.get(id) ? 1 : 0},`;
+  return sig;
+}
+
+function doorsOnPath(doors: ArenaView["doors"], points: readonly Vec3[]): string[] {
+  const ids: string[] = [];
+  for (const door of doors) {
+    const leaf = doorLeafBox(door);
+    if (polylineHits(points, leaf)) ids.push(door.id);
+  }
+  ids.sort();
+  return ids;
+}
+
+function polylineHits(
+  points: readonly Vec3[],
+  box: { minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number },
+): boolean {
+  if (points.length === 0) return false;
+  if (points.length === 1) return pointInBox(points[0]!, box);
+  for (let i = 1; i < points.length; i += 1) {
+    if (segmentHitsBox(points[i - 1]!, points[i]!, box)) return true;
+  }
+  return false;
+}
+
+function pointInBox(
+  point: Vec3,
+  box: { minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number },
+): boolean {
+  return point[0] >= box.minX && point[0] <= box.maxX
+    && point[1] >= box.minY && point[1] <= box.maxY
+    && point[2] >= box.minZ && point[2] <= box.maxZ;
+}
+
+function segmentHitsBox(
+  a: Vec3,
+  b: Vec3,
+  box: { minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number },
+): boolean {
+  let t0 = 0;
+  let t1 = 1;
+  const axes: Array<[number, number, number, number]> = [
+    [a[0], b[0] - a[0], box.minX, box.maxX],
+    [a[1], b[1] - a[1], box.minY, box.maxY],
+    [a[2], b[2] - a[2], box.minZ, box.maxZ],
+  ];
+  for (const [origin, delta, min, max] of axes) {
+    if (Math.abs(delta) <= 1e-9) {
+      if (origin < min || origin > max) return false;
+      continue;
+    }
+    let near = (min - origin) / delta;
+    let far = (max - origin) / delta;
+    if (near > far) {
+      const swap = near;
+      near = far;
+      far = swap;
+    }
+    if (near > t0) t0 = near;
+    if (far < t1) t1 = far;
+    if (t0 > t1) return false;
+  }
+  return true;
+}
+
+function gridForPath(
+  graph: SceneGraph,
+  view: NavView,
+  shut: ReadonlySet<string>,
+  points: readonly Vec3[],
+  baseY: number,
+) {
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minZ = Infinity;
+  let maxZ = -Infinity;
+  for (const point of points) {
+    if (point[0] < minX) minX = point[0];
+    if (point[0] > maxX) maxX = point[0];
+    if (point[2] < minZ) minZ = point[2];
+    if (point[2] > maxZ) maxZ = point[2];
+  }
+  if (!Number.isFinite(minX)) {
+    minX = 0;
+    maxX = 1;
+    minZ = 0;
+    maxZ = 1;
+  }
+  const pad = 3;
+  return buildGrid(
+    { minX: minX - pad, maxX: maxX + pad, minZ: minZ - pad, maxZ: maxZ + pad },
+    navBoxes(view, graph, shut),
+    { cell: 0.25, radius: view.pawnRadius, height: view.pawnHeight, baseY },
+  );
+}
+
+function wanderPose(world: AuthoritativeWorld, agent: WanderAgent): Pose | undefined {
+  const view = world.store.view(agent.id);
+  if (!view) return undefined;
+  return {
+    x: view.position.x,
+    y: view.position.y,
+    z: view.position.z,
+    vx: view.velocity.x,
+    vz: view.velocity.z,
+    yaw: yawFromQuat(view.rotation),
+  };
+}
+
+function followOthers(world: AuthoritativeWorld, agents: readonly WanderAgent[], self: number, radius: number): FollowPawn[] {
+  const out: FollowPawn[] = [];
+  for (const other of agents) {
+    if (other.id === self) continue;
+    const view = world.store.view(other.id);
+    if (!view) continue;
+    out.push({
+      x: view.position.x,
+      z: view.position.z,
+      radius: view.radius > 0 ? view.radius : radius,
+    });
+  }
+  return out;
+}
+
 export function startWanderLoop(
   world: AuthoritativeWorld,
   agents: WanderAgent[],
@@ -126,8 +594,10 @@ export function startWanderLoop(
   holdNpcs = false,
   /** Cab step. Rider ids skip input for this tick and ride through slabs. */
   elevators?: { step(dt: number): readonly number[] },
+  wanderNav?: WanderNav,
 ): () => void {
   const rng = splitMix(20260917);
+  const navCache = createNavCache();
   const snaps = hostSnapPath((clientId, envelope) => {
     server.sendSnapshot(clientId, envelope);
   });
@@ -182,16 +652,15 @@ export function startWanderLoop(
         continue;
       }
       if (holdNpcs) continue;
-      if (tick >= agent.nextTurn) {
-        agent.heading += (unit01(rng) - 0.5) * Math.PI;
-        let gait = MOVEMENTS[Math.floor(unit01(rng) * MOVEMENTS.length)] ?? "idle";
-        if (gait == "fall") gait = "idle";
-        agent.gait = gait;
-        // TODO: remove this log, it is spammy
-        //console.log("agent:",agent.id,gait);
-        //world.triggerAction(agent.id, gait);
-        agent.nextTurn = tick + 20 + Math.floor(unit01(rng) * 30);
-      }
+      steerUnownedWander(
+        world,
+        agent,
+        tick,
+        rng,
+        wanderNav,
+        navCache,
+        followOthers(world, agents, agent.id, wanderNav?.pawnRadius ?? 0.5),
+      );
       // The picked gait only scales the wish. The clip follows the eased speed.
       stepUnownedWander(world, agent);
     }
@@ -237,7 +706,13 @@ export function startWanderLoop(
 /** Move a pawn that just became alive onto a free spawn. The shot itself does not write a transform. */
 function respawnPawn(world: AuthoritativeWorld, agents: WanderAgent[], id: number, playerSpawns: readonly SpawnPick[]): void {
   const agent = agents.find((item) => item.id === id);
-  if (agent) agent.gait = "idle";
+  if (agent) {
+    agent.gait = "idle";
+    if (wanderWalks.has(agent)) {
+      clearWalk(agent);
+      agent.nextTurn = 0;
+    }
+  }
   const pads = agent?.role === "player" ? playerSpawns : world.listSpawnPoints();
   const spawn = claimClearSpawn(world, id, pads);
   const view = world.store.view(id);
