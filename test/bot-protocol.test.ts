@@ -145,12 +145,26 @@ test("parseArenaFrame round-trips host frames and drops an unknown t", () => {
     },
     { t: "teleportResult", ok: true },
     { t: "teleportResult", ok: false, reason: "blocked" },
+    { t: "snapshotResult", ok: true, id: "snap-1", png: "data:image/png;base64,QQ==" },
+    { t: "snapshotResult", ok: false, id: "snap-1", reason: "noRenderer" },
+    { t: "snapshotResult", ok: false, id: "snap-1", reason: "invalid" },
+    { t: "snapshotResult", ok: false, id: "snap-1", reason: "busy" },
+    { t: "qaCapture", id: "snap-1" },
+    {
+      t: "qaCapture",
+      id: "snap-2",
+      lookFrom: { eye: { x: 1, y: 2, z: 3 }, target: { x: 4, y: 5, z: 6 }, fovDeg: 55 },
+      follow: { entityId: 7, back: 3, up: 1.6 },
+      waitFrames: 2,
+    },
   ];
   for (const frame of frames) {
     assert.deepEqual(parseArenaFrame(JSON.stringify(frame)), frame);
   }
   assert.equal(parseArenaFrame(JSON.stringify({ t: "nope" })), undefined);
   assert.equal(parseArenaFrame("{"), undefined);
+  assert.equal(parseArenaFrame(JSON.stringify({ t: "snapshotResult", ok: false, id: "snap-1", reason: "nope" })), undefined);
+  assert.equal(parseArenaFrame(JSON.stringify({ t: "qaCapture" })), undefined);
 
   const bare = parseWelcomeExtras({
     type: "welcome",

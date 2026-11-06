@@ -74,6 +74,12 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
   const held = createHeldInputs();
   /** Last deny log per client. One line per minute, not an audit counter. */
   const teleportDeniedAt = new Map<number, number>();
+  /** Last qaSnapshot deny log per client. One line per minute, not an audit counter. */
+  const qaSnapshotDeniedAt = new Map<number, number>();
+  /** One remote shutter in flight per requester. The PNG is not logged or stored. */
+  const snapByRequester = new Map<number, SnapJob>();
+  const snapById = new Map<string, SnapJob>();
+  let snapSeq = 0;
   /** Pads chosen since the last commit. The next hello treats them as occupied. */
   const reservedPads = new Map<number, SpawnPick>();
   const health = createPawnHealth();
@@ -264,6 +270,15 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
   });
   const arenaJson = JSON.stringify({ ...loaded.view, propClips });
 
+  function sendClient(clientId: number, frame: object): void {
+    engine.session(clientId)?.socket.send(encodeFrame(frame));
+  }
+
+  function nextSnapId(clientId: number): string {
+    snapSeq += 1;
+    return `snap-${clientId}-${snapSeq}`;
+  }
+
   function sendInventory(pawnId: number): void {
     // Keys survive respawn today. Death dropping keys is later, so this list is not cleared.
     const frame = encodeFrame({ t: "inventory", keys: pickupHost.getHeldItems(pawnId) });
@@ -287,6 +302,13 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
         if (now - prev < 60_000) return;
         teleportDeniedAt.set(clientId, now);
         console.log(`[teleport] denied client=${clientId} sub=${conn.claims?.sub ?? ""}`);
+      };
+      const denyQaSnapshot = (clientId: number): void => {
+        const now = Date.now();
+        const prev = qaSnapshotDeniedAt.get(clientId) ?? 0;
+        if (now - prev < 60_000) return;
+        qaSnapshotDeniedAt.set(clientId, now);
+        console.log(`[qaSnapshot] denied client=${clientId} sub=${conn.claims?.sub ?? ""}`);
       };
       const socket = socketFromConn(conn, refused, (clientId) => engine.disconnect(clientId), (sock, frame) => {
         const clientId = clientIdFor(engine, sock);
@@ -315,6 +337,62 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
           // Commit first so that step starts at the landing instead of the old feet.
           loaded.world.commit(loaded.world.currentTick);
           conn.send(encodeFrame({ t: "teleportResult", ok: true }));
+          return;
+        }
+        if (isQaSnapshotFrame(frame)) {
+          if (conn.claims?.scope.includes("qa") !== true) {
+            denyQaSnapshot(clientId);
+            return;
+          }
+          const parsed = parseQaSnapshotAsk(frame);
+          const id = (parsed.ok ? parsed.ask.id : parsed.id) ?? nextSnapId(clientId);
+          if (!parsed.ok) {
+            sendClient(clientId, { t: "snapshotResult", ok: false, id, reason: "invalid" });
+            return;
+          }
+          if (snapByRequester.has(clientId) || snapById.has(id)) {
+            sendClient(clientId, { t: "snapshotResult", ok: false, id, reason: "busy" });
+            return;
+          }
+          const ask = parsed.ask;
+          const capture = {
+            t: "qaCapture" as const,
+            id,
+            ...(ask.lookFrom ? { lookFrom: ask.lookFrom } : {}),
+            ...(ask.follow ? { follow: ask.follow } : {}),
+            ...(ask.waitFrames !== undefined ? { waitFrames: ask.waitFrames } : {}),
+          };
+          const job: SnapJob = {
+            id,
+            requesterId: clientId,
+            timer: setTimeout(() => {
+              const current = snapById.get(id);
+              if (!current) return;
+              snapById.delete(id);
+              snapByRequester.delete(current.requesterId);
+              sendClient(current.requesterId, { t: "snapshotResult", ok: false, id, reason: "noRenderer" });
+            }, SNAP_TIMEOUT_MS),
+          };
+          snapByRequester.set(clientId, job);
+          snapById.set(id, job);
+          const text = encodeFrame(capture);
+          for (const otherId of engine.connected) {
+            if (otherId === clientId) continue;
+            engine.session(otherId)?.socket.send(text);
+          }
+          return;
+        }
+        if (isQaSnapshotDataFrame(frame)) {
+          const data = readQaSnapshotData(frame);
+          if (data) {
+            const job = snapById.get(data.id);
+            if (job) {
+              clearTimeout(job.timer);
+              snapById.delete(job.id);
+              snapByRequester.delete(job.requesterId);
+              sendClient(job.requesterId, { t: "snapshotResult", ok: true, id: job.id, png: data.png });
+            }
+          }
           return;
         }
         const chosen = parseModelFrame(frame);
@@ -354,6 +432,9 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
       engine.attach(socket);
     },
     stop() {
+      for (const job of snapById.values()) clearTimeout(job.timer);
+      snapById.clear();
+      snapByRequester.clear();
       stopLoop();
     },
   };
@@ -417,6 +498,113 @@ export function socketFromConn(
 
 function spectateHello(hello: object): boolean {
   return (hello as { spectate?: unknown }).spectate === true;
+}
+
+const SNAP_TIMEOUT_MS = 3_000;
+const PNG_PREFIX = "data:image/png;base64,";
+const PNG_MAX_CHARS = 4_000_000;
+const SNAP_ID_MAX = 64;
+
+type SnapJob = {
+  id: string;
+  requesterId: number;
+  timer: ReturnType<typeof setTimeout>;
+};
+
+type SnapVec = { x: number; y: number; z: number };
+
+type SnapLook = { eye: SnapVec; target: SnapVec; fovDeg: number };
+
+type SnapFollow = { entityId: number; back: number; up: number };
+
+type SnapAsk = {
+  id?: string;
+  lookFrom?: SnapLook;
+  follow?: SnapFollow;
+  waitFrames?: number;
+};
+
+function isQaSnapshotFrame(frame: unknown): frame is { t: "qaSnapshot" } {
+  return !!frame && typeof frame === "object" && !Array.isArray(frame) && (frame as { t?: unknown }).t === "qaSnapshot";
+}
+
+function isQaSnapshotDataFrame(frame: unknown): frame is { t: "qaSnapshotData" } {
+  return !!frame && typeof frame === "object" && !Array.isArray(frame) && (frame as { t?: unknown }).t === "qaSnapshotData";
+}
+
+function parseQaSnapshotAsk(frame: { t: "qaSnapshot" }): { ok: true; ask: SnapAsk } | { ok: false; id?: string } {
+  const rec = frame as { id?: unknown; lookFrom?: unknown; follow?: unknown; waitFrames?: unknown };
+  let id: string | undefined;
+  if (rec.id !== undefined) {
+    if (typeof rec.id !== "string" || rec.id.length === 0 || rec.id.length > SNAP_ID_MAX) return { ok: false };
+    id = rec.id;
+  }
+  let lookFrom: SnapLook | undefined;
+  if (rec.lookFrom !== undefined) {
+    const parsed = parseSnapLook(rec.lookFrom);
+    if (!parsed) return { ok: false, id };
+    lookFrom = parsed;
+  }
+  let follow: SnapFollow | undefined;
+  if (rec.follow !== undefined) {
+    const parsed = parseSnapFollow(rec.follow);
+    if (!parsed) return { ok: false, id };
+    follow = parsed;
+  }
+  let waitFrames: number | undefined;
+  if (rec.waitFrames !== undefined) {
+    if (typeof rec.waitFrames !== "number" || !Number.isInteger(rec.waitFrames)) return { ok: false, id };
+    waitFrames = Math.min(30, Math.max(0, rec.waitFrames));
+  }
+  const ask: SnapAsk = {};
+  if (id) ask.id = id;
+  if (lookFrom) ask.lookFrom = lookFrom;
+  if (follow) ask.follow = follow;
+  if (waitFrames !== undefined) ask.waitFrames = waitFrames;
+  return { ok: true, ask };
+}
+
+function parseSnapLook(value: unknown): SnapLook | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const rec = value as { eye?: unknown; target?: unknown; fovDeg?: unknown };
+  const eye = parseSnapVec(rec.eye);
+  const target = parseSnapVec(rec.target);
+  if (!eye || !target) return undefined;
+  if (rec.fovDeg === undefined) return { eye, target, fovDeg: 55 };
+  if (typeof rec.fovDeg !== "number" || !Number.isFinite(rec.fovDeg)) return undefined;
+  return { eye, target, fovDeg: rec.fovDeg };
+}
+
+function parseSnapFollow(value: unknown): SnapFollow | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const rec = value as { entityId?: unknown; back?: unknown; up?: unknown };
+  if (typeof rec.entityId !== "number" || !Number.isInteger(rec.entityId)) return undefined;
+  let back = 3;
+  let up = 1.6;
+  if (rec.back !== undefined) {
+    if (typeof rec.back !== "number" || !Number.isFinite(rec.back)) return undefined;
+    back = rec.back;
+  }
+  if (rec.up !== undefined) {
+    if (typeof rec.up !== "number" || !Number.isFinite(rec.up)) return undefined;
+    up = rec.up;
+  }
+  return { entityId: rec.entityId, back, up };
+}
+
+function parseSnapVec(value: unknown): SnapVec | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const rec = value as { x?: unknown; y?: unknown; z?: unknown };
+  if (typeof rec.x !== "number" || typeof rec.y !== "number" || typeof rec.z !== "number") return undefined;
+  if (!Number.isFinite(rec.x) || !Number.isFinite(rec.y) || !Number.isFinite(rec.z)) return undefined;
+  return { x: rec.x, y: rec.y, z: rec.z };
+}
+
+function readQaSnapshotData(frame: { t: "qaSnapshotData" }): { id: string; png: string } | undefined {
+  const rec = frame as { id?: unknown; png?: unknown };
+  if (typeof rec.id !== "string" || rec.id.length === 0) return undefined;
+  if (typeof rec.png !== "string" || !rec.png.startsWith(PNG_PREFIX) || rec.png.length > PNG_MAX_CHARS) return undefined;
+  return { id: rec.id, png: rec.png };
 }
 
 function isTeleportFrame(frame: unknown): frame is { t: "teleport" } {

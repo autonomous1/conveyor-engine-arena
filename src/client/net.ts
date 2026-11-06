@@ -2,7 +2,7 @@ import { EngineClient } from "conveyor-engine-client";
 import { fireShotFrame, summarizeInbound } from "../shared/fire-debug.js";
 import { parseAudit, type AuditCounters } from "../shared/audit.js";
 import { parseHealth } from "../shared/health.js";
-import { parseSceneGraphFrame, type SceneGraphFrame } from "../shared/bot-protocol.js";
+import { parseQaCapture, parseSceneGraphFrame, type QaCaptureFrame, type SceneGraphFrame } from "../shared/bot-protocol.js";
 import { parseDoor, parseDoorSet, useFrame, type DoorFrame } from "../shared/doors.js";
 import { parseElevatorSet, parseElevatorState, type ElevatorState } from "../shared/elevators.js";
 import { parseGrenadePose, grenadeFrame, type GrenadePose } from "../shared/grenade.js";
@@ -77,6 +77,8 @@ export type LiveLink = {
    * Returns false when the frame was not written on this call.
    */
   sendModel(model: string): boolean;
+  /** PNG data URL for a host `qaCapture`. Sent with or without an owned pawn. */
+  sendQaSnapshotData(id: string, png: string): boolean;
   /** True after the socket has closed. Closing does not open another socket. */
   socketClosed(): boolean;
   /** connecting, open, closing, or closed. */
@@ -128,6 +130,8 @@ export function connectLive(opts: {
   onSceneGraph?: (frame: SceneGraphFrame | undefined) => void;
   /** This client only. Other clients do not receive a viewmodel. */
   onLoadout?: (loadout: LoadoutFrame) => void;
+  /** Host asked this browser for a PNG. QA and play tabs both receive it. */
+  onQaCapture?: (capture: QaCaptureFrame) => void;
   /** Read when a shot is sent. The host logs only when this is on. */
   fireDebug?: () => boolean;
   /** One inbound frame, after it parses and before it is applied. */
@@ -238,6 +242,11 @@ export function connectLive(opts: {
     if (typeof msg.t === "string") {
       if (msg.t === "sceneGraph") {
         opts.onSceneGraph?.(parseSceneGraphFrame(msg));
+        return;
+      }
+      if (msg.t === "qaCapture") {
+        const capture = parseQaCapture(msg);
+        if (capture) opts.onQaCapture?.(capture);
         return;
       }
       const laser = parseLaser(msg);
@@ -375,6 +384,11 @@ export function connectLive(opts: {
       queuedModel = model;
       if (ownedId === undefined || ws.readyState !== WebSocket.OPEN) return false;
       flushModel();
+      return true;
+    },
+    sendQaSnapshotData(id, png) {
+      if (ws.readyState !== WebSocket.OPEN || id.length === 0) return false;
+      ws.send(JSON.stringify({ t: "qaSnapshotData", id, png }));
       return true;
     },
     socketClosed() {

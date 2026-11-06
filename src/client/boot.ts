@@ -28,12 +28,13 @@ import { cameraAim, createInfoProbe, leafAabb, type ProbePawn } from "./info-pro
 import { attachPlayInput } from "./input.js";
 import { createLaserBeams } from "./laser.js";
 import { assetBase } from "../shared/asset-base.js";
+import type { QaCaptureFrame } from "../shared/bot-protocol.js";
 import { connectLive, type LaserNotice, type OpenSocket } from "./net.js";
 import { createViewModel } from "./viewmodel.js";
 import { createOptionsDialog } from "./options.js";
 import { createSceneMap, loadMapBakeBounds } from "./scene-map.js";
 import { createPawnLayer } from "./presentation.js";
-import { installQaApi } from "./qa.js";
+import { installQaApi, type QaApi } from "./qa.js";
 import { createRateWindow, formatOverlay } from "./rates.js";
 import { formatFireLog, presentShot } from "./shot-view.js";
 
@@ -196,6 +197,33 @@ export async function boot(
     arena.camera.lookAt(entity.position.x, entity.position.y + 1.6, entity.position.z);
   };
 
+  const snapshotSend: { current: (id: string, png: string) => void } = { current: () => {} };
+  const answerQaCapture = (msg: QaCaptureFrame): void => {
+    void takeQaCapture(msg).catch((err: unknown) => {
+      console.error("qa capture threw", err);
+    });
+  };
+  async function takeQaCapture(msg: QaCaptureFrame): Promise<void> {
+    if (qa) {
+      const api = (window as { __qa?: QaApi }).__qa;
+      if (!api) return;
+      if (msg.lookFrom) api.lookFrom(msg.lookFrom.eye, msg.lookFrom.target, msg.lookFrom.fovDeg);
+      if (msg.follow) {
+        api.follow(msg.follow.entityId, {
+          ...(msg.follow.back !== undefined ? { back: msg.follow.back } : {}),
+          ...(msg.follow.up !== undefined ? { up: msg.follow.up } : {}),
+        });
+      }
+      if (msg.waitFrames !== undefined) await api.waitFrames(msg.waitFrames);
+      snapshotSend.current(msg.id, await api.snapshot());
+      return;
+    }
+    // Aimed shots stay on a ?qa=1 tab. A play tab only ships its current view.
+    if (msg.lookFrom || msg.follow) return;
+    arena.renderer.render(arena.scene, arena.camera);
+    snapshotSend.current(msg.id, arena.renderer.domElement.toDataURL("image/png"));
+  }
+
   const link = connectLive({
     bundleId: view.bundleId,
     authoritativeHash: view.authoritativeHash,
@@ -257,7 +285,7 @@ export async function boot(
         awaitFireReply = false;
         return;
       }
-      if (summary.startsWith("snapshot") && !loggedFireSnap) {
+      if (summary.startsWith("snapshot ") && !loggedFireSnap) {
         fireDebug.frameReceived(summary);
         loggedFireSnap = true;
       }
@@ -272,9 +300,13 @@ export async function boot(
     auth: opts?.auth,
     spectate: qa,
     onAuthRejected: opts?.onAuthRejected,
+    onQaCapture: answerQaCapture,
   });
   pushModel = (id) => {
     link.sendModel(id);
+  };
+  snapshotSend.current = (id, png) => {
+    link.sendQaSnapshotData(id, png);
   };
 
   let last = performance.now();

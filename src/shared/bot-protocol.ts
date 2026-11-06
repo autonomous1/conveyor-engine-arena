@@ -31,6 +31,46 @@ export type TeleportResultFrame = {
   reason?: string;
 };
 
+export type SnapshotVec3 = { x: number; y: number; z: number };
+
+/** Aimed shutter. `fovDeg` defaults to 55 on the QA page when omitted. */
+export type SnapshotLookFrom = {
+  eye: SnapshotVec3;
+  target: SnapshotVec3;
+  fovDeg?: number;
+};
+
+/** Chase a pawn. `back` / `up` default to 3 / 1.6 on the QA page when omitted. */
+export type SnapshotFollow = {
+  entityId: number;
+  back?: number;
+  up?: number;
+};
+
+export type SnapshotResultReason = "invalid" | "busy" | "noRenderer";
+
+/** Reply to the client that sent `qaSnapshot`. `png` is a PNG data URL. */
+export type SnapshotResultFrame = {
+  t: "snapshotResult";
+  ok: boolean;
+  id: string;
+  png?: string;
+  reason?: SnapshotResultReason;
+};
+
+/**
+ * Host → other browsers. The requester is skipped.
+ * No `lookFrom` or `follow`: any play tab may answer with its current view.
+ * Either field: only a `?qa=1` tab should answer.
+ */
+export type QaCaptureFrame = {
+  t: "qaCapture";
+  id: string;
+  lookFrom?: SnapshotLookFrom;
+  follow?: SnapshotFollow;
+  waitFrames?: number;
+};
+
 /** Host → client arena frames. Elevator is cab state. Grenade is the replicated pose. */
 export type ArenaFrame =
   | LoadoutFrame
@@ -43,7 +83,9 @@ export type ArenaFrame =
   | AuditFrame
   | InventoryFrame
   | SceneGraphFrame
-  | TeleportResultFrame;
+  | TeleportResultFrame
+  | SnapshotResultFrame
+  | QaCaptureFrame;
 
 export type WelcomeExtras = {
   pickups: string[];
@@ -77,7 +119,85 @@ export function parseArenaFrame(text: string): ArenaFrame | undefined {
   if (t === "inventory") return parseInventory(value);
   if (t === "sceneGraph") return parseSceneGraphFrame(value);
   if (t === "teleportResult") return parseTeleportResult(value);
+  if (t === "snapshotResult") return parseSnapshotResult(value);
+  if (t === "qaCapture") return parseQaCapture(value);
   return undefined;
+}
+
+const SNAPSHOT_REASONS = new Set<string>(["invalid", "busy", "noRenderer"]);
+
+export function parseSnapshotResult(frame: unknown): SnapshotResultFrame | undefined {
+  if (!frame || typeof frame !== "object" || Array.isArray(frame)) return undefined;
+  const rec = frame as Record<string, unknown>;
+  if (rec.t !== "snapshotResult" || typeof rec.ok !== "boolean") return undefined;
+  if (typeof rec.id !== "string" || rec.id.length === 0 || rec.id.length > 64) return undefined;
+  if (rec.ok === true) {
+    if (typeof rec.png !== "string" || !rec.png.startsWith("data:image/png;base64,")) return undefined;
+    if (rec.reason !== undefined) return undefined;
+    return { t: "snapshotResult", ok: true, id: rec.id, png: rec.png };
+  }
+  if (typeof rec.reason !== "string" || !SNAPSHOT_REASONS.has(rec.reason)) return undefined;
+  if (rec.png !== undefined) return undefined;
+  return { t: "snapshotResult", ok: false, id: rec.id, reason: rec.reason as SnapshotResultReason };
+}
+
+export function parseQaCapture(frame: unknown): QaCaptureFrame | undefined {
+  if (!frame || typeof frame !== "object" || Array.isArray(frame)) return undefined;
+  const rec = frame as Record<string, unknown>;
+  if (rec.t !== "qaCapture") return undefined;
+  if (typeof rec.id !== "string" || rec.id.length === 0 || rec.id.length > 64) return undefined;
+  const out: QaCaptureFrame = { t: "qaCapture", id: rec.id };
+  if (rec.lookFrom !== undefined) {
+    const lookFrom = parseSnapshotLook(rec.lookFrom);
+    if (!lookFrom) return undefined;
+    out.lookFrom = lookFrom;
+  }
+  if (rec.follow !== undefined) {
+    const follow = parseSnapshotFollow(rec.follow);
+    if (!follow) return undefined;
+    out.follow = follow;
+  }
+  if (rec.waitFrames !== undefined) {
+    if (typeof rec.waitFrames !== "number" || !Number.isInteger(rec.waitFrames)) return undefined;
+    if (rec.waitFrames < 0 || rec.waitFrames > 30) return undefined;
+    out.waitFrames = rec.waitFrames;
+  }
+  return out;
+}
+
+function parseSnapshotLook(value: unknown): SnapshotLookFrom | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const rec = value as Record<string, unknown>;
+  const eye = parseSnapshotVec(rec.eye);
+  const target = parseSnapshotVec(rec.target);
+  if (!eye || !target) return undefined;
+  if (rec.fovDeg === undefined) return { eye, target };
+  if (typeof rec.fovDeg !== "number" || !Number.isFinite(rec.fovDeg)) return undefined;
+  return { eye, target, fovDeg: rec.fovDeg };
+}
+
+function parseSnapshotFollow(value: unknown): SnapshotFollow | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const rec = value as Record<string, unknown>;
+  if (typeof rec.entityId !== "number" || !Number.isInteger(rec.entityId)) return undefined;
+  const out: SnapshotFollow = { entityId: rec.entityId };
+  if (rec.back !== undefined) {
+    if (typeof rec.back !== "number" || !Number.isFinite(rec.back)) return undefined;
+    out.back = rec.back;
+  }
+  if (rec.up !== undefined) {
+    if (typeof rec.up !== "number" || !Number.isFinite(rec.up)) return undefined;
+    out.up = rec.up;
+  }
+  return out;
+}
+
+function parseSnapshotVec(value: unknown): SnapshotVec3 | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const rec = value as Record<string, unknown>;
+  if (typeof rec.x !== "number" || typeof rec.y !== "number" || typeof rec.z !== "number") return undefined;
+  if (!Number.isFinite(rec.x) || !Number.isFinite(rec.y) || !Number.isFinite(rec.z)) return undefined;
+  return { x: rec.x, y: rec.y, z: rec.z };
 }
 
 export function parseTeleportResult(frame: unknown): TeleportResultFrame | undefined {
