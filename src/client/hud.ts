@@ -52,12 +52,33 @@ export function createHud() {
   cross.append(vert, horz);
   const info = document.createElement("div");
   info.id = "info-probe";
-  info.style.cssText = [
-    "position:fixed", "left:50%", "top:calc(50% + 18px)", "transform:translateX(-50%)",
-    "z-index:3", "max-width:42rem", "padding:6px 8px", "background:#12151ccc", "color:#ffffff",
-    "font:13px/1.4 ui-sans-serif, system-ui", "white-space:pre", "text-align:center",
-    "pointer-events:none", "display:none",
-  ].join(";");
+  let shown = "";
+  let copiedUntil = 0;
+  const paintInfo = () => {
+    const visible = shown.length > 0;
+    const hint = visible && Date.now() < copiedUntil ? "\ncopied" : "";
+    info.textContent = shown + hint;
+    info.style.cssText = [
+      "position:fixed", "left:50%", "top:calc(50% + 18px)", "transform:translateX(-50%)",
+      "z-index:3", "max-width:42rem", "padding:6px 8px", "background:#12151ccc", "color:#ffffff",
+      "font:13px/1.4 ui-sans-serif, system-ui", "white-space:pre", "text-align:center",
+      `pointer-events:${visible ? "auto" : "none"}`,
+      `user-select:${visible ? "text" : "none"}`,
+      `display:${visible ? "block" : "none"}`,
+    ].join(";");
+    info.style.display = visible ? "block" : "none";
+    info.style.pointerEvents = visible ? "auto" : "none";
+    info.style.userSelect = visible ? "text" : "none";
+  };
+  paintInfo();
+  // A press on the readout must not become use or fire. preventDefault would
+  // also cancel text selection, so the event is only stopped.
+  const stopOverlayPress = (ev: Event) => {
+    ev.stopPropagation();
+  };
+  info.addEventListener("pointerdown", stopOverlayPress);
+  info.addEventListener("mousedown", stopOverlayPress);
+  info.addEventListener("click", stopOverlayPress);
   let onProfileToggle = () => {};
   profileButton.addEventListener("click", (ev) => {
     ev.preventDefault();
@@ -116,8 +137,26 @@ export function createHud() {
     },
     /** Crosshair inspect. Empty hides the line. Does not touch status or stats. */
     setInfo(text: string) {
-      info.textContent = text;
-      info.style.display = text.length > 0 ? "block" : "none";
+      shown = text;
+      paintInfo();
+    },
+    /**
+     * Copy an inspect hit id. Refresh must not call this.
+     * A missing clipboard or a rejected write leaves the overlay up.
+     */
+    copyInfo(id: string) {
+      if (id.length === 0) return;
+      const markCopied = () => {
+        copiedUntil = Date.now() + 1000;
+        paintInfo();
+      };
+      try {
+        const clip = navigator.clipboard;
+        if (!clip || typeof clip.writeText !== "function") return;
+        void Promise.resolve(clip.writeText(id)).then(markCopied, () => {});
+      } catch {
+        // Clipboard can throw when the document is not focused. The readout stays.
+      }
     },
   };
 }

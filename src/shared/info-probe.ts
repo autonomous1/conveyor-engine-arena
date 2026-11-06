@@ -252,6 +252,8 @@ export type InfoSession = {
   doorLive(id: string): { open: boolean; locked: boolean } | undefined;
   pickupAvailable(id: string): boolean;
   readonly graph: SceneGraph | undefined;
+  /** Id of the last inspect hit. Absent after a miss or after the readout expires. */
+  readonly hitId: string | undefined;
   inspect(args: {
     now: number;
     origin: Vec3;
@@ -282,6 +284,7 @@ export function createInfoSession(opts: {
   let remaining = new Set(opts.pickups.map((pickup) => pickup.id));
   let graph: SceneGraph | undefined;
   let shown: { until: number; hit?: InfoHit } | undefined;
+  let lastHitId: string | undefined;
 
   const text = (own?: InfoOwn, cabs?: readonly CabState[]): string => {
     if (!shown) return "";
@@ -348,15 +351,20 @@ export function createInfoSession(opts: {
     get graph() {
       return graph;
     },
+    get hitId() {
+      return lastHitId;
+    },
     inspect(args) {
       const hit = pickInfoTarget(args.origin, args.direction, args.candidates, args.range ?? INFO_RANGE_M);
       shown = { until: args.now + INFO_SHOW_MS, ...(hit ? { hit } : {}) };
+      lastHitId = hit && hit.id.length > 0 ? hit.id : undefined;
       return text(args.own, args.cabs);
     },
     refresh(now, own, cabs) {
       if (!shown) return "";
       if (!(now < shown.until)) {
         shown = undefined;
+        lastHitId = undefined;
         return "";
       }
       return text(own, cabs);

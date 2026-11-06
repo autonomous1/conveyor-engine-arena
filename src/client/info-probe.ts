@@ -93,6 +93,8 @@ export function createInfoProbe(opts: {
   pickups: readonly { id: string; kind?: string; minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number }[];
   props: readonly { id: string }[];
   show(text: string): void;
+  /** Hit id from a fresh inspect. Refresh does not call this. */
+  copy?(id: string): void;
 }): InfoProbe {
   const session = createInfoSession({ doors: opts.doors, pickups: opts.pickups });
   const doors = opts.doors;
@@ -142,14 +144,17 @@ export function createInfoProbe(opts: {
         propIds,
         pickupIds,
       });
-      paint(session.inspect({
+      const value = session.inspect({
         now: args.now,
         origin: args.origin,
         direction: args.direction,
         candidates,
         own: args.own,
         cabs: args.cabs,
-      }));
+      });
+      paint(value);
+      const id = session.hitId;
+      if (id) opts.copy?.(id);
     },
     refresh(now, nextOwn, nextCabs) {
       if (nextOwn) own = nextOwn;

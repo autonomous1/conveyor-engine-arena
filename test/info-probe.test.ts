@@ -784,6 +784,183 @@ test("I and Y inspect once, and the other controls stay on their own actions", (
   }
 });
 
+test("inspect records the hit id and a miss or expiry clears it", () => {
+  const session = createInfoSession({ doors: [], pickups: [] });
+  const shown = session.inspect({
+    now: 0,
+    origin: vec(0.5, 1, 0),
+    direction: vec(0, 0, 1),
+    candidates: [box("pickup", "crate-7", [0, 0, 2], [1, 2, 2.4])],
+  });
+  assert.match(shown, /^pickup crate-7/);
+  assert.equal(session.hitId, "crate-7");
+  assert.equal(session.refresh(INFO_SHOW_MS - 1).includes("crate-7"), true);
+  assert.equal(session.hitId, "crate-7");
+  const door = session.inspect({
+    now: 10,
+    origin: vec(0.5, 1, 0),
+    direction: vec(0, 0, 1),
+    candidates: [box("door", "hall.door", [0, 0, 2], [1, 2, 2.4])],
+  });
+  assert.match(door, /^door hall.door/);
+  assert.equal(session.hitId, "hall.door");
+  const missed = session.inspect({
+    now: 20,
+    origin: vec(0.5, 1, 0),
+    direction: vec(0, 0, -1),
+    candidates: [box("prop", "crate-7", [0, 0, 2], [1, 2, 2.4])],
+  });
+  assert.equal(missed.includes("crate-7"), false);
+  assert.equal(session.hitId, undefined);
+  session.inspect({
+    now: 30,
+    origin: vec(0.5, 1, 0),
+    direction: vec(0, 0, 1),
+    candidates: [box("prop", "crate-7", [0, 0, 2], [1, 2, 2.4])],
+  });
+  assert.equal(session.hitId, "crate-7");
+  assert.equal(session.refresh(30 + INFO_SHOW_MS), "");
+  assert.equal(session.hitId, undefined);
+});
+
+test("showing an info string with a pickup or door id copies that id", async () => {
+  const writes: string[] = [];
+  const previousNavigator = globalThis.navigator;
+  const useClipboard = (writeText?: (text: string) => Promise<void> | void) => {
+    Object.defineProperty(globalThis, "navigator", {
+      configurable: true,
+      writable: true,
+      value: writeText ? { clipboard: { writeText } } : {},
+    });
+  };
+  const rig = installElements();
+  const now = Date.now;
+  try {
+    const hud = createHud();
+    const info = rig.byId("info-probe");
+    assert.ok(info);
+    hud.setInfo("door <hall> · closed");
+    assert.equal(info.style.display, "block");
+    assert.equal(info.style.userSelect, "text");
+    assert.equal(info.style.pointerEvents, "auto");
+    assert.match(info.style.cssText, /user-select:text/);
+    assert.doesNotMatch(info.style.cssText, /pointer-events:\s*none/);
+    for (const type of ["pointerdown", "mousedown", "click"]) {
+      const ev = rig.press("info-probe", type);
+      assert.equal(ev.stopped, true, type);
+      assert.equal(ev.prevented, false, type);
+    }
+    hud.setInfo("");
+    assert.equal(info.style.display, "none");
+    assert.equal(info.style.pointerEvents, "none");
+
+    const door = doorDef("hall.door", false, true, "key-1");
+    const shut = doorLeafBox(door);
+    const probe = createInfoProbe({
+      doors: [door],
+      pickups: [{
+        id: "med",
+        kind: "health",
+        minX: -0.25,
+        maxX: 0.25,
+        minY: 0,
+        maxY: 0.4,
+        minZ: 2,
+        maxZ: 2.4,
+      }],
+      props: [{ id: "crate-7" }],
+      show: (text) => hud.setInfo(text),
+      copy: (id) => hud.copyInfo(id),
+    });
+    const aimDoor = {
+      origin: { x: (shut.minX + shut.maxX) / 2, y: (shut.minY + shut.maxY) / 2, z: shut.minZ - 2 },
+      direction: { x: 0, y: 0, z: 1 },
+    };
+    const aimPickup = {
+      origin: { x: 0, y: 4.2, z: 0 },
+      direction: { x: 0, y: 0, z: 1 },
+      volumes: [{ id: 7, source: "med-box", minX: -0.25, maxX: 0.25, minY: 4, maxY: 4.4, minZ: 2, maxZ: 2.4, mesh: true }],
+    };
+    const look = (nowMs: number, aim: { origin: { x: number; y: number; z: number }; direction: { x: number; y: number; z: number }; volumes?: { id: number; source: string; minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number; mesh: boolean }[] }) => {
+      probe.inspect({
+        now: nowMs,
+        origin: aim.origin,
+        direction: aim.direction,
+        leaves: new Map(),
+        volumes: aim.volumes ?? [],
+        pawns: [],
+        radius: 0.4,
+        height: 1.8,
+      });
+    };
+
+    useClipboard(() => Promise.reject(new Error("denied")));
+    look(0, aimDoor);
+    await Promise.resolve();
+    assert.match(info.textContent, /^door hall.door/);
+    assert.equal(info.textContent.includes("copied"), false);
+    assert.equal(writes.length, 0);
+
+    useClipboard(() => {
+      throw new Error("blocked");
+    });
+    look(10, aimDoor);
+    await Promise.resolve();
+    assert.match(info.textContent, /^door hall.door/);
+    assert.equal(info.textContent.includes("copied"), false);
+
+    useClipboard();
+    look(20, aimDoor);
+    await Promise.resolve();
+    assert.match(info.textContent, /^door hall.door/);
+    assert.equal(writes.length, 0);
+
+    useClipboard((text) => {
+      writes.push(text);
+      return Promise.resolve();
+    });
+    look(30, aimPickup);
+    await Promise.resolve();
+    assert.equal(writes.at(-1), "med");
+    assert.match(info.textContent, /^pickup med · health · available/);
+    assert.match(info.textContent, /\ncopied$/);
+    assert.equal(info.style.userSelect, "text");
+    assert.notEqual(info.style.pointerEvents, "none");
+    const afterPickup = writes.length;
+    probe.refresh(31);
+    assert.equal(writes.length, afterPickup);
+    assert.match(info.textContent, /^pickup med/);
+    assert.match(info.textContent, /\ncopied$/);
+
+    look(40, aimDoor);
+    await Promise.resolve();
+    assert.equal(writes.at(-1), "hall.door");
+    assert.match(info.textContent, /^door hall.door · closed · locked · needs key-1/);
+
+    const afterDoor = writes.length;
+    look(50, { origin: { x: 40, y: 40, z: 40 }, direction: { x: 0, y: 1, z: 0 } });
+    await Promise.resolve();
+    assert.equal(writes.length, afterDoor);
+    assert.equal(info.textContent, "");
+
+    look(60, aimPickup);
+    await Promise.resolve();
+    assert.equal(writes.at(-1), "med");
+    Date.now = () => now() + 5000;
+    probe.refresh(61);
+    assert.equal(info.textContent.includes("copied"), false);
+    assert.match(info.textContent, /^pickup med/);
+  } finally {
+    Date.now = now;
+    rig.restore();
+    Object.defineProperty(globalThis, "navigator", {
+      configurable: true,
+      writable: true,
+      value: previousNavigator,
+    });
+  }
+});
+
 test("the info line is text and does not replace the status line", () => {
   const rig = installElements();
   try {
@@ -885,6 +1062,7 @@ test("info modules do not import node, the server, or a scene-graph file", () =>
   const boot = readFileSync("src/client/boot.ts", "utf8");
   assert.equal(/sendInput\([^)]*info/.test(boot), false);
   assert.equal(boot.includes("sample.info"), true);
+  assert.match(boot, /copy: \(id\) => hud\.copyInfo\(id\)/);
   const clientBuild = readFileSync("scripts/build-client.mjs", "utf8");
   assert.equal(clientBuild.includes("scene-graph.json"), false);
 });
@@ -1072,14 +1250,21 @@ function memoryStorage() {
 }
 
 function installElements() {
+  type OverlayEvent = {
+    stopped: boolean;
+    prevented: boolean;
+    stopPropagation(): void;
+    preventDefault(): void;
+  };
   type El = {
     id: string;
     textContent: string;
-    style: { cssText: string; display: string };
+    style: { cssText: string; display: string; pointerEvents?: string; userSelect?: string };
     children: El[];
     hidden: boolean;
+    listeners: { type: string; fn: (ev: OverlayEvent) => void }[];
     append(...nodes: El[]): void;
-    addEventListener(): void;
+    addEventListener(type: string, fn: (ev: OverlayEvent) => void): void;
     setAttribute(): void;
     type: string;
     title: string;
@@ -1092,10 +1277,13 @@ function installElements() {
       style: { cssText: "", display: "" },
       children: [],
       hidden: false,
+      listeners: [],
       append(...extra) {
         el.children.push(...extra);
       },
-      addEventListener() {},
+      addEventListener(type: string, fn: (ev: OverlayEvent) => void) {
+        el.listeners.push({ type, fn });
+      },
       setAttribute() {},
       type: "",
       title: "",
@@ -1116,6 +1304,24 @@ function installElements() {
   return {
     byId(id: string) {
       return nodes.find((node) => node.id === id);
+    },
+    press(id: string, type: string) {
+      const node = nodes.find((item) => item.id === id);
+      assert.ok(node, id);
+      const ev = {
+        stopped: false,
+        prevented: false,
+        stopPropagation() {
+          ev.stopped = true;
+        },
+        preventDefault() {
+          ev.prevented = true;
+        },
+      };
+      for (const listener of node.listeners) {
+        if (listener.type === type) listener.fn(ev);
+      }
+      return ev;
     },
     restore() {
       root.window = previous.window;

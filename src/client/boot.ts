@@ -110,6 +110,7 @@ export async function boot(
     pickups: view.pickups ?? [],
     props: view.props ?? [],
     show: (text) => hud.setInfo(text),
+    copy: (id) => hud.copyInfo(id),
   });
   input.onPadMenu((ev) => {
     if (ev === "toggle") {
