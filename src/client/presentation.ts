@@ -166,7 +166,7 @@ export function createPawnLayer(parent: THREE.Object3D, templates: CharacterTemp
      * Positions and facing come only from the render snapshot. The owned pawn
      * is hidden so the first-person camera is not inside the mesh.
      */
-    apply(render: RenderSnapshot, dt: number, movementOf: (id: number) => string | undefined, ownedId?: number) {
+    apply(render: RenderSnapshot, dt: number, movementOf: (id: number) => string | undefined, ownedId?: number, stepMixers = true) {
       const seen = new Set<number>();
       for (const entity of render.entities) {
         const id = Number(entity.id);
@@ -196,7 +196,7 @@ export function createPawnLayer(parent: THREE.Object3D, templates: CharacterTemp
           pawn.motionBone.position.y = pawn.restRootY;
           pawn.planted = false;
         }
-        pawn.mixer?.update(dt);
+        if (stepMixers) pawn.mixer?.update(dt);
         pawn.px = entity.position.x;
         pawn.pz = entity.position.z;
         // The snapshot owns the pawn transform. The mixer does not write position.

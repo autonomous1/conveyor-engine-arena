@@ -9,7 +9,7 @@ import { canonicalJson, sceneGraphPayload, sha256Hex } from "../shared/scene-gra
 import { createArenaDoors, createDoorBlockers } from "./doors.js";
 import { createArenaElevators } from "./elevators.js";
 import { createArenaFire } from "./fire.js";
-import { applyPawnModel, claimClearSpawn, createHeldInputs, placePawn, startPropAnimation, startWanderLoop } from "./game.js";
+import { applyPawnModel, claimClearSpawn, createHeldInputs, placePawn, startPropAnimation, startWanderLoop, teleportBlockReason } from "./game.js";
 import { createArenaGrenades } from "./grenade.js";
 import { createHostSocketPaths } from "./host-path.js";
 import { pawnBodies, releasePickupObstacle } from "./pickups.js";
@@ -72,6 +72,8 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
   let sceneGraphHash: string | undefined;
   const sceneWaiters: HostConn[] = [];
   const held = createHeldInputs();
+  /** Last deny log per client. One line per minute, not an audit counter. */
+  const teleportDeniedAt = new Map<number, number>();
   /** Pads chosen since the last commit. The next hello treats them as occupied. */
   const reservedPads = new Map<number, SpawnPick>();
   const health = createPawnHealth();
@@ -134,6 +136,8 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
     compatibility: { protocol: 1, world: loaded.view.world },
     bundle: { bundleId: loaded.view.bundleId, authoritativeHash: loaded.view.authoritativeHash },
     onHello: (session, hello): number | undefined => {
+      // A spectator watches. They do not take a seat and are not a full server.
+      if (spectateHello(hello)) return undefined;
       const used = new Set<number>();
       for (const clientId of engine.connected) {
         if (clientId === session.clientId) continue;
@@ -277,9 +281,42 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
     },
     sceneGraphReady,
     attach(conn) {
+      const denyTeleport = (clientId: number): void => {
+        const now = Date.now();
+        const prev = teleportDeniedAt.get(clientId) ?? 0;
+        if (now - prev < 60_000) return;
+        teleportDeniedAt.set(clientId, now);
+        console.log(`[teleport] denied client=${clientId} sub=${conn.claims?.sub ?? ""}`);
+      };
       const socket = socketFromConn(conn, refused, (clientId) => engine.disconnect(clientId), (sock, frame) => {
         const clientId = clientIdFor(engine, sock);
         if (clientId === undefined) return;
+        if (isTeleportFrame(frame)) {
+          const pawnId = engine.replicator.get(clientId)?.ownedEntity;
+          if (pawnId === undefined || conn.claims?.scope.includes("teleport") !== true) {
+            denyTeleport(clientId);
+            return;
+          }
+          const landing = finiteTeleport(frame);
+          if (!landing) {
+            conn.send(encodeFrame({ t: "teleportResult", ok: false, reason: "invalid" }));
+            return;
+          }
+          const reason = teleportBlockReason(loaded.world, loaded.view.bounds, pawnId, landing.x, landing.y, landing.z);
+          if (reason) {
+            conn.send(encodeFrame({ t: "teleportResult", ok: false, reason }));
+            return;
+          }
+          held.drop(pawnId);
+          const agent = loaded.agents.find((item) => item.id === pawnId);
+          if (agent) agent.heading = landing.yaw;
+          placePawn(loaded.world, pawnId, landing);
+          // The wander tick enqueues its own setTransform from the store pose.
+          // Commit first so that step starts at the landing instead of the old feet.
+          loaded.world.commit(loaded.world.currentTick);
+          conn.send(encodeFrame({ t: "teleportResult", ok: true }));
+          return;
+        }
         const chosen = parseModelFrame(frame);
         if (chosen) {
           const pawnId = engine.replicator.get(clientId)?.ownedEntity;
@@ -376,6 +413,25 @@ export function socketFromConn(
     },
   };
   return self;
+}
+
+function spectateHello(hello: object): boolean {
+  return (hello as { spectate?: unknown }).spectate === true;
+}
+
+function isTeleportFrame(frame: unknown): frame is { t: "teleport" } {
+  return !!frame && typeof frame === "object" && !Array.isArray(frame) && (frame as { t?: unknown }).t === "teleport";
+}
+
+function finiteTeleport(frame: { t: "teleport" }): { x: number; y: number; z: number; yaw: number } | undefined {
+  const rec = frame as { x?: unknown; y?: unknown; z?: unknown; yaw?: unknown };
+  if (typeof rec.x !== "number" || typeof rec.y !== "number" || typeof rec.z !== "number" || typeof rec.yaw !== "number") {
+    return undefined;
+  }
+  if (!Number.isFinite(rec.x) || !Number.isFinite(rec.y) || !Number.isFinite(rec.z) || !Number.isFinite(rec.yaw)) {
+    return undefined;
+  }
+  return { x: rec.x, y: rec.y, z: rec.z, yaw: rec.yaw };
 }
 
 function clientIdFor(engine: EngineWsServer, socket: TransportSocket): number | undefined {

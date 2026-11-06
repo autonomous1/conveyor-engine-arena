@@ -140,6 +140,8 @@ export function connectLive(opts: {
   open: () => OpenSocket;
   /** When false, hello carries no token and welcome does not store one. Solo passes false. */
   auth?: boolean;
+  /** Hello `spectate: true`. The host does not seat this client. */
+  spectate?: boolean;
   /** Host closed 4401 or 4403. The page clears the key and leaves the game. */
   onAuthRejected?: (reason: string) => void;
 }): LiveLink {
@@ -190,6 +192,7 @@ export function connectLive(opts: {
       token,
       auth,
       ...(typeof model === "string" && model.length > 0 ? { model } : {}),
+      ...(opts.spectate === true ? { spectate: true } : {}),
     }));
     opts.onStatus({ phase: "hello", text: "hello sent", resyncs });
   };
@@ -265,8 +268,9 @@ export function connectLive(opts: {
         const nextOwned = Number.isFinite(owned) ? owned : undefined;
         // A second welcome clears interpolation and would snap the view onto
         // whatever pawn the host named. Stay on the pawn we already have.
-        if (!welcomed && nextOwned !== undefined) {
-          ownedId = nextOwned;
+        // A spectator welcome has no pawn. Connect once so snapshots still apply.
+        if (!welcomed && (nextOwned !== undefined || opts.spectate === true)) {
+          if (nextOwned !== undefined) ownedId = nextOwned;
           inputSeq = 1;
           opts.client.connect(ownedId, clientId);
           welcomed = true;

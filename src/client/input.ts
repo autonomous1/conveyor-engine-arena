@@ -140,6 +140,7 @@ export function attachPlayInput(
   onFirePress: () => void = () => {},
   getInvertY: () => boolean = () => false,
   getMenuOpen: () => boolean = () => false,
+  requestLock = true,
 ): PlayInput {
   const keys = new Set<string>();
   let yaw = 0;
@@ -327,7 +328,7 @@ export function attachPlayInput(
     if (ev.button !== 0) return;
     // Cancel the click default before it can follow a link or submit a form.
     ev.preventDefault();
-    if (document.pointerLockElement === dom) return;
+    if (!requestLock || document.pointerLockElement === dom) return;
     const pending = dom.requestPointerLock();
     void Promise.resolve(pending).catch(() => {});
   };

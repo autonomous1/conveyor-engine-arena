@@ -2,6 +2,7 @@ import type { AuthoritativeWorld } from "conveyor-engine-world";
 import type { EngineWsServer } from "conveyor-engine-transport-ws";
 import type { Audit } from "../shared/audit.js";
 import { pawnHitsBox, pickRespawnSpawn, type BlockPawn, type PawnHealth, type SpawnPick } from "../shared/health.js";
+import { capsuleOverlapsAabb } from "../shared/pickups.js";
 import { moveIntent, yawFromQuat } from "../shared/look.js";
 import { approachYaw, commitShielded, enqueueOwnedMove, MOVE_DT, MOVEMENTS, movementIntent, yawQuaternion } from "../shared/movements.js";
 import { deliverAuditFrame } from "./audit.js";
@@ -312,6 +313,49 @@ export function placePawn(world: AuthoritativeWorld, id: number, spawn: SpawnPic
     rotation: yawQuaternion(spawn.yaw),
     scale: { x: view.scale.x, y: view.scale.y, z: view.scale.z },
   });
+}
+
+export type TeleportBlock = "bounds" | "blocked";
+
+/**
+ * Why this landing cannot be used. `undefined` means the capsule is inside
+ * `bounds` and clear of static obstacles, including a shut door leaf.
+ * Another pawn nearby is not a reason.
+ */
+export function teleportBlockReason(
+  world: AuthoritativeWorld,
+  bounds: { minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number },
+  pawnId: number,
+  x: number,
+  y: number,
+  z: number,
+): TeleportBlock | undefined {
+  const view = world.store.view(pawnId);
+  const radius = view && view.radius > 0 ? view.radius : 0.5;
+  const height = Number.isFinite(world.pawnHeight) ? world.pawnHeight : 1.8;
+  const capsule = [x, y, z, radius, height, bounds.minX, bounds.maxX, bounds.minY, bounds.maxY, bounds.minZ, bounds.maxZ];
+  if (!capsule.every(Number.isFinite)) return "bounds";
+  const inside = x - radius >= bounds.minX && x + radius <= bounds.maxX
+    && z - radius >= bounds.minZ && z + radius <= bounds.maxZ
+    && y >= bounds.minY && y + height <= bounds.maxY;
+  if (!inside) return "bounds";
+  for (const box of world.listObstacles()) {
+    const minY = box.minY;
+    const maxY = box.maxY;
+    if (typeof minY === "number" && typeof maxY === "number" && Number.isFinite(minY) && Number.isFinite(maxY)) {
+      if (capsuleOverlapsAabb(x, y, z, radius, height, {
+        minX: box.minX,
+        maxX: box.maxX,
+        minY,
+        maxY,
+        minZ: box.minZ,
+        maxZ: box.maxZ,
+      })) return "blocked";
+      continue;
+    }
+    if (pawnHitsBox(x, z, radius, y, height, box)) return "blocked";
+  }
+  return undefined;
 }
 
 /** Replace the pawn mesh key. Ignored when `assetKey` is not one of `allowed`. */

@@ -17,6 +17,13 @@ export type ArenaScene = {
   camera: THREE.PerspectiveCamera;
   content: THREE.Group;
   resize: () => void;
+  /** QA owns the camera. Pawn follow stays off while this is set. */
+  cameraLocked: boolean;
+};
+
+export type ArenaSceneOptions = {
+  /** Fixed 1280×720 buffer at pixel ratio 1, kept so a PNG can be read back. */
+  qa?: boolean;
 };
 
 export type CharacterVisual = {
@@ -181,10 +188,14 @@ function renderWithRoomLights(
   }
 }
 
-export function createArenaScene(quality: ShadowQuality): ArenaScene {
+export function createArenaScene(quality: ShadowQuality, options?: ArenaSceneOptions): ArenaScene {
+  const qa = options?.qa === true;
   const shadows = shadowSettings(quality);
-  const renderer = new THREE.WebGLRenderer({ antialias: false });
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 1));
+  const renderer = new THREE.WebGLRenderer({
+    antialias: false,
+    ...(qa ? { preserveDrawingBuffer: true } : {}),
+  });
+  renderer.setPixelRatio(qa ? 1 : Math.min(devicePixelRatio, 1));
   renderer.setClearColor(0x8eb8d4);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -225,13 +236,21 @@ export function createArenaScene(quality: ShadowQuality): ArenaScene {
   renderer.render = (nextScene, nextCamera) => renderWithRoomLights(renderer, baseRender, nextScene, nextCamera);
 
   const resize = () => {
+    if (qa) {
+      camera.aspect = 1280 / 720;
+      camera.updateProjectionMatrix();
+      renderer.setSize(1280, 720, false);
+      renderer.domElement.style.width = "1280px";
+      renderer.domElement.style.height = "720px";
+      return;
+    }
     camera.aspect = innerWidth / Math.max(1, innerHeight);
     camera.updateProjectionMatrix();
     renderer.setSize(innerWidth, innerHeight, false);
   };
   resize();
-  addEventListener("resize", resize);
-  return { renderer, scene, camera, content, resize };
+  if (!qa) addEventListener("resize", resize);
+  return { renderer, scene, camera, content, resize, cameraLocked: false };
 }
 
 /**

@@ -24,6 +24,13 @@ export type SceneGraphFrame = {
   graph: SceneGraphFile;
 };
 
+/** Reply to a client `teleport` frame. Only the sender's connection gets it. */
+export type TeleportResultFrame = {
+  t: "teleportResult";
+  ok: boolean;
+  reason?: string;
+};
+
 /** Host → client arena frames. Elevator is cab state. Grenade is the replicated pose. */
 export type ArenaFrame =
   | LoadoutFrame
@@ -35,7 +42,8 @@ export type ArenaFrame =
   | GrenadePose
   | AuditFrame
   | InventoryFrame
-  | SceneGraphFrame;
+  | SceneGraphFrame
+  | TeleportResultFrame;
 
 export type WelcomeExtras = {
   pickups: string[];
@@ -68,7 +76,17 @@ export function parseArenaFrame(text: string): ArenaFrame | undefined {
   if (t === "audit") return parseAudit(value);
   if (t === "inventory") return parseInventory(value);
   if (t === "sceneGraph") return parseSceneGraphFrame(value);
+  if (t === "teleportResult") return parseTeleportResult(value);
   return undefined;
+}
+
+export function parseTeleportResult(frame: unknown): TeleportResultFrame | undefined {
+  if (!frame || typeof frame !== "object" || Array.isArray(frame)) return undefined;
+  const rec = frame as Record<string, unknown>;
+  if (rec.t !== "teleportResult" || typeof rec.ok !== "boolean") return undefined;
+  if (rec.reason === undefined) return { t: "teleportResult", ok: rec.ok };
+  if (typeof rec.reason !== "string" || rec.reason.length === 0) return undefined;
+  return { t: "teleportResult", ok: rec.ok, reason: rec.reason };
 }
 
 export function parseInventory(frame: unknown): InventoryFrame | undefined {

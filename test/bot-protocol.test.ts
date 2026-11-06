@@ -143,6 +143,8 @@ test("parseArenaFrame round-trips host frames and drops an unknown t", () => {
       hash: "ab".repeat(32),
       graph: { formatVersion: 1, units: "meters", places: [], portals: [] },
     },
+    { t: "teleportResult", ok: true },
+    { t: "teleportResult", ok: false, reason: "blocked" },
   ];
   for (const frame of frames) {
     assert.deepEqual(parseArenaFrame(JSON.stringify(frame)), frame);

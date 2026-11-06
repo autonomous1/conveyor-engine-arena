@@ -15,7 +15,7 @@ export function localHealthLabel(vital: { hp: number; dead: boolean } | undefine
   return `hp ${hp}`;
 }
 
-export function createHud() {
+export function createHud(opts?: { hidden?: boolean }) {
   const status = document.createElement("div");
   status.id = "status";
   status.style.cssText = [
@@ -54,7 +54,12 @@ export function createHud() {
   info.id = "info-probe";
   let shown = "";
   let copiedUntil = 0;
+  const hidden = opts?.hidden === true;
   const paintInfo = () => {
+    if (hidden) {
+      info.style.display = "none";
+      return;
+    }
     const visible = shown.length > 0;
     const hint = visible && Date.now() < copiedUntil ? "\ncopied" : "";
     info.textContent = shown + hint;
@@ -97,12 +102,18 @@ export function createHud() {
   ].join(";");
   let statsVisible = true;
   const onStatsKey = (ev: KeyboardEvent) => {
-    if (ev.repeat || ev.code !== "F3") return;
+    if (hidden || ev.repeat || ev.code !== "F3") return;
     ev.preventDefault();
     statsVisible = !statsVisible;
     stats.style.display = statsVisible ? "block" : "none";
   };
   window.addEventListener("keydown", onStatsKey);
+  if (hidden) {
+    status.style.display = "none";
+    cross.style.display = "none";
+    stats.style.display = "none";
+    info.style.display = "none";
+  }
   document.body.append(status, stats, cross, info);
   return {
     setStatus(text: string) {

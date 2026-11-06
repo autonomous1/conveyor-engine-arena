@@ -33,18 +33,20 @@ import { createViewModel } from "./viewmodel.js";
 import { createOptionsDialog } from "./options.js";
 import { createSceneMap, loadMapBakeBounds } from "./scene-map.js";
 import { createPawnLayer } from "./presentation.js";
+import { installQaApi } from "./qa.js";
 import { createRateWindow, formatOverlay } from "./rates.js";
 import { formatFireLog, presentShot } from "./shot-view.js";
 
 export async function boot(
   view: ArenaView,
   open: () => OpenSocket,
-  opts?: { auth?: boolean; onAuthRejected?: (reason: string) => void },
+  opts?: { auth?: boolean; onAuthRejected?: (reason: string) => void; qa?: boolean },
 ): Promise<void> {
-  const hud = createHud();
+  const qa = opts?.qa === true;
+  const hud = createHud(qa ? { hidden: true } : undefined);
   const hitMarker = createHitMarker();
   hud.setStatus("loading arena");
-  const arena = createArenaScene(view.shadows?.quality ?? "off");
+  const arena = createArenaScene(view.shadows?.quality ?? "off", qa ? { qa: true } : undefined);
   const collisionDebug = createAabbDebug(view.aabbs);
   arena.scene.add(collisionDebug.group);
   const CAB_BOX_H = 0.1;
@@ -104,7 +106,7 @@ export async function boot(
   const pawns = createPawnLayer(arena.content, visuals.templates, view.pawnHeight);
   const input = attachPlayInput(arena.renderer.domElement, undefined, () => {
     fireDebug.keydown();
-  }, () => options.invertY, () => options.open);
+  }, () => options.invertY, () => options.open, !qa);
   const probe = createInfoProbe({
     doors: view.doors ?? [],
     pickups: view.pickups ?? [],
@@ -170,6 +172,30 @@ export async function boot(
   const grenadeQueue: GrenadePose[] = [];
   const pawnVital = new Map<number, { hp: number; dead: boolean }>();
 
+  let sawSnap = false;
+  let resolveSnap = (): void => {};
+  const firstSnapshot = new Promise<void>((resolve) => {
+    resolveSnap = resolve;
+  });
+  let frozen = false;
+  let followId: number | undefined;
+  let followBack = 3;
+  let followUp = 1.6;
+  const placeFollow = () => {
+    if (followId === undefined) return;
+    const sample = client.renderSnapshot();
+    const entity = sample.entities.find((item) => Number(item.id) === followId);
+    if (!entity) return;
+    const yaw = yawFromQuat(entity.rotation);
+    arena.camera.position.set(
+      entity.position.x - Math.sin(yaw) * followBack,
+      entity.position.y + followUp,
+      entity.position.z - Math.cos(yaw) * followBack,
+    );
+    arena.camera.up.set(0, 1, 0);
+    arena.camera.lookAt(entity.position.x, entity.position.y + 1.6, entity.position.z);
+  };
+
   const link = connectLive({
     bundleId: view.bundleId,
     authoritativeHash: view.authoritativeHash,
@@ -180,7 +206,11 @@ export async function boot(
       statusText = status.text;
       resyncs = status.resyncs;
     },
-    onApplied: () => { },
+    onApplied: () => {
+      if (sawSnap) return;
+      sawSnap = true;
+      resolveSnap();
+    },
     onLaser: (laser) => {
       laserQueue.push(laser);
     },
@@ -240,6 +270,7 @@ export async function boot(
     model: () => options.modelChoice || undefined,
     open,
     auth: opts?.auth,
+    spectate: qa,
     onAuthRejected: opts?.onAuthRejected,
   });
   pushModel = (id) => {
@@ -326,7 +357,9 @@ export async function boot(
   function drawFrame(now: number) {
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
-    for (const mixer of visuals.propMixers) mixer.update(dt);
+    if (!frozen) {
+      for (const mixer of visuals.propMixers) mixer.update(dt);
+    }
     let debugShot = false;
     input.setMenuOpen(options.open);
     input.update(dt);
@@ -416,17 +449,19 @@ export async function boot(
           fireDebug.socket(link.socketState());
         }
       }
-      presentShot({
-        camera: arena.camera,
-        pawn,
-        yaw: sample.yaw,
-        pitch: sample.pitch,
-        from: shotFrom,
-        to: shotTo,
-        show(from, to) {
-          lasers.show(ownedId, from, to, now + LASER_MS);
-        },
-      });
+      if (!arena.cameraLocked) {
+        presentShot({
+          camera: arena.camera,
+          pawn,
+          yaw: sample.yaw,
+          pitch: sample.pitch,
+          from: shotFrom,
+          to: shotTo,
+          show(from, to) {
+            lasers.show(ownedId, from, to, now + LASER_MS);
+          },
+        });
+      }
       if (debugShot) {
         const camera = arena.camera.position;
         fireDebug.camera({ x: camera.x, y: camera.y, z: camera.z });
@@ -446,7 +481,7 @@ export async function boot(
     for (const pose of grenadeQueue) grenades.place(pose, now);
     grenadeQueue.length = 0;
     grenades.expire(now);
-    pawns.apply(render, dt, (id) => client.authoritative(id)?.action, ownedId);
+    pawns.apply(render, frozen ? 0 : dt, (id) => client.authoritative(id)?.action, ownedId, !frozen);
     sendAcc += dt;
     if (sendAcc >= sendDt) {
       sendAcc = Math.min(sendAcc - sendDt, sendDt);
@@ -489,6 +524,7 @@ export async function boot(
     }
     hud.setProfile(input.profile);
     hud.setPad(input.padStatus, input.profile);
+    if (followId !== undefined) placeFollow();
     arena.renderer.render(arena.scene, arena.camera);
     const info = arena.renderer.info;
     const calls = info.render.calls;
@@ -522,6 +558,51 @@ export async function boot(
         hp: mine?.hp,
       }));
     }
+  }
+  if (qa) {
+    installQaApi({
+      scene: arena,
+      net: { firstSnapshot },
+      render() {
+        arena.renderer.render(arena.scene, arena.camera);
+      },
+      freeze() {
+        frozen = true;
+      },
+      follow(entityId, opts) {
+        followId = entityId;
+        followBack = opts.back;
+        followUp = opts.up;
+        placeFollow();
+      },
+      clearFollow() {
+        followId = undefined;
+      },
+      doors() {
+        return [...doorOpen.entries()]
+          .map(([id, open]) => ({ id, open }))
+          .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+      },
+      pickups() {
+        return (view.pickups ?? [])
+          .filter((pickup) => !visuals.placements.hidden(pickup.id))
+          .map((pickup) => ({ id: pickup.id }))
+          .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+      },
+      pawns() {
+        return client.renderSnapshot().entities.flatMap((entity) => {
+          const id = Number(entity.id);
+          if (!Number.isFinite(id)) return [];
+          return [{
+            id,
+            x: entity.position.x,
+            y: entity.position.y,
+            z: entity.position.z,
+            yaw: yawFromQuat(entity.rotation),
+          }];
+        });
+      },
+    });
   }
   requestAnimationFrame(frame);
 
