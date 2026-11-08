@@ -507,14 +507,15 @@
        z="3.75" />
     <rect
        inkscape:label="model:szukalski-centerpiece"
-       y="-0.067941904"
+       y="-0.2090988"
        x="-295.20215"
        height="3"
        width="3"
        id="centerpiece"
        style="color:#000000;display:inline;overflow:visible;opacity:1;vector-effect:none;fill:#3e67f2;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:0.65459722px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
        z="0"
-       transform="rotate(-90)" />
+       transform="rotate(-90)"
+       data-model="szukalski-centerpiece" />
   </g>
   <g
      inkscape:groupmode="layer"
@@ -672,34 +673,34 @@
      style="display:inline">
     <text
        id="player-pad-5"
-       x="-3.593992"
-       y="298.77838"
+       x="-6.8483553"
+       y="294.69312"
        style="font-size:3.17499995px;line-height:3.17499995px;stroke:#0000ff;stroke-width:0.26458332;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1">
       <tspan
-         x="-3.593992"
-         y="298.77838"
+         x="-6.8483553"
+         y="294.69312"
          style="font-size:3.17499995px;line-height:3.17499995px;fill:#f23e3e;stroke:#0000ff;stroke-width:0.26458332;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
          id="tspan21205">x</tspan>
     </text>
     <text
        id="player-pad-5-6"
-       x="0.54065782"
-       y="298.77838"
+       x="-3.2428725"
+       y="294.69312"
        style="font-size:3.17499995px;line-height:3.17499995px;display:inline;stroke:#0000ff;stroke-width:0.26458332;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1">
       <tspan
-         x="0.54065782"
-         y="298.77838"
+         x="-3.2428725"
+         y="294.69312"
          style="font-size:3.17499995px;line-height:3.17499995px;fill:#f23e3e;stroke:#0000ff;stroke-width:0.26458332;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
          id="tspan21205-4">x</tspan>
     </text>
     <text
        id="player-pad-5-1"
-       x="4.6753078"
-       y="298.77838"
+       x="3.958122"
+       y="294.76236"
        style="font-size:3.17499995px;line-height:3.17499995px;display:inline;stroke:#0000ff;stroke-width:0.26458332;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1">
       <tspan
-         x="4.6753078"
-         y="298.77838"
+         x="3.958122"
+         y="294.76236"
          style="font-size:3.17499995px;line-height:3.17499995px;fill:#f23e3e;stroke:#0000ff;stroke-width:0.26458332;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
          id="tspan21205-2">x</tspan>
     </text>
@@ -878,15 +879,15 @@
      inkscape:groupmode="layer"
      id="layer3"
      inkscape:label="bounds"
-     style="display:inline"
-     sodipodi:insensitive="true">
+     style="display:inline">
     <rect
        style="color:#000000;overflow:visible;opacity:1;vector-effect:none;fill:none;fill-opacity:1;fill-rule:nonzero;stroke:#5d5d5d;stroke-width:0.237;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:0.948, 0.237;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers fill stroke"
-       id="rect1763"
+       id="world-bounds"
        width="143.57817"
        height="92.69841"
        x="-70.933441"
-       y="249.75755" />
+       y="249.75755"
+       inkscape:label="world-bounds" />
   </g>
   <g
      style="display:none"

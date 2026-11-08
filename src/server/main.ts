@@ -385,6 +385,13 @@ export async function startArenaServer(
 
 const isMain = process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
 if (isMain) {
+//TODO: remove - profiling
+/*
+  process.once('SIGINT', () => {
+  console.log('\nStopping; writing CPU profile...');
+  process.exit(130);
+});
+*/
   const host = await startArenaServer();
   console.log(JSON.stringify({ url: host.url, ws: host.url.replace(/^http/, "ws") }));
 }

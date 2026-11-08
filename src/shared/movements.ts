@@ -181,6 +181,7 @@ export function floorHeight(
   feet: number,
   step = STEP_HEIGHT,
 ): number {
+  // TODO: performance debugging  -use rag model to limit boxes to the ones that are near the pawn's current position, instead of checking all boxes in the world.
   const r = radius > 0 ? radius : 0;
   const limit = feet + step + STEP_SLOP;
   let floor = 0;
