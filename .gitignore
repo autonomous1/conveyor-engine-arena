@@ -5,6 +5,8 @@ viewer/
 generated/
 node_modules/
 dist/
+profiling/results
+.profiling-tmp/
 web/qa-snaps/*.png
 dist/web/qa-snaps/*.png
 *.log
