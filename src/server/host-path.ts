@@ -61,25 +61,16 @@ export function createHostSocketPaths(io: {
   onEngineText: (text: string) => void;
   onArenaFrame?: (frame: unknown) => void;
 }): HostSocketPaths {
-  const outbound = new DirectNetPath<unknown>((frame) => {
-    io.writeWire(encodeFrame(frame));
+  /** Outbound text is already encoded by the engine or arena; it goes to the wire as is. */
+  const outbound = new DirectNetPath<string>((text) => {
+    io.writeWire(text);
   });
   const inbound = new DirectNetPath<unknown>((frame) => {
     io.onEngineText(encodeFrame(frame));
   });
-  const accept = (path: DirectNetPath<unknown>, text: string, raw: (text: string) => void) => {
-    let frame: unknown;
-    try {
-      frame = decodeFrame(text);
-    } catch {
-      raw(text);
-      return;
-    }
-    dispatchHostFrame(path, frame, { kind: hostFrameKind(frame) });
-  };
   return {
     sendEncoded(text) {
-      accept(outbound, text, io.writeWire);
+      dispatchHostFrame(outbound, text);
     },
     deliverEncoded(text) {
       let frame: unknown;

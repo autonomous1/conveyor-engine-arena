@@ -94,6 +94,7 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
   const audit = createAudit();
   for (const agent of loaded.agents) health.note(agent.id);
   const attachPickupWelcome = (text: string, claims?: HostClaims): string => {
+    if (!mayBeWelcome(text)) return text;
     let frame: unknown;
     try {
       frame = JSON.parse(text);
@@ -657,7 +658,18 @@ function clientIdFor(engine: EngineWsServer, socket: TransportSocket): number | 
   return undefined;
 }
 
+/**
+ * Cheap pre-check before parsing an outbound frame. Every frame on this path is
+ * produced by JSON.stringify (encodeFrame), so a welcome always contains this
+ * exact token. False positives fall through to the full parse; there are no
+ * false negatives for stringify output.
+ */
+export function mayBeWelcome(text: string): boolean {
+  return text.includes('"type":"welcome"');
+}
+
 function isWelcomeText(text: string): boolean {
+  if (!mayBeWelcome(text)) return false;
   try {
     const frame = JSON.parse(text) as { type?: unknown };
     return !!frame && typeof frame === "object" && frame.type === "welcome";
@@ -667,6 +679,7 @@ function isWelcomeText(text: string): boolean {
 }
 
 function refusedWelcome(text: string, refused: Set<number>): number | undefined {
+  if (refused.size === 0 || !mayBeWelcome(text)) return undefined;
   try {
     const frame = decodeFrame(text) as { type?: string; clientId?: number };
     if (frame.type === "welcome" && typeof frame.clientId === "number" && refused.has(frame.clientId)) return frame.clientId;
