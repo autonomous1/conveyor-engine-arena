@@ -7,6 +7,7 @@
  */
 import type { ArenaView } from "../shared/arena-view.js";
 import type { ElevatorDoors } from "./elevators.js";
+import { markDynamicObstacle } from "../shared/movements.js";
 import {
   doorFrame,
   doorLeafBox,
@@ -59,6 +60,8 @@ export function createDoorBlockers(world: ObstacleWorld): DoorBlockers {
       }
       const box = live(id);
       if (!box) return;
+      // The leaf box moves in XZ in place, so the floor grid checks it every query.
+      markDynamicObstacle(box);
       const shut = door.open ? undefined : doorLeafBox(door);
       box.minX = shut ? shut.minX : PARKED;
       box.maxX = shut ? shut.maxX : PARKED;

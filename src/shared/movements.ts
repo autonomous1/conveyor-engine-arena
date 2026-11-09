@@ -162,6 +162,160 @@ type MoveCommand =
     }
   | { kind: "setClip"; entity: number; clip: string; speed: number };
 
+/**
+ * Floor grid index. Static uniform XZ grid over the live obstacle array, for the floor queries in
+ * `movements.ts`. Built once per array and reused every tick; nothing is
+ * allocated per query.
+ *
+ * Each cell lists the boxes whose XZ footprint, grown by `FLOOR_INDEX_PAD`,
+ * overlaps it. A disc of radius r <= PAD that touches a box's grown footprint
+ * therefore always has its centre in a cell that lists the box, so one cell is
+ * enough per point query.
+ *
+ * Boxes whose XZ can change in place (door leaves) are marked with
+ * `markDynamicObstacle` and are checked on every query instead. Boxes with
+ * huge or non-finite footprints go to that same always-checked list.
+ *
+ * The index is rebuilt only when it goes stale: the array length or its last
+ * element changed (add or splice), or a box was newly marked dynamic.
+ * Y is never indexed; queries read minY/maxY live, so elevator rides that
+ * rewrite Y in place need no rebuild.
+ */
+
+/** Cell edge in metres. */
+export const FLOOR_INDEX_CELL = 2;
+/** Largest query radius the cells cover. Bigger radii fall back to a full scan. */
+export const FLOOR_INDEX_PAD = 1;
+/** A box spanning more cells than this is checked every query instead. */
+const MAX_SPAN_CELLS = 256;
+/** Coordinates beyond this (parked door leaves sit at -1e6) are not gridded. */
+const FAR = 1e5;
+
+export type FloorIndex = {
+  readonly boxes: readonly FloorBox[];
+  readonly length: number;
+  readonly last: FloorBox | undefined;
+  readonly epoch: number;
+  readonly originX: number;
+  readonly originZ: number;
+  readonly cols: number;
+  readonly rows: number;
+  /** CSR offsets: cell c lists items[cellStart[c] .. cellStart[c + 1]). */
+  readonly cellStart: Int32Array;
+  readonly items: Int32Array;
+  /** Box indices checked on every query. */
+  readonly always: Int32Array;
+  /** Build time in ms, for logs and profiling. */
+  readonly buildMs: number;
+};
+
+const dynamicBoxes = new WeakSet<object>();
+let dynamicEpoch = 0;
+const cache = new WeakMap<readonly FloorBox[], FloorIndex>();
+
+/** A box whose XZ is rewritten in place (door leaf). Bumps the epoch so indexes rebuild once. */
+export function markDynamicObstacle(box: object): void {
+  if (dynamicBoxes.has(box)) return;
+  dynamicBoxes.add(box);
+  dynamicEpoch += 1;
+}
+
+/** Cached index for this live array, rebuilt only when stale. */
+export function floorIndexFor(boxes: readonly FloorBox[]): FloorIndex {
+  const hit = cache.get(boxes);
+  if (hit && hit.length === boxes.length && hit.last === boxes[boxes.length - 1] && hit.epoch === dynamicEpoch) return hit;
+  const built = buildFloorIndex(boxes);
+  cache.set(boxes, built);
+  return built;
+}
+
+function hasFloorBand(box: FloorBox): boolean {
+  return box.minY !== undefined && box.maxY !== undefined && Number.isFinite(box.minY) && Number.isFinite(box.maxY);
+}
+
+function gridded(box: FloorBox): boolean {
+  if (dynamicBoxes.has(box)) return false;
+  const { minX, maxX, minZ, maxZ } = box;
+  return Number.isFinite(minX) && Number.isFinite(maxX) && Number.isFinite(minZ) && Number.isFinite(maxZ)
+    && Math.abs(minX) < FAR && Math.abs(maxX) < FAR && Math.abs(minZ) < FAR && Math.abs(maxZ) < FAR;
+}
+
+export function buildFloorIndex(boxes: readonly FloorBox[]): FloorIndex {
+  const t0 = performance.now();
+  const cs = FLOOR_INDEX_CELL;
+  const pad = FLOOR_INDEX_PAD;
+  let loX = Infinity, hiX = -Infinity, loZ = Infinity, hiZ = -Infinity;
+  for (const box of boxes) {
+    if (!hasFloorBand(box) || !gridded(box)) continue;
+    loX = Math.min(loX, box.minX, box.maxX);
+    hiX = Math.max(hiX, box.minX, box.maxX);
+    loZ = Math.min(loZ, box.minZ, box.maxZ);
+    hiZ = Math.max(hiZ, box.minZ, box.maxZ);
+  }
+  const empty = !(loX <= hiX && loZ <= hiZ);
+  const originX = empty ? 0 : loX - pad;
+  const originZ = empty ? 0 : loZ - pad;
+  const cols = empty ? 0 : Math.floor((hiX + pad - originX) / cs) + 1;
+  const rows = empty ? 0 : Math.floor((hiZ + pad - originZ) / cs) + 1;
+  const counts = new Int32Array(cols * rows + 1);
+  const always: number[] = [];
+  // Cell ranges use the same float ops as the query (box edge minus pad, minus origin, over cell),
+  // so a centre strictly inside the grown footprint always lands in a listed cell.
+  const span = (box: FloorBox): [number, number, number, number] => [
+    Math.max(0, Math.floor((Math.min(box.minX, box.maxX) - pad - originX) / cs)),
+    Math.min(cols - 1, Math.floor((Math.max(box.minX, box.maxX) + pad - originX) / cs)),
+    Math.max(0, Math.floor((Math.min(box.minZ, box.maxZ) - pad - originZ) / cs)),
+    Math.min(rows - 1, Math.floor((Math.max(box.minZ, box.maxZ) + pad - originZ) / cs)),
+  ];
+  const place: boolean[] = new Array(boxes.length).fill(false);
+  boxes.forEach((box, i) => {
+    if (!hasFloorBand(box) && !dynamicBoxes.has(box)) return;
+    if (!gridded(box)) {
+      always.push(i);
+      return;
+    }
+    const [c0, c1, r0, r1] = span(box);
+    if ((c1 - c0 + 1) * (r1 - r0 + 1) > MAX_SPAN_CELLS) {
+      always.push(i);
+      return;
+    }
+    place[i] = true;
+    for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) counts[r * cols + c + 1]! += 1;
+  });
+  for (let c = 1; c < counts.length; c++) counts[c]! += counts[c - 1]!;
+  const cellStart = counts;
+  const items = new Int32Array(cellStart[cellStart.length - 1]!);
+  const fill = cellStart.slice(0, cellStart.length - 1);
+  boxes.forEach((box, i) => {
+    if (!place[i]) return;
+    const [c0, c1, r0, r1] = span(box);
+    for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) items[fill[r * cols + c]!++] = i;
+  });
+  return {
+    boxes,
+    length: boxes.length,
+    last: boxes[boxes.length - 1],
+    epoch: dynamicEpoch,
+    originX,
+    originZ,
+    cols,
+    rows,
+    cellStart,
+    items,
+    always: Int32Array.from(always),
+    buildMs: performance.now() - t0,
+  };
+}
+
+/** Cell holding (x, z), or -1 when the point is off the grid or r is too big (full-scan fallback). */
+export function floorIndexCell(index: FloorIndex, x: number, z: number, r: number): number {
+  if (!(r <= FLOOR_INDEX_PAD)) return -1;
+  const c = Math.floor((x - index.originX) / FLOOR_INDEX_CELL);
+  const w = Math.floor((z - index.originZ) / FLOOR_INDEX_CELL);
+  if (!(c >= 0 && c < index.cols && w >= 0 && w < index.rows)) return -1;
+  return w * index.cols + c;
+}
+
 type MoveWorld = {
   store: { view(id: number): MoveView | undefined };
   enqueue(cmd: MoveCommand): void;
@@ -181,7 +335,6 @@ export function floorHeight(
   feet: number,
   step = STEP_HEIGHT,
 ): number {
-  // TODO: performance debugging  -use rag model to limit boxes to the ones that are near the pawn's current position, instead of checking all boxes in the world.
   const r = radius > 0 ? radius : 0;
   const limit = feet + step + STEP_SLOP;
   let floor = 0;
@@ -227,6 +380,71 @@ export function floorAlongMove(
   return y;
 }
 
+/** One box's contribution to `floorHeight`: same tests, same order. */
+function boxFloorTop(box: FloorBox, x: number, z: number, r: number, limit: number, floor: number): number {
+  if (box.minY === undefined || box.maxY === undefined) return floor;
+  if (!Number.isFinite(box.minY) || !Number.isFinite(box.maxY)) return floor;
+  const top = Math.max(box.minY, box.maxY);
+  if (top > limit) return floor;
+  const minX = Math.min(box.minX, box.maxX) - r;
+  const maxX = Math.max(box.minX, box.maxX) + r;
+  const minZ = Math.min(box.minZ, box.maxZ) - r;
+  const maxZ = Math.max(box.minZ, box.maxZ) + r;
+  if (x <= minX || x >= maxX || z <= minZ || z >= maxZ) return floor;
+  return top > floor ? top : floor;
+}
+
+/**
+ * `floorHeight` over the boxes the static grid lists for (x, z), plus the
+ * always-checked ones. Off the grid, or for a radius past the grid pad, it is
+ * the full scan. Same result as `floorHeight(index.boxes, ...)`.
+ */
+export function floorHeightIndexed(
+  index: FloorIndex,
+  x: number,
+  z: number,
+  radius: number,
+  feet: number,
+  step = STEP_HEIGHT,
+): number {
+  const r = radius > 0 ? radius : 0;
+  const cell = floorIndexCell(index, x, z, r);
+  if (cell < 0) return floorHeight(index.boxes, x, z, radius, feet, step);
+  const limit = feet + step + STEP_SLOP;
+  const boxes = index.boxes;
+  const items = index.items;
+  const always = index.always;
+  let floor = 0;
+  for (let i = index.cellStart[cell]!, end = index.cellStart[cell + 1]!; i < end; i++) {
+    floor = boxFloorTop(boxes[items[i]!]!, x, z, r, limit, floor);
+  }
+  for (let i = 0; i < always.length; i++) floor = boxFloorTop(boxes[always[i]!]!, x, z, r, limit, floor);
+  return floor;
+}
+
+/** `floorAlongMove` on the static grid. Same samples, same result. */
+export function floorAlongMoveIndexed(
+  index: FloorIndex,
+  x0: number,
+  z0: number,
+  x1: number,
+  z1: number,
+  radius: number,
+  feet: number,
+  step = STEP_HEIGHT,
+): number {
+  const dx = x1 - x0;
+  const dz = z1 - z0;
+  const dist = Math.hypot(dx, dz);
+  const n = Math.max(1, Math.ceil(dist / 0.1));
+  let y = feet;
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    y = floorHeightIndexed(index, x0 + dx * t, z0 + dz * t, radius, y, step);
+  }
+  return y;
+}
+
 export type PlanarStep = { vx: number; vz: number; speed: number };
 
 /**
@@ -249,7 +467,7 @@ export function enqueuePlanarMove(
   const next = approachVelocity({ x: view.velocity.x, z: view.velocity.z }, wishPlanar(moveX, moveZ));
   const x = view.position.x + next.x * dt;
   const z = view.position.z + next.z * dt;
-  const y = floorAlongMove(world.listObstacles(), view.position.x, view.position.z, x, z, view.radius, view.position.y);
+  const y = floorAlongMoveIndexed(floorIndexFor(world.listObstacles()), view.position.x, view.position.z, x, z, view.radius, view.position.y);
   world.enqueue({ kind: "setVelocity", entity, linear: { x: next.x, y: 0, z: next.z } });
   world.enqueue({
     kind: "setTransform",
