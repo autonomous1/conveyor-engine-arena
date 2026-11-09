@@ -678,13 +678,15 @@ export function startWanderLoop(
     }
     server.setTick(BigInt(tick));
     const envelopes = server.replicator.publish(world, snap);
-    const healthFrames = health?.frames() ?? [];
+    const snapped: number[] = [];
     for (const clientId of server.connected) {
       const env = envelopes.get(clientId);
       if (!env) continue;
       dispatchHostFrame(snaps, { type: "snap", clientId, envelope: env }, { to: `client:${clientId}`, kind: "snap" });
-      if (healthFrames.length > 0) deliverHealthFrames(server, [clientId], healthFrames);
+      snapped.push(clientId);
     }
+    // Only changed or not-yet-seen rows leave; a new session gets every visible pawn once.
+    if (health && snapped.length > 0) deliverHealthFrames(server, snapped, health.frames());
     if (audit) deliverAuditFrame(server, audit.frame());
     if (tick <= 3 || tick % 40 === 0) {
       log(`[live] ${JSON.stringify({
