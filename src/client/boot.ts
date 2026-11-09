@@ -14,7 +14,8 @@ import {
 import type { CabState } from "../shared/scene-graph.js";
 import { encodeMoveButtons } from "../shared/movements.js";
 import { dropPickupAabb } from "../shared/pickups.js";
-import { clientFaultText, createFireDebugLog } from "../shared/fire-debug.js";
+import { createFireDebugLog } from "../shared/fire-debug.js";
+import { createClientDiag, presentFaultHud, reportFrameFault } from "./diag.js";
 import { doorLeafBox, pickDoorForUse } from "../shared/doors.js";
 import { advanceGrenadeClock, type GrenadePose } from "../shared/grenade.js";
 import { advanceFireClock, LASER_MS, traceHitscan, type TraceCapsule } from "../shared/hitscan.js";
@@ -157,13 +158,14 @@ export async function boot(
   });
   const client = new EngineClient(1, { delayMs: 80, extraMs: 0, predictOwned: false });
   let statusText = "connecting";
+  let consoleHint = false;
+  const diag = createClientDiag();
   let aimedPawn: number | undefined;
   let fireSeq = 0;
   let nextFireAt = 0;
   let grenadeSeq = 0;
   let nextGrenadeAt = 0;
   let useSeq = 0;
-  let pinnedError: string | undefined;
   let pendingFireLog: { socketClosed: boolean; camBefore: { x: number; y: number; z: number } } | undefined;
   let awaitFireReply = false;
   let loggedFireSnap = false;
@@ -292,9 +294,11 @@ export async function boot(
       }
     },
     onFault(err) {
-      pinnedError = clientFaultText(err);
+      consoleHint = true;
       fireDebug.thrown("socket", err);
-      hud.setStatus(`frame error ${pinnedError}`);
+    },
+    onConsoleHint() {
+      consoleHint = true;
     },
     model: () => options.modelChoice || undefined,
     open,
@@ -329,15 +333,14 @@ export async function boot(
       drawFrame(now);
     } catch (err) {
       threw = true;
-      pinnedError = clientFaultText(err);
-      console.error(err);
-      console.error("frame threw", pinnedError);
+      consoleHint = true;
+      reportFrameFault(diag, err, link.faultContext());
       fireDebug.thrown("frame", err);
       const camera = arena.camera.position;
       fireDebug.camera({ x: camera.x, y: camera.y, z: camera.z });
       fireDebug.pawn(client.ownedEntity);
       fireDebug.socket(link.socketState());
-      hud.setStatus(`frame error ${pinnedError}`);
+      hud.setStatus(presentFaultHud(statusText, true));
       laserQueue.length = 0;
       lasers.drop();
       grenadeQueue.length = 0;
@@ -345,7 +348,7 @@ export async function boot(
       try {
         arena.renderer.render(arena.scene, arena.camera);
       } catch (renderErr) {
-        console.error(renderErr);
+        reportFrameFault(diag, renderErr, { ...link.faultContext(), category: "render" });
       }
     }
     hitMarker.tick(now);
@@ -384,7 +387,6 @@ export async function boot(
       }
       pendingFireLog = undefined;
     }
-    if (pinnedError) hud.setStatus(`frame error ${pinnedError}`);
     requestAnimationFrame(frame);
   }
   function drawFrame(now: number) {
@@ -552,9 +554,10 @@ export async function boot(
       owned ? { x: owned.position.x, y: owned.position.y, z: owned.position.z, yaw: yawFromQuat(owned.rotation) } : undefined,
       view.elevators,
     );
-    if (!pinnedError) {
-      hud.setStatus(`${statusText} · ${look}${hpText} · meshes ${pawns.count} models ${pawns.count - pawns.fallbacks} fallback ${pawns.fallbacks + visuals.fallbacks}${liftText}`);
-    }
+    hud.setStatus(presentFaultHud(
+      `${statusText} · ${look}${hpText} · meshes ${pawns.count} models ${pawns.count - pawns.fallbacks} fallback ${pawns.fallbacks + visuals.fallbacks}${liftText}`,
+      consoleHint,
+    ));
     hud.setProfile(input.profile);
     hud.setPad(input.padStatus, input.profile);
     if (followId !== undefined) placeFollow();

@@ -140,7 +140,7 @@ test("installed manifest matches the authoritative world and keeps spawns clear"
   assert.ok(game.view.modelChoices.includes("grok-bot"));
   assert.ok(game.view.modelChoices.includes("player-1"));
   assert.ok(game.view.modelChoices.length >= 2);
-  assert.deepEqual(game.view.npcModelChoices, ["ratty", "cyborg-endoskeleton", "player-a", "player-b", "player-d"]);
+  assert.deepEqual(game.view.npcModelChoices, ["steampunk-dog", "ratty", "cyborg-endoskeleton", "player-a", "player-b", "player-d"]);
   assert.equal(game.view.characters.find((character) => character.id === "player-1")?.model, "/assets/models/player-2.glb");
   assert.ok(game.view.characters.some((character) => character.id === "cyborg-endoskeleton"));
   for (const character of game.view.characters) assert.ok(character.scale > 0, character.id);

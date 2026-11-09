@@ -11,6 +11,7 @@ import { modelFrame } from "../shared/model-choice.js";
 import { parseLoadout, parsePickup, parsePickupSet, type LoadoutFrame, type PickupFrame } from "../shared/pickups.js";
 import { asSnapshot, revive } from "../shared/wire.js";
 import { isArenaSolo, loadKey } from "./auth-key.js";
+import { boundLabel, createClientDiag, type ClientDiag, type DiagFields } from "./diag.js";
 
 const TOKEN_KEY = "ce-arena-token";
 
@@ -83,6 +84,11 @@ export type LiveLink = {
   socketClosed(): boolean;
   /** connecting, open, closing, or closed. */
   socketState(): string;
+  /**
+   * Ids known to this socket for a fault log.
+   * `inputAck` is omitted: a snapshot ack is not an input acknowledgement.
+   */
+  faultContext(): DiagFields;
   close(): void;
 };
 
@@ -136,8 +142,12 @@ export function connectLive(opts: {
   fireDebug?: () => boolean;
   /** One inbound frame, after it parses and before it is applied. */
   onInbound?: (summary: string) => void;
-  /** Parse or apply threw. The caller pins the message. This does not resync. */
+  /** Parse, inbound hook, or apply threw. The caller does not resync from this. */
   onFault?: (err: unknown) => void;
+  /** A fault or host refusal was logged. The HUD may show a short console hint. */
+  onConsoleHint?: () => void;
+  /** Fault log for this connection. Tests pass one. The browser uses the console. */
+  diag?: ClientDiag;
   /** Read when hello is sent. Empty omits the field. */
   model?: () => string | undefined;
   /** Opens one socket. Solo passes the in-tab pair. Multiplayer passes a WebSocket. */
@@ -151,14 +161,114 @@ export function connectLive(opts: {
 }): LiveLink {
   const ws = opts.open() as WebSocketLike;
   const useAuth = opts.auth !== false;
+  const diag = opts.diag ?? createClientDiag();
   let lastSeq = 0;
   let lastSnapAt = 0;
+  let lastSnapSeq: number | undefined;
+  let lastSnapTick: bigint | undefined;
+  /**
+   * Highest `lastProcessedInput` on a snapshot.
+   * The transport writes that field when an input is admitted, not when the world applies it.
+   * It is an admission high water. It is not an input ack, and it is not a snapshot sequence.
+   */
+  let lastProcessed: number | undefined;
+  let admittedHigh: number | undefined;
+  let recovering = false;
+  /** Snapshot tick when this recovery started. A same-tick snapshot is too early to rebase on. */
+  let recoverBaseline: bigint | undefined;
+  let recoverSawTick: bigint | undefined;
+  let lastSentInputId: number | undefined;
+  let clientId: number | undefined;
   let inputSeq = 1;
   let ownedId: number | undefined;
   let resyncs = 0;
   let closed = false;
   let welcomed = false;
   let queuedModel: string | undefined;
+  const finiteId = (value: unknown): number | undefined => {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "bigint") return Number(value);
+    return undefined;
+  };
+  const faultFields = (extra: {
+    source: string;
+    messageType?: string;
+    category?: string;
+    reason?: string;
+    code?: string | number;
+  }): DiagFields => ({
+    source: extra.source,
+    messageType: extra.messageType,
+    category: extra.category,
+    reason: extra.reason,
+    code: extra.code,
+    connection: clientId,
+    ownedEntity: ownedId,
+    sentInputId: lastSentInputId,
+    processedInput: lastProcessed,
+    snapSeq: lastSnapSeq,
+    simTick: lastSnapTick,
+  });
+  const ADMIT_WINDOW = 8;
+  const noteAdmitted = (value: number) => {
+    if (admittedHigh !== undefined && value < admittedHigh) return;
+    admittedHigh = value;
+    lastProcessed = value;
+  };
+  const finishRecovery = () => {
+    if (admittedHigh === undefined) return;
+    const next = admittedHigh + 1;
+    // Outstanding frames were already rejected or admitted before this later tick.
+    if (inputSeq <= admittedHigh || inputSeq > admittedHigh + ADMIT_WINDOW) inputSeq = next;
+    recovering = false;
+    diag.report({
+      level: "warn",
+      fields: faultFields({ source: "input", messageType: "input", category: "recovery", reason: "rebase" }),
+    });
+  };
+  const considerRecoverySnap = (tick: bigint) => {
+    if (!recovering) return;
+    if (recoverBaseline === undefined) {
+      if (recoverSawTick === undefined) {
+        recoverSawTick = tick;
+        return;
+      }
+      if (tick > recoverSawTick) finishRecovery();
+      return;
+    }
+    if (tick > recoverBaseline) finishRecovery();
+  };
+  const enterRecovery = (reason: string) => {
+    if (recovering || closed) return;
+    recovering = true;
+    recoverBaseline = lastSnapTick;
+    recoverSawTick = undefined;
+    opts.onConsoleHint?.();
+    opts.onStatus({
+      phase: "resync",
+      text: "recovering input",
+      ownedEntityId: ownedId,
+      snapSeq: lastSnapSeq,
+      resyncs,
+    });
+    diag.report({
+      level: "warn",
+      fields: faultFields({ source: "input", messageType: "input", category: "recovery", reason }),
+    });
+  };
+  const rememberSnap = (snap: { seq: number; tick: bigint }, envelope: Record<string, unknown>) => {
+    if (Number.isFinite(snap.seq)) lastSnapSeq = snap.seq;
+    if ("lastProcessedInput" in envelope) {
+      const processed = finiteId(envelope.lastProcessedInput);
+      if (processed !== undefined) noteAdmitted(processed);
+    }
+    considerRecoverySnap(snap.tick);
+    lastSnapTick = snap.tick;
+  };
+  const fieldCode = (value: unknown): string | number | undefined => {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    return boundLabel(value);
+  };
   const flushModel = () => {
     if (!queuedModel || ownedId === undefined || ws.readyState !== WebSocket.OPEN) return;
     ws.send(JSON.stringify(modelFrame(queuedModel)));
@@ -200,13 +310,32 @@ export function connectLive(opts: {
     }));
     opts.onStatus({ phase: "hello", text: "hello sent", resyncs });
   };
-  ws.onerror = () => opts.onStatus({ phase: "error", text: "socket error", ownedEntityId: ownedId, resyncs });
+  ws.onerror = () => {
+    diag.report({
+      level: "error",
+      fields: faultFields({ source: "socket", messageType: "error", category: "error" }),
+    });
+    opts.onConsoleHint?.();
+    opts.onStatus({ phase: "error", text: "socket error", ownedEntityId: ownedId, resyncs });
+  };
   ws.onclose = (ev) => {
     closed = true;
-    console.log("socket closed");
     opts.onSceneGraph?.(undefined);
     const info = closeInfo(ev);
-    if (!isArenaSolo() && (info.code === 4401 || info.code === 4403)) {
+    const authClose = !isArenaSolo() && (info.code === 4401 || info.code === 4403);
+    diag.report({
+      level: authClose ? "warn" : "error",
+      fields: faultFields({
+        source: "socket",
+        messageType: "close",
+        category: authClose ? "auth" : "close",
+        reason: boundLabel(info.reason),
+        code: info.code,
+      }),
+    });
+    opts.onConsoleHint?.();
+    recovering = false;
+    if (authClose) {
       opts.onStatus({
         phase: "reject",
         text: "auth: " + info.reason,
@@ -224,19 +353,25 @@ export function connectLive(opts: {
       const text = typeof ev.data === "string" ? ev.data : new TextDecoder().decode(ev.data as ArrayBuffer);
       msg = revive(JSON.parse(text)) as Record<string, unknown>;
     } catch (err) {
-      console.error(err);
-      opts.onFault?.(err);
-      opts.onStatus({
-        phase: "error",
-        text: `frame error ${err instanceof Error ? err.message : String(err)}`,
-        ownedEntityId: ownedId,
-        resyncs,
+      diag.report({
+        level: "error",
+        error: err,
+        fields: faultFields({ source: "parse", category: "parse" }),
       });
+      opts.onConsoleHint?.();
+      opts.onFault?.(err);
       return;
     }
     try {
       opts.onInbound?.(summarizeInbound(msg));
     } catch (err) {
+      const kind = typeof msg.t === "string" ? msg.t : typeof msg.type === "string" ? msg.type : undefined;
+      diag.report({
+        level: "error",
+        error: err,
+        fields: faultFields({ source: "inbound", messageType: boundLabel(kind), category: "callback" }),
+      });
+      opts.onConsoleHint?.();
       opts.onFault?.(err);
     }
     if (typeof msg.t === "string") {
@@ -273,7 +408,8 @@ export function connectLive(opts: {
         const token = typeof msg.reconnectToken === "string" ? msg.reconnectToken : undefined;
         if (token && useAuth) sessionStorage.setItem(TOKEN_KEY, token);
         const owned = Number(msg.ownedEntityId);
-        const clientId = Number(msg.clientId) || 1;
+        const welcomedId = Number(msg.clientId) || 1;
+        clientId = welcomedId;
         const nextOwned = Number.isFinite(owned) ? owned : undefined;
         // A second welcome clears interpolation and would snap the view onto
         // whatever pawn the host named. Stay on the pawn we already have.
@@ -281,7 +417,7 @@ export function connectLive(opts: {
         if (!welcomed && (nextOwned !== undefined || opts.spectate === true)) {
           if (nextOwned !== undefined) ownedId = nextOwned;
           inputSeq = 1;
-          opts.client.connect(ownedId, clientId);
+          opts.client.connect(ownedId, welcomedId);
           welcomed = true;
           lastSeq = 0;
         }
@@ -298,8 +434,8 @@ export function connectLive(opts: {
         }
         opts.onStatus({
           phase: "welcome",
-          text: `welcome client ${clientId} owned ${ownedId ?? "none"}`,
-          clientId,
+          text: `welcome client ${welcomedId} owned ${ownedId ?? "none"}`,
+          clientId: welcomedId,
           ownedEntityId: ownedId,
           resyncs,
         });
@@ -307,19 +443,29 @@ export function connectLive(opts: {
         return;
       }
       if (msg.type === "reject" || msg.type === "error") {
-        opts.onStatus({
-          phase: msg.type,
-          text: `${String(msg.type)} ${String(msg.reason ?? msg.code ?? "")}`,
-          ownedEntityId: ownedId,
-          resyncs,
+        diag.report({
+          level: msg.type === "reject" ? "warn" : "error",
+          fields: faultFields({
+            source: "host",
+            messageType: msg.type,
+            category: boundLabel(msg.category),
+            reason: boundLabel(msg.reason),
+            code: fieldCode(msg.code),
+          }),
         });
+        opts.onConsoleHint?.();
+        if (msg.type === "error" && (msg.reason === "future" || msg.reason === "duplicate-or-old")) {
+          enterRecovery(msg.reason);
+        }
         return;
       }
       if (msg.type !== "snapshot" || !msg.envelope || typeof msg.envelope !== "object") return;
-      const snap = asSnapshot(msg.envelope as Record<string, unknown>);
+      const envelope = msg.envelope as Record<string, unknown>;
+      const snap = asSnapshot(envelope);
       if (snap.kind !== "full" && lastSeq > 0 && snap.seq > lastSeq + 1) requestResync();
       lastSeq = Number.isFinite(snap.seq) ? snap.seq : lastSeq;
       lastSnapAt = Date.now();
+      rememberSnap(snap, envelope);
       opts.client.applySnapshot(snap);
       ws.send(JSON.stringify({ v: 1, type: "ack", snapshotSeq: snap.seq }));
       const rendered = opts.client.renderSnapshot();
@@ -334,23 +480,30 @@ export function connectLive(opts: {
       });
       opts.onApplied();
     } catch (err) {
-      opts.onFault?.(err);
-      opts.onStatus({
-        phase: "error",
-        text: `apply failed ${err instanceof Error ? err.message : String(err)}`,
-        ownedEntityId: ownedId,
-        resyncs,
+      diag.report({
+        level: "error",
+        error: err,
+        fields: faultFields({ source: "apply", messageType: "snapshot", category: "apply" }),
       });
+      opts.onConsoleHint?.();
+      opts.onFault?.(err);
       requestResync();
     }
   };
   return {
     sendInput(moveX, moveZ, yaw, buttons = 0) {
-      if (ownedId === undefined || ws.readyState !== WebSocket.OPEN) return;
+      if (ownedId === undefined || closed || ws.readyState !== WebSocket.OPEN || recovering) return;
+      // Do not run further ahead of the last published admission than the gateway will accept.
+      if (admittedHigh !== undefined && inputSeq > admittedHigh + ADMIT_WINDOW) {
+        enterRecovery("ahead");
+        return;
+      }
+      const seq = inputSeq++;
+      lastSentInputId = seq;
       ws.send(JSON.stringify({
         v: 1,
         type: "input",
-        seq: inputSeq++,
+        seq,
         moveX,
         moveZ,
         yaw,
@@ -399,6 +552,9 @@ export function connectLive(opts: {
       if (ws.readyState === WebSocket.OPEN) return "open";
       if (ws.readyState === WebSocket.CLOSING) return "closing";
       return "connecting";
+    },
+    faultContext() {
+      return faultFields({ source: "client" });
     },
     close() {
       document.removeEventListener("visibilitychange", onVisibility);
