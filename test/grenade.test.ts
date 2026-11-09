@@ -718,3 +718,45 @@ function installDom() {
     },
   };
 }
+
+test("the floor plane stops a grenade: one bounce on it, then a stop at floor height", () => {
+  const origin = { x: 0, y: EYE_HEIGHT, z: 0 };
+  const dir = aimDirection(0, -0.3);
+  let free = grenade.launchGrenade(1, 7, origin, dir);
+  let freeStep: grenade.GrenadeStep | undefined;
+  for (let i = 0; i < 200; i++) {
+    freeStep = grenade.stepGrenade(free, DT, [], []);
+    if (freeStep.kind === "stop") break;
+    free = freeStep.body;
+  }
+  assert.equal(freeStep?.kind, "stop");
+  assert.ok(freeStep!.hit.point.y < -50, "with no floor it falls far under the map, then times out");
+
+  let body = grenade.launchGrenade(1, 7, origin, dir);
+  let bounces = 0;
+  let stop: grenade.GrenadeHit | undefined;
+  let t = 0;
+  for (let i = 0; i < 200 && !stop; i++) {
+    const step = grenade.stepGrenade(body, DT, [], [], 0);
+    t += DT;
+    body = step.body;
+    if (step.kind === "bounce") {
+      bounces += 1;
+      assert.equal(step.hit.normal.y, 1);
+      assert.ok(Math.abs(step.hit.point.y) < 1e-9);
+      assert.ok(step.body.vy > 0, "bounces up");
+    }
+    if (step.kind === "stop") stop = step.hit;
+  }
+  assert.equal(bounces, 1);
+  assert.ok(stop);
+  assert.ok(Math.abs(stop.point.y) < 1e-9, `stop y ${stop.point.y}`);
+  assert.ok(t < 3, `stops well before the ${grenade.GRENADE_LIFE_S} s timeout (${t.toFixed(2)} s)`);
+
+  // A box above the floor is still hit first.
+  const crate: TraceAabb = { id: 3, minX: -2, maxX: 2, minY: 0, maxY: 1, minZ: 2, maxZ: 3 };
+  const first = grenade.stepGrenade(grenade.launchGrenade(2, 7, { x: 0, y: 0.5, z: 1.9 }, { x: 0, y: 0, z: 1 }), DT, [crate], [], 0);
+  assert.equal(first.kind, "bounce");
+  assert.equal((first as { hit: grenade.GrenadeHit }).hit.id, 3);
+});
+

@@ -218,6 +218,17 @@ export type ArenaView = {
   /** Thrown grenade mesh. Absent when the manifest has no `grenade` model. */
   grenade?: string;
   /**
+   * Grenade blast sprite sheet from the `grenade-explosion` texture asset and its `sprite` block.
+   * Absent when the manifest has no such asset. Not part of either content hash.
+   */
+  explosion?: ArenaExplosionSheet;
+  /**
+   * Sound effects from the `audio` assets `laser-blast`, `grenade-launch`, and `grenade-blast`
+   * and their `sound` blocks. A key is absent when the manifest has no such asset.
+   * Not part of either content hash.
+   */
+  sounds?: ArenaSounds;
+  /**
    * Multiplayer socket for a static client. `ws:` or `wss:` only.
    * Absent: the page origin. The solo build ignores it and uses an in-tab host.
    * Not part of either content hash.
@@ -234,3 +245,36 @@ export type ArenaView = {
    */
   authRequired?: boolean;
 };
+
+/** One animated sprite sheet: frames left to right, rows top to bottom. */
+export type ArenaExplosionSheet = {
+  texture: string;
+  columns: number;
+  rows: number;
+  frameCount: number;
+  frameWidth: number;
+  frameHeight: number;
+  fps: number;
+  /** World size of the sprite in metres. */
+  size: number;
+  /** Sprite size for a laser hit point, in metres. Optional `sprite.laserImpactSize`; absent means 0.8. */
+  laserImpactSize?: number;
+  blending: "normal" | "additive";
+};
+
+/** One decoded-once sound effect. `uri` is under `/assets/`, like every other asset. */
+export type ArenaSoundEffect = {
+  uri: string;
+  /** Effect gain, 0 to 1, under the master volume. */
+  volume: number;
+  /** Overlapping plays at once. A new play past the cap stops the oldest. */
+  maxVoices: number;
+  /** Other players' plays use a panner at their world point. Your own never do. */
+  positional: boolean;
+  /** Panner distance in metres where the gain starts to fall (inverse model). */
+  refDistance: number;
+};
+
+export type ArenaSoundName = "laser" | "grenadeLaunch" | "grenadeBlast";
+
+export type ArenaSounds = Partial<Record<ArenaSoundName, ArenaSoundEffect>>;

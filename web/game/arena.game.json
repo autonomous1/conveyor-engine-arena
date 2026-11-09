@@ -1012,6 +1012,95 @@
         "origin": "procedural",
         "notes": "Created with blender"
       }
+    },
+    {
+      "id": "grenade-explosion",
+      "kind": "texture",
+      "type": "explosion",
+      "uri": "/assets/textures/grenade-explosion-sheet.png",
+      "mediaType": "image/png",
+      "sprite": {
+        "columns": 6,
+        "rows": 5,
+        "frameCount": 30,
+        "frameWidth": 226,
+        "frameHeight": 256,
+        "fps": 30,
+        "size": 8,
+        "laserImpactSize": 0.8,
+        "blending": "normal"
+      },
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
+      "provenance": {
+        "origin": "manual",
+        "notes": "Grenade explosion sprite sheet supplied for this arena: 1356x1280, 30 frames of 226x256, 6 columns x 5 rows."
+      }
+    },
+    {
+      "id": "laser-blast",
+      "kind": "audio",
+      "type": "sfx",
+      "uri": "/assets/audio/laser-blast-sfx.mp3",
+      "mediaType": "audio/mpeg",
+      "sound": {
+        "volume": 0.6,
+        "maxVoices": 4,
+        "positional": true,
+        "refDistance": 4
+      },
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
+      "provenance": {
+        "origin": "manual",
+        "notes": "Laser blast sound supplied for this arena. Plays once per laser shot."
+      }
+    },
+    {
+      "id": "grenade-launch",
+      "kind": "audio",
+      "type": "sfx",
+      "uri": "/assets/audio/grenade-launch.wav",
+      "mediaType": "audio/wav",
+      "sound": {
+        "volume": 0.8,
+        "maxVoices": 2,
+        "positional": true,
+        "refDistance": 3
+      },
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
+      "provenance": {
+        "origin": "manual",
+        "notes": "Grenade launch sound supplied for this arena. Plays once per throw."
+      }
+    },
+    {
+      "id": "grenade-blast",
+      "kind": "audio",
+      "type": "sfx",
+      "uri": "/assets/audio/grenade-launch-grenade-blast.wav",
+      "mediaType": "audio/wav",
+      "sound": {
+        "volume": 1,
+        "maxVoices": 4,
+        "positional": true,
+        "refDistance": 8
+      },
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
+      "provenance": {
+        "origin": "manual",
+        "notes": "Grenade blast sound supplied for this arena. Plays at the detonation point. The file name suggests launch plus blast; it is used as the blast only."
+      }
     }
   ],
   "player": {

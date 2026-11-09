@@ -5,7 +5,7 @@
  * Grenades do not collide with each other. There is no second dynamic body.
  */
 
-import { sweepSegment, type TraceAabb, type TraceCapsule, type Vec3 } from "./hitscan.js";
+import { sweepSegment, type SweepHit, type TraceAabb, type TraceCapsule, type Vec3 } from "./hitscan.js";
 
 export const GRENADE_INTERVAL_MS = 1000;
 /** Finite toss. A hitscan ray crosses its range in one trace, so this is slower. */
@@ -158,11 +158,17 @@ export function launchGrenade(
  * An obstacle bounces once. The next obstacle hit stops the body.
  * A pawn hit stops it and is marked so the caller can apply the existing damage.
  */
+/**
+ * One tick. `floorY` is the ground plane. The arena floor is not a collision box
+ * (pawns stand on a height scan), so without it a grenade falls through the floor and
+ * only stops on {@link GRENADE_LIFE_S}, far below the map.
+ */
 export function stepGrenade(
   body: GrenadeBody,
   dt: number,
   aabbs: readonly TraceAabb[],
   capsules: readonly TraceCapsule[],
+  floorY?: number,
 ): GrenadeStep {
   const next: GrenadeBody = { ...body, age: body.age + dt };
   if (!(dt > 0)) return { kind: "fly", body: next };
@@ -173,7 +179,7 @@ export function stepGrenade(
     y: body.y + next.vy * dt,
     z: body.z + next.vz * dt,
   };
-  const hit = sweepSegment(from, to, aabbs, capsules);
+  const hit = closerFloorHit(from, to, sweepSegment(from, to, aabbs, capsules), floorY);
   if (!hit) {
     next.x = to.x;
     next.y = to.y;
@@ -207,6 +213,17 @@ export function stepGrenade(
   next.y = hit.point.y + hit.normal.y * GRENADE_SKIN;
   next.z = hit.point.z + hit.normal.z * GRENADE_SKIN;
   return { kind: "bounce", body: next, hit: contact };
+}
+
+/** The floor crossing when it comes before `hit` along the segment. */
+function closerFloorHit(from: Vec3, to: Vec3, hit: SweepHit | undefined, floorY: number | undefined): SweepHit | undefined {
+  if (floorY === undefined || !Number.isFinite(floorY)) return hit;
+  if (!(from.y >= floorY && to.y < floorY)) return hit;
+  const t = (from.y - floorY) / (from.y - to.y);
+  const point = { x: from.x + (to.x - from.x) * t, y: floorY, z: from.z + (to.z - from.z) * t };
+  const distance = Math.hypot(point.x - from.x, point.y - from.y, point.z - from.z);
+  if (hit && hit.distance <= distance) return hit;
+  return { distance, point, normal: { x: 0, y: 1, z: 0 }, pawn: false };
 }
 
 /** `normal` points toward the incoming side, so `dot(velocity, normal)` is negative. */

@@ -103,16 +103,24 @@ export function createGrenadeProps(
     });
   }
 
-  function place(pose: GrenadeDraw, now = 0) {
-    if (!Number.isFinite(pose.id) || !Number.isFinite(pose.x) || !Number.isFinite(pose.y) || !Number.isFinite(pose.z)) return;
-    if (!Number.isFinite(pose.yaw)) return;
+  /**
+   * `"stop"` only for the first `stop` pose of a grenade: the detonation point.
+   * `"launch"` for the first pose of a new grenade that is not a stop: the throw.
+   * Undefined otherwise.
+   */
+  function place(pose: GrenadeDraw, now = 0): "launch" | "stop" | undefined {
+    if (!Number.isFinite(pose.id) || !Number.isFinite(pose.x) || !Number.isFinite(pose.y) || !Number.isFinite(pose.z)) return undefined;
+    if (!Number.isFinite(pose.yaw)) return undefined;
     ensureTemplate();
     let mesh = props.get(pose.id);
+    const fresh = !mesh;
     if (!mesh) mesh = spawn(pose.id, pose.yaw);
     mesh.position.set(pose.x, pose.y, pose.z);
     if (pose.stop === true && typeof mesh.userData.dropAt !== "number") {
       mesh.userData.dropAt = now + GRENADE_DRAW_MS;
+      return "stop";
     }
+    return fresh && pose.stop !== true ? "launch" : undefined;
   }
 
   function expire(now: number) {

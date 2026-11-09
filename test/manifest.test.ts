@@ -728,3 +728,92 @@ test("scene.sceneGraph is optional, a missing file is an issue, and invalid json
     console.warn = orig;
   }
 });
+
+test("grenade-explosion asset compiles to view.explosion; a bad sprite block is an issue", () => {
+  const doc = document();
+  const files = filesFromDisk();
+  const read = (uri: string) => files.get(uri);
+  const compiled = compile(doc, read);
+  assert.deepEqual(compiled.view.explosion, {
+    texture: "/assets/textures/grenade-explosion-sheet.png",
+    columns: 6,
+    rows: 5,
+    frameCount: 30,
+    frameWidth: 226,
+    frameHeight: 256,
+    fps: 30,
+    size: 8,
+    blending: "normal",
+    laserImpactSize: 0.8,
+  });
+
+  const bad = structuredClone(doc) as { assets: Array<Record<string, unknown>> };
+  const sheet = bad.assets.find((asset) => asset.id === "grenade-explosion");
+  assert.ok(sheet);
+  sheet.sprite = { ...(sheet.sprite as Record<string, unknown>), frameCount: 31, blending: "screen" };
+  assert.throws(() => compile(bad, read), (err: unknown) => {
+    assert.ok(err instanceof GameManifestError);
+    assert.ok(err.issues.some((issue) => issue.path.endsWith(".sprite.blending")));
+    return true;
+  });
+  sheet.sprite = { ...(sheet.sprite as Record<string, unknown>), blending: "additive" };
+  assert.throws(() => compile(bad, read), (err: unknown) => {
+    assert.ok(err instanceof GameManifestError);
+    assert.ok(err.issues.some((issue) => issue.path.endsWith(".sprite.frameCount")));
+    return true;
+  });
+
+  const none = structuredClone(doc) as { assets: Array<Record<string, unknown>> };
+  none.assets = none.assets.filter((asset) => asset.id !== "grenade-explosion");
+  assert.equal(compile(none, read).view.explosion, undefined);
+});
+
+test("audio assets compile to view.sounds; a bad sound block or file is an issue", () => {
+  const doc = document();
+  const files = filesFromDisk();
+  const read = (uri: string) => files.get(uri);
+  assert.deepEqual(compile(doc, read).view.sounds, {
+    laser: { uri: "/assets/audio/laser-blast-sfx.mp3", volume: 0.6, maxVoices: 4, positional: true, refDistance: 4 },
+    grenadeLaunch: { uri: "/assets/audio/grenade-launch.wav", volume: 0.8, maxVoices: 2, positional: true, refDistance: 3 },
+    grenadeBlast: { uri: "/assets/audio/grenade-launch-grenade-blast.wav", volume: 1, maxVoices: 4, positional: true, refDistance: 8 },
+  });
+
+  const issuesOf = (edit: (assets: Array<Record<string, unknown>>) => void, readFile = read) => {
+    const bad = structuredClone(doc) as { assets: Array<Record<string, unknown>> };
+    edit(bad.assets);
+    try {
+      compile(bad, readFile);
+    } catch (err) {
+      assert.ok(err instanceof GameManifestError);
+      return err.issues.map((issue) => `${issue.path} ${issue.message}`);
+    }
+    return [];
+  };
+  const laser = (assets: Array<Record<string, unknown>>) => assets.find((asset) => asset.id === "laser-blast")!;
+  const bad = issuesOf((assets) => {
+    laser(assets).sound = { volume: 1.5, maxVoices: 0, positional: "yes", refDistance: -1 };
+  });
+  for (const key of ["volume", "maxVoices", "positional", "refDistance"]) {
+    assert.ok(bad.some((issue) => issue.includes(`.sound.${key}`)), `${key}: ${bad.join("; ")}`);
+  }
+  assert.ok(issuesOf((assets) => {
+    delete laser(assets).sound;
+  }).some((issue) => issue.endsWith(".sound required sound object")));
+  assert.ok(issuesOf((assets) => {
+    laser(assets).mediaType = "audio/ogg";
+  }).some((issue) => issue.includes(".mediaType must be audio/mpeg or audio/wav")));
+  assert.ok(issuesOf(() => undefined, (uri) => (uri.endsWith(".wav") ? new Uint8Array([1, 2, 3, 4]) : read(uri)))
+    .some((issue) => issue.endsWith("not a wav")));
+  assert.ok(issuesOf(() => undefined, (uri) => (uri.endsWith("laser-blast-sfx.mp3") ? undefined : read(uri)))
+    .some((issue) => issue.includes("file not found for /assets/audio/laser-blast-sfx.mp3")));
+
+  const none = structuredClone(doc) as { assets: Array<Record<string, unknown>> };
+  none.assets = none.assets.filter((asset) => asset.kind !== "audio");
+  assert.equal(compile(none, read).view.sounds, undefined);
+  const defaults = structuredClone(doc) as { assets: Array<Record<string, unknown>> };
+  laser(defaults.assets).sound = { volume: 0.5, maxVoices: 3 };
+  assert.deepEqual(compile(defaults, read).view.sounds?.laser, {
+    uri: "/assets/audio/laser-blast-sfx.mp3", volume: 0.5, maxVoices: 3, positional: false, refDistance: 1,
+  });
+});
+

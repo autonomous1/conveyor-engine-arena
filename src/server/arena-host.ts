@@ -252,6 +252,8 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
     world: loaded.world,
     server: engine,
     health,
+    // The rendered floor, or the bottom of the world when there is none.
+    floorY: loaded.view.floor?.y ?? loaded.view.bounds.minY,
     send(clientId, frame) {
       engine.session(clientId)?.socket.send(encodeFrame(frame));
     },

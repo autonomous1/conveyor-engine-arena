@@ -13,7 +13,7 @@ import {
   type StaticWorldDefinition,
 } from "conveyor-engine-assets";
 import { attachBuildingProfiles } from "../shared/building-profile.js";
-import type { ArenaElevator, ArenaView, CharacterAnimation } from "../shared/arena-view.js";
+import type { ArenaElevator, ArenaExplosionSheet, ArenaSoundEffect, ArenaSoundName, ArenaSounds, ArenaView, CharacterAnimation } from "../shared/arena-view.js";
 import { parseSceneGraph, type ElevatorPlace, type SceneGraph } from "../shared/scene-graph.js";
 import { parseBakedRegions, type BakedRegionsFile } from "../shared/nav/regions.js";
 import { DEFAULT_MOVEMENT_SPEED, MOVEMENTS, type Movement } from "../shared/movements.js";
@@ -55,7 +55,7 @@ export type CompiledGame = {
 
 type AssetRec = {
   id: string;
-  kind: "texture" | "model";
+  kind: "texture" | "model" | "audio";
   uri: string;
   mediaType: string;
   licenseId: string;
@@ -231,6 +231,142 @@ function drawsAsProp(asset: AssetRec): boolean {
   if (asset.kind !== "model") return false;
   if ((asset.scale ?? 1) !== 1) return true;
   return typeof asset.animation === "string" && asset.animation.length > 0;
+}
+
+const EXPLOSION_ASSET = "grenade-explosion";
+
+/**
+ * `sprite` block of the `grenade-explosion` texture asset. Bad fields are manifest issues.
+ * A PNG whose size is not columns × frameWidth by rows × frameHeight is a warning only.
+ */
+function explosionSheet(
+  docAssets: unknown,
+  asset: AssetRec | undefined,
+  fileBytes: ReadonlyMap<string, Uint8Array>,
+  issues: GameIssue[],
+): ArenaExplosionSheet | undefined {
+  if (!asset) return undefined;
+  const index = Array.isArray(docAssets) ? docAssets.findIndex((item) => isObject(item) && item.id === EXPLOSION_ASSET) : -1;
+  const path = `assets[${index}].sprite`;
+  if (asset.kind !== "texture") {
+    issues.push({ path: `assets[${index}].kind`, message: `${EXPLOSION_ASSET} must be a texture` });
+    return undefined;
+  }
+  const item = index >= 0 ? (docAssets as unknown[])[index] : undefined;
+  const sprite = isObject(item) && isObject(item.sprite) ? item.sprite : undefined;
+  if (!sprite) {
+    issues.push({ path, message: "required sprite object" });
+    return undefined;
+  }
+  const whole = (key: string): number | undefined => {
+    const value = sprite[key];
+    if (typeof value === "number" && Number.isInteger(value) && value > 0) return value;
+    issues.push({ path: `${path}.${key}`, message: "must be a positive integer" });
+    return undefined;
+  };
+  const positive = (key: string): number | undefined => {
+    const value = sprite[key];
+    if (typeof value === "number" && Number.isFinite(value) && value > 0) return value;
+    issues.push({ path: `${path}.${key}`, message: "must be > 0" });
+    return undefined;
+  };
+  const columns = whole("columns");
+  const rows = whole("rows");
+  const frameCount = whole("frameCount");
+  const frameWidth = whole("frameWidth");
+  const frameHeight = whole("frameHeight");
+  const fps = positive("fps");
+  const size = positive("size");
+  const blending = sprite.blending ?? "normal";
+  if (blending !== "normal" && blending !== "additive") issues.push({ path: `${path}.blending`, message: "must be normal or additive" });
+  if (!columns || !rows || !frameCount || !frameWidth || !frameHeight || !fps || !size) return undefined;
+  if (blending !== "normal" && blending !== "additive") return undefined;
+  if (frameCount > columns * rows) {
+    issues.push({ path: `${path}.frameCount`, message: `more than ${columns} × ${rows} frames` });
+    return undefined;
+  }
+  const impact = sprite.laserImpactSize;
+  if (impact !== undefined && !(typeof impact === "number" && Number.isFinite(impact) && impact > 0)) {
+    issues.push({ path: `${path}.laserImpactSize`, message: "must be > 0" });
+    return undefined;
+  }
+  const png = fileBytes.get(asset.uri);
+  if (png && png.length >= 24) {
+    const width = ((png[16]! << 24) | (png[17]! << 16) | (png[18]! << 8) | png[19]!) >>> 0;
+    const height = ((png[20]! << 24) | (png[21]! << 16) | (png[22]! << 8) | png[23]!) >>> 0;
+    if (width !== columns * frameWidth || height !== rows * frameHeight) {
+      console.warn(`${EXPLOSION_ASSET}: ${asset.uri} is ${width}x${height}, sprite expects ${columns * frameWidth}x${rows * frameHeight}`);
+    }
+  }
+  return {
+    texture: asset.uri, columns, rows, frameCount, frameWidth, frameHeight, fps, size, blending,
+    ...(typeof impact === "number" ? { laserImpactSize: impact } : {}),
+  };
+}
+
+const AUDIO_MEDIA_TYPES = new Set(["audio/mpeg", "audio/wav"]);
+
+/** MP3: an ID3 tag or an MPEG frame sync. WAV: RIFF....WAVE. */
+function audioBytesMatch(mediaType: string, bytes: Uint8Array): boolean {
+  const ascii = (at: number, text: string) => [...text].every((ch, i) => bytes[at + i] === ch.charCodeAt(0));
+  if (mediaType === "audio/wav") return bytes.length >= 12 && ascii(0, "RIFF") && ascii(8, "WAVE");
+  if (bytes.length < 3) return false;
+  return ascii(0, "ID3") || (bytes[0] === 0xff && (bytes[1]! & 0xe0) === 0xe0);
+}
+
+/** Fixed asset id per effect, like `grenade-explosion` for the blast sprite. */
+const SOUND_ASSETS: ReadonlyArray<readonly [ArenaSoundName, string]> = [
+  ["laser", "laser-blast"],
+  ["grenadeLaunch", "grenade-launch"],
+  ["grenadeBlast", "grenade-blast"],
+];
+const MAX_SOUND_VOICES = 16;
+
+/**
+ * `sound` block of each effect's `audio` asset. Bad fields are manifest issues.
+ * `positional` defaults to false and `refDistance` to 1.
+ */
+function soundEffects(docAssets: unknown, assets: ReadonlyMap<string, AssetRec>, issues: GameIssue[]): ArenaSounds | undefined {
+  const out: ArenaSounds = {};
+  let any = false;
+  for (const [name, id] of SOUND_ASSETS) {
+    const asset = assets.get(id);
+    if (!asset) continue;
+    const index = Array.isArray(docAssets) ? docAssets.findIndex((item) => isObject(item) && item.id === id) : -1;
+    if (asset.kind !== "audio") {
+      issues.push({ path: `assets[${index}].kind`, message: `${id} must be audio` });
+      continue;
+    }
+    const path = `assets[${index}].sound`;
+    const item = index >= 0 ? (docAssets as unknown[])[index] : undefined;
+    const sound = isObject(item) && isObject(item.sound) ? item.sound : undefined;
+    if (!sound) {
+      issues.push({ path, message: "required sound object" });
+      continue;
+    }
+    const volume = sound.volume;
+    const volumeOk = typeof volume === "number" && Number.isFinite(volume) && volume >= 0 && volume <= 1;
+    if (!volumeOk) issues.push({ path: `${path}.volume`, message: "must be a number from 0 to 1" });
+    const voices = sound.maxVoices;
+    const voicesOk = typeof voices === "number" && Number.isInteger(voices) && voices >= 1 && voices <= MAX_SOUND_VOICES;
+    if (!voicesOk) issues.push({ path: `${path}.maxVoices`, message: `must be an integer from 1 to ${MAX_SOUND_VOICES}` });
+    const positional = sound.positional ?? false;
+    if (typeof positional !== "boolean") issues.push({ path: `${path}.positional`, message: "must be a boolean" });
+    const refDistance = sound.refDistance ?? 1;
+    const refOk = typeof refDistance === "number" && Number.isFinite(refDistance) && refDistance > 0;
+    if (!refOk) issues.push({ path: `${path}.refDistance`, message: "must be > 0" });
+    if (!volumeOk || !voicesOk || typeof positional !== "boolean" || !refOk) continue;
+    const effect: ArenaSoundEffect = {
+      uri: asset.uri,
+      volume: volume as number,
+      maxVoices: voices as number,
+      positional,
+      refDistance: refDistance as number,
+    };
+    out[name] = effect;
+    any = true;
+  }
+  return any ? out : undefined;
 }
 
 function logBuiltProp(id: string, model: string, item: Record<string, unknown>): void {
@@ -1065,8 +1201,8 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
         return;
       }
       const id = str(item.id, `${path}.id`, issues);
-      const kind = item.kind === "texture" || item.kind === "model" ? item.kind : undefined;
-      if (!kind) issues.push({ path: `${path}.kind`, message: "must be texture or model" });
+      const kind = item.kind === "texture" || item.kind === "model" || item.kind === "audio" ? item.kind : undefined;
+      if (!kind) issues.push({ path: `${path}.kind`, message: "must be texture, model, or audio" });
       const uri = publicAssetUri(item.uri, `${path}.uri`, issues);
       const mediaType = str(item.mediaType, `${path}.mediaType`, issues);
       const licenseId = isObject(item.license) && typeof item.license.id === "string" ? item.license.id : undefined;
@@ -1468,14 +1604,20 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
   for (const asset of assets.values()) {
     const index = [...(Array.isArray(doc.assets) ? doc.assets : [])].findIndex((item) => isObject(item) && item.id === asset.id);
     const path = `assets[${index}].uri`;
-    const expected = asset.kind === "texture" ? "image/png" : "model/gltf-binary";
-    if (asset.mediaType !== expected) issues.push({ path: `assets[${index}].mediaType`, message: `must be ${expected}` });
+    if (asset.kind === "audio") {
+      if (!AUDIO_MEDIA_TYPES.has(asset.mediaType)) issues.push({ path: `assets[${index}].mediaType`, message: "must be audio/mpeg or audio/wav" });
+    } else {
+      const expected = asset.kind === "texture" ? "image/png" : "model/gltf-binary";
+      if (asset.mediaType !== expected) issues.push({ path: `assets[${index}].mediaType`, message: `must be ${expected}` });
+    }
     const bytes = read(asset.uri);
     if (!bytes) {
       issues.push({ path, message: `file not found for ${asset.uri}` });
       continue;
     }
-    if (asset.kind === "texture") {
+    if (asset.kind === "audio") {
+      if (!audioBytesMatch(asset.mediaType, bytes)) issues.push({ path, message: `not ${asset.mediaType === "audio/wav" ? "a wav" : "an mp3"}` });
+    } else if (asset.kind === "texture") {
       const png = bytes.length >= 8 && bytes[0] === 137 && bytes[1] === 80 && bytes[2] === 78 && bytes[3] === 71;
       if (!png) issues.push({ path, message: "not a png" });
     } else {
@@ -1513,6 +1655,8 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
     const placed = facePlacements[face];
     return !!placed && assets.get(placed.model)?.kind === "model";
   });
+  const explosion = explosionSheet(doc.assets, assets.get(EXPLOSION_ASSET), fileBytes, issues);
+  const sounds = soundEffects(doc.assets, assets, issues);
   if (issues.length || !facesReady || !bundleId || !bundleVersion || !worldVersion || minX === undefined || maxX === undefined || minY === undefined || maxY === undefined || minZ === undefined || maxZ === undefined || pawnRadius === undefined || pawnHeight === undefined) {
     throw new GameManifestError(issues.length ? issues : [{ path: "$", message: "manifest is incomplete" }]);
   }
@@ -1597,12 +1741,12 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
       },
       ...[...assets.values()].map((asset) => ({
         id: asset.id,
-        kind: asset.kind === "texture" ? "texture" as const : "renderable-model" as const,
+        kind: asset.kind === "texture" ? "texture" as const : asset.kind === "audio" ? "audio" as const : "renderable-model" as const,
         authority: "presentation" as const,
         version: "1.0.0",
         contentHash: hashBytes(fileBytes.get(asset.uri) ?? new Uint8Array()),
         runtimeUri: asset.uri.replace(/^\//, ""),
-        runtimeRole: asset.kind === "texture" ? "texture" as const : "model" as const,
+        runtimeRole: asset.kind === "texture" ? "texture" as const : asset.kind === "audio" ? "audio" as const : "model" as const,
         license: { id: asset.licenseId, status: asset.licenseId === "CC0-1.0" ? "spdx" as const : "unknown" as const },
         provenance: {
           origin: (KNOWN_ORIGINS.has(asset.origin) ? asset.origin : "manual") as OriginCategory,
@@ -1707,6 +1851,8 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
     lights,
     ...(elevators.length ? { elevators } : {}),
     ...(grenadeModel ? { grenade: grenadeModel } : {}),
+    ...(explosion ? { explosion } : {}),
+    ...(sounds ? { sounds } : {}),
     ...(wsUrl ? { wsUrl } : {}),
   };
 

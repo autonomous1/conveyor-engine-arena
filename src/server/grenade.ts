@@ -28,6 +28,8 @@ export function createArenaGrenades(opts: {
   now?: () => number;
   send: (clientId: number, frame: GrenadePose) => void;
   health?: PawnHealth;
+  /** Ground plane. A grenade bounces on it, then stops, like any other surface. */
+  floorY?: number;
 }) {
   const now = opts.now ?? Date.now;
   const gates = new Map<number, { sessionId: number; gate: GrenadeGate }>();
@@ -86,7 +88,7 @@ export function createArenaGrenades(opts: {
       const boxes = opts.world.listObstacles();
       const kept: GrenadeBody[] = [];
       for (const body of bodies) {
-        const step = stepGrenade(body, dt, boxes, pawnCapsules(opts.world, body.owner));
+        const step = stepGrenade(body, dt, boxes, pawnCapsules(opts.world, body.owner), opts.floorY);
         const point = step.kind === "fly"
           ? { x: step.body.x, y: step.body.y, z: step.body.z }
           : step.kind === "bounce"

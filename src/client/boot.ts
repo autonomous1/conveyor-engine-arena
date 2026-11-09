@@ -1,7 +1,7 @@
 import { EngineClient } from "conveyor-engine-client";
 import * as THREE from "three";
 import type { ArenaElevator, ArenaView } from "../shared/arena-view.js";
-import { aimDirection, eyeLook, INPUT_HZ, moveIntent, yawFromQuat } from "../shared/look.js";
+import { aimDirection, EYE_HEIGHT, eyeLook, INPUT_HZ, moveIntent, yawFromQuat } from "../shared/look.js";
 import {
   elevatorPolygonBounds,
   inCab,
@@ -18,11 +18,13 @@ import { createFireDebugLog } from "../shared/fire-debug.js";
 import { createClientDiag, presentFaultHud, reportFrameFault } from "./diag.js";
 import { doorLeafBox, pickDoorForUse } from "../shared/doors.js";
 import { advanceGrenadeClock, type GrenadePose } from "../shared/grenade.js";
-import { advanceFireClock, LASER_MS, traceHitscan, type TraceCapsule } from "../shared/hitscan.js";
+import { advanceFireClock, LASER_MS, TRACE_RANGE, traceHitscan, type TraceCapsule } from "../shared/hitscan.js";
 import { createAabbDebug } from "./aabb-debug.js";
 import { loadKey } from "./auth-key.js";
 import { applyDoorSwing, attachKtx2Loader, createArenaScene, loadArenaVisuals, tickDoorSwing } from "./arena-scene.js";
 import { createElevatorRooms } from "./elevator-room.js";
+import { createEchoDedupe, createSfx } from "./audio.js";
+import { createExplosionFx } from "./explosion.js";
 import { createGrenadeProps } from "./grenade.js";
 import { createHitMarker } from "./hit-marker.js";
 import { createHud, localHealthLabel } from "./hud.js";
@@ -39,6 +41,14 @@ import { createPawnLayer } from "./presentation.js";
 import { installQaApi, type QaApi } from "./qa.js";
 import { createRateWindow, formatOverlay } from "./rates.js";
 import { formatFireLog, presentShot } from "./shot-view.js";
+
+/** Laser hit point: a small, quick blast. Grenades use the manifest `sprite.size` at 30 fps. */
+const LASER_IMPACT_SIZE = 0.8;
+const LASER_IMPACT_FPS = 60;
+/** Grenade blast centre above the stop point, as a fraction of the sprite size. */
+const GRENADE_BLAST_LIFT = 0.25;
+/** A grenade's first pose is the thrower's eye. Within this of your own eye, it is yours. */
+const OWN_GRENADE_RADIUS = 2.5;
 
 export async function boot(
   view: ArenaView,
@@ -160,6 +170,69 @@ export async function boot(
   let statusText = "connecting";
   let consoleHint = false;
   const diag = createClientDiag();
+  // Sheet and texture come from the manifest asset `grenade-explosion` (`view.explosion`).
+  // The solo build already rewrites its `/assets/` uri to `./assets/`.
+  const explosions = createExplosionFx(arena.scene, {
+    sheet: view.explosion,
+    onLoadError(err) {
+      diag.report({ level: "error", error: err, fields: { source: "fx", category: "explosion-atlas" } });
+    },
+  });
+  const explosionSheet = view.explosion;
+  const laserImpactSize = explosionSheet?.laserImpactSize ?? LASER_IMPACT_SIZE;
+  void explosions.load(async () => {
+    if (!explosionSheet) throw new Error("manifest has no grenade-explosion sprite");
+    return new THREE.TextureLoader().loadAsync(explosionSheet.texture);
+  }, arena.renderer);
+  // Sounds come from the manifest `audio` assets (`view.sounds`). Files load now; the
+  // AudioContext starts on the first click, tap, or key (autoplay policy), then decodes.
+  const sfx = createSfx({
+    sounds: view.sounds,
+    onError(err, effect) {
+      diag.report({ level: "error", error: err, fields: { source: "fx", category: "audio", reason: effect } });
+    },
+  });
+  void sfx.load();
+  // Kept until the context is running, in case a first resume is refused.
+  const unlockAudio = () => {
+    if (!sfx.unlock() || sfx.running) removeUnlock();
+  };
+  const unlockEvents = ["pointerdown", "keydown", "touchend"] as const;
+  function removeUnlock() {
+    for (const type of unlockEvents) window.removeEventListener(type, unlockAudio, true);
+  }
+  for (const type of unlockEvents) window.addEventListener(type, unlockAudio, true);
+  if (typeof document !== "undefined") {
+    sfx.setHidden(document.hidden);
+    document.addEventListener("visibilitychange", () => sfx.setHidden(document.hidden));
+  }
+  // Own shots play on the local send. These drop the host echo of each one.
+  const ownLaserEcho = createEchoDedupe();
+  const ownGrenadeEcho = createEchoDedupe();
+  // Debug: `__fx.explode()` in the console puts a blast 4 m in front of the camera.
+  // `__fx.audio.setVolume(0.5)`, `__fx.audio.mute()`, `__fx.audio.mute(false)`, `__fx.audio.play("grenadeBlast")`.
+  (window as { __fx?: unknown }).__fx = {
+    audio: {
+      setVolume: (value: number) => sfx.setVolume(value),
+      mute: (value = true) => sfx.mute(value),
+      play: (name: "laser" | "grenadeLaunch" | "grenadeBlast") => sfx.play(name),
+      get volume() {
+        return sfx.volume;
+      },
+      get muted() {
+        return sfx.muted;
+      },
+    },
+    explode(size = 4, distance = 4): boolean {
+      const cam = arena.camera;
+      const ahead = cam.getWorldDirection(new THREE.Vector3()).multiplyScalar(distance).add(cam.position);
+      return explosions.spawn(ahead.x, ahead.y, ahead.z, size);
+    },
+    setBlending: (mode: "normal" | "additive") => explosions.setBlending(mode),
+    get active() {
+      return explosions.activeCount;
+    },
+  };
   let aimedPawn: number | undefined;
   let fireSeq = 0;
   let nextFireAt = 0;
@@ -345,6 +418,10 @@ export async function boot(
       lasers.drop();
       grenadeQueue.length = 0;
       grenades.drop();
+      explosions.clear();
+      sfx.stopAll();
+      ownLaserEcho.clear();
+      ownGrenadeEcho.clear();
       try {
         arena.renderer.render(arena.scene, arena.camera);
       } catch (renderErr) {
@@ -418,9 +495,14 @@ export async function boot(
       nextFireAt = clock.nextAt;
       const thrown = advanceGrenadeClock(sample.grenade, now, nextGrenadeAt);
       nextGrenadeAt = thrown.nextAt;
+      const ownDead = pawnVital.get(ownedId)?.dead === true;
       if (thrown.due) {
         const seq = grenadeSeq + 1;
-        if (link.sendGrenade(seq, sample.yaw, sample.pitch)) grenadeSeq = seq;
+        if (link.sendGrenade(seq, sample.yaw, sample.pitch)) {
+          grenadeSeq = seq;
+          // The host admits on the same interval and drops a dead thrower.
+          if (!ownDead && sfx.play("grenadeLaunch")) ownGrenadeEcho.noteLocal(now);
+        }
       }
       const atDoor = overlapsDoor(pawn);
       if ((sample.using && !sample.cabConfirm) || (sample.cabConfirm && atDoor)) {
@@ -462,6 +544,7 @@ export async function boot(
         hitMarker.note({ kind: "fire", sent }, now);
         if (sent) {
           fireSeq = seq;
+          if (!ownDead && sfx.play("laser")) ownLaserEcho.noteLocal(now);
           if (options.fireDebug) {
             fireDebug.frameSent(seq, sample.yaw, sample.pitch);
             awaitFireReply = true;
@@ -507,15 +590,44 @@ export async function boot(
     }
     for (const laser of laserQueue) {
       hitMarker.note({ kind: "laser", shooter: laser.shooter, ownedId }, now);
+      if (laser.shooter !== ownedId) sfx.play("laser", laser.from);
+      else if (ownLaserEcho.echo(now)) sfx.play("laser");
+      // A miss ends at TRACE_RANGE. Anything shorter hit a box or a pawn.
+      const lx = laser.to.x - laser.from.x;
+      const ly = laser.to.y - laser.from.y;
+      const lz = laser.to.z - laser.from.z;
+      if (lx * lx + ly * ly + lz * lz < (TRACE_RANGE - 0.01) ** 2) {
+        explosions.spawn(laser.to.x, laser.to.y, laser.to.z, laserImpactSize, LASER_IMPACT_FPS);
+      }
       const remain = laser.until - Date.now();
       if (!(remain > 0)) continue;
       lasers.show(laser.shooter, laser.from, laser.to, now + remain);
     }
     laserQueue.length = 0;
     lasers.expire(now);
-    for (const pose of grenadeQueue) grenades.place(pose, now);
+    for (const pose of grenadeQueue) {
+      const event = grenades.place(pose, now);
+      if (event === "stop") {
+        // The stop point is on a surface, usually the floor. Lift the centre so the
+        // fireball is not half under the ground.
+        explosions.spawn(pose.x, pose.y + explosions.size * GRENADE_BLAST_LIFT, pose.z);
+        sfx.play("grenadeBlast", pose);
+      } else if (event === "launch") {
+        // Poses carry no owner. A launch at your own eye while a local throw waits is yours.
+        const mine = owned !== undefined
+          && Math.hypot(pose.x - owned.position.x, pose.y - (owned.position.y + EYE_HEIGHT), pose.z - owned.position.z) < OWN_GRENADE_RADIUS;
+        if (!mine) sfx.play("grenadeLaunch", pose);
+        else if (ownGrenadeEcho.echo(now)) sfx.play("grenadeLaunch");
+      }
+    }
     grenadeQueue.length = 0;
     grenades.expire(now);
+    explosions.update(frozen ? 0 : dt);
+    {
+      // Listener is the camera: position, forward (-Z), up (+Y) from its world matrix.
+      const m = arena.camera.matrixWorld.elements;
+      sfx.setListener(m[12]!, m[13]!, m[14]!, -m[8]!, -m[9]!, -m[10]!, m[4]!, m[5]!, m[6]!);
+    }
     pawns.apply(render, frozen ? 0 : dt, (id) => client.authoritative(id)?.action, ownedId, !frozen);
     sendAcc += dt;
     if (sendAcc >= sendDt) {
