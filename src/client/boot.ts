@@ -24,7 +24,11 @@ import { loadKey } from "./auth-key.js";
 import { applyDoorSwing, attachKtx2Loader, createArenaScene, loadArenaVisuals, tickDoorSwing } from "./arena-scene.js";
 import { createElevatorRooms } from "./elevator-room.js";
 import { createEchoDedupe, createSfx } from "./audio.js";
-import { createExplosionFx } from "./explosion.js";
+import { createDoorSounds } from "./door-sound.js";
+import { createElevatorSounds } from "./elevator-sound.js";
+import { createPickupSounds, kindSoundsOf } from "./pickup-sound.js";
+import { createCharacterFx, type CharacterFx, type Point as FxPoint } from "./character-fx.js";
+import { createExplosionFx, type ExplosionFx } from "./explosion.js";
 import { createGrenadeProps } from "./grenade.js";
 import { createHitMarker } from "./hit-marker.js";
 import { createHud, localHealthLabel } from "./hud.js";
@@ -184,6 +188,50 @@ export async function boot(
     if (!explosionSheet) throw new Error("manifest has no grenade-explosion sprite");
     return new THREE.TextureLoader().loadAsync(explosionSheet.texture);
   }, arena.renderer);
+  // Character spawn and despawn: sound, beam sheet, and a fade of the model. `view.characterBeam`
+  // sets the timings; absent, characters appear and go at once. Triggers: a `spawn` host frame (a
+  // player took a seat), and the health frames (death: despawn, back alive: spawn). The first health
+  // frame of a pawn, and everything in welcome, is only a baseline.
+  const beamConfig = view.characterBeam;
+  const beamSheets: Record<"spawn" | "despawn", { fx: ExplosionFx; size: number; fps: number } | undefined> = { spawn: undefined, despawn: undefined };
+  if (beamConfig) {
+    for (const kind of ["spawn", "despawn"] as const) {
+      const sheet = beamConfig[kind];
+      if (!sheet) continue;
+      const fx = createExplosionFx(arena.scene, {
+        cap: 6,
+        sheet,
+        onLoadError(err) {
+          diag.report({ level: "error", error: err, fields: { source: "fx", category: `beam-${kind}-sheet` } });
+        },
+      });
+      void fx.load(async () => new THREE.TextureLoader().loadAsync(sheet.texture), arena.renderer);
+      beamSheets[kind] = { fx, size: sheet.size, fps: sheet.fps };
+    }
+  }
+  let fxNow = 0;
+  const characterFx: CharacterFx | undefined = beamConfig
+    ? createCharacterFx(beamConfig, {
+      sound(kind, id, at) {
+        const name = kind === "spawn" ? "beamSpawn" : "beamDespawn";
+        // Your own pawn is not in front of the camera: play it flat. Everyone else's sits at their feet.
+        if (id === client.ownedEntity) sfx.play(name);
+        else sfx.play(name, { x: at.x, y: at.y + view.pawnHeight / 2, z: at.z });
+      },
+      beam(kind, id, at) {
+        const sheet = beamSheets[kind];
+        // No beam over your own first-person view.
+        if (!sheet || id === client.ownedEntity) return;
+        // Square sprite, world size ≈ pawn height; sheet.rotation (despawn: 90°) is on the material.
+        sheet.fx.spawn(at.x, at.y + sheet.size / 2, at.z, sheet.size, sheet.fps);
+      },
+    })
+    : undefined;
+  const fadeOf = characterFx ? (id: number) => characterFx.opacity(id, fxNow) : undefined;
+  function authoritativeFeet(id: number): FxPoint | undefined {
+    const position = client.authoritative(id)?.position;
+    return position ? { x: position.x, y: position.y, z: position.z } : undefined;
+  }
   // Sounds come from the manifest `audio` assets (`view.sounds`). Files load now; the
   // AudioContext starts on the first click, tap, or key (autoplay policy), then decodes.
   const sfx = createSfx({
@@ -206,6 +254,33 @@ export async function boot(
     sfx.setHidden(document.hidden);
     document.addEventListener("visibilitychange", () => sfx.setHidden(document.hidden));
   }
+  // Pickup sounds wait for the host's word: `pickup gone`, then your own loadout/inventory.
+  const pickupSounds = createPickupSounds({
+    pickups: view.pickups ?? [],
+    kindSounds: kindSoundsOf(view.sounds),
+    play: (name, at) => sfx.play(name, at),
+  });
+  // Door sounds: only a real open/closed change in a host door frame. Welcome is silent.
+  const doorSounds = createDoorSounds({
+    doors: (view.doors ?? []).map((door) => {
+      const box = doorLeafBox(door);
+      return {
+        id: door.id,
+        open: door.open,
+        locked: door.locked,
+        at: { x: (box.minX + box.maxX) / 2, y: (box.minY + box.maxY) / 2, z: (box.minZ + box.maxZ) / 2 },
+      };
+    }),
+    play: (name, at) => sfx.play(name, at),
+  });
+  // Elevator start: a stationary-to-moving cab frame plays it at the cab, then it rides along.
+  const elevatorSounds = createElevatorSounds({
+    cabs: (view.elevators ?? []).map((def) => {
+      const bounds = elevatorPolygonBounds(def.polygon);
+      return { id: def.id, x: (bounds.minX + bounds.maxX) / 2, z: (bounds.minZ + bounds.maxZ) / 2 };
+    }),
+    play: (name, at) => sfx.playTracked(name, at),
+  });
   // Own shots play on the local send. These drop the host echo of each one.
   const ownLaserEcho = createEchoDedupe();
   const ownGrenadeEcho = createEchoDedupe();
@@ -322,34 +397,56 @@ export async function boot(
       grenadeQueue.push(grenade);
     },
     onHealth: (health) => {
+      const before = pawnVital.get(health.entity);
       pawnVital.set(health.entity, { hp: health.hp, dead: health.dead });
+      // A pawn's first health frame is a baseline. A change of `dead` is a real death or respawn.
+      if (characterFx && before && before.dead !== health.dead) {
+        const feet = authoritativeFeet(health.entity);
+        if (feet) {
+          if (health.dead) characterFx.despawn(health.entity, feet, performance.now(), beamConfig?.deathHoldMs ?? 0);
+          else characterFx.spawn(health.entity, feet, performance.now());
+        }
+      }
+    },
+    onSpawn: (spawn) => {
+      characterFx?.spawn(spawn.id, { x: spawn.x, y: spawn.y, z: spawn.z }, performance.now());
     },
     onAudit: (audit) => {
       options.setAudit(audit);
     },
     onPickupSet: (ids) => {
+      pickupSounds.onSet(ids);
       showRemaining(ids);
       probe.onPickupSet(ids);
     },
     onPickup: (pickup) => {
+      pickupSounds.onGone(pickup.id, performance.now());
       visuals.placements.setVisible(pickup.id, false);
       dropBox(pickup.id);
       probe.onPickupGone(pickup.id);
     },
     onDoor: (door) => {
+      doorSounds.onDoor(door, performance.now());
       swingDoor(door.id, door.open);
       probe.onDoor(door);
     },
     onDoors: (doors) => {
+      doorSounds.onSet(doors);
       for (const door of doors) swingDoor(door.id, door.open);
       probe.onDoors(doors);
     },
     onSceneGraph: (frame) => probe.onSceneGraph(frame),
-    onElevator: (row) => applyCab(row),
+    onElevator: (row) => {
+      elevatorSounds.onCab(row);
+      applyCab(row);
+    },
     onElevators: (rows) => {
+      elevatorSounds.onSet(rows);
       for (const row of rows) applyCab(row);
     },
+    onInventory: (keys) => pickupSounds.onInventory(keys, performance.now()),
     onLoadout: (loadout) => {
+      pickupSounds.onLoadout(performance.now());
       showWeapon(loadout.weapon);
     },
     onInbound(summary) {
@@ -419,6 +516,12 @@ export async function boot(
       grenadeQueue.length = 0;
       grenades.drop();
       explosions.clear();
+      pickupSounds.clear();
+      doorSounds.clear();
+      elevatorSounds.clear();
+      characterFx?.clear();
+      beamSheets.spawn?.fx.clear();
+      beamSheets.despawn?.fx.clear();
       sfx.stopAll();
       ownLaserEcho.clear();
       ownGrenadeEcho.clear();
@@ -623,12 +726,18 @@ export async function boot(
     grenadeQueue.length = 0;
     grenades.expire(now);
     explosions.update(frozen ? 0 : dt);
+    pickupSounds.update(performance.now());
+    doorSounds.update(performance.now());
     {
       // Listener is the camera: position, forward (-Z), up (+Y) from its world matrix.
       const m = arena.camera.matrixWorld.elements;
       sfx.setListener(m[12]!, m[13]!, m[14]!, -m[8]!, -m[9]!, -m[10]!, m[4]!, m[5]!, m[6]!);
     }
-    pawns.apply(render, frozen ? 0 : dt, (id) => client.authoritative(id)?.action, ownedId, !frozen);
+    fxNow = performance.now();
+    characterFx?.update(fxNow);
+    beamSheets.spawn?.fx.update(frozen ? 0 : dt);
+    beamSheets.despawn?.fx.update(frozen ? 0 : dt);
+    pawns.apply(render, frozen ? 0 : dt, (id) => client.authoritative(id)?.action, ownedId, !frozen, fadeOf);
     sendAcc += dt;
     if (sendAcc >= sendDt) {
       sendAcc = Math.min(sendAcc - sendDt, sendDt);
@@ -899,7 +1008,8 @@ export async function boot(
     doorOpen.set(id, open);
     const rig = visuals.doors.get(id);
     if (!rig) return;
-    applyDoorSwing(rig.group, rig.hinge, open, true);
+    const swing = view.doorSwing;
+    applyDoorSwing(rig.group, rig.hinge, open, true, swing ? (open ? swing.openMs : swing.closeMs) / 1000 : undefined);
   }
 
   /** The eye sits inside the shooter's capsule, so that pawn is not a target. */

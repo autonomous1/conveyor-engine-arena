@@ -16,7 +16,7 @@ import type { ArenaSoundEffect, ArenaSoundName, ArenaSounds } from "../shared/ar
  * effect (or all audio) off. Nothing here throws.
  */
 
-export const SOUND_NAMES: readonly ArenaSoundName[] = ["laser", "grenadeLaunch", "grenadeBlast"];
+export const SOUND_NAMES: readonly ArenaSoundName[] = ["laser", "grenadeLaunch", "grenadeBlast", "cratePickup", "keyPickup", "medkitPickup", "doorOpen", "doorClose", "elevatorStart", "beamSpawn", "beamDespawn"];
 
 /** The part of AudioParam this module sets. */
 type ParamLike = { value: number };
@@ -83,6 +83,9 @@ export type SfxOptions = {
 };
 
 export type Point = { x: number; y: number; z: number };
+
+/** A positional play that can still be moved. See `playTracked`. */
+export type SoundHandle = { move(x: number, y: number, z: number): boolean };
 
 type Voice = {
   source: SourceLike | undefined;
@@ -274,10 +277,36 @@ export function createSfx(opts: SfxOptions = {}) {
    * Returns false when audio is locked, hidden, muted at the source, or the effect is off.
    */
   function play(name: ArenaSoundName, at?: Point): boolean {
+    return start(name, at) !== undefined;
+  }
+
+  /**
+   * Like {@link play}, and returns a handle that moves the voice's panner while it sounds. `move` takes plain
+   * numbers, so a per-frame call allocates nothing. It returns false once the voice has ended or been replaced.
+   * Undefined when nothing started (locked, hidden, effect off).
+   */
+  function playTracked(name: ArenaSoundName, at: Point): SoundHandle | undefined {
+    const started = start(name, at);
+    if (!started) return undefined;
+    const { voice, source } = started;
+    return {
+      move(x: number, y: number, z: number): boolean {
+        const panner = voice.panner;
+        if (voice.source !== source || !panner || !ctx || ctx.currentTime >= voice.endsAt) return false;
+        if (!(Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z))) return false;
+        setParam(panner.positionX, x);
+        setParam(panner.positionY, y);
+        setParam(panner.positionZ, z);
+        return true;
+      },
+    };
+  }
+
+  function start(name: ArenaSoundName, at?: Point): { voice: Voice; source: SourceLike } | undefined {
     const effect = effects.get(name);
-    if (!ctx || !effect || effect.state !== "ready" || !effect.buffer || !effect.gain || hidden) return false;
-    if (ctx.state !== "running") return false;
-    if (at && !(Number.isFinite(at.x) && Number.isFinite(at.y) && Number.isFinite(at.z))) return false;
+    if (!ctx || !effect || effect.state !== "ready" || !effect.buffer || !effect.gain || hidden) return undefined;
+    if (ctx.state !== "running") return undefined;
+    if (at && !(Number.isFinite(at.x) && Number.isFinite(at.y) && Number.isFinite(at.z))) return undefined;
     try {
       const now = ctx.currentTime;
       const voice = pickVoice(effect, now);
@@ -305,10 +334,10 @@ export function createSfx(opts: SfxOptions = {}) {
       voice.source = source;
       voice.startedAt = now;
       voice.endsAt = now + effect.buffer.duration;
-      return true;
+      return { voice, source };
     } catch (err) {
       fail(effect, err);
-      return false;
+      return undefined;
     }
   }
 
@@ -349,6 +378,7 @@ export function createSfx(opts: SfxOptions = {}) {
     load,
     unlock,
     play,
+    playTracked,
     setListener,
     setHidden,
     /** Master volume 0 to 1. */

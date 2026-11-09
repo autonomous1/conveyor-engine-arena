@@ -25,6 +25,16 @@
       "quality": "soft",
       "radius": "80"
     },
+    "doorSwing": {
+      "openMs": 2800,
+      "closeMs": 2800
+    },
+    "characterBeam": {
+      "fadeMs": 1700,
+      "despawnDelayMs": 1200,
+      "despawnSoundDelayMs": 0,
+      "deathHoldMs": 0
+    },
     "spawnPoints": "./web/game/spawn-points.json",
     "playerSpawnPoints": "./web/game/player-spawns.json",
     "lights": "./web/game/rooms.lights.json",
@@ -1016,7 +1026,6 @@
     {
       "id": "grenade-explosion",
       "kind": "texture",
-      "type": "explosion",
       "uri": "/assets/textures/grenade-explosion-sheet.png",
       "mediaType": "image/png",
       "sprite": {
@@ -1042,7 +1051,6 @@
     {
       "id": "laser-blast",
       "kind": "audio",
-      "type": "sfx",
       "uri": "/assets/audio/laser-blast-sfx.mp3",
       "mediaType": "audio/mpeg",
       "sound": {
@@ -1063,7 +1071,6 @@
     {
       "id": "grenade-launch",
       "kind": "audio",
-      "type": "sfx",
       "uri": "/assets/audio/grenade-launch.wav",
       "mediaType": "audio/wav",
       "sound": {
@@ -1084,7 +1091,6 @@
     {
       "id": "grenade-blast",
       "kind": "audio",
-      "type": "sfx",
       "uri": "/assets/audio/grenade-launch-grenade-blast.wav",
       "mediaType": "audio/wav",
       "sound": {
@@ -1100,6 +1106,224 @@
       "provenance": {
         "origin": "manual",
         "notes": "Grenade blast sound supplied for this arena. Plays at the detonation point. The file name suggests launch plus blast; it is used as the blast only."
+      }
+    },
+    {
+      "id": "crate-pickup",
+      "kind": "audio",
+      "uri": "/assets/audio/crate-pickup.wav",
+      "mediaType": "audio/wav",
+      "sound": {
+        "volume": 0.8,
+        "maxVoices": 2,
+        "positional": true,
+        "refDistance": 3,
+        "pickupKinds": ["ammo"]
+      },
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
+      "provenance": {
+        "origin": "manual",
+        "notes": "Sound for taking an ammo crate (the ammo-box pickup, type ammo). Plays once per pickup the host confirms. To swap the file, change uri only."
+      }
+    },
+    {
+      "id": "key-pickup",
+      "kind": "audio",
+      "uri": "/assets/audio/key-pickup.wav",
+      "mediaType": "audio/wav",
+      "sound": {
+        "volume": 0.8,
+        "maxVoices": 2,
+        "positional": true,
+        "refDistance": 3,
+        "pickupKinds": ["key"]
+      },
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
+      "provenance": {
+        "origin": "manual",
+        "notes": "Sound for taking a key (the key-1 pickup, type key). Plays once per pickup the host confirms. To swap the file, change uri only."
+      }
+    },
+    {
+      "id": "medkit-pickup",
+      "kind": "audio",
+      "optional": true,
+      "uri": "/assets/audio/medkit-pickup.wav",
+      "mediaType": "audio/wav",
+      "sound": {
+        "volume": 0.8,
+        "maxVoices": 2,
+        "positional": true,
+        "refDistance": 3,
+        "pickupKinds": ["health"]
+      },
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
+      "provenance": {
+        "origin": "manual",
+        "notes": "Sound for taking a med-kit (the med-kit pickup, type health). Optional: while the file is absent the host warns once and the sound stays silent."
+      }
+    },
+    {
+      "id": "door-open",
+      "kind": "audio",
+      "optional": true,
+      "uri": "/assets/audio/metal-door-creak-open.wav",
+      "mediaType": "audio/wav",
+      "sound": {
+        "volume": 0.8,
+        "maxVoices": 4,
+        "positional": true,
+        "refDistance": 4
+      },
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
+      "provenance": {
+        "origin": "manual",
+        "notes": "Door creaking open. Plays when a door changes from closed to open. Optional: while the file is absent the host warns once and the sound stays silent."
+      }
+    },
+    {
+      "id": "door-close",
+      "kind": "audio",
+      "optional": true,
+      "uri": "/assets/audio/metal-door-close.wav",
+      "mediaType": "audio/wav",
+      "sound": {
+        "volume": 0.8,
+        "maxVoices": 4,
+        "positional": true,
+        "refDistance": 4
+      },
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
+      "provenance": {
+        "origin": "manual",
+        "notes": "Door closing. Plays when a door starts to close (the swing is as long as the file). Optional: while the file is absent the host warns once and the sound stays silent."
+      }
+    },
+    {
+      "id": "elevator-start",
+      "kind": "audio",
+      "optional": true,
+      "uri": "/assets/audio/elevator-start.opus",
+      "mediaType": "audio/ogg",
+      "sound": {
+        "volume": 0.8,
+        "maxVoices": 2,
+        "positional": true,
+        "refDistance": 5
+      },
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
+      "provenance": {
+        "origin": "manual",
+        "notes": "Elevator starting to move. Ogg Opus (decodeAudioData: Chrome and Firefox; Safari from 18.4). Plays at the cab when it leaves a stop. Optional: while the file is absent the host warns once and the sound stays silent."
+      }
+    },
+    {
+      "id": "beam-spawn",
+      "kind": "texture",
+      "optional": true,
+      "uri": "/assets/textures/beam-spawn-sheet.png",
+      "mediaType": "image/png",
+      "sprite": {
+        "columns": 8,
+        "rows": 6,
+        "frameCount": 48,
+        "frameWidth": 256,
+        "frameHeight": 256,
+        "fps": 24,
+        "blending": "additive"
+      },
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
+      "provenance": {
+        "origin": "manual",
+        "notes": "Transporter beam overlay played over a character that spawns. Sheet 2048x1536: 48 frames of 256x256 in 8 columns x 6 rows at 24 fps (2 s). The beam is ~160 px wide and vertical within each frame. size defaults to the pawn height (square sprite). Optional: while the file is absent the beam is skipped."
+      }
+    },
+    {
+      "id": "beam-despawn",
+      "kind": "texture",
+      "optional": true,
+      "uri": "/assets/textures/beam-despawn-sheet.png",
+      "mediaType": "image/png",
+      "sprite": {
+        "columns": 8,
+        "rows": 6,
+        "frameCount": 48,
+        "frameWidth": 256,
+        "frameHeight": 256,
+        "fps": 24,
+        "blending": "additive",
+        "rotation": 90
+      },
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
+      "provenance": {
+        "origin": "manual",
+        "notes": "Transporter beam overlay played over a character that despawns, from scene.characterBeam.despawnDelayMs after the event. Same 8x6 / 48 / 24 fps sheet as beam-spawn, but the beam runs horizontally in the art; sprite.rotation 90 turns it vertical. Optional: while the file is absent the beam is skipped."
+      }
+    },
+    {
+      "id": "beam-spawn-sfx",
+      "kind": "audio",
+      "optional": true,
+      "uri": "/assets/audio/beam-transport-sfx-spawn.mp3",
+      "mediaType": "audio/mpeg",
+      "sound": {
+        "volume": 0.8,
+        "maxVoices": 4,
+        "positional": true,
+        "refDistance": 4
+      },
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
+      "provenance": {
+        "origin": "manual",
+        "notes": "Transporter sound for a character that spawns. Plays at the spawn. Optional: while the file is absent the host warns once and the sound stays silent."
+      }
+    },
+    {
+      "id": "beam-despawn-sfx",
+      "kind": "audio",
+      "optional": true,
+      "uri": "/assets/audio/beam-transport-sfx-despawn.mp3",
+      "mediaType": "audio/mpeg",
+      "sound": {
+        "volume": 0.8,
+        "maxVoices": 4,
+        "positional": true,
+        "refDistance": 4
+      },
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
+      "provenance": {
+        "origin": "manual",
+        "notes": "Transporter sound for a character that despawns. Plays at the despawn event plus scene.characterBeam.despawnSoundDelayMs. Optional: while the file is absent the host warns once and the sound stays silent."
       }
     }
   ],

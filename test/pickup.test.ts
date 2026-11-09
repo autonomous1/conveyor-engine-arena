@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import * as THREE from "three";
@@ -49,6 +49,8 @@ function filesFromDisk(): Map<string, Uint8Array> {
   const out = new Map<string, Uint8Array>();
   for (const asset of doc.assets ?? []) {
     if (typeof asset.uri !== "string") continue;
+    // An optional audio file the user has not supplied yet is absent; compile reports any required one.
+    if (!existsSync(`${rootDir()}/web${asset.uri}`)) continue;
     out.set(asset.uri, new Uint8Array(readFileSync(`${rootDir()}/web${asset.uri}`)));
   }
   return out;

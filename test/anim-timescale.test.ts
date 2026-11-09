@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { test } from "node:test";
 import * as THREE from "three";
 import type { CharacterTemplates } from "../src/client/arena-scene.ts";
@@ -105,7 +105,10 @@ function compile(doc: unknown) {
   const root = projectRoot();
   const files = new Map<string, Uint8Array>();
   for (const asset of (doc as { assets: Array<{ uri?: unknown }> }).assets) {
-    if (typeof asset.uri === "string") files.set(asset.uri, new Uint8Array(readFileSync(`${root}/web${asset.uri}`)));
+    if (typeof asset.uri !== "string") continue;
+    // An optional audio file the user has not supplied yet is absent; compile reports any required one.
+    if (!existsSync(`${root}/web${asset.uri}`)) continue;
+    files.set(asset.uri, new Uint8Array(readFileSync(`${root}/web${asset.uri}`)));
   }
   return compileGame(doc, (uri: string) => files.get(uri), readManifestSources(root, doc));
 }

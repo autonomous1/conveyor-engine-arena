@@ -6,6 +6,7 @@ import { helloModel, parseModelFrame } from "../shared/model-choice.js";
 import { createPawnKit, createPickupHost } from "../shared/pickups.js";
 import { decodeMoveButtons } from "../shared/movements.js";
 import { canonicalJson, sceneGraphPayload, sha256Hex } from "../shared/scene-graph.js";
+import { spawnFrame } from "../shared/spawn-frame.js";
 import { createArenaDoors, createDoorBlockers } from "./doors.js";
 import { createArenaElevators } from "./elevators.js";
 import { createArenaFire } from "./fire.js";
@@ -184,6 +185,9 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
           const agent = loaded.agents.find((item) => item.id === owned);
           if (agent) agent.heading = pad.yaw;
           reservedPads.set(owned, pad);
+          // One frame to everyone: this pawn just appeared on the pad (a client beams it in).
+          const joined = encodeFrame(spawnFrame(owned, pad.x, pad.y, pad.z));
+          for (const clientId of engine.connected) engine.session(clientId)?.socket.send(joined);
         }
       }
       applyPawnModel(loaded.world, owned, helloModel(hello), loaded.view.modelChoices);

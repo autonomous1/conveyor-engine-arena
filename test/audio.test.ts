@@ -158,6 +158,29 @@ test("positional plays use the panner at the point; own plays skip it", async ()
   assert.equal(sfx.play("laser", { x: Number.NaN, y: 0, z: 0 }), false);
 });
 
+test("playTracked moves the panner while the voice sounds, and stops once it ends or is replaced", async () => {
+  const { ctx, sfx } = await ready();
+  const handle = sfx.playTracked("grenadeLaunch", { x: 1, y: 2, z: 3 });
+  assert.ok(handle);
+  const panner = ctx.sources.at(-1)!.connected[0] as { positionX: { value: number }; positionY: { value: number }; positionZ: { value: number } };
+  assert.deepEqual([panner.positionX.value, panner.positionY.value, panner.positionZ.value], [1, 2, 3]);
+  assert.equal(handle.move(4, 5, 6), true);
+  assert.deepEqual([panner.positionX.value, panner.positionY.value, panner.positionZ.value], [4, 5, 6]);
+  assert.equal(handle.move(Number.NaN, 0, 0), false);
+  assert.equal(panner.positionX.value, 4, "a bad point is ignored");
+  // maxVoices is 2: two more plays replace the first voice, and its handle goes dead.
+  sfx.playTracked("grenadeLaunch", { x: 0, y: 0, z: 0 });
+  sfx.playTracked("grenadeLaunch", { x: 0, y: 0, z: 0 });
+  assert.equal(handle.move(7, 7, 7), false);
+  assert.equal(panner.positionX.value, 0, "the slot's panner now belongs to the newer play and is not moved by the old handle");
+  const later = sfx.playTracked("grenadeBlast", { x: 0, y: 0, z: 0 })!;
+  ctx.currentTime = 5;
+  assert.equal(later.move(1, 1, 1), false, "ended");
+  assert.equal(sfx.playTracked("laser", { x: Number.NaN, y: 0, z: 0 }), undefined);
+  sfx.setHidden(true);
+  assert.equal(sfx.playTracked("grenadeBlast", { x: 0, y: 0, z: 0 }), undefined, "hidden tab: nothing starts");
+});
+
 test("hidden tab suspends and drops plays; volume and mute set the master gain", async () => {
   const { ctx, sfx } = await ready();
   sfx.setHidden(true);

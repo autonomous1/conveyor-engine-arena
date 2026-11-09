@@ -359,10 +359,19 @@ export function doorSwingRadians(hinge: "left" | "right", open: boolean): number
   return hinge === "left" ? radians : -radians;
 }
 
-const DOOR_SWING_SECONDS = 0.4;
+export const DOOR_SWING_SECONDS = 0.4;
 
-/** Retarget the hinge only. With `animate`, `tickDoorSwing` eases it there. */
-export function applyDoorSwing(group: THREE.Object3D, hinge: "left" | "right", open: boolean, animate = false): void {
+/**
+ * Retarget the hinge only. With `animate`, `tickDoorSwing` eases it there over `seconds`
+ * (default {@link DOOR_SWING_SECONDS}).
+ */
+export function applyDoorSwing(
+  group: THREE.Object3D,
+  hinge: "left" | "right",
+  open: boolean,
+  animate = false,
+  seconds = DOOR_SWING_SECONDS,
+): void {
   const node = group.getObjectByName("hinge");
   if (!node) return;
   const to = doorSwingRadians(hinge, open);
@@ -371,15 +380,15 @@ export function applyDoorSwing(group: THREE.Object3D, hinge: "left" | "right", o
     delete node.userData.swing;
     return;
   }
-  node.userData.swing = { from: node.rotation.y, to, t: 0 };
+  node.userData.swing = { from: node.rotation.y, to, t: 0, seconds: seconds > 0 ? seconds : DOOR_SWING_SECONDS };
 }
 
 /** Advance an eased swing by `dt` seconds (smoothstep). */
 export function tickDoorSwing(group: THREE.Object3D, dt: number): void {
   const node = group.getObjectByName("hinge");
-  const swing = node?.userData.swing as { from: number; to: number; t: number } | undefined;
+  const swing = node?.userData.swing as { from: number; to: number; t: number; seconds?: number } | undefined;
   if (!node || !swing) return;
-  swing.t = Math.min(1, swing.t + dt / DOOR_SWING_SECONDS);
+  swing.t = Math.min(1, swing.t + dt / (swing.seconds ?? DOOR_SWING_SECONDS));
   const e = swing.t * swing.t * (3 - 2 * swing.t);
   node.rotation.y = swing.from + (swing.to - swing.from) * e;
   if (swing.t === 1) delete node.userData.swing;

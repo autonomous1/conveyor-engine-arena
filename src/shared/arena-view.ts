@@ -142,6 +142,16 @@ export type ArenaView = {
   cityscape?: { texture: string; shape: BackdropShape; radius: number; height: number };
   /** Omitted when the manifest has no shadows block. */
   shadows?: { quality: ShadowQuality };
+  /**
+   * How long a door leaf takes to swing, from `scene.doorSwing`. Client animation only:
+   * the host opens and closes a door at once. Absent means 400 ms each way.
+   */
+  doorSwing?: { openMs: number; closeMs: number };
+  /**
+   * Character spawn and despawn effects, from `scene.characterBeam`. Client visuals and sounds
+   * only. Absent: characters appear and go at once, with no beam.
+   */
+  characterBeam?: ArenaCharacterBeam;
   props: Array<Prop>;
   /**
    * Placements the host can remove. Ids are strings. Decorative props are absent.
@@ -223,7 +233,7 @@ export type ArenaView = {
    */
   explosion?: ArenaExplosionSheet;
   /**
-   * Sound effects from the `audio` assets `laser-blast`, `grenade-launch`, and `grenade-blast`
+   * Sound effects from the `audio` assets `laser-blast`, `grenade-launch`, `grenade-blast`, `crate-pickup`, `key-pickup`, `medkit-pickup`, `door-open`, `door-close`, `elevator-start`, `beam-spawn-sfx`, and `beam-despawn-sfx`
    * and their `sound` blocks. A key is absent when the manifest has no such asset.
    * Not part of either content hash.
    */
@@ -255,11 +265,35 @@ export type ArenaExplosionSheet = {
   frameWidth: number;
   frameHeight: number;
   fps: number;
-  /** World size of the sprite in metres. */
+  /** World size of the sprite in metres (height; width is height × frame aspect). */
   size: number;
   /** Sprite size for a laser hit point, in metres. Optional `sprite.laserImpactSize`; absent means 0.8. */
   laserImpactSize?: number;
   blending: "normal" | "additive";
+  /**
+   * Optional sheet rotation in degrees, applied as `SpriteMaterial.rotation` (radians) on the client.
+   * Beam-despawn uses 90 so its horizontal art plays as a vertical beam.
+   */
+  rotation?: number;
+};
+
+/**
+ * Timings in ms, plus the optional beam overlay sheets (`beam-spawn`, `beam-despawn` assets).
+ * A sheet is left out when its file is absent. `size` of a sheet is its world height in metres
+ * (defaults to the pawn height; frames are square, so the sprite is square). Beam playback length
+ * is `frameCount / fps` (2 s at 48/24) and is independent of `fadeMs` (1.7 s).
+ */
+export type ArenaCharacterBeam = {
+  /** Fade in on a spawn and fade out on a despawn. Independent of how long the beam sheet plays. */
+  fadeMs: number;
+  /** The despawn beam and fade-out start this long after the despawn event; the character stays still until then. */
+  despawnDelayMs: number;
+  /** The despawn sound plays this long after the event (0: at once). */
+  despawnSoundDelayMs: number;
+  /** A despawn caused by a death starts this long after the death. */
+  deathHoldMs: number;
+  spawn?: ArenaExplosionSheet;
+  despawn?: ArenaExplosionSheet;
 };
 
 /** One decoded-once sound effect. `uri` is under `/assets/`, like every other asset. */
@@ -273,8 +307,10 @@ export type ArenaSoundEffect = {
   positional: boolean;
   /** Panner distance in metres where the gain starts to fall (inverse model). */
   refDistance: number;
+  /** Pickup kinds (`ammo`, `health`, `weapon`, `key`) that play this effect when taken. */
+  pickupKinds?: string[];
 };
 
-export type ArenaSoundName = "laser" | "grenadeLaunch" | "grenadeBlast";
+export type ArenaSoundName = "laser" | "grenadeLaunch" | "grenadeBlast" | "cratePickup" | "keyPickup" | "medkitPickup" | "doorOpen" | "doorClose" | "elevatorStart" | "beamSpawn" | "beamDespawn";
 
 export type ArenaSounds = Partial<Record<ArenaSoundName, ArenaSoundEffect>>;

@@ -40,6 +40,8 @@ export type ExplosionSheet = {
   /** Frame pixels. Only the ratio is used, for the sprite aspect. The loaded image wins. */
   frameWidth?: number;
   frameHeight?: number;
+  /** Optional rotation in degrees, applied as SpriteMaterial.rotation in radians. */
+  rotation?: number;
 };
 
 /** `aspect` is frame width over height. `size` is the sprite height; width is `size * aspect`. */
@@ -63,7 +65,7 @@ function blendingOf(mode: ExplosionBlending): THREE.Blending {
   return mode === "additive" ? THREE.AdditiveBlending : THREE.NormalBlending;
 }
 
-function createExplosion(parent: THREE.Object3D, atlas: THREE.Texture, blending: ExplosionBlending, layout: Layout) {
+function createExplosion(parent: THREE.Object3D, atlas: THREE.Texture, blending: ExplosionBlending, layout: Layout, rotationRad: number) {
   // r186 `Texture.copy` (inside clone) sets `needsUpdate`, which bumps the shared
   // `source.version` and would re-upload the full atlas once per new sprite. Undo that
   // bump and mark the clone ready through its own `version` only.
@@ -77,6 +79,7 @@ function createExplosion(parent: THREE.Object3D, atlas: THREE.Texture, blending:
     transparent: true,
     depthWrite: false,
     blending: blendingOf(blending),
+    rotation: rotationRad,
   });
   const sprite = new THREE.Sprite(material);
   sprite.name = "explosion";
@@ -177,6 +180,10 @@ export function createExplosionFx(
   const defaultFps = positive(sheet.fps, EXPLOSION_FPS);
   const defaultSize = positive(sheet.size, EXPLOSION_SIZE);
   let blending: ExplosionBlending = sheet.blending === "additive" ? "additive" : "normal";
+  // Degrees in the sheet (manifest); SpriteMaterial wants radians.
+  const rotationRad = typeof sheet.rotation === "number" && Number.isFinite(sheet.rotation)
+    ? (sheet.rotation * Math.PI) / 180
+    : 0;
   const group = new THREE.Group();
   group.name = "explosions";
   parent.add(group);
@@ -205,7 +212,7 @@ export function createExplosionFx(
     const height = Number(image?.height);
     if (width > 0 && height > 0) layout.aspect = (width / columns) / (height / rows);
     atlas = texture;
-    if (slots.length === 0) slots.push(createExplosion(group, texture, blending, layout));
+    if (slots.length === 0) slots.push(createExplosion(group, texture, blending, layout, rotationRad));
     // Upload the shared atlas now, not on the first blast.
     try {
       renderer?.initTexture(slots[0]!.map);
@@ -264,7 +271,7 @@ export function createExplosionFx(
       if (!(size > 0) || !(fps > 0)) return false;
       let slot = slots.find((item) => !item.active);
       if (!slot && slots.length < cap) {
-        slot = createExplosion(group, atlas, blending, layout);
+        slot = createExplosion(group, atlas, blending, layout, rotationRad);
         slots.push(slot);
       }
       if (!slot) {
@@ -292,6 +299,10 @@ export function createExplosionFx(
     },
     get blending() {
       return blending;
+    },
+    /** Sheet rotation in radians (0 when unset). */
+    get rotation() {
+      return rotationRad;
     },
     /** Hide every blast; the pool stays for reuse. */
     clear() {

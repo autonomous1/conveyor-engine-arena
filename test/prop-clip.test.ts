@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import * as THREE from "three";
@@ -20,6 +20,8 @@ test("alien-weapon-1 plays rotate and a still prop gets no mixer", async () => {
   const files = new Map<string, Uint8Array>();
   for (const asset of doc.assets ?? []) {
     if (typeof asset.uri !== "string") continue;
+    // An optional audio file the user has not supplied yet is absent; compile reports any required one.
+    if (!existsSync(path.join(root, "web", asset.uri))) continue;
     files.set(asset.uri, new Uint8Array(readFileSync(path.join(root, "web", asset.uri))));
   }
   const scene = structuredClone(doc);
@@ -91,6 +93,8 @@ test("the key on the top step draws, and a missing rotate clip keeps the mesh", 
   const files = new Map<string, Uint8Array>();
   for (const asset of doc.assets ?? []) {
     if (typeof asset.uri !== "string") continue;
+    // An optional audio file the user has not supplied yet is absent; compile reports any required one.
+    if (!existsSync(path.join(root, "web", asset.uri))) continue;
     files.set(asset.uri, new Uint8Array(readFileSync(path.join(root, "web", asset.uri))));
   }
   const scene = structuredClone(doc);

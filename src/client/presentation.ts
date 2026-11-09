@@ -37,7 +37,61 @@ type Pawn = {
   scale: number;
   /** Smoothed rendered horizontal speed, m/s. */
   ground: GroundSpeed;
+  /** Set only while the pawn is translucent: its meshes carry private material clones. */
+  faded?: FadedMaterials;
 };
+
+/** One mesh's own material clones while it fades. `original` goes back when the fade ends. */
+type FadedMaterials = {
+  entries: Array<{ mesh: THREE.Mesh; original: THREE.Material | THREE.Material[]; clones: THREE.Material[] }>;
+  opacity: number;
+};
+
+/**
+ * Fade a pawn without making every character translucent for good. Meshes of one model share
+ * their materials with every other instance of it, so a fade gives this pawn's meshes private
+ * clones (textures stay shared, so nothing is re-uploaded), sets `transparent` and `opacity` on
+ * them, and puts the shared originals back at opacity 1. Cost: one material clone per material
+ * for the fade's length, and one extra shader variant per material type the first time (the
+ * `transparent` flag selects a program). Nothing is allocated per frame.
+ */
+function setPawnOpacity(pawn: Pawn, opacity: number): void {
+  // Plain or hidden: shared materials, no clones.
+  if (opacity >= 1 || !(opacity > 0)) {
+    restoreMaterials(pawn);
+    return;
+  }
+  if (!pawn.faded) {
+    const faded: FadedMaterials = { entries: [], opacity: 1 };
+    pawn.root.traverse((obj) => {
+      const mesh = obj as THREE.Mesh;
+      if (!mesh.isMesh || !mesh.material) return;
+      const original = mesh.material;
+      const clones = (Array.isArray(original) ? original : [original]).map((material) => {
+        const clone = material.clone();
+        clone.transparent = true;
+        return clone;
+      });
+      mesh.material = Array.isArray(original) ? clones : clones[0]!;
+      faded.entries.push({ mesh, original, clones });
+    });
+    pawn.faded = faded;
+  }
+  const faded = pawn.faded;
+  if (faded.opacity === opacity) return;
+  faded.opacity = opacity;
+  for (const entry of faded.entries) for (const clone of entry.clones) clone.opacity = opacity;
+}
+
+function restoreMaterials(pawn: Pawn): void {
+  const faded = pawn.faded;
+  if (!faded) return;
+  pawn.faded = undefined;
+  for (const entry of faded.entries) {
+    entry.mesh.material = entry.original;
+    for (const clone of entry.clones) clone.dispose();
+  }
+}
 
 function motionBoneOf(model: THREE.Object3D, clips: Map<string, THREE.AnimationClip>): THREE.Object3D | undefined {
   const track = clips.get("fall")?.tracks.find((item) => item.name.endsWith(".position[x]"));
@@ -105,6 +159,7 @@ export function createPawnLayer(parent: THREE.Object3D, templates: CharacterTemp
   }
 
   function release(pawn: Pawn): void {
+    restoreMaterials(pawn);
     parent.remove(pawn.root);
     if (!pawn.fallback) return;
     pawn.root.traverse((obj) => {
@@ -166,7 +221,15 @@ export function createPawnLayer(parent: THREE.Object3D, templates: CharacterTemp
      * Positions and facing come only from the render snapshot. The owned pawn
      * is hidden so the first-person camera is not inside the mesh.
      */
-    apply(render: RenderSnapshot, dt: number, movementOf: (id: number) => string | undefined, ownedId?: number, stepMixers = true) {
+    apply(
+      render: RenderSnapshot,
+      dt: number,
+      movementOf: (id: number) => string | undefined,
+      ownedId?: number,
+      stepMixers = true,
+      /** 1: plain, 0: hidden, between: faded. Absent: every pawn plain. */
+      opacityOf?: (id: number) => number,
+    ) {
       const seen = new Set<number>();
       for (const entity of render.entities) {
         const id = Number(entity.id);
@@ -207,7 +270,9 @@ export function createPawnLayer(parent: THREE.Object3D, templates: CharacterTemp
           lowerRootToFeet(pawn.motionBone, skinnedSoleGap(pawn.root));
           pawn.planted = true;
         }
-        pawn.root.visible = ownedId === undefined || id !== ownedId;
+        const alpha = opacityOf ? opacityOf(id) : 1;
+        setPawnOpacity(pawn, alpha);
+        pawn.root.visible = (ownedId === undefined || id !== ownedId) && alpha > 0;
       }
       for (const [id, pawn] of pawns) {
         if (seen.has(id)) continue;
@@ -230,6 +295,12 @@ export function createPawnLayer(parent: THREE.Object3D, templates: CharacterTemp
     },
     get count() {
       return pawns.size;
+    },
+    /** Pawns holding private material clones for a fade right now. */
+    get fading() {
+      let n = 0;
+      for (const pawn of pawns.values()) if (pawn.faded) n += 1;
+      return n;
     },
     get fallbacks() {
       let n = 0;

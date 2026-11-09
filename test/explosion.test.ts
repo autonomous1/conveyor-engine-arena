@@ -182,3 +182,31 @@ test("non-square frames: the sprite width follows the image's frame aspect", () 
   close(mapOf(sprite).repeat.y, 1 / 5);
 });
 
+test("sheet.rotation turns SpriteMaterial.rotation; 8×6 beam sheet plays 48 frames at 24 fps", () => {
+  const scene = new THREE.Scene();
+  const fx = createExplosionFx(scene, {
+    sheet: { columns: 8, rows: 6, frameCount: 48, fps: 24, size: 1.8, frameWidth: 256, frameHeight: 256, blending: "additive", rotation: 90 },
+  });
+  const tex = new THREE.Texture({ width: 2048, height: 1536 } as unknown as HTMLImageElement);
+  tex.needsUpdate = true;
+  fx.setAtlas(tex);
+  assert.equal(fx.rotation, Math.PI / 2);
+  assert.equal(fx.duration(), 2);
+  assert.deepEqual(fx.layout, { columns: 8, rows: 6, frameCount: 48, aspect: 1 });
+  assert.equal(fx.spawn(0, 0.9, 0), true);
+  const [sprite] = sprites(fx);
+  assert.ok(sprite);
+  const material = sprite.material as THREE.SpriteMaterial;
+  close(material.rotation, Math.PI / 2);
+  assert.equal(material.blending, THREE.AdditiveBlending);
+  assert.deepEqual([sprite.scale.x, sprite.scale.y], [1.8, 1.8], "square frame → square sprite at pawn height");
+  const map = mapOf(sprite);
+  close(map.repeat.x, 1 / 8);
+  close(map.repeat.y, 1 / 6);
+  // 47/24 s still playing; one more frame ends it.
+  for (let i = 0; i < 19; i++) fx.update(0.1); // 1.9 s
+  assert.equal(fx.activeCount, 1);
+  fx.update(0.1); // 2.0 s → frame 48, done
+  assert.equal(fx.activeCount, 0);
+  assert.equal(sprite.visible, false);
+});

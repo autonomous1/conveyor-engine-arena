@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { test } from "node:test";
 import * as THREE from "three";
 import { placeStaticInstances, propInstancePose } from "../src/client/arena-scene.ts";
@@ -13,9 +13,24 @@ function filesFromDisk(): Map<string, Uint8Array> {
   const out = new Map<string, Uint8Array>();
   for (const asset of doc.assets ?? []) {
     if (typeof asset.uri !== "string") continue;
+    // An optional audio file the user has not supplied yet is absent; compile reports any required one.
+    if (!existsSync(`${root}/web${asset.uri}`)) continue;
     out.set(asset.uri, new Uint8Array(readFileSync(`${root}/web${asset.uri}`)));
   }
   return out;
+}
+
+/** The first Ogg page of an Opus stream: 'OggS', one segment holding a 19-byte 'OpusHead'. */
+function opusHeader(version = 1): Uint8Array {
+  const page = new Uint8Array(27 + 1 + 19);
+  page.set(Buffer.from("OggS"), 0);
+  page[5] = 0x02;
+  page[26] = 1;
+  page[27] = 19;
+  page.set(Buffer.from("OpusHead"), 28);
+  page[36] = version;
+  page[37] = 2;
+  return page;
 }
 
 function document(): Record<string, unknown> {
@@ -771,11 +786,28 @@ test("grenade-explosion asset compiles to view.explosion; a bad sprite block is 
 test("audio assets compile to view.sounds; a bad sound block or file is an issue", () => {
   const doc = document();
   const files = filesFromDisk();
+  // The med-kit file is optional and may not be on disk; this test wants it present.
+  for (const uri of ["medkit-pickup", "metal-door-creak-open", "metal-door-close"]) {
+    if (!files.has(`/assets/audio/${uri}.wav`)) files.set(`/assets/audio/${uri}.wav`, new Uint8Array([...Buffer.from("RIFF"), 0, 0, 0, 0, ...Buffer.from("WAVE")]));
+  }
+  if (!files.has("/assets/audio/elevator-start.opus")) files.set("/assets/audio/elevator-start.opus", opusHeader());
+  for (const name of ["spawn", "despawn"]) {
+    const uri = `/assets/audio/beam-transport-sfx-${name}.mp3`;
+    if (!files.has(uri)) files.set(uri, new Uint8Array([...Buffer.from("ID3"), 4, 0, 0]));
+  }
   const read = (uri: string) => files.get(uri);
   assert.deepEqual(compile(doc, read).view.sounds, {
     laser: { uri: "/assets/audio/laser-blast-sfx.mp3", volume: 0.6, maxVoices: 4, positional: true, refDistance: 4 },
     grenadeLaunch: { uri: "/assets/audio/grenade-launch.wav", volume: 0.8, maxVoices: 2, positional: true, refDistance: 3 },
     grenadeBlast: { uri: "/assets/audio/grenade-launch-grenade-blast.wav", volume: 1, maxVoices: 4, positional: true, refDistance: 8 },
+    cratePickup: { uri: "/assets/audio/crate-pickup.wav", volume: 0.8, maxVoices: 2, positional: true, refDistance: 3, pickupKinds: ["ammo"] },
+    keyPickup: { uri: "/assets/audio/key-pickup.wav", volume: 0.8, maxVoices: 2, positional: true, refDistance: 3, pickupKinds: ["key"] },
+    medkitPickup: { uri: "/assets/audio/medkit-pickup.wav", volume: 0.8, maxVoices: 2, positional: true, refDistance: 3, pickupKinds: ["health"] },
+    doorOpen: { uri: "/assets/audio/metal-door-creak-open.wav", volume: 0.8, maxVoices: 4, positional: true, refDistance: 4 },
+    doorClose: { uri: "/assets/audio/metal-door-close.wav", volume: 0.8, maxVoices: 4, positional: true, refDistance: 4 },
+    elevatorStart: { uri: "/assets/audio/elevator-start.opus", volume: 0.8, maxVoices: 2, positional: true, refDistance: 5 },
+    beamSpawn: { uri: "/assets/audio/beam-transport-sfx-spawn.mp3", volume: 0.8, maxVoices: 4, positional: true, refDistance: 4 },
+    beamDespawn: { uri: "/assets/audio/beam-transport-sfx-despawn.mp3", volume: 0.8, maxVoices: 4, positional: true, refDistance: 4 },
   });
 
   const issuesOf = (edit: (assets: Array<Record<string, unknown>>) => void, readFile = read) => {
@@ -800,8 +832,8 @@ test("audio assets compile to view.sounds; a bad sound block or file is an issue
     delete laser(assets).sound;
   }).some((issue) => issue.endsWith(".sound required sound object")));
   assert.ok(issuesOf((assets) => {
-    laser(assets).mediaType = "audio/ogg";
-  }).some((issue) => issue.includes(".mediaType must be audio/mpeg or audio/wav")));
+    laser(assets).mediaType = "audio/flac";
+  }).some((issue) => issue.includes(".mediaType must be audio/mpeg, audio/wav, audio/ogg or audio/opus")));
   assert.ok(issuesOf(() => undefined, (uri) => (uri.endsWith(".wav") ? new Uint8Array([1, 2, 3, 4]) : read(uri)))
     .some((issue) => issue.endsWith("not a wav")));
   assert.ok(issuesOf(() => undefined, (uri) => (uri.endsWith("laser-blast-sfx.mp3") ? undefined : read(uri)))
@@ -815,5 +847,320 @@ test("audio assets compile to view.sounds; a bad sound block or file is an issue
   assert.deepEqual(compile(defaults, read).view.sounds?.laser, {
     uri: "/assets/audio/laser-blast-sfx.mp3", volume: 0.5, maxVoices: 3, positional: false, refDistance: 1,
   });
+});
+
+test("pickup sound assets are audio entries with their own sound blocks", () => {
+  const doc = document();
+  const files = filesFromDisk();
+  const read = (uri: string) => files.get(uri);
+  for (const [id, uri] of [["crate-pickup", "/assets/audio/crate-pickup.wav"], ["key-pickup", "/assets/audio/key-pickup.wav"]] as const) {
+    const row = (doc.assets as Array<Record<string, unknown>>).find((asset) => asset.id === id);
+    assert.ok(row, id);
+    assert.equal(row.kind, "audio");
+    assert.equal(row.uri, uri);
+    assert.equal(row.mediaType, "audio/wav");
+  }
+  const bad = structuredClone(doc) as { assets: Array<Record<string, unknown>> };
+  const key = bad.assets.find((asset) => asset.id === "key-pickup")!;
+  key.sound = { volume: 2, maxVoices: 2 };
+  assert.throws(() => compile(bad, read), (err: unknown) => {
+    assert.ok(err instanceof GameManifestError);
+    assert.ok(err.issues.some((issue) => issue.path.endsWith(".sound.volume")));
+    return true;
+  });
+  const missing = (uri: string) => (uri.endsWith("key-pickup.wav") ? undefined : read(uri));
+  assert.throws(() => compile(doc, missing), (err: unknown) => {
+    assert.ok(err instanceof GameManifestError);
+    assert.ok(err.issues.some((issue) => issue.message.includes("file not found for /assets/audio/key-pickup.wav")));
+    return true;
+  });
+});
+
+test("medkit-pickup is optional audio: present it is validated, absent it is dropped with a warning", () => {
+  const doc = document();
+  const files = filesFromDisk();
+  const wav = new Uint8Array([...Buffer.from("RIFF"), 0, 0, 0, 0, ...Buffer.from("WAVE")]);
+  const withFile = (uri: string) => (uri === "/assets/audio/medkit-pickup.wav" ? wav : files.get(uri));
+  const without = (uri: string) => (uri === "/assets/audio/medkit-pickup.wav" ? undefined : files.get(uri));
+  const row = (doc.assets as Array<Record<string, unknown>>).find((asset) => asset.id === "medkit-pickup")!;
+  assert.equal(row.optional, true);
+  assert.deepEqual((row.sound as { pickupKinds: string[] }).pickupKinds, ["health"]);
+
+  assert.deepEqual(compile(doc, withFile).view.sounds?.medkitPickup, {
+    uri: "/assets/audio/medkit-pickup.wav", volume: 0.8, maxVoices: 2, positional: true, refDistance: 3, pickupKinds: ["health"],
+  });
+  const warnings: string[] = [];
+  const warn = console.warn;
+  console.warn = (...args: unknown[]) => void warnings.push(args.join(" "));
+  try {
+    const compiled = compile(doc, without);
+    assert.equal(compiled.view.sounds?.medkitPickup, undefined);
+    assert.ok(compiled.view.sounds?.cratePickup, "the other sounds are unaffected");
+  } finally {
+    console.warn = warn;
+  }
+  assert.equal(warnings.filter((line) => line.includes("medkit-pickup")).length, 1);
+
+  // Present but not a wav: still an issue. Required audio missing: still an issue.
+  assert.throws(() => compile(doc, (uri) => (uri.endsWith("medkit-pickup.wav") ? new Uint8Array([1, 2, 3, 4]) : files.get(uri))), (err: unknown) => {
+    assert.ok(err instanceof GameManifestError);
+    assert.ok(err.issues.some((issue) => issue.message === "not a wav"));
+    return true;
+  });
+  const required = structuredClone(doc) as { assets: Array<Record<string, unknown>> };
+  delete required.assets.find((asset) => asset.id === "medkit-pickup")!.optional;
+  assert.throws(() => compile(required, without), (err: unknown) => {
+    assert.ok(err instanceof GameManifestError);
+    assert.ok(err.issues.some((issue) => issue.message.includes("file not found for /assets/audio/medkit-pickup.wav")));
+    return true;
+  });
+  // The flag and the kinds are validated.
+  const bad = structuredClone(doc) as { assets: Array<Record<string, unknown>> };
+  bad.assets.find((asset) => asset.id === "key-pickup")!.optional = "yes";
+  (bad.assets.find((asset) => asset.id === "crate-pickup")!.sound as Record<string, unknown>).pickupKinds = ["ammo", "crate"];
+  assert.throws(() => compile(bad, withFile), (err: unknown) => {
+    assert.ok(err instanceof GameManifestError);
+    assert.ok(err.issues.some((issue) => issue.path.endsWith(".optional")));
+    assert.ok(err.issues.some((issue) => issue.path.endsWith(".sound.pickupKinds")));
+    return true;
+  });
+});
+
+test("door-open and door-close are optional audio entries without a type: absent they are dropped with a warning", () => {
+  const doc = document();
+  const files = filesFromDisk();
+  const wav = new Uint8Array([...Buffer.from("RIFF"), 0, 0, 0, 0, ...Buffer.from("WAVE")]);
+  const rows = (doc.assets as Array<Record<string, unknown>>).filter((asset) => asset.id === "door-open" || asset.id === "door-close");
+  assert.equal(rows.length, 2);
+  for (const row of rows) {
+    assert.equal(row.kind, "audio");
+    assert.equal(row.optional, true);
+    assert.equal("type" in row, false, "no placement type, so bake:scene accepts it");
+  }
+  const door = (uri: string) => (uri.includes("metal-door") ? wav : files.get(uri));
+  const sounds = compile(doc, door).view.sounds;
+  assert.equal(sounds?.doorOpen?.uri, "/assets/audio/metal-door-creak-open.wav");
+  assert.equal(sounds?.doorClose?.uri, "/assets/audio/metal-door-close.wav");
+  const warnings: string[] = [];
+  const warn = console.warn;
+  console.warn = (...args: unknown[]) => void warnings.push(args.join(" "));
+  try {
+    const none = compile(doc, (uri) => (uri.includes("metal-door") ? undefined : files.get(uri))).view.sounds;
+    assert.equal(none?.doorOpen, undefined);
+    assert.equal(none?.doorClose, undefined);
+  } finally {
+    console.warn = warn;
+  }
+  assert.equal(warnings.filter((line) => line.startsWith("door-open") || line.startsWith("door-close")).length, 2);
+  assert.throws(() => compile(doc, (uri) => (uri.endsWith("metal-door-close.wav") ? new Uint8Array([1, 2, 3, 4]) : door(uri))), (err: unknown) => {
+    assert.ok(err instanceof GameManifestError);
+    assert.ok(err.issues.some((issue) => issue.message === "not a wav"));
+    return true;
+  });
+});
+
+test("scene.doorSwing sets the swing time in view; absent omits it; bad values name the field", () => {
+  const doc = document();
+  const files = filesFromDisk();
+  const read = (uri: string) => files.get(uri);
+  assert.deepEqual(compile(doc, read).view.doorSwing, { openMs: 2800, closeMs: 2800 });
+
+  const scene = (edit: (scene: Record<string, unknown>) => void) => {
+    const copy = structuredClone(doc) as { scene: Record<string, unknown> };
+    edit(copy.scene);
+    return copy;
+  };
+  assert.equal(compile(scene((s) => void delete s.doorSwing), read).view.doorSwing, undefined);
+  assert.deepEqual(compile(scene((s) => void (s.doorSwing = { openMs: 1500 })), read).view.doorSwing, { openMs: 1500, closeMs: 400 });
+
+  const issues = (edit: (scene: Record<string, unknown>) => void) => {
+    try {
+      compile(scene(edit), read);
+    } catch (err) {
+      assert.ok(err instanceof GameManifestError);
+      return err.issues.map((issue) => issue.path);
+    }
+    return [];
+  };
+  assert.ok(issues((s) => void (s.doorSwing = { openMs: 10, closeMs: 99999 })).includes("scene.doorSwing.openMs"));
+  assert.ok(issues((s) => void (s.doorSwing = { openMs: 10, closeMs: 99999 })).includes("scene.doorSwing.closeMs"));
+  assert.ok(issues((s) => void (s.doorSwing = { closeMs: "slow" })).includes("scene.doorSwing.closeMs"));
+  assert.ok(issues((s) => void (s.doorSwing = 5)).includes("scene.doorSwing"));
+});
+
+test("elevator-start is an optional ogg opus entry: header-checked, dropped with one warning when absent", () => {
+  const doc = document();
+  const files = filesFromDisk();
+  const uri = "/assets/audio/elevator-start.opus";
+  const row = (doc.assets as Array<Record<string, unknown>>).find((asset) => asset.id === "elevator-start")!;
+  assert.equal(row.kind, "audio");
+  assert.equal(row.optional, true);
+  assert.equal("type" in row, false, "no placement type");
+  assert.equal(row.mediaType, "audio/ogg");
+  assert.equal(row.uri, uri);
+  const withFile = (bytes: Uint8Array | undefined) => (path: string) => (path === uri ? bytes : files.get(path));
+
+  assert.deepEqual(compile(doc, withFile(opusHeader())).view.sounds?.elevatorStart, {
+    uri, volume: 0.8, maxVoices: 2, positional: true, refDistance: 5,
+  });
+  // audio/opus is accepted too.
+  const asOpus = structuredClone(doc) as { assets: Array<Record<string, unknown>> };
+  asOpus.assets.find((asset) => asset.id === "elevator-start")!.mediaType = "audio/opus";
+  assert.ok(compile(asOpus, withFile(opusHeader())).view.sounds?.elevatorStart);
+
+  const warnings: string[] = [];
+  const warn = console.warn;
+  console.warn = (...args: unknown[]) => void warnings.push(args.join(" "));
+  try {
+    const compiled = compile(doc, withFile(undefined));
+    assert.equal(compiled.view.sounds?.elevatorStart, undefined);
+    assert.ok(compiled.view.sounds?.cratePickup, "the other sounds are unaffected");
+  } finally {
+    console.warn = warn;
+  }
+  assert.equal(warnings.filter((line) => line.includes("elevator-start")).length, 1);
+
+  const messages = (bytes: Uint8Array, source = doc): string[] => {
+    try {
+      compile(source, withFile(bytes));
+    } catch (err) {
+      assert.ok(err instanceof GameManifestError);
+      return err.issues.map((issue) => issue.message);
+    }
+    return [];
+  };
+  const broken = opusHeader();
+  broken.set(Buffer.from("OpusTags"), 28);
+  assert.deepEqual(messages(broken), ["not an ogg opus file"], "an Ogg page that does not open with OpusHead");
+  assert.deepEqual(messages(new Uint8Array([...Buffer.from("RIFF"), 0, 0, 0, 0, ...Buffer.from("WAVE")])), ["not an ogg opus file"]);
+  assert.deepEqual(messages(opusHeader().subarray(0, 30)), ["not an ogg opus file"], "truncated");
+  assert.deepEqual(messages(opusHeader(0x10)), ["not an ogg opus file"], "an unknown OpusHead version");
+  const vorbis = opusHeader();
+  vorbis.set(Buffer.from("\x01vorbis"), 28);
+  assert.deepEqual(messages(vorbis), ["not an ogg opus file"], "Ogg Vorbis is not accepted");
+
+  const wrongType = structuredClone(doc) as { assets: Array<Record<string, unknown>> };
+  wrongType.assets.find((asset) => asset.id === "elevator-start")!.mediaType = "audio/flac";
+  assert.ok(messages(opusHeader(), wrongType).some((message) => message.includes("audio/ogg or audio/opus")));
+  // An Ogg Opus file under a wav type is still rejected.
+  const asWav = structuredClone(doc) as { assets: Array<Record<string, unknown>> };
+  asWav.assets.find((asset) => asset.id === "elevator-start")!.mediaType = "audio/wav";
+  assert.deepEqual(messages(opusHeader(), asWav), ["not a wav"]);
+});
+
+/** A PNG header (signature, IHDR length and tag, width, height) is all the manifest reads. */
+function pngHeader(width: number, height: number): Uint8Array {
+  const bytes = new Uint8Array(33);
+  bytes.set([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82], 0);
+  new DataView(bytes.buffer).setUint32(16, width);
+  new DataView(bytes.buffer).setUint32(20, height);
+  return bytes;
+}
+
+test("scene.characterBeam: timings, optional beam sheets with defaults, absent files skipped", () => {
+  const doc = document();
+  const files = filesFromDisk();
+  const spawnUri = "/assets/textures/beam-spawn-sheet.png";
+  const despawnUri = "/assets/textures/beam-despawn-sheet.png";
+  for (const id of ["beam-spawn", "beam-despawn"]) {
+    const row = (doc.assets as Array<Record<string, unknown>>).find((asset) => asset.id === id)!;
+    assert.equal(row.kind, "texture");
+    assert.equal(row.optional, true);
+    assert.equal("type" in row, false, "no placement type");
+  }
+  for (const id of ["beam-spawn-sfx", "beam-despawn-sfx"]) {
+    const row = (doc.assets as Array<Record<string, unknown>>).find((asset) => asset.id === id)!;
+    assert.equal(row.kind, "audio");
+    assert.equal(row.optional, true);
+    assert.equal("type" in row, false);
+  }
+  const reader = (extra: Record<string, Uint8Array | undefined> = {}) => (uri: string) => (uri in extra ? extra[uri] : files.get(uri));
+  const timings = { fadeMs: 1700, despawnDelayMs: 1200, despawnSoundDelayMs: 0, deathHoldMs: 0 };
+
+  // No sheet files: the timings still apply, there is just no beam.
+  const warnings: string[] = [];
+  const warn = console.warn;
+  console.warn = (...args: unknown[]) => void warnings.push(args.join(" "));
+  let bare;
+  try {
+    bare = compile(doc, reader({ [spawnUri]: undefined, [despawnUri]: undefined }));
+  } finally {
+    console.warn = warn;
+  }
+  assert.deepEqual(bare.view.characterBeam, timings);
+  assert.equal(warnings.filter((line) => line.includes("beam-spawn") && line.includes("effect is skipped")).length >= 1, true);
+
+  // Sheet files with the real 8 x 6 x 48 layout: fps 24, square frames, despawn rotated 90°.
+  const view = compile(doc, reader({ [spawnUri]: pngHeader(2048, 1536), [despawnUri]: pngHeader(2048, 1536) })).view;
+  const sheet = {
+    columns: 8, rows: 6, frameCount: 48, frameWidth: 256, frameHeight: 256, fps: 24, size: view.pawnHeight, blending: "additive" as const,
+  };
+  assert.deepEqual(view.characterBeam?.spawn, { texture: spawnUri, ...sheet });
+  assert.deepEqual(view.characterBeam?.despawn, { texture: despawnUri, ...sheet, rotation: 90 });
+  assert.equal(view.characterBeam!.spawn!.fps, 24);
+  assert.equal(view.characterBeam!.spawn!.frameCount / view.characterBeam!.spawn!.fps, 2, "48 frames at 24 fps = 2 s");
+
+  // Empty sprite object: code defaults (8x6, 48, 256 square, fps 24, size = pawn height, additive, no rotation).
+  const bareSheets = structuredClone(doc) as { scene: Record<string, unknown>; assets: Array<Record<string, unknown>> };
+  bareSheets.assets.find((asset) => asset.id === "beam-spawn")!.sprite = {};
+  bareSheets.assets.find((asset) => asset.id === "beam-despawn")!.sprite = {};
+  const bareView = compile(bareSheets, reader({ [spawnUri]: pngHeader(2048, 1536), [despawnUri]: pngHeader(2048, 1536) })).view;
+  assert.deepEqual(bareView.characterBeam?.spawn, { texture: spawnUri, ...sheet });
+  assert.deepEqual(bareView.characterBeam?.despawn, { texture: despawnUri, ...sheet }, "no rotation when omitted");
+
+  // Overrides: layout, an explicit fps, a size, rotation, and a different fade (fade no longer drives fps).
+  const custom = structuredClone(doc) as { scene: Record<string, unknown>; assets: Array<Record<string, unknown>> };
+  custom.scene.characterBeam = { fadeMs: 2000, despawnDelayMs: 900, despawnSoundDelayMs: 150, deathHoldMs: 400 };
+  custom.assets.find((asset) => asset.id === "beam-spawn")!.sprite = { columns: 4, rows: 4, frameCount: 16, frameWidth: 100, frameHeight: 300, fps: 8, size: 3, blending: "normal" };
+  custom.assets.find((asset) => asset.id === "beam-despawn")!.sprite = { rotation: -90 };
+  const customView = compile(custom, reader({ [spawnUri]: pngHeader(400, 1200), [despawnUri]: pngHeader(2048, 1536) })).view;
+  assert.deepEqual(customView.characterBeam?.spawn, {
+    texture: spawnUri, columns: 4, rows: 4, frameCount: 16, frameWidth: 100, frameHeight: 300, fps: 8, size: 3, blending: "normal",
+  });
+  assert.deepEqual(customView.characterBeam?.despawn, {
+    texture: despawnUri, columns: 8, rows: 6, frameCount: 48, frameWidth: 256, frameHeight: 256, fps: 24, size: customView.pawnHeight, blending: "additive", rotation: -90,
+  });
+  assert.deepEqual(
+    { ...customView.characterBeam, spawn: undefined, despawn: undefined },
+    { fadeMs: 2000, despawnDelayMs: 900, despawnSoundDelayMs: 150, deathHoldMs: 400, spawn: undefined, despawn: undefined },
+  );
+
+  // No scene block: no beam, even with the files present.
+  const off = structuredClone(doc) as { scene: Record<string, unknown> };
+  delete off.scene.characterBeam;
+  assert.equal(compile(off, reader({ [spawnUri]: pngHeader(2048, 1536), [despawnUri]: pngHeader(2048, 1536) })).view.characterBeam, undefined);
+});
+
+test("scene.characterBeam and the beam sprites reject bad values with the field path", () => {
+  const doc = document();
+  const files = filesFromDisk();
+  const spawnUri = "/assets/textures/beam-spawn-sheet.png";
+  const read = (uri: string) => (uri === spawnUri ? pngHeader(2048, 1536) : files.get(uri));
+  const paths = (edit: (copy: { scene: Record<string, unknown>; assets: Array<Record<string, unknown>> }) => void): string[] => {
+    const copy = structuredClone(doc) as { scene: Record<string, unknown>; assets: Array<Record<string, unknown>> };
+    edit(copy);
+    try {
+      compile(copy, read);
+    } catch (err) {
+      assert.ok(err instanceof GameManifestError);
+      return err.issues.map((issue) => issue.path);
+    }
+    return [];
+  };
+  assert.ok(paths((c) => void (c.scene.characterBeam = { fadeMs: 10 })).includes("scene.characterBeam.fadeMs"));
+  assert.ok(paths((c) => void (c.scene.characterBeam = { despawnDelayMs: -1 })).includes("scene.characterBeam.despawnDelayMs"));
+  assert.ok(paths((c) => void (c.scene.characterBeam = { despawnSoundDelayMs: "now" })).includes("scene.characterBeam.despawnSoundDelayMs"));
+  assert.ok(paths((c) => void (c.scene.characterBeam = { deathHoldMs: 99999 })).includes("scene.characterBeam.deathHoldMs"));
+  assert.ok(paths((c) => void (c.scene.characterBeam = 7)).includes("scene.characterBeam"));
+  const sheet = (sprite: unknown) => (c: { assets: Array<Record<string, unknown>> }) => void (c.assets.find((asset) => asset.id === "beam-spawn")!.sprite = sprite);
+  assert.ok(paths(sheet({ columns: 0 })).some((path) => path.endsWith(".sprite.columns")));
+  assert.ok(paths(sheet({ frameCount: 49 })).some((path) => path.endsWith(".sprite.frameCount")), "49 > 8x6");
+  assert.ok(paths(sheet({ fps: -2 })).some((path) => path.endsWith(".sprite.fps")));
+  assert.ok(paths(sheet({ blending: "multiply" })).some((path) => path.endsWith(".sprite.blending")));
+  assert.ok(paths(sheet({ rotation: "cw" })).some((path) => path.endsWith(".sprite.rotation")));
+  assert.ok(paths(sheet({ rotation: Number.NaN })).some((path) => path.endsWith(".sprite.rotation")));
+  assert.ok(paths(sheet("fast")).some((path) => path.endsWith(".sprite")));
+  // `optional` is for audio and texture assets only.
+  assert.ok(paths((c) => void (c.assets.find((asset) => asset.kind === "model")!.optional = true)).some((path) => path.endsWith(".optional")));
 });
 

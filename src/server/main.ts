@@ -23,6 +23,7 @@ const types: Record<string, string> = {
   ".glb": "model/gltf-binary",
   ".mp3": "audio/mpeg",
   ".wav": "audio/wav",
+  ".opus": "audio/ogg",
   ".wasm": "application/wasm",
   ".svg": "image/svg+xml",
   ".ico": "image/x-icon",

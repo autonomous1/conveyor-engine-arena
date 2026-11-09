@@ -2,6 +2,7 @@ import { EngineClient } from "conveyor-engine-client";
 import { fireShotFrame, summarizeInbound } from "../shared/fire-debug.js";
 import { parseAudit, type AuditCounters } from "../shared/audit.js";
 import { parseHealth } from "../shared/health.js";
+import { parseSpawn, type SpawnFrame } from "../shared/spawn-frame.js";
 import { parseQaCapture, parseSceneGraphFrame, type QaCaptureFrame, type SceneGraphFrame } from "../shared/bot-protocol.js";
 import { parseDoor, parseDoorSet, useFrame, type DoorFrame } from "../shared/doors.js";
 import { parseElevatorSet, parseElevatorState, type ElevatorState } from "../shared/elevators.js";
@@ -117,10 +118,14 @@ export function connectLive(opts: {
   onLaser?: (laser: LaserNotice) => void;
   onGrenade?: (grenade: GrenadePose) => void;
   onHealth?: (health: HealthNotice) => void;
+  /** A player took a seat and was placed on a pad. Sent once, never replayed to a late joiner. */
+  onSpawn?: (spawn: SpawnFrame) => void;
   onAudit?: (audit: AuditCounters) => void;
   /** Remaining pickup ids from welcome. Taken placements are absent. */
   onPickupSet?: (ids: readonly string[]) => void;
   onPickup?: (pickup: PickupFrame) => void;
+  /** Owner-only. The keys this pawn holds, sent after it takes a key and not otherwise. */
+  onInventory?: (keys: readonly string[]) => void;
   /** One door changed. Both tabs receive the same open and locked. */
   onDoor?: (door: DoorFrame) => void;
   /** Full door list from welcome, so a late joiner matches. */
@@ -394,6 +399,11 @@ export function connectLive(opts: {
       if (audit) opts.onAudit?.(audit);
       const pickup = parsePickup(msg);
       if (pickup) opts.onPickup?.(pickup);
+      if (msg.t === "inventory" && Array.isArray(msg.keys)) {
+        opts.onInventory?.(msg.keys.filter((key): key is string => typeof key === "string"));
+      }
+      const spawned = parseSpawn(msg);
+      if (spawned) opts.onSpawn?.(spawned);
       const door = parseDoor(msg);
       if (door) opts.onDoor?.(door);
       const elevator = parseElevatorState(msg);

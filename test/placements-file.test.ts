@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { register } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -155,6 +155,8 @@ test("a rooms placements file loads a room, a hinged door, and obstacles", async
   const files = new Map<string, Uint8Array>();
   for (const asset of doc.assets ?? []) {
     if (typeof asset.uri !== "string") continue;
+    // An optional audio file the user has not supplied yet is absent; compile reports any required one.
+    if (!existsSync(path.join(root, "web", asset.uri))) continue;
     files.set(asset.uri, new Uint8Array(readFileSync(path.join(root, "web", asset.uri))));
   }
   const game = compileGame(doc, (uri) => files.get(uri), sources);
