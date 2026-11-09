@@ -1,0 +1,14 @@
+{
+  "name": "conveyor-engine-arena-profiling",
+  "private": true,
+  "type": "module",
+  "description": "Bottom-Up CPU profiling suite for the arena host and solo client. Not part of npm test.",
+  "engines": { "node": ">=22.18" },
+  "scripts": {
+    "host": "node profile-host.mjs",
+    "client": "node profile-client.mjs",
+    "all": "node run-all.mjs",
+    "analyze": "node analyze.mjs",
+    "compare": "node compare.mjs"
+  }
+}
