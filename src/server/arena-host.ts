@@ -8,6 +8,7 @@ import { createPawnKit, createPickupHost } from "../shared/pickups.js";
 import { decodeMoveButtons } from "../shared/movements.js";
 import { canonicalJson, sceneGraphPayload, sha256Hex } from "../shared/scene-graph.js";
 import { spawnFrame } from "../shared/spawn-frame.js";
+import { createHostBotBrain } from "./bot-brain.js";
 import { createHostBotSense } from "./bot-sense.js";
 import { createArenaDoors, createDoorBlockers } from "./doors.js";
 import { createArenaElevators } from "./elevators.js";
@@ -64,7 +65,7 @@ export type ArenaSession = {
   /** Hex SHA-256 of {@link regionsJson}. Set when {@link sceneGraphReady} resolves. */
   regionsHash?: string;
   sceneGraphReady: Promise<void>;
-  /** Read-only sensed state of the wander bots. Nothing in the host acts on it yet. */
+  /** Read-only sensed state of the wander bots. */
   botSense: BotSenseReader;
   attach(conn: HostConn): void;
   stop(): void;
@@ -287,6 +288,28 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
       return owned;
     },
   });
+  const wanderNav = {
+    sceneGraph: loaded.sceneGraph,
+    regions: loaded.regions,
+    aabbs: loaded.view.aabbs,
+    doors: loaded.view.doors,
+    pawnRadius: loaded.view.pawnRadius,
+    pawnHeight: loaded.view.pawnHeight,
+    liveDoors: () => doorHost.snapshot(),
+  };
+  // Held bots stand on their pads on purpose, so they would read as trapped.
+  const botBrain = !holdNpcs && wanderNav.sceneGraph && wanderNav.regions
+    ? createHostBotBrain({
+      world: loaded.world,
+      agents: loaded.agents,
+      health,
+      sense: botSense,
+      nav: { ...wanderNav, sceneGraph: wanderNav.sceneGraph, regions: wanderNav.regions },
+      pickups: loaded.view.pickups ?? [],
+      log: (line) => console.error(line),
+      useDoor: (pawnId, door) => doorHost.useDoorAs(pawnId, { door }),
+    })
+    : undefined;
   const stopLoop = startWanderLoop(loaded.world, loaded.agents, engine, held, (line) => console.error(line), health, audit, () => {
     reservedPads.clear();
     const bodies = pawnBodies(loaded.world, health);
@@ -307,15 +330,8 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
     }
     grenades.tick();
     botSense.update(bodies);
-  }, loaded.view.noclip === true, loaded.playerSpawns, holdNpcs, elevatorHost, {
-    sceneGraph: loaded.sceneGraph,
-    regions: loaded.regions,
-    aabbs: loaded.view.aabbs,
-    doors: loaded.view.doors,
-    pawnRadius: loaded.view.pawnRadius,
-    pawnHeight: loaded.view.pawnHeight,
-    liveDoors: () => doorHost.snapshot(),
-  });
+    botBrain?.update();
+  }, loaded.view.noclip === true, loaded.playerSpawns, holdNpcs, elevatorHost, wanderNav);
   const propClips = startPropAnimation(loaded.view.props);
   const fire = createArenaFire({
     world: loaded.world,

@@ -114,7 +114,7 @@ export function planLegs(
     );
     if (!inside) return { ok: false, step: stepIndex };
     append(points, inside);
-    const crossed = walk(
+    const crossed = doorStraight(step, shut) ?? walk(
       cache,
       graph,
       view,
@@ -141,6 +141,22 @@ export function planLegs(
   }
   if (points.length === 0) points.push([from.x, from.y, from.z]);
   return { ok: true, points };
+}
+
+/**
+ * An open door's gap is only about a capsule wide, so the occupancy grid often
+ * has no cell path through it, and when another gap is open it can find a long
+ * way round instead. The enter and exit points are baked door pockets, so the
+ * straight segment between them is the walk through the gap. A shut door gets
+ * nothing: the route gate has already refused it.
+ */
+function doorStraight(step: RouteStep, shut: ReadonlySet<string>): Vec3[] | undefined {
+  if (step.portal.kind !== "door") return undefined;
+  if (shut.has(step.portal.door ?? step.portal.id)) return undefined;
+  return [
+    [step.enter[0], step.enter[1], step.enter[2]],
+    [step.exit[0], step.exit[1], step.exit[2]],
+  ];
 }
 
 function doorFreeAxis(step: RouteStep): DoorAxis {

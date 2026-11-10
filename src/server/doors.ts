@@ -76,6 +76,12 @@ export function createDoorBlockers(world: ObstacleWorld): DoorBlockers {
   };
 }
 
+/**
+ * What a use press did. `none`: no door in reach. `open`: the door was already
+ * open and was left alone (a brain press only). `lift`: it rides a moving cab.
+ */
+export type DoorUseResult = "none" | "open" | "lift" | "locked" | "opened" | "closed";
+
 export function createArenaDoors(opts: {
   doors: ReadonlyArray<ArenaView["doors"][number]>;
   pawnOf(pawnId: number): PawnBody | undefined;
@@ -129,6 +135,31 @@ export function createArenaDoors(opts: {
     },
   };
 
+  /** One use press by `pawn`. `only` limits it to that door, and never closes it. */
+  function press(pawnId: number, pawn: PawnBody, at: string, only?: string): DoorUseResult {
+    let pool = [...state.values()];
+    if (only !== undefined) pool = pool.filter((item) => item.id === only);
+    const door = pickDoorForUse(pool, pawn);
+    if (!door) {
+      if (only === undefined) opts.log?.(`[door] use ${at}: no door in reach${nearestNote(pool, pawn)}`);
+      return "none";
+    }
+    if (only !== undefined && door.open) return "open";
+    if (held.has(door.id)) {
+      opts.log?.(`[door] use ${at}: ${door.id} rides a moving lift`);
+      return "lift";
+    }
+    const next = tryUseDoor(door, pawnId, opts.keys);
+    if (!next) {
+      opts.log?.(`[door] use ${at}: ${door.id} is locked; this pawn does not hold "${door.key ?? ""}"`);
+      return "locked";
+    }
+    opts.blockers?.sync(door);
+    opts.log?.(`[door] use ${at}: ${door.id} open=${next.open} locked=${next.locked}`);
+    opts.sendAll(doorFrame(next.id, next.open, next.locked));
+    return next.open ? "opened" : "closed";
+  }
+
   return {
     /** Current open/locked rows, sorted by id. Welcome attaches this list. */
     snapshot(): Array<{ id: string; open: boolean; locked: boolean }> {
@@ -162,24 +193,19 @@ export function createArenaDoors(opts: {
       const pawn = opts.pawnOf(pawnId);
       if (!pawn || !pawn.alive) return true;
       const at = `client=${clientId} pawn=${pawnId} at (${pawn.x.toFixed(2)}, ${pawn.y.toFixed(2)}, ${pawn.z.toFixed(2)})`;
-      const door = pickDoorForUse([...state.values()], pawn);
-      if (!door) {
-        opts.log?.(`[door] use ${at}: no door in reach${nearestNote([...state.values()], pawn)}`);
-        return false;
-      }
-      if (held.has(door.id)) {
-        opts.log?.(`[door] use ${at}: ${door.id} rides a moving lift`);
-        return true;
-      }
-      const next = tryUseDoor(door, pawnId, opts.keys);
-      if (!next) {
-        opts.log?.(`[door] use ${at}: ${door.id} is locked; this pawn does not hold "${door.key ?? ""}"`);
-        return true;
-      }
-      opts.blockers?.sync(door);
-      opts.log?.(`[door] use ${at}: ${door.id} open=${next.open} locked=${next.locked}`);
-      opts.sendAll(doorFrame(next.id, next.open, next.locked));
-      return true;
+      return press(pawnId, pawn, at) !== "none";
+    },
+    /**
+     * A host brain presses use for a pawn it drives. Same reach volume, lift,
+     * lock and key rules as a player's frame. Only `door` is considered, and
+     * an open door is left alone, so a bot never closes one.
+     */
+    useDoorAs(pawnId: number, only: { door: string }): DoorUseResult {
+      const pawn = opts.pawnOf(pawnId);
+      if (!pawn || !pawn.alive) return "none";
+      if (opts.alive && !opts.alive(pawnId)) return "none";
+      const at = `bot pawn=${pawnId} at (${pawn.x.toFixed(2)}, ${pawn.y.toFixed(2)}, ${pawn.z.toFixed(2)})`;
+      return press(pawnId, pawn, at, only.door);
     },
     offset: ride.offset,
     force: ride.force,

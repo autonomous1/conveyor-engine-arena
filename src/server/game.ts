@@ -143,23 +143,30 @@ export type WanderNav = {
   pawnRadius: number;
   pawnHeight: number;
   /** Live open bits. Absent: `doors[].open` (tests, and a host with no door table). */
-  liveDoors?: () => ReadonlyArray<{ id: string; open: boolean }>;
+  liveDoors?: () => ReadonlyArray<{ id: string; open: boolean; locked?: boolean }>;
 };
 
 type WanderWalk = {
   follow: ReturnType<typeof createFollower>;
   watched: readonly string[];
   doorSig: string;
+  /** The `override.goal` this walk was planned for. Absent for a sampled wander goal. */
+  claim?: object;
 };
 
 type PlannedWalk = {
   points: Vec3[];
   goal: { x: number; y: number; z: number };
+  claim?: object;
 };
 
 type NavView = Pick<ArenaView, "aabbs" | "doors" | "pawnRadius" | "pawnHeight">;
 
 const wanderWalks = new WeakMap<WanderAgent, WanderWalk>();
+/** The `override` the last steer saw, so a claim, a change of claim or a release replans at once. */
+const lastClaims = new WeakMap<WanderAgent, object>();
+/** A claimed goal that cannot be planned waits this long, then tries again. */
+const CLAIM_RETRY_TICKS = 20;
 
 /** Follower installed by {@link steerUnownedWander}. Tests step this; the loop does too. */
 export function wanderFollower(agent: WanderAgent): WanderWalk["follow"] | undefined {
@@ -190,7 +197,14 @@ export function steerUnownedWander(
   const loaded = { ...nav, sceneGraph, regions };
   const pose = wanderPose(world, agent);
   if (!pose) return;
-  const flags = doorFlags(loaded);
+  const flags = doorFlags(loaded, agent.override?.openDoors === true);
+  const claim = agent.override?.goal;
+  if (lastClaims.get(agent) !== agent.override) {
+    if (agent.override) lastClaims.set(agent, agent.override);
+    else lastClaims.delete(agent);
+    clearWalk(agent);
+    agent.nextTurn = tick;
+  }
   const walk = wanderWalks.get(agent);
   const deadline = agent.nextTurn;
   if (walk && tick >= deadline) {
@@ -199,7 +213,7 @@ export function steerUnownedWander(
     const again = planWanderTo(pose, agent.goal, loaded, cache, flags);
     if (again) {
       const goal = agent.goal;
-      installWalk(agent, { points: again, goal }, pose, loaded, flags, tick, rng, others);
+      installWalk(agent, { points: again, goal, claim: walk.claim }, pose, loaded, flags, tick, rng, others);
       if (wanderWalks.has(agent)) agent.nextTurn = deadline;
       return;
     }
@@ -213,11 +227,11 @@ export function steerUnownedWander(
     // A failed sample. A fresh pawn still has its spawn gait and plans now.
     return;
   }
-  const chosen = chooseWanderGoal(pose, loaded, rng, cache, flags);
+  const chosen = claim ? planClaimed(pose, claim, loaded, cache, flags) : chooseWanderGoal(pose, loaded, rng, cache, flags);
   if (!chosen) {
     clearWalk(agent);
     agent.gait = "idle";
-    agent.nextTurn = tick + WANDER_GOAL_TICKS;
+    agent.nextTurn = tick + (claim ? CLAIM_RETRY_TICKS : WANDER_GOAL_TICKS);
     return;
   }
   installWalk(agent, chosen, pose, loaded, flags, tick, rng, others);
@@ -266,7 +280,7 @@ function installWalk(
   agent.nextTurn = tick + WANDER_GOAL_TICKS;
   agent.heading = stepped.input.yaw;
   if (stepped.status === "running") {
-    wanderWalks.set(agent, { follow, watched, doorSig });
+    wanderWalks.set(agent, { follow, watched, doorSig, claim: planned.claim });
     return;
   }
   clearWalk(agent);
@@ -289,6 +303,74 @@ function chooseWanderGoal(
     const points = planWanderTo(pose, goal, nav, cache, flags);
     if (!points) continue;
     return { points, goal };
+  }
+  return undefined;
+}
+
+function planClaimed(
+  pose: Pose,
+  goal: { x: number; y: number; z: number },
+  nav: WanderNav & { sceneGraph: SceneGraph; regions: BakedRegionsFile },
+  cache: NavCache,
+  flags: ReadonlyMap<string, boolean>,
+): PlannedWalk | undefined {
+  const points = planWanderTo(pose, goal, nav, cache, flags);
+  return points ? { points, goal, claim: goal } : undefined;
+}
+
+/** Exterior door landings, then nearest `outside` region centres, tried by {@link planEscapeGoal}. */
+const LANDING_TRIES = 8;
+const ESCAPE_TRIES = 6;
+
+/**
+ * Brain seam: a stand point in `outside` that `agent` can walk to now, or
+ * `keep` while that still holds. Shut doors stay unusable, as for wander.
+ */
+export function planEscapeGoal(
+  world: AuthoritativeWorld,
+  agent: WanderAgent,
+  nav: WanderNav & { sceneGraph: SceneGraph; regions: BakedRegionsFile },
+  cache: NavCache,
+  keep?: { x: number; y: number; z: number },
+  /** Plan through shut unlocked doors. The caller presses them. A locked door stays shut. */
+  openDoors = false,
+): { x: number; y: number; z: number } | undefined {
+  const pose = wanderPose(world, agent);
+  if (!pose) return undefined;
+  const flags = doorFlags(nav, openDoors);
+  if (keep && planWanderTo(pose, keep, nav, cache, flags)) return keep;
+  const sortNear = (list: Array<{ d: number; x: number; y: number; z: number }>) => list.sort((a, b) => a.d - b.d);
+  // First choice: the outside landing of an exterior door. The walk ends at the
+  // door, so it cannot wander back in through another one.
+  const landings: Array<{ d: number; x: number; y: number; z: number }> = [];
+  for (const portal of nav.sceneGraph.portals) {
+    if (portal.kind !== "door") continue;
+    const at = portal.a === "outside" ? portal.at.a : portal.b === "outside" ? portal.at.b : undefined;
+    if (at) landings.push({ d: Math.hypot(at[0] - pose.x, at[2] - pose.z), x: at[0], y: at[1], z: at[2] });
+  }
+  const centres: Array<{ d: number; x: number; y: number; z: number }> = [];
+  for (const place of nav.regions.places) {
+    if (place.placeId !== "outside") continue;
+    for (const region of place.regions) {
+      const x = (region.minX + region.maxX) / 2;
+      const z = (region.minZ + region.maxZ) / 2;
+      centres.push({ d: Math.hypot(x - pose.x, z - pose.z), x, y: region.y, z });
+    }
+  }
+  const tiers: Array<[Array<{ d: number; x: number; y: number; z: number }>, number]> = [
+    [sortNear(landings), LANDING_TRIES],
+    [sortNear(centres), ESCAPE_TRIES],
+  ];
+  for (const [near, limit] of tiers) {
+    let tries = 0;
+    for (let i = 0; i < near.length && tries < limit; i += 1) {
+      const goal = { x: near[i]!.x, y: near[i]!.y, z: near[i]!.z };
+      // A region centre can sit inside a building footprint. That is not outside.
+      if (placeAt(nav.sceneGraph, goal.x, goal.y, goal.z).id !== "outside") continue;
+      if (!canStand(nav.regions, "outside", goal.x, goal.y, goal.z)) continue;
+      tries += 1;
+      if (planWanderTo(pose, goal, nav, cache, flags)) return goal;
+    }
   }
   return undefined;
 }
@@ -321,7 +403,30 @@ function planWanderTo(
   if (!nearGoal(points, goal) && !appendInterior(nav.sceneGraph, view, nav.regions, cache, shut, points, goal)) {
     return undefined;
   }
-  return points.length > 0 ? points : undefined;
+  if (points.length === 0) return undefined;
+  // The baked outside regions also cover door gaps, and a shut leaf does not cut
+  // them all. A walk that would cross a shut leaf is not a walk.
+  if (shut.size > 0 && crossesShutLeaf(view.doors, shut, points)) return undefined;
+  return points;
+}
+
+/** A walk may graze the end of a shut leaf (a string-pulled corner). It may not cross the panel. */
+const LEAF_END_SLACK = 0.15;
+
+function crossesShutLeaf(doors: ArenaView["doors"], shut: ReadonlySet<string>, points: readonly Vec3[]): boolean {
+  for (const door of doors) {
+    if (!shut.has(door.id)) continue;
+    const leaf = { ...doorLeafBox(door) };
+    if (leaf.maxX - leaf.minX > leaf.maxZ - leaf.minZ) {
+      leaf.minX += LEAF_END_SLACK;
+      leaf.maxX -= LEAF_END_SLACK;
+    } else {
+      leaf.minZ += LEAF_END_SLACK;
+      leaf.maxZ -= LEAF_END_SLACK;
+    }
+    if (polylineHits(points, leaf)) return true;
+  }
+  return false;
 }
 
 function appendInterior(
@@ -422,14 +527,58 @@ function appendPoints(out: Vec3[], extra: readonly Vec3[]): void {
   }
 }
 
-function doorFlags(nav: WanderNav): Map<string, boolean> {
+/**
+ * Open bit per door. `passUnlocked` (Escape only) also counts a shut unlocked
+ * door as passable, so the plan goes through it and the brain presses it.
+ */
+function doorFlags(nav: WanderNav, passUnlocked = false): Map<string, boolean> {
   const flags = new Map<string, boolean>();
-  for (const door of nav.doors) flags.set(door.id, door.open === true);
+  const locked = new Map<string, boolean>();
+  for (const door of nav.doors) {
+    flags.set(door.id, door.open === true);
+    locked.set(door.id, door.locked === true);
+  }
   const live = nav.liveDoors?.();
   if (live) {
-    for (const door of live) flags.set(door.id, door.open === true);
+    for (const door of live) {
+      flags.set(door.id, door.open === true);
+      if (door.locked !== undefined) locked.set(door.id, door.locked);
+    }
+  }
+  if (passUnlocked) {
+    // Only doors a route can go through. A cab door belongs to its elevator.
+    const portals = doorPortalIds(nav.sceneGraph);
+    for (const [id, open] of flags) {
+      if (!open && locked.get(id) !== true && portals.has(id)) flags.set(id, true);
+    }
   }
   return flags;
+}
+
+const portalDoors = new WeakMap<SceneGraph, Set<string>>();
+
+function doorPortalIds(graph: SceneGraph | undefined): ReadonlySet<string> {
+  if (!graph) return new Set();
+  let ids = portalDoors.get(graph);
+  if (!ids) {
+    ids = new Set();
+    for (const portal of graph.portals) {
+      if (portal.kind === "door") ids.add(portal.door ?? portal.id);
+    }
+    portalDoors.set(graph, ids);
+  }
+  return ids;
+}
+
+/**
+ * Ids of the doors whose leaf the polyline touches, sorted. With `graph`, only
+ * the doors a route goes through, not a cab door the path happens to pass.
+ */
+export function doorsOnRoute(doors: ArenaView["doors"], points: readonly Vec3[], graph?: SceneGraph): string[] {
+  const ids = doorsOnPath(doors, points);
+  if (!graph) return ids;
+  const portals = doorPortalIds(graph);
+  return ids.filter((id) => portals.has(id));
 }
 
 function shutIds(flags: ReadonlyMap<string, boolean>): Set<string> {

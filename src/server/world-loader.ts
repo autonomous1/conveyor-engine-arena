@@ -18,6 +18,11 @@ export type WanderAgent = {
   goal?: { x: number; y: number; z: number };
   /** Waypoints for `goal`. The follower in the wander loop consumes these. */
   path?: ReadonlyArray<readonly [number, number, number]>;
+  /**
+   * A bot brain's claim. While set, `steerUnownedWander` walks to `goal` instead of sampling one.
+   * `openDoors`: plan through shut unlocked doors. The brain presses each one as the bot reaches it.
+   */
+  override?: { goal: { x: number; y: number; z: number }; openDoors?: boolean };
 };
 
 export type LoadedArena = {
