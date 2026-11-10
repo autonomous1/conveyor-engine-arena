@@ -3,14 +3,21 @@ import test from "node:test";
 import * as THREE from "three";
 import {
   createExplosionFx,
+  EXPLOSION_FPS,
   EXPLOSION_MAX_DT,
   EXPLOSION_POOL_CAP,
+  EXPLOSION_SIZE,
   explosionFrameOffset,
   LASER_IMPACT_FALLBACK_FPS,
   LASER_IMPACT_SIZE,
   laserImpactPlaybackFps,
   laserImpactWorldSize,
   resolveLaserImpactSheet,
+  resolveSurfaceExplosionSheet,
+  SURFACE_BLAST_STANDOFF,
+  surfaceBlastPose,
+  surfaceExplosionPlaybackFps,
+  surfaceExplosionWorldSize,
 } from "../src/client/explosion.ts";
 
 const close = (actual: number, expected: number) => assert.ok(Math.abs(actual - expected) < 1e-9, `${actual} vs ${expected}`);
@@ -197,7 +204,7 @@ test("sheet.rotation turns SpriteMaterial.rotation; 8×6 beam sheet plays 48 fra
   fx.setAtlas(tex);
   assert.equal(fx.rotation, Math.PI / 2);
   assert.equal(fx.duration(), 2);
-  assert.deepEqual(fx.layout, { columns: 8, rows: 6, frameCount: 48, aspect: 1 });
+  assert.deepEqual(fx.layout, { columns: 8, rows: 6, frameCount: 48, aspect: 1, anchorY: 0 });
   assert.equal(fx.spawn(0, 0.9, 0), true);
   const [sprite] = sprites(fx);
   assert.ok(sprite);
@@ -245,4 +252,164 @@ test("a 1536x1280 laser-impact sheet of 6 x 5 uses square 256x256 frames from th
   const sprite = (fx.group.children as THREE.Sprite[])[0]!;
   close(sprite.scale.x, 0.8);
   close(sprite.scale.y, 0.8);
+});
+
+const sideLook = {
+  position: { x: 0, y: 1.6, z: 6 },
+  right: { x: 1, y: 0, z: 0 },
+  up: { x: 0, y: 1, z: 0 },
+  forward: { x: 0, y: 0, z: -1 },
+};
+
+test("surfaceBlastPose: floor is upright, wall points out, head-on is degenerate", () => {
+  const impact = { x: 1, y: 2, z: 3 };
+  const floor = surfaceBlastPose(impact, { x: 0, y: 1, z: 0 }, sideLook, 8);
+  assert.equal(floor.degenerate, false);
+  close(floor.x, 1);
+  close(floor.y, 2 + SURFACE_BLAST_STANDOFF);
+  close(floor.z, 3);
+  close(floor.centerX, 0.5);
+  close(floor.centerY, 0);
+  close(floor.rotation, 0);
+
+  const wall = surfaceBlastPose(impact, { x: 1, y: 0, z: 0 }, sideLook, 8);
+  assert.equal(wall.degenerate, false);
+  close(wall.x, 1 + SURFACE_BLAST_STANDOFF);
+  close(wall.y, 2);
+  close(wall.z, 3);
+  close(wall.centerX, 0.5);
+  close(wall.centerY, 0);
+  close(wall.rotation, -Math.PI / 2);
+
+  const back = surfaceBlastPose(impact, { x: -1, y: 0, z: 0 }, sideLook, 4, 0.3);
+  assert.equal(back.degenerate, false);
+  close(back.rotation, Math.PI / 2 + 0.3);
+
+  // Looking along the floor normal: centre lifts by size/2, no screen-space rotation.
+  const downLook = {
+    position: { x: 1, y: 10, z: 3 },
+    right: { x: 1, y: 0, z: 0 },
+    up: { x: 0, y: 0, z: -1 },
+    forward: { x: 0, y: -1, z: 0 },
+  };
+  const above = surfaceBlastPose(impact, { x: 0, y: 1, z: 0 }, downLook, 8, 0.1);
+  assert.equal(above.degenerate, true);
+  close(above.x, 1);
+  close(above.y, 2 + 4 + SURFACE_BLAST_STANDOFF);
+  close(above.z, 3);
+  close(above.centerX, 0.5);
+  close(above.centerY, 0.5);
+  close(above.rotation, 0.1);
+
+  const headOn = surfaceBlastPose(impact, { x: 0, y: 0, z: -1 }, sideLook, 8);
+  assert.equal(headOn.degenerate, true);
+  close(headOn.x, 1);
+  close(headOn.y, 2);
+  close(headOn.z, 3 - 4 - SURFACE_BLAST_STANDOFF);
+  close(headOn.centerY, 0.5);
+});
+
+test("surface pool anchors the bottom on a wall and recentres when looking along the normal", () => {
+  const scene = new THREE.Scene();
+  const fx = createExplosionFx(scene, { sheet: { size: 8 } });
+  fx.setAtlas(atlas());
+  const impact = { x: 0, y: 1, z: 0 };
+  assert.equal(fx.spawnSurface(impact.x, impact.y, impact.z, { x: 0, y: 1, z: 0 }, 8), true);
+  const sprite = sprites(fx)[0]!;
+  const material = sprite.material as THREE.SpriteMaterial;
+  close(sprite.center.x, 0.5);
+  close(sprite.center.y, 0);
+  close(sprite.position.y, 1 + SURFACE_BLAST_STANDOFF);
+
+  const side = new THREE.PerspectiveCamera(60, 1, 0.1, 100);
+  side.position.set(0, 1.6, 6);
+  side.up.set(0, 1, 0);
+  side.lookAt(0, 1.6, 0);
+  side.updateMatrixWorld();
+  fx.update(0.01, side);
+  close(sprite.center.y, 0);
+  close(sprite.position.x, 0);
+  close(sprite.position.y, 1 + SURFACE_BLAST_STANDOFF);
+  close(sprite.position.z, 0);
+  close(material.rotation, 0);
+
+  const above = new THREE.PerspectiveCamera(60, 1, 0.1, 100);
+  above.position.set(0, 10, 0);
+  above.up.set(0, 0, -1);
+  above.lookAt(0, 1, 0);
+  above.updateMatrixWorld();
+  fx.update(0.01, above);
+  close(sprite.center.y, 0.5);
+  close(sprite.position.x, 0);
+  close(sprite.position.y, 1 + 4 + SURFACE_BLAST_STANDOFF);
+  close(sprite.position.z, 0);
+  close(material.rotation, 0);
+
+  fx.clear();
+  const wall = new THREE.PerspectiveCamera(60, 1, 0.1, 100);
+  wall.position.set(0, 1, 6);
+  wall.up.set(0, 1, 0);
+  wall.lookAt(0, 1, 0);
+  wall.updateMatrixWorld();
+  assert.equal(fx.spawnSurface(0, 1, 0, { x: 1, y: 0, z: 0 }, 8), true, "reuse the slot");
+  fx.update(0.01, wall);
+  close(sprite.center.y, 0);
+  close(sprite.position.x, SURFACE_BLAST_STANDOFF);
+  close(sprite.position.y, 1);
+  close(sprite.position.z, 0);
+  close(material.rotation, -Math.PI / 2);
+
+  fx.clear();
+  assert.equal(fx.spawn(2, 3, 4), true, "air burst reuses the slot and recentres");
+  close(sprite.center.x, 0.5);
+  close(sprite.center.y, 0.5);
+  assert.deepEqual([sprite.position.x, sprite.position.y, sprite.position.z], [2, 3, 4]);
+  close(material.rotation, 0);
+  assert.equal(fx.spawnSurface(0, 0, 0, { x: 0, y: 0, z: 0 }), false);
+});
+
+test("resolveSurfaceExplosionSheet prefers the dedicated sheet and falls back to the grenade size", () => {
+  const surface = { texture: "/assets/textures/grenade-ground-blast-sheet.png", fps: 30, size: 8 };
+  const grenade = { texture: "/assets/textures/grenade-explosion-sheet.png", fps: 30, size: 8 };
+  const dedicated = resolveSurfaceExplosionSheet(surface, grenade);
+  assert.deepEqual(dedicated, { sheet: surface, fallback: false });
+  assert.equal(surfaceExplosionWorldSize(dedicated), 8);
+  assert.equal(surfaceExplosionPlaybackFps(dedicated), 30);
+  const fallback = resolveSurfaceExplosionSheet(undefined, grenade);
+  assert.deepEqual(fallback, { sheet: grenade, fallback: true });
+  assert.equal(surfaceExplosionWorldSize(fallback), 8, "fallback keeps the grenade blast size");
+  assert.equal(surfaceExplosionPlaybackFps(fallback), 30);
+  const custom = resolveSurfaceExplosionSheet({ texture: surface.texture, fps: 24, size: 6 });
+  assert.equal(surfaceExplosionWorldSize(custom), 6);
+  assert.equal(surfaceExplosionPlaybackFps(custom), 24);
+  assert.equal(resolveSurfaceExplosionSheet(undefined, undefined), undefined);
+  assert.equal(surfaceExplosionWorldSize(undefined), EXPLOSION_SIZE);
+  assert.equal(surfaceExplosionPlaybackFps(undefined), EXPLOSION_FPS);
+});
+
+test("surfaceBlastPose: anchorY puts the art's ground line on the impact", () => {
+  const impact = { x: 1, y: 2, z: 3 };
+  const floor = surfaceBlastPose(impact, { x: 0, y: 1, z: 0 }, sideLook, 8, 0, SURFACE_BLAST_STANDOFF, 0.46);
+  assert.equal(floor.degenerate, false);
+  close(floor.y, 2 + SURFACE_BLAST_STANDOFF);
+  close(floor.centerY, 0.46);
+  close(floor.rotation, 0);
+  const downLook = {
+    position: { x: 1, y: 10, z: 3 },
+    right: { x: 1, y: 0, z: 0 },
+    up: { x: 0, y: 0, z: -1 },
+    forward: { x: 0, y: -1, z: 0 },
+  };
+  const above = surfaceBlastPose(impact, { x: 0, y: 1, z: 0 }, downLook, 8, 0, SURFACE_BLAST_STANDOFF, 0.46);
+  assert.equal(above.degenerate, true);
+  close(above.y, 2 + 8 * 0.04 + SURFACE_BLAST_STANDOFF);
+  close(above.centerY, 0.5);
+});
+
+test("explosion pool reads anchorY from the sheet for surface blasts only", () => {
+  const scene = new THREE.Scene();
+  const fx = createExplosionFx(scene, { sheet: { anchorY: 0.46 } });
+  assert.equal(fx.layout.anchorY, 0.46);
+  const bad = createExplosionFx(scene, { sheet: { anchorY: 1.5 } });
+  assert.equal(bad.layout.anchorY, 0);
 });

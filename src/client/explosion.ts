@@ -26,8 +26,108 @@ export const EXPLOSION_SIZE = 4;
 export const EXPLOSION_POOL_CAP = 8;
 /** Longest step one update takes, in seconds. A long frame doesn't skip the whole blast. */
 export const EXPLOSION_MAX_DT = 0.1;
+/** Tiny push along the surface normal so the billboard does not z-fight the face. */
+export const SURFACE_BLAST_STANDOFF = 0.02;
+/**
+ * If the surface normal projected into the camera plane is shorter than this,
+ * the view is nearly along the normal (looking down at a floor, or head-on at a
+ * wall). Then the sprite is centred and pushed out along the normal so the art's
+ * ground line (`anchorY`) is on the surface, so the blast stays a facing quad.
+ */
+export const SURFACE_BLAST_DEGENERATE = 0.08;
 
 export type ExplosionBlending = "normal" | "additive";
+
+export type SurfaceBlastLook = {
+  position: { x: number; y: number; z: number };
+  right: { x: number; y: number; z: number };
+  up: { x: number; y: number; z: number };
+  forward: { x: number; y: number; z: number };
+};
+
+export type SurfaceBlastPose = {
+  x: number;
+  y: number;
+  z: number;
+  centerX: number;
+  centerY: number;
+  rotation: number;
+  degenerate: boolean;
+};
+
+export type ExplosionCamera = {
+  updateMatrixWorld?: () => void;
+  matrixWorld: { elements: ArrayLike<number> };
+};
+
+function unit3(v: { x: number; y: number; z: number }): { x: number; y: number; z: number } {
+  const len = Math.hypot(v.x, v.y, v.z);
+  if (!(len > 1e-8)) return { x: 0, y: 0, z: 0 };
+  return { x: v.x / len, y: v.y / len, z: v.z / len };
+}
+
+/** Camera basis from `matrixWorld`: right, up, and look (-Z). */
+export function lookFromCamera(camera: ExplosionCamera): SurfaceBlastLook {
+  camera.updateMatrixWorld?.();
+  const m = camera.matrixWorld.elements;
+  return {
+    position: { x: m[12]!, y: m[13]!, z: m[14]! },
+    right: { x: m[0]!, y: m[1]!, z: m[2]! },
+    up: { x: m[4]!, y: m[5]!, z: m[6]! },
+    forward: { x: -m[8]!, y: -m[9]!, z: -m[10]! },
+  };
+}
+
+/**
+ * The art's ground line (`anchorY`, fraction of frame height from the bottom)
+ * at the impact point (plus a tiny standoff), texture up aligned with the
+ * surface normal in screen space. Degenerate views (see
+ * {@link SURFACE_BLAST_DEGENERATE}) push the centre out by size × (0.5 − anchorY)
+ * along the normal, keep a centred anchor, and leave the sheet's base rotation.
+ */
+export function surfaceBlastPose(
+  impact: { x: number; y: number; z: number },
+  normal: { x: number; y: number; z: number },
+  look: SurfaceBlastLook,
+  size: number,
+  baseRotation = 0,
+  standoff = SURFACE_BLAST_STANDOFF,
+  anchorY = 0,
+): SurfaceBlastPose {
+  const n = unit3(normal);
+  const forward = unit3(look.forward);
+  const right = unit3(look.right);
+  const up = unit3(look.up);
+  const nScreenX = n.x - forward.x * (n.x * forward.x + n.y * forward.y + n.z * forward.z);
+  const nScreenY = n.y - forward.y * (n.x * forward.x + n.y * forward.y + n.z * forward.z);
+  const nScreenZ = n.z - forward.z * (n.x * forward.x + n.y * forward.y + n.z * forward.z);
+  const projected = Math.hypot(nScreenX, nScreenY, nScreenZ);
+  if (!(projected >= SURFACE_BLAST_DEGENERATE) || !(size > 0)) {
+    const lift = (size > 0 ? size * (0.5 - anchorY) : 0) + standoff;
+    return {
+      x: impact.x + n.x * lift,
+      y: impact.y + n.y * lift,
+      z: impact.z + n.z * lift,
+      centerX: 0.5,
+      centerY: 0.5,
+      rotation: baseRotation,
+      degenerate: true,
+    };
+  }
+  const sx = nScreenX * right.x + nScreenY * right.y + nScreenZ * right.z;
+  const sy = nScreenX * up.x + nScreenY * up.y + nScreenZ * up.z;
+  return {
+    x: impact.x + n.x * standoff,
+    y: impact.y + n.y * standoff,
+    z: impact.z + n.z * standoff,
+    centerX: 0.5,
+    centerY: anchorY,
+    // SpriteMaterial.rotation turns counter-clockwise, so texture up lands on
+    // (-sin r, cos r). Solve for the projected normal (sx, sy).
+    rotation: Math.atan2(-sx, sy) + baseRotation,
+    degenerate: false,
+  };
+}
 
 /** Sheet layout and playback. Missing fields use the defaults above. */
 export type ExplosionSheet = {
@@ -42,10 +142,12 @@ export type ExplosionSheet = {
   frameHeight?: number;
   /** Optional rotation in degrees, applied as SpriteMaterial.rotation in radians. */
   rotation?: number;
+  /** Surface blasts: ground line of the art as a fraction of frame height from the bottom. Default 0. */
+  anchorY?: number;
 };
 
 /** `aspect` is frame width over height. `size` is the sprite height; width is `size * aspect`. */
-type Layout = { columns: number; rows: number; frameCount: number; aspect: number };
+type Layout = { columns: number; rows: number; frameCount: number; aspect: number; anchorY: number };
 
 /** UV offset of `frame` in the atlas. Row 0 is the image top, so v counts down from 1. */
 export function explosionFrameOffset(
@@ -93,6 +195,7 @@ function createExplosion(parent: THREE.Object3D, atlas: THREE.Texture, blending:
   let fps = EXPLOSION_FPS;
   let lastFrame = -1;
   let disposed = false;
+  let surface: { ix: number; iy: number; iz: number; nx: number; ny: number; nz: number; size: number } | undefined;
 
   function setFrame(frame: number) {
     explosionFrameOffset(frame, layout.columns, layout.rows, map.offset);
@@ -114,16 +217,29 @@ function createExplosion(parent: THREE.Object3D, atlas: THREE.Texture, blending:
     get age() {
       return age;
     },
-    start(x: number, y: number, z: number, size: number, rate: number) {
-      sprite.position.set(x, y, z);
+    start(x: number, y: number, z: number, size: number, rate: number, normal?: { x: number; y: number; z: number }) {
       sprite.scale.set(size * layout.aspect, size, 1);
       age = 0;
       fps = rate;
       setFrame(0);
       active = true;
       sprite.visible = true;
+      if (normal) {
+        surface = { ix: x, iy: y, iz: z, nx: normal.x, ny: normal.y, nz: normal.z, size };
+        sprite.center.set(0.5, layout.anchorY);
+        sprite.position.set(
+          x + normal.x * SURFACE_BLAST_STANDOFF,
+          y + normal.y * SURFACE_BLAST_STANDOFF,
+          z + normal.z * SURFACE_BLAST_STANDOFF,
+        );
+      } else {
+        surface = undefined;
+        sprite.center.set(0.5, 0.5);
+        sprite.position.set(x, y, z);
+      }
+      material.rotation = rotationRad;
     },
-    update(dt: number): boolean {
+    update(dt: number, look?: SurfaceBlastLook): boolean {
       if (!active) return false;
       age += dt;
       const frame = Math.floor(age * fps);
@@ -132,6 +248,20 @@ function createExplosion(parent: THREE.Object3D, atlas: THREE.Texture, blending:
         return false;
       }
       if (frame !== lastFrame) setFrame(frame);
+      if (surface && look) {
+        const pose = surfaceBlastPose(
+          { x: surface.ix, y: surface.iy, z: surface.iz },
+          { x: surface.nx, y: surface.ny, z: surface.nz },
+          look,
+          surface.size,
+          rotationRad,
+          SURFACE_BLAST_STANDOFF,
+          layout.anchorY,
+        );
+        sprite.position.set(pose.x, pose.y, pose.z);
+        sprite.center.set(pose.centerX, pose.centerY);
+        material.rotation = pose.rotation;
+      }
       return true;
     },
     setBlending(mode: ExplosionBlending) {
@@ -176,6 +306,7 @@ export function createExplosionFx(
     rows,
     frameCount: Math.min(whole(sheet.frameCount, EXPLOSION_FRAMES), columns * rows),
     aspect: positive(sheet.frameWidth, 1) / positive(sheet.frameHeight, 1),
+    anchorY: typeof sheet.anchorY === "number" && sheet.anchorY >= 0 && sheet.anchorY < 1 ? sheet.anchorY : 0,
   };
   const defaultFps = positive(sheet.fps, EXPLOSION_FPS);
   const defaultSize = positive(sheet.size, EXPLOSION_SIZE);
@@ -219,6 +350,33 @@ export function createExplosionFx(
     } catch (err) {
       console.warn("explosion prewarm", err);
     }
+  }
+
+  function begin(
+    x: number,
+    y: number,
+    z: number,
+    size: number,
+    fps: number,
+    normal?: { x: number; y: number; z: number },
+  ): boolean {
+    if (!atlas || disabled) return false;
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return false;
+    if (!(size > 0) || !(fps > 0)) return false;
+    let slot = slots.find((item) => !item.active);
+    if (!slot && slots.length < cap) {
+      slot = createExplosion(group, atlas, blending, layout, rotationRad);
+      slots.push(slot);
+    }
+    if (!slot) {
+      // Full: restart the oldest.
+      slot = slots[0]!;
+      for (const item of slots) if (item.age > slot.age) slot = item;
+    } else {
+      running += 1;
+    }
+    slot.start(x, y, z, size, fps, normal);
+    return true;
   }
 
   return {
@@ -266,31 +424,32 @@ export function createExplosionFx(
       return layout.frameCount / fps;
     },
     spawn(x: number, y: number, z: number, size = defaultSize, fps = defaultFps): boolean {
-      if (!atlas || disabled) return false;
-      if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return false;
-      if (!(size > 0) || !(fps > 0)) return false;
-      let slot = slots.find((item) => !item.active);
-      if (!slot && slots.length < cap) {
-        slot = createExplosion(group, atlas, blending, layout, rotationRad);
-        slots.push(slot);
-      }
-      if (!slot) {
-        // Full: restart the oldest.
-        slot = slots[0]!;
-        for (const item of slots) if (item.age > slot.age) slot = item;
-      } else {
-        running += 1;
-      }
-      slot.start(x, y, z, size, fps);
-      return true;
+      return begin(x, y, z, size, fps);
     },
-    /** Render-loop delta in seconds. Returns at once when nothing is playing. */
-    update(dt: number) {
+    /**
+     * Surface blast: bottom edge on the impact point, texture up along the
+     * surface normal in screen space. Needs {@link update} with the camera.
+     */
+    spawnSurface(
+      x: number,
+      y: number,
+      z: number,
+      normal: { x: number; y: number; z: number },
+      size = defaultSize,
+      fps = defaultFps,
+    ): boolean {
+      const len = Math.hypot(normal.x, normal.y, normal.z);
+      if (!(len > 1e-8) || !Number.isFinite(len)) return false;
+      return begin(x, y, z, size, fps, { x: normal.x / len, y: normal.y / len, z: normal.z / len });
+    },
+    /** Render-loop delta in seconds. Pass the camera so surface blasts can reorient. */
+    update(dt: number, camera?: ExplosionCamera) {
       if (running === 0) return;
       const step = Number.isFinite(dt) ? Math.min(Math.max(dt, 0), EXPLOSION_MAX_DT) : 0;
+      const look = camera ? lookFromCamera(camera) : undefined;
       for (let i = 0; i < slots.length; i++) {
         const slot = slots[i]!;
-        if (slot.active && !slot.update(step)) running -= 1;
+        if (slot.active && !slot.update(step, look)) running -= 1;
       }
     },
     setBlending(mode: ExplosionBlending) {
@@ -359,5 +518,32 @@ export function laserImpactPlaybackFps(source: LaserImpactSource | undefined, fa
     const fps = source.sheet.fps;
     if (typeof fps === "number" && Number.isFinite(fps) && fps > 0) return fps;
   }
+  return fallback;
+}
+export type SurfaceExplosionSheet = ExplosionSheet & { texture: string };
+
+/** The `grenade-surface-explosion` asset, or the grenade sheet when that optional file is missing. */
+export function resolveSurfaceExplosionSheet(
+  surfaceExplosion?: SurfaceExplosionSheet,
+  explosion?: SurfaceExplosionSheet,
+): { sheet: SurfaceExplosionSheet; fallback: boolean } | undefined {
+  if (surfaceExplosion) return { sheet: surfaceExplosion, fallback: false };
+  if (explosion) return { sheet: explosion, fallback: true };
+  return undefined;
+}
+
+export type SurfaceExplosionSource = NonNullable<ReturnType<typeof resolveSurfaceExplosionSheet>>;
+
+/** World size of a surface blast. Uses the chosen sheet's `size`, else the grenade default. */
+export function surfaceExplosionWorldSize(source: SurfaceExplosionSource | undefined, fallback = EXPLOSION_SIZE): number {
+  const size = source?.sheet.size;
+  if (typeof size === "number" && Number.isFinite(size) && size > 0) return size;
+  return fallback;
+}
+
+/** Playback fps of a surface blast. The chosen sheet's `fps`, else the grenade default. */
+export function surfaceExplosionPlaybackFps(source: SurfaceExplosionSource | undefined, fallback = EXPLOSION_FPS): number {
+  const fps = source?.sheet.fps;
+  if (typeof fps === "number" && Number.isFinite(fps) && fps > 0) return fps;
   return fallback;
 }

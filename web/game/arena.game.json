@@ -1079,6 +1079,32 @@
       }
     },
     {
+      "id": "grenade-surface-explosion",
+      "kind": "texture",
+      "optional": true,
+      "uri": "/assets/textures/grenade-ground-blast-sheet.png",
+      "mediaType": "image/png",
+      "sprite": {
+        "columns": 6,
+        "rows": 5,
+        "frameCount": 30,
+        "frameWidth": 256,
+        "frameHeight": 256,
+        "fps": 30,
+        "size": 8,
+        "anchorY": 0.48,
+        "blending": "normal"
+      },
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
+      "provenance": {
+        "origin": "manual",
+        "notes": "Surface grenade blast sprite sheet, 1536x1280: 30 frames of 256x256 in 6 columns x 5 rows at 30 fps. Drawn with the bottom edge on the impact surface. The client derives frame size from the loaded image. Optional: while the file is absent, surface hits use the grenade-explosion sheet."
+      }
+    },
+    {
       "id": "laser-blast",
       "kind": "audio",
       "uri": "/assets/audio/laser-blast-sfx.mp3",

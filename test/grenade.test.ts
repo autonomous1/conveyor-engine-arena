@@ -960,3 +960,137 @@ test("the floor plane stops a grenade: one bounce on it, then a stop at floor he
   assert.equal(first.kind, "bounce");
   assert.equal((first as { hit: grenade.GrenadeHit }).hit.id, 3);
 });
+
+test("stop poses encode and decode an optional snapped surface normal", () => {
+  const point = { x: 1, y: 2, z: 3 };
+  const air = grenade.grenadePose(4, point, 0.5, true);
+  assert.equal(air.stop, true);
+  assert.equal(air.n, undefined);
+  assert.deepEqual(grenade.parseGrenadePose(air), air);
+  assert.deepEqual(grenade.parseGrenadePose({ t: "grenade", id: 4, x: 1, y: 2, z: 3, yaw: 0.5, stop: true }), air);
+
+  const floor = grenade.grenadePose(5, point, 0.25, true, { x: 0.1, y: 2, z: -0.2 });
+  assert.deepEqual(floor.n, [0, 1, 0]);
+  assert.deepEqual(grenade.parseGrenadePose(floor), floor);
+  const wall = grenade.grenadePose(6, point, 0, true, { x: 0, y: 0, z: -1 });
+  assert.deepEqual(wall.n, [0, 0, -1]);
+  assert.deepEqual(grenade.parseGrenadePose({ t: "grenade", id: 6, x: 1, y: 2, z: 3, yaw: 0, stop: true, n: [0, 0, -1] }), wall);
+
+  const fly = grenade.grenadePose(7, point, 1, false, { x: 0, y: 1, z: 0 });
+  assert.equal("stop" in fly, false);
+  assert.equal("n" in fly, false, "normal is only on stop poses");
+  const ignored = grenade.parseGrenadePose({ t: "grenade", id: 7, x: 1, y: 2, z: 3, yaw: 1, n: [0, 1, 0] });
+  assert.ok(ignored);
+  assert.equal(ignored.n, undefined, "n without stop is ignored");
+
+  const bad = grenade.parseGrenadePose({ t: "grenade", id: 8, x: 1, y: 2, z: 3, yaw: 0, stop: true, n: [0, 0, 0] });
+  assert.ok(bad);
+  assert.equal(bad.stop, true);
+  assert.equal(bad.n, undefined, "invalid n is dropped, pose still parses");
+  assert.equal(grenade.parseGrenadeSurfaceNormal(["up"]), undefined);
+  assert.equal(grenade.snapSurfaceNormal({ x: 0, y: 0, z: 0 }), undefined);
+  assert.deepEqual(grenade.snapSurfaceNormal({ x: -3, y: 0.1, z: 0.2 }), { x: -1, y: 0, z: 0 });
+});
+
+test("stepGrenade surface stops carry a snapped normal; pawn and timeout stops do not", () => {
+  const wall: TraceAabb = { id: 10, minX: -2, maxX: 2, minY: 0, maxY: 3, minZ: 4, maxZ: 4.4 };
+  const origin = { x: 0, y: EYE_HEIGHT, z: 0 };
+  let body = grenade.launchGrenade(1, 7, origin, aimDirection(0, 0), grenade.GRENADE_SPEED, 0, "explode");
+  let wallHit: grenade.GrenadeHit | undefined;
+  for (let i = 0; i < 80 && !wallHit; i++) {
+    const step = grenade.stepGrenade(body, DT, [wall], []);
+    body = step.body;
+    if (step.kind === "stop") wallHit = step.hit;
+  }
+  assert.ok(wallHit);
+  assert.equal(wallHit.pawn, false);
+  assert.equal(wallHit.surface, true);
+  assert.deepEqual(grenade.stopSurfaceNormal(wallHit), { x: 0, y: 0, z: -1 });
+
+  let floorBody = grenade.launchGrenade(2, 7, origin, aimDirection(0, -0.3), grenade.GRENADE_SPEED, 0, "explode");
+  let floorHit: grenade.GrenadeHit | undefined;
+  for (let i = 0; i < 200 && !floorHit; i++) {
+    const step = grenade.stepGrenade(floorBody, DT, [], [], 0);
+    floorBody = step.body;
+    if (step.kind === "stop") floorHit = step.hit;
+  }
+  assert.ok(floorHit);
+  assert.equal(floorHit.surface, true);
+  assert.deepEqual(grenade.stopSurfaceNormal(floorHit), { x: 0, y: 1, z: 0 });
+
+  const target: TraceCapsule = { id: 9, x: 0, y: 0, z: 3, radius: 0.5, height: 1.8 };
+  let pawnBody = grenade.launchGrenade(3, 7, origin, { x: 0, y: 0, z: 1 }, grenade.GRENADE_SPEED, 0, "explode");
+  pawnBody = grenade.stepGrenade(pawnBody, grenade.GRENADE_ARMING_S, [], []).body;
+  let pawnHit: grenade.GrenadeHit | undefined;
+  for (let i = 0; i < 40 && !pawnHit; i++) {
+    const step = grenade.stepGrenade(pawnBody, DT, [], [target]);
+    pawnBody = step.body;
+    if (step.kind === "stop") pawnHit = step.hit;
+  }
+  assert.ok(pawnHit);
+  assert.equal(pawnHit.pawn, true);
+  assert.equal(pawnHit.surface, undefined);
+  assert.equal(grenade.stopSurfaceNormal(pawnHit), undefined);
+
+  let timeout = grenade.launchGrenade(4, 7, { x: 0, y: 20, z: 0 }, { x: 0, y: 1, z: 0 }, 1);
+  let timeoutHit: grenade.GrenadeHit | undefined;
+  for (let i = 0; i < 500 && !timeoutHit; i++) {
+    const step = grenade.stepGrenade(timeout, DT, [], []);
+    timeout = step.body;
+    if (step.kind === "stop") timeoutHit = step.hit;
+  }
+  assert.ok(timeoutHit);
+  assert.equal(timeoutHit.pawn, false);
+  assert.equal(timeoutHit.surface, undefined, "lifetime timeout is not a surface");
+  assert.equal(grenade.stopSurfaceNormal(timeoutHit), undefined);
+});
+
+test("the host puts n on surface stop poses and omits it for a pawn hit", () => {
+  const wall: TraceAabb = { id: 10, minX: -2, maxX: 2, minY: 0, maxY: 3, minZ: 6, maxZ: 6.4 };
+  const pawns = [
+    { id: 1, position: { x: 0, y: 0, z: 0 }, lifecycle: "alive" as const, radius: 0.5 },
+    { id: 2, position: { x: 0, y: 0, z: 3 }, lifecycle: "alive" as const, radius: 0.5 },
+  ];
+  const worldOf = (boxes: TraceAabb[], roster: typeof pawns) => ({
+    store: { view: (id: number) => roster.find((pawn) => pawn.id === id) },
+    pawnHeight: 1.8,
+    listObstacles: () => boxes,
+    query: () => roster,
+  });
+  const run = (boxes: TraceAabb[], roster: typeof pawns, pitch = 0) => {
+    const sent: grenade.GrenadePose[] = [];
+    const host = createArenaGrenades({
+      world: worldOf(boxes, roster) as never,
+      server: {
+        session: () => ({ sessionId: 1 }),
+        replicator: { get: () => ({ ownedEntity: 1, connected: true, known: new Set<number>([1, 2]) }) },
+        connected: [1],
+      } as never,
+      now: () => 0,
+      floorY: 0,
+      send(_clientId, frame) {
+        sent.push(frame);
+      },
+    });
+    host.onFrame(1, grenade.grenadeFrame(1, 0, pitch));
+    let stop: grenade.GrenadePose | undefined;
+    for (let i = 0; i < 80 && !stop; i++) {
+      host.tick();
+      stop = sent.find((pose) => pose.stop === true);
+    }
+    return stop;
+  };
+
+  const wallStop = run([wall], [pawns[0]!]);
+  assert.ok(wallStop);
+  assert.deepEqual(wallStop.n, [0, 0, -1]);
+  assert.deepEqual(grenade.parseGrenadePose(wallStop)?.n, [0, 0, -1]);
+
+  const floorStop = run([], [pawns[0]!], -0.4);
+  assert.ok(floorStop);
+  assert.deepEqual(floorStop.n, [0, 1, 0]);
+
+  const pawnStop = run([], pawns);
+  assert.ok(pawnStop);
+  assert.equal(pawnStop.n, undefined);
+});

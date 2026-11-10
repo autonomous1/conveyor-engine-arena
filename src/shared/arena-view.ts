@@ -251,6 +251,13 @@ export type ArenaView = {
    */
   laserImpact?: ArenaExplosionSheet;
   /**
+   * Surface grenade blast sprite sheet from the `grenade-surface-explosion` texture
+   * asset and its `sprite` block. Absent when the manifest has no such asset or the
+   * optional file is missing; the client then uses `explosion`. Not part of either
+   * content hash.
+   */
+  surfaceExplosion?: ArenaExplosionSheet;
+  /**
    * Sound effects from the `audio` assets `laser-blast`, `grenade-launch`, `grenade-blast`, `crate-pickup`, `key-pickup`, `medkit-pickup`, `door-open`, `door-close`, `elevator-start`, `beam-spawn-sfx`, and `beam-despawn-sfx`
    * and their `sound` blocks. A key is absent when the manifest has no such asset.
    * Not part of either content hash.
@@ -293,6 +300,11 @@ export type ArenaExplosionSheet = {
    * Beam-despawn uses 90 so its horizontal art plays as a vertical beam.
    */
   rotation?: number;
+  /**
+   * Surface blasts only: where the art's ground line sits, as a fraction of the frame
+   * height from the bottom (0 = bottom edge). That line is placed on the impact point.
+   */
+  anchorY?: number;
 };
 
 /**

@@ -82,10 +82,15 @@ export function admitGrenade(gate: GrenadeGate, seq: number, now: number): "acce
   return "accept";
 }
 
+/** Unit axis of a stop surface: one of ±X, ±Y, or ±Z. */
+export type GrenadeSurfaceNormal = [number, number, number];
+
 /**
  * Replicated point. `yaw` is the launch yaw, in radians, and does not change
  * when gravity or a bounce bends the velocity. `stop` is the final hit: the
- * client shows it, then removes the mesh.
+ * client shows it, then removes the mesh. `n` is the snapped surface axis on a
+ * box or floor stop only; absent means an air burst (pawn, timeout, or an old
+ * host). Old clients ignore `n`.
  */
 export type GrenadePose = {
   t: "grenade";
@@ -95,11 +100,46 @@ export type GrenadePose = {
   z: number;
   yaw: number;
   stop?: true;
+  n?: GrenadeSurfaceNormal;
 };
 
-export function grenadePose(id: number, point: Vec3, yaw: number, stop = false): GrenadePose {
+/** Snap a hit normal to the dominant unit axis. Zero or non-finite yields undefined. */
+export function snapSurfaceNormal(normal: Vec3): Vec3 | undefined {
+  const ax = Math.abs(normal.x);
+  const ay = Math.abs(normal.y);
+  const az = Math.abs(normal.z);
+  if (!Number.isFinite(ax) || !Number.isFinite(ay) || !Number.isFinite(az)) return undefined;
+  if (ay >= ax && ay >= az && ay > 0) return { x: 0, y: normal.y < 0 ? -1 : 1, z: 0 };
+  if (ax >= az && ax > 0) return { x: normal.x < 0 ? -1 : 1, y: 0, z: 0 };
+  if (az > 0) return { x: 0, y: 0, z: normal.z < 0 ? -1 : 1 };
+  return undefined;
+}
+
+/** Wire `n` on a stop pose: a 3-number axis, snapped. Invalid values are dropped. */
+export function parseGrenadeSurfaceNormal(value: unknown): GrenadeSurfaceNormal | undefined {
+  if (!Array.isArray(value) || value.length !== 3) return undefined;
+  const x = value[0];
+  const y = value[1];
+  const z = value[2];
+  if (typeof x !== "number" || typeof y !== "number" || typeof z !== "number") return undefined;
+  const snapped = snapSurfaceNormal({ x, y, z });
+  if (!snapped) return undefined;
+  return [snapped.x, snapped.y, snapped.z];
+}
+
+/** Surface axis for a stop pose. Pawn hits and lifetime timeouts have none. */
+export function stopSurfaceNormal(hit: GrenadeHit): Vec3 | undefined {
+  if (hit.pawn || hit.surface !== true) return undefined;
+  return snapSurfaceNormal(hit.normal);
+}
+
+export function grenadePose(id: number, point: Vec3, yaw: number, stop = false, normal?: Vec3): GrenadePose {
   const pose: GrenadePose = { t: "grenade", id, x: point.x, y: point.y, z: point.z, yaw };
-  if (stop) pose.stop = true;
+  if (stop) {
+    pose.stop = true;
+    const snapped = normal ? snapSurfaceNormal(normal) : undefined;
+    if (snapped) pose.n = [snapped.x, snapped.y, snapped.z];
+  }
   return pose;
 }
 
@@ -112,7 +152,11 @@ export function parseGrenadePose(frame: unknown): GrenadePose | undefined {
   if (!Number.isFinite(rec.x) || !Number.isFinite(rec.y) || !Number.isFinite(rec.z)) return undefined;
   if (typeof rec.yaw !== "number" || !Number.isFinite(rec.yaw)) return undefined;
   const pose: GrenadePose = { t: "grenade", id: rec.id, x: rec.x, y: rec.y, z: rec.z, yaw: rec.yaw };
-  if (rec.stop === true) pose.stop = true;
+  if (rec.stop === true) {
+    pose.stop = true;
+    const n = parseGrenadeSurfaceNormal(rec.n);
+    if (n) pose.n = n;
+  }
   return pose;
 }
 
@@ -138,6 +182,8 @@ export type GrenadeHit = {
   normal: Vec3;
   id?: number;
   pawn: boolean;
+  /** Box or ground-plane contact. Absent on a pawn hit or a lifetime timeout. */
+  surface?: true;
 };
 
 export type GrenadeStep =
@@ -219,6 +265,7 @@ export function stepGrenade(
     : hit.point;
   const contact: GrenadeHit = { point, normal: hit.normal, pawn: hit.pawn };
   if (hit.id !== undefined) contact.id = hit.id;
+  if (!hit.pawn) contact.surface = true;
   if (hit.pawn || body.bounced || explode) {
     next.x = point.x;
     next.y = point.y;

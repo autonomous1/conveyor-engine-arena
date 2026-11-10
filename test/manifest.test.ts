@@ -902,6 +902,103 @@ test("laser-impact sprite rejects bad values with the field path", () => {
   assert.ok(objPaths.some((path) => path.endsWith(".sprite")), String(objPaths));
 });
 
+test("grenade-surface-explosion asset compiles to view.surfaceExplosion; an absent optional file is dropped with a warning", () => {
+  const doc = document();
+  const files = filesFromDisk();
+  const uri = "/assets/textures/grenade-ground-blast-sheet.png";
+  const row = (doc.assets as Array<Record<string, unknown>>).find((asset) => asset.id === "grenade-surface-explosion")!;
+  assert.equal(row.kind, "texture");
+  assert.equal(row.optional, true);
+  assert.equal("type" in row, false, "no placement type");
+  assert.equal(row.uri, uri);
+  const reader = (extra: Record<string, Uint8Array | undefined> = {}) => (path: string) => (path in extra ? extra[path] : files.get(path));
+
+  const warnings: string[] = [];
+  const warn = console.warn;
+  console.warn = (...args: unknown[]) => void warnings.push(args.join(" "));
+  let bare;
+  try {
+    bare = compile(doc, reader({ [uri]: undefined }));
+  } finally {
+    console.warn = warn;
+  }
+  assert.equal(bare.view.surfaceExplosion, undefined);
+  assert.ok(bare.view.explosion, "grenade sheet is still there for the client fallback");
+  assert.equal(warnings.filter((line) => line.includes("grenade-surface-explosion") && line.includes("effect is skipped")).length >= 1, true);
+
+  const view = compile(doc, reader({ [uri]: pngHeader(1536, 1280) })).view;
+  assert.deepEqual(view.surfaceExplosion, {
+    texture: uri,
+    columns: 6,
+    rows: 5,
+    frameCount: 30,
+    frameWidth: 256,
+    frameHeight: 256,
+    fps: 30,
+    size: 8,
+    blending: "normal",
+    anchorY: 0.46,
+  });
+
+  const emptySprite = structuredClone(doc) as { assets: Array<Record<string, unknown>> };
+  emptySprite.assets.find((asset) => asset.id === "grenade-surface-explosion")!.sprite = {};
+  const defaults = compile(emptySprite, reader({ [uri]: pngHeader(1536, 1280) })).view.surfaceExplosion;
+  assert.deepEqual(defaults, {
+    texture: uri, columns: 6, rows: 5, frameCount: 30, frameWidth: 256, frameHeight: 256, fps: 30, size: 8, blending: "normal",
+  }, "size defaults to the grenade-explosion size");
+
+  const noExplosion = structuredClone(emptySprite) as { assets: Array<Record<string, unknown>> };
+  noExplosion.assets = noExplosion.assets.filter((asset) => asset.id !== "grenade-explosion");
+  const fallbackSize = compile(noExplosion, reader({ [uri]: pngHeader(1536, 1280) })).view.surfaceExplosion;
+  assert.equal(fallbackSize?.size, 4, "size falls back to 4 when the grenade sheet is also absent");
+
+  const custom = structuredClone(doc) as { assets: Array<Record<string, unknown>> };
+  custom.assets.find((asset) => asset.id === "grenade-surface-explosion")!.sprite = {
+    columns: 4, rows: 4, frameCount: 16, frameWidth: 128, frameHeight: 128, fps: 12, size: 6, blending: "additive", rotation: 90,
+  };
+  assert.deepEqual(compile(custom, reader({ [uri]: pngHeader(512, 512) })).view.surfaceExplosion, {
+    texture: uri, columns: 4, rows: 4, frameCount: 16, frameWidth: 128, frameHeight: 128, fps: 12, size: 6, blending: "additive", rotation: 90,
+  });
+
+  const none = structuredClone(doc) as { assets: Array<Record<string, unknown>> };
+  none.assets = none.assets.filter((asset) => asset.id !== "grenade-surface-explosion");
+  assert.equal(compile(none, (path) => files.get(path)).view.surfaceExplosion, undefined);
+});
+
+test("grenade-surface-explosion sprite rejects bad values with the field path", () => {
+  const doc = document();
+  const files = filesFromDisk();
+  const uri = "/assets/textures/grenade-ground-blast-sheet.png";
+  const read = (path: string) => (path === uri ? pngHeader(1536, 1280) : files.get(path));
+  const paths = (edit: (copy: { assets: Array<Record<string, unknown>> }) => void): string[] => {
+    const copy = structuredClone(doc) as { assets: Array<Record<string, unknown>> };
+    edit(copy);
+    try {
+      compile(copy, read);
+    } catch (err) {
+      assert.ok(err instanceof GameManifestError);
+      return err.issues.map((issue) => issue.path);
+    }
+    return [];
+  };
+  const columnPaths = paths((c) => void (c.assets.find((asset) => asset.id === "grenade-surface-explosion")!.sprite = { columns: 0 }));
+  assert.ok(columnPaths.some((path) => path.endsWith(".sprite.columns")), String(columnPaths));
+  const blendPaths = paths((c) => void (c.assets.find((asset) => asset.id === "grenade-surface-explosion")!.sprite = { blending: "screen" }));
+  assert.ok(blendPaths.some((path) => path.endsWith(".sprite.blending")), String(blendPaths));
+  const rotPaths = paths((c) => void (c.assets.find((asset) => asset.id === "grenade-surface-explosion")!.sprite = { rotation: "cw" }));
+  assert.ok(rotPaths.some((path) => path.endsWith(".sprite.rotation")), String(rotPaths));
+  const countPaths = paths((c) => void (c.assets.find((asset) => asset.id === "grenade-surface-explosion")!.sprite = { columns: 6, rows: 5, frameCount: 31 }));
+  assert.ok(countPaths.some((path) => path.endsWith(".sprite.frameCount")), String(countPaths));
+  const anchorPaths = paths((c) => void (c.assets.find((asset) => asset.id === "grenade-surface-explosion")!.sprite = { anchorY: 1 }));
+  assert.ok(anchorPaths.some((path) => path.endsWith(".sprite.anchorY")), String(anchorPaths));
+  const sizePaths = paths((c) => void (c.assets.find((asset) => asset.id === "grenade-surface-explosion")!.sprite = { size: 0 }));
+  assert.ok(sizePaths.some((path) => path.endsWith(".sprite.size")), String(sizePaths));
+  const kindPaths = paths((c) => void (c.assets.find((asset) => asset.id === "grenade-surface-explosion")!.kind = "model"));
+  assert.ok(kindPaths.some((path) => path.endsWith(".kind")), String(kindPaths));
+  const objPaths = paths((c) => void (c.assets.find((asset) => asset.id === "grenade-surface-explosion")!.sprite = "sheet"));
+  assert.ok(objPaths.some((path) => path.endsWith(".sprite")), String(objPaths));
+});
+
 test("audio assets compile to view.sounds; a bad sound block or file is an issue", () => {
   const doc = document();
   const files = filesFromDisk();

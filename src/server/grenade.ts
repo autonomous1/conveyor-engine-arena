@@ -12,6 +12,7 @@ import {
   launchGrenade,
   parseGrenade,
   stepGrenade,
+  stopSurfaceNormal,
   type GrenadeBody,
   type GrenadeGate,
   type GrenadeImpact,
@@ -106,7 +107,7 @@ export function createArenaGrenades(opts: {
             : step.hit.point;
         if (!finitePoint(point)) continue;
         if (step.kind === "stop") {
-          broadcast(body.owner, grenadePose(body.id, point, body.yaw, true));
+          broadcast(body.owner, grenadePose(body.id, point, body.yaw, true, stopSurfaceNormal(step.hit)));
           if (step.hit.pawn && step.hit.id !== undefined) wound(step.hit.id, body.owner);
           continue;
         }

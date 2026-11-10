@@ -237,6 +237,9 @@ function drawsAsProp(asset: AssetRec): boolean {
 
 const EXPLOSION_ASSET = "grenade-explosion";
 const LASER_IMPACT_ASSET = "laser-impact";
+const SURFACE_EXPLOSION_ASSET = "grenade-surface-explosion";
+/** Fallback world size when the grenade-explosion sheet is also absent. Matches client EXPLOSION_SIZE. */
+const SURFACE_EXPLOSION_SIZE_FALLBACK = 4;
 
 /**
  * `projectile` block on the `grenade` model. Absent is not an issue: the host
@@ -435,6 +438,103 @@ function laserImpactSheet(
     texture: asset.uri, columns, rows, frameCount, frameWidth, frameHeight, fps, size, blending,
     ...(typeof impact === "number" ? { laserImpactSize: impact } : {}),
     ...(rotation !== undefined ? { rotation } : {}),
+  };
+}
+
+
+/**
+ * `sprite` block of the optional `grenade-surface-explosion` texture asset. Every
+ * field is optional. Defaults match `grenade-explosion` (6 x 5, 30 frames, 256 x 256
+ * px, 30 fps, `blending` normal). `size` defaults to the grenade-explosion size
+ * (or 4 if that sheet is also absent). Optional `rotation` is degrees. A bad field
+ * is a manifest issue. An absent optional file leaves the sheet out; the client
+ * then uses the grenade-explosion sheet.
+ */
+function surfaceExplosionSheet(
+  docAssets: unknown,
+  asset: AssetRec | undefined,
+  absent: ReadonlySet<string>,
+  fileBytes: ReadonlyMap<string, Uint8Array>,
+  defaultSize: number,
+  issues: GameIssue[],
+): ArenaExplosionSheet | undefined {
+  if (!asset || absent.has(asset.id)) return undefined;
+  const index = Array.isArray(docAssets) ? docAssets.findIndex((item) => isObject(item) && item.id === asset.id) : -1;
+  const path = `assets[${index}].sprite`;
+  if (asset.kind !== "texture") {
+    issues.push({ path: `assets[${index}].kind`, message: `${asset.id} must be a texture` });
+    return undefined;
+  }
+  const item = index >= 0 ? (docAssets as unknown[])[index] : undefined;
+  const raw = isObject(item) ? item.sprite : undefined;
+  if (raw !== undefined && !isObject(raw)) {
+    issues.push({ path, message: "must be an object" });
+    return undefined;
+  }
+  const sprite: Record<string, unknown> = raw ?? {};
+  let ok = true;
+  const whole = (key: string, fallback: number): number => {
+    const value = sprite[key];
+    if (value === undefined) return fallback;
+    if (typeof value === "number" && Number.isInteger(value) && value > 0) return value;
+    issues.push({ path: `${path}.${key}`, message: "must be a positive integer" });
+    ok = false;
+    return fallback;
+  };
+  const positive = (key: string, fallback: number): number => {
+    const value = sprite[key];
+    if (value === undefined) return fallback;
+    if (typeof value === "number" && Number.isFinite(value) && value > 0) return value;
+    issues.push({ path: `${path}.${key}`, message: "must be > 0" });
+    ok = false;
+    return fallback;
+  };
+  const columns = whole("columns", 6);
+  const rows = whole("rows", 5);
+  const frameCount = whole("frameCount", 30);
+  const frameWidth = whole("frameWidth", 256);
+  const frameHeight = whole("frameHeight", 256);
+  const fps = positive("fps", 30);
+  const size = positive("size", defaultSize);
+  const blending = sprite.blending ?? "normal";
+  if (blending !== "normal" && blending !== "additive") {
+    issues.push({ path: `${path}.blending`, message: "must be normal or additive" });
+    ok = false;
+  }
+  let rotation: number | undefined;
+  if (sprite.rotation !== undefined) {
+    if (typeof sprite.rotation === "number" && Number.isFinite(sprite.rotation)) rotation = sprite.rotation;
+    else {
+      issues.push({ path: `${path}.rotation`, message: "must be a finite number of degrees" });
+      ok = false;
+    }
+  }
+  let anchorY: number | undefined;
+  if (sprite.anchorY !== undefined) {
+    if (typeof sprite.anchorY === "number" && Number.isFinite(sprite.anchorY) && sprite.anchorY >= 0 && sprite.anchorY < 1) {
+      anchorY = sprite.anchorY;
+    } else {
+      issues.push({ path: `${path}.anchorY`, message: "must be >= 0 and < 1" });
+      ok = false;
+    }
+  }
+  if (frameCount > columns * rows) {
+    issues.push({ path: `${path}.frameCount`, message: `more than ${columns} × ${rows} frames` });
+    ok = false;
+  }
+  if (!ok || (blending !== "normal" && blending !== "additive")) return undefined;
+  const png = fileBytes.get(asset.uri);
+  if (png && png.length >= 24 && sprite.frameWidth !== undefined && sprite.frameHeight !== undefined) {
+    const width = ((png[16]! << 24) | (png[17]! << 16) | (png[18]! << 8) | png[19]!) >>> 0;
+    const height = ((png[20]! << 24) | (png[21]! << 16) | (png[22]! << 8) | png[23]!) >>> 0;
+    if (width !== columns * frameWidth || height !== rows * frameHeight) {
+      console.warn(`${asset.id}: ${asset.uri} is ${width}x${height}, sprite expects ${columns * frameWidth}x${rows * frameHeight}`);
+    }
+  }
+  return {
+    texture: asset.uri, columns, rows, frameCount, frameWidth, frameHeight, fps, size, blending,
+    ...(rotation !== undefined ? { rotation } : {}),
+    ...(anchorY !== undefined ? { anchorY } : {}),
   };
 }
 
@@ -1967,6 +2067,14 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
   });
   const explosion = explosionSheet(doc.assets, assets.get(EXPLOSION_ASSET), fileBytes, issues);
   const laserImpact = laserImpactSheet(doc.assets, assets.get(LASER_IMPACT_ASSET), absentOptional, fileBytes, issues);
+  const surfaceExplosion = surfaceExplosionSheet(
+    doc.assets,
+    assets.get(SURFACE_EXPLOSION_ASSET),
+    absentOptional,
+    fileBytes,
+    explosion?.size ?? SURFACE_EXPLOSION_SIZE_FALLBACK,
+    issues,
+  );
   const grenadeProj = grenadeProjectile(doc.assets, issues);
   const sounds = soundEffects(doc.assets, assets, absentOptional, issues);
   const characterBeam: ArenaCharacterBeam | undefined = beamTiming
@@ -2177,6 +2285,7 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
     ...(grenadeProj?.damage !== undefined ? { grenadeDamage: grenadeProj.damage } : {}),
     ...(explosion ? { explosion } : {}),
     ...(laserImpact ? { laserImpact } : {}),
+    ...(surfaceExplosion ? { surfaceExplosion } : {}),
     ...(sounds ? { sounds } : {}),
     ...(characterBeam ? { characterBeam } : {}),
     ...(wsUrl ? { wsUrl } : {}),

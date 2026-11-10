@@ -28,7 +28,7 @@ import { createDoorSounds } from "./door-sound.js";
 import { createElevatorSounds } from "./elevator-sound.js";
 import { createPickupSounds, kindSoundsOf } from "./pickup-sound.js";
 import { createCharacterFx, type CharacterFx, type Point as FxPoint } from "./character-fx.js";
-import { createExplosionFx, type ExplosionFx, resolveLaserImpactSheet, laserImpactWorldSize, laserImpactPlaybackFps, LASER_IMPACT_SIZE } from "./explosion.js";
+import { createExplosionFx, type ExplosionFx, resolveLaserImpactSheet, laserImpactWorldSize, laserImpactPlaybackFps, LASER_IMPACT_SIZE, resolveSurfaceExplosionSheet, surfaceExplosionWorldSize, surfaceExplosionPlaybackFps } from "./explosion.js";
 import { createGrenadeProps } from "./grenade.js";
 import { createHitMarker } from "./hit-marker.js";
 import { createHud, localHealthLabel } from "./hud.js";
@@ -47,8 +47,6 @@ import { createRateWindow, formatOverlay } from "./rates.js";
 import { formatFireLog, presentShot } from "./shot-view.js";
 
 /** Laser hit point: a small blast. Size is 0.8 m unless the sheet sets `laserImpactSize` (or `size` on `laser-impact`). */
-/** Grenade blast centre above the stop point, as a fraction of the sprite size. */
-const GRENADE_BLAST_LIFT = 0.25;
 /** A grenade's first pose is the thrower's eye. Within this of your own eye, it is yours. */
 const OWN_GRENADE_RADIUS = 2.5;
 
@@ -206,6 +204,29 @@ export async function boot(
   void laserImpacts.load(async () => {
     if (!laserSource) throw new Error("manifest has no laser-impact or grenade-explosion sprite");
     return new THREE.TextureLoader().loadAsync(laserSource.sheet.texture);
+  }, arena.renderer);
+  // Surface grenade hits use their own pool and the `grenade-surface-explosion`
+  // sheet (`view.surfaceExplosion`). If that optional file is missing, this falls
+  // back to the grenade-explosion sheet and logs once through diag (console, not
+  // the HUD). Air and pawn stops stay on the centred air-burst pool.
+  const surfaceSource = resolveSurfaceExplosionSheet(view.surfaceExplosion, view.explosion);
+  if (surfaceSource?.fallback) {
+    diag.report({
+      level: "warn",
+      fields: { source: "fx", category: "grenade-surface-atlas", reason: "fallback-to-grenade-explosion" },
+    });
+  }
+  const surfaceExplosions = createExplosionFx(arena.scene, {
+    sheet: surfaceSource?.sheet,
+    onLoadError(err) {
+      diag.report({ level: "error", error: err, fields: { source: "fx", category: "grenade-surface-atlas" } });
+    },
+  });
+  const surfaceExplosionSize = surfaceExplosionWorldSize(surfaceSource, explosions.size);
+  const surfaceExplosionFps = surfaceExplosionPlaybackFps(surfaceSource);
+  void surfaceExplosions.load(async () => {
+    if (!surfaceSource) throw new Error("manifest has no grenade-surface-explosion or grenade-explosion sprite");
+    return new THREE.TextureLoader().loadAsync(surfaceSource.sheet.texture);
   }, arena.renderer);
   // Character spawn and despawn: sound, beam sheet, and a fade of the model. `view.characterBeam`
   // sets the timings; absent, characters appear and go at once. Triggers: a `spawn` host frame (a
@@ -536,6 +557,7 @@ export async function boot(
       grenades.drop();
       explosions.clear();
       laserImpacts.clear();
+      surfaceExplosions.clear();
       pickupSounds.clear();
       doorSounds.clear();
       elevatorSounds.clear();
@@ -731,9 +753,13 @@ export async function boot(
     for (const pose of grenadeQueue) {
       const event = grenades.place(pose, now);
       if (event === "stop") {
-        // The stop point is on a surface, usually the floor. Lift the centre so the
-        // fireball is not half under the ground.
-        explosions.spawn(pose.x, pose.y + explosions.size * GRENADE_BLAST_LIFT, pose.z);
+        // A surface axis (`n`) uses the surface pool: bottom edge on the impact,
+        // texture up along the normal. Air, pawn, and timeout stops stay centred.
+        if (pose.n) {
+          surfaceExplosions.spawnSurface(pose.x, pose.y, pose.z, { x: pose.n[0], y: pose.n[1], z: pose.n[2] }, surfaceExplosionSize, surfaceExplosionFps);
+        } else {
+          explosions.spawn(pose.x, pose.y, pose.z);
+        }
         sfx.play("grenadeBlast", pose);
       } else if (event === "launch") {
         // Poses carry no owner. A launch at your own eye while a local throw waits is yours.
@@ -747,6 +773,7 @@ export async function boot(
     grenades.expire(now);
     explosions.update(frozen ? 0 : dt);
     laserImpacts.update(frozen ? 0 : dt);
+    surfaceExplosions.update(frozen ? 0 : dt, arena.camera);
     pickupSounds.update(performance.now());
     doorSounds.update(performance.now());
     {
