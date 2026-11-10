@@ -44,12 +44,28 @@ test("arbiter: trapped after 60 s with no route out, not before", () => {
   assert.equal(late.respawn, false);
 });
 
-test("arbiter: 60 s of no net movement is trapped too, outside included", () => {
+test("arbiter: 60 s of no net movement inside a building is trapped", () => {
   const mind = createMind();
   assert.equal(judge(mind, { ...calm, msNoProgress: 59_999 }, 0).goal, "wander");
   assert.equal(judge(mind, { ...calm, msNoProgress: 60_000 }, 50).goal, "escape");
-  const other = createMind();
-  assert.equal(judge(other, { ...calm, place: "outside", msNoProgress: 60_000 }, 0).goal, "escape");
+});
+
+test("arbiter: a bot outside is never trapped. Wander retries; a jammed one respawns after 180 s", () => {
+  const out = { ...calm, place: "outside" };
+  const mind = createMind();
+  for (const stuck of [0, 60 * S, 120 * S, 179_999]) {
+    const verdict = judge(mind, { ...out, msNoProgress: stuck }, stuck);
+    assert.equal(verdict.goal, "wander", `${stuck} ms`);
+    assert.equal(verdict.trapped, false);
+    assert.equal(verdict.respawn, false);
+  }
+  const jammed = judge(mind, { ...out, msNoProgress: 180 * S }, 180 * S);
+  assert.equal(jammed.goal, "wander", "no Escape: there is nowhere to escape to");
+  assert.equal(jammed.respawn, true);
+  // A no-route reading never counts outside either.
+  const walledOut = createMind();
+  judge(walledOut, { ...out, routeOut: { open: false, unlocked: false } }, 0);
+  assert.equal(judge(walledOut, { ...out, routeOut: { open: false, unlocked: false } }, 500 * S).goal, "wander");
 });
 
 test("arbiter: the no-route timer restarts when a route opens or the place changes", () => {
@@ -74,11 +90,12 @@ test("arbiter: Escape holds through a place change or an opened door, and ends o
   assert.equal(judge(mind, calm, 62 * S).goal, "escape");
   assert.equal(judge(mind, { ...calm, place: "outside" }, 63 * S).goal, "wander");
   assert.equal(judge(mind, walled, 64 * S).goal, "wander");
-  // Outside but still wedged: it keeps the claim and the clock.
+  // Escape never latches outside: a bot that was wedged inside and arrives outside lets go at once.
   const wedged = createMind();
-  judge(wedged, { ...calm, place: "outside", msNoProgress: 60 * S }, 0);
-  assert.equal(judge(wedged, { ...calm, place: "outside", msNoProgress: 61 * S }, 1 * S).goal, "escape");
-  assert.equal(judge(wedged, { ...calm, place: "outside", msNoProgress: 0 }, 2 * S).goal, "wander");
+  judge(wedged, { ...calm, msNoProgress: 60 * S }, 0);
+  assert.equal(judge(wedged, { ...calm, msNoProgress: 61 * S }, 1 * S).goal, "escape");
+  assert.equal(judge(wedged, { ...calm, place: "outside", msNoProgress: 62 * S }, 2 * S).goal, "wander");
+  assert.equal(judge(wedged, { ...calm, msNoProgress: 63 * S }, 3 * S).goal, "escape", "inside again and still wedged: a new Escape");
 });
 
 test("arbiter: respawn is due 120 s after it became trapped, and death resets it", () => {

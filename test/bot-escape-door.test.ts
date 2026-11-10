@@ -18,6 +18,7 @@ register(
     `),
 );
 
+const { AuthoritativeWorld } = await import("conveyor-engine-world");
 const { createHostBotBrain } = await import("../src/server/bot-brain.ts");
 const { createHostBotSense } = await import("../src/server/bot-sense.ts");
 const { createArenaDoors, createDoorBlockers } = await import("../src/server/doors.ts");
@@ -322,4 +323,113 @@ test("real arena: a Wander bot never presses a door, even one it stands beside",
   assert.deepEqual(spy, []);
   assert.equal(doorOpen(r, DOOR("-4")), false);
   assert.deepEqual(r.doorLog, []);
+});
+
+// ---- outside ----
+
+/** A pen with a big far region that nothing connects to. The bot stands in the pen. */
+function penNav() {
+  const rect = (id: string, kind: "room" | "outside", minX: number, maxX: number, minZ: number, maxZ: number) => ({
+    id,
+    kind,
+    y: 0,
+    polygon: [[minX, minZ], [maxX, minZ], [maxX, maxZ], [minX, maxZ]] as Array<[number, number]>,
+    bounds: { minX, maxX, minZ, maxZ },
+  });
+  const places = [rect("pen", "room", 0, 12, 0, 12), rect("far", "room", 30, 100, 30, 100), rect("outside", "outside", -200, 200, -200, 200)];
+  const sceneGraph = {
+    formatVersion: 1 as const,
+    units: "meters" as const,
+    places,
+    portals: [],
+    placeById: new Map(places.map((item) => [item.id, item])),
+    portalsOf: new Map(),
+    shafts: [],
+    skip: new Set<string>(),
+  };
+  const regions = {
+    version: 1 as const,
+    radius: 0.5,
+    height: 1.8,
+    places: [
+      { placeId: "pen", regions: [{ id: "p", minX: 0.5, maxX: 11.5, minZ: 0.5, maxZ: 11.5, y: 0 }], portals: [] },
+      { placeId: "far", regions: [{ id: "f", minX: 30.5, maxX: 99.5, minZ: 30.5, maxZ: 99.5, y: 0 }], portals: [] },
+    ],
+  };
+  return { sceneGraph, regions, aabbs: [], doors: [], pawnRadius: 0.5, pawnHeight: 1.8 };
+}
+
+function penBot(x: number, z: number) {
+  const world = new AuthoritativeWorld();
+  const id = world.createEntity(0n, { type: "pawn", shape: "capsule" });
+  world.enqueue({ kind: "setTransform", entity: id, position: { x, y: 0, z }, rotation: { x: 0, y: 0, z: 0, w: 1 }, scale: { x: 1, y: 1, z: 1 } });
+  world.enqueue({ kind: "setBounds", entity: id, radius: 0.5 });
+  world.commit(0n);
+  return { world, agent: { id, heading: 0, gait: "idle", nextTurn: 0, speeds: { idle: 0, walk: 1, run: 2, fall: 0, angry: 0 } } as Record<string, any> };
+}
+
+test("wander: nearly every goal sits where the pawn cannot walk, and it still walks the pen", () => {
+  const nav = penNav();
+  for (let seed = 1; seed <= 25; seed += 1) {
+    const { world, agent } = penBot(6, 6);
+    steerUnownedWander(world, agent as never, 1, splitMix(seed), nav as never, createNavCache());
+    assert.ok(agent.goal, `seed ${seed}: no goal`);
+    assert.ok(agent.goal.x < 12 && agent.goal.z < 12, `seed ${seed}: goal ${JSON.stringify(agent.goal)} is not in the pen`);
+  }
+});
+
+test("wander: a pick with no walkable goal tries again in 2 s, not a whole goal's time", () => {
+  const nav = penNav();
+  // Off every region: nothing is walkable from here, so every sample fails.
+  const { world, agent } = penBot(-50, -50);
+  steerUnownedWander(world, agent as never, 100, splitMix(1), nav as never, createNavCache());
+  assert.equal(agent.goal, undefined);
+  assert.equal(agent.gait, "idle");
+  assert.equal(agent.nextTurn, 140, "retry 40 ticks later");
+  // Still idle and waiting at tick 139: no new pick.
+  const rolls: number[] = [];
+  steerUnownedWander(world, agent as never, 139, () => (rolls.push(1), 0.5), nav as never, createNavCache());
+  assert.deepEqual(rolls, []);
+  // At 140 it picks again. The world has changed: the bot can now walk.
+  world.enqueue({ kind: "setTransform", entity: agent.id, position: { x: 6, y: 0, z: 6 }, rotation: { x: 0, y: 0, z: 0, w: 1 }, scale: { x: 1, y: 1, z: 1 } });
+  world.commit(1n);
+  steerUnownedWander(world, agent as never, 140, splitMix(2), nav as never, createNavCache());
+  assert.ok(agent.goal);
+});
+
+test("real arena: a bot wandering outside with every door shut is never trapped, escaping or respawned", () => {
+  // Open ground west of the buildings.
+  for (const [x, z] of [[-60, 20], [-40, -60], [30, 60]] as const) {
+    const r = rig({ x, z });
+    let worst = 0;
+    let escaped = false;
+    r.run(240 * S, () => {
+      const sense = r.sense.get(r.agent.id);
+      if (sense) worst = Math.max(worst, sense.msNoProgress);
+      if (r.brain.goalOf(r.agent.id) === "escape") escaped = true;
+      return false;
+    });
+    assert.equal(r.place(), "outside", `${x},${z}`);
+    assert.equal(escaped, false, `${x},${z} latched Escape`);
+    assert.ok(worst < 60 * S, `${x},${z} stood still for ${worst} ms`);
+    assert.equal(r.health.isDead(r.agent.id), false);
+    assert.equal(r.agent.override, undefined);
+    assert.deepEqual(r.logs, []);
+  }
+});
+
+test("real arena: a bot jammed in a door pocket outside never runs Escape, and respawns only after 180 s", () => {
+  // The pocket east of a shut leaf in the wall: outside by place, with no walk out.
+  const r = rig({ x: 33.4, z: -17.42 });
+  let escaped = false;
+  let overridden = false;
+  assert.equal(r.run(200 * S, () => {
+    if (r.brain.goalOf(r.agent.id) === "escape") escaped = true;
+    if (r.agent.override) overridden = true;
+    return r.health.isDead(r.agent.id);
+  }), true, "never respawned");
+  assert.equal(escaped, false);
+  assert.equal(overridden, false);
+  assert.ok(r.clock >= 180 * S, `respawned at ${r.clock}`);
+  assert.ok(r.clock < 200 * S);
 });

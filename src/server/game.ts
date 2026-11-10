@@ -129,6 +129,10 @@ export function stepUnownedWander(world: AuthoritativeWorld, agent: WanderAgent)
 
 /** ~20 s at {@link TICK_MS}. A planned walk is not cut off by the old 1–2.5 s heading roll. */
 const WANDER_GOAL_TICKS = 400;
+/** A wander pick that found no walkable goal tries again after this long (2 s), not after a whole goal's time. */
+const WANDER_RETRY_TICKS = 40;
+/** Every other sample, from the second, is taken this close to the pawn, in its own place, so a pawn whose far goals are all shut off still has somewhere to walk. */
+const WANDER_LOCAL_M = 15;
 /** Stand samples and failed plans before the pawn waits for the next retarget. */
 const WANDER_SAMPLE_TRIES = 8;
 /** Close enough that the follower can finish. Farther, and the interior walk is missing. */
@@ -231,7 +235,7 @@ export function steerUnownedWander(
   if (!chosen) {
     clearWalk(agent);
     agent.gait = "idle";
-    agent.nextTurn = tick + (claim ? CLAIM_RETRY_TICKS : WANDER_GOAL_TICKS);
+    agent.nextTurn = tick + (claim ? CLAIM_RETRY_TICKS : WANDER_RETRY_TICKS);
     return;
   }
   installWalk(agent, chosen, pose, loaded, flags, tick, rng, others);
@@ -296,7 +300,7 @@ function chooseWanderGoal(
   flags: ReadonlyMap<string, boolean>,
 ): PlannedWalk | undefined {
   for (let attempt = 0; attempt < WANDER_SAMPLE_TRIES; attempt += 1) {
-    const sample = sampleRegionPoint(nav.regions, rng);
+    const sample = (attempt % 2 === 1 ? sampleLocalPoint(nav, pose, rng) : undefined) ?? sampleRegionPoint(nav.regions, rng);
     if (!sample) return undefined;
     if (!canStand(nav.regions, sample.placeId, sample.x, sample.y, sample.z)) continue;
     const goal = { x: sample.x, y: sample.y, z: sample.z };
@@ -472,6 +476,45 @@ function appendInterior(
   if (!local) return false;
   appendPoints(points, local);
   return nearGoal(points, goal);
+}
+
+/** A random point of `pose`'s own place within {@link WANDER_LOCAL_M}, weighted by area. */
+function sampleLocalPoint(
+  nav: { sceneGraph: SceneGraph; regions: BakedRegionsFile },
+  pose: Pose,
+  rng: () => number,
+): { placeId: string; x: number; y: number; z: number } | undefined {
+  const placeId = placeAt(nav.sceneGraph, pose.x, pose.y, pose.z).id;
+  const graph = regionsOf(nav.regions, placeId);
+  if (!graph) return undefined;
+  const near: Array<{ region: Region; area: number }> = [];
+  let total = 0;
+  for (const region of graph.regions) {
+    const dx = Math.max(region.minX - pose.x, 0, pose.x - region.maxX);
+    const dz = Math.max(region.minZ - pose.z, 0, pose.z - region.maxZ);
+    if (Math.hypot(dx, dz) > WANDER_LOCAL_M) continue;
+    const area = Math.max(0, region.maxX - region.minX) * Math.max(0, region.maxZ - region.minZ);
+    if (!(area > 0)) continue;
+    near.push({ region, area });
+    total += area;
+  }
+  if (!(total > 0)) return undefined;
+  let pick = unit01(rng) * total;
+  let chosen = near[near.length - 1]!;
+  for (const item of near) {
+    pick -= item.area;
+    if (pick <= 0) {
+      chosen = item;
+      break;
+    }
+  }
+  const region = chosen.region;
+  return {
+    placeId,
+    x: region.minX + unit01(rng) * (region.maxX - region.minX),
+    y: region.y,
+    z: region.minZ + unit01(rng) * (region.maxZ - region.minZ),
+  };
 }
 
 function sampleRegionPoint(

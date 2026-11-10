@@ -1,7 +1,7 @@
 /**
  * Goal arbitration for a host wander bot. Pure: the caller passes the sensed
  * state and the clock. Wander is the fallback. Escape (KeepMoving) takes over
- * once the bot is trapped and holds until it is out.
+ * once a bot inside a building is trapped and holds until it is outside.
  */
 import type { BotSense } from "./sense.js";
 
@@ -10,12 +10,18 @@ export type ArbiterTuning = {
   trappedMs: number;
   /** Still trapped this long after it began: the bot respawns itself. */
   respawnMs: number;
+  /**
+   * Outside and not moving this long: a jammed capsule, not a trap. There is
+   * nothing to escape to, so the bot respawns without an Escape.
+   */
+  outsideWedgedMs: number;
 };
 
-/** 60 s, 120 s. */
+/** 60 s, 120 s, 180 s. */
 export const DEFAULT_ARBITER_TUNING: Readonly<ArbiterTuning> = Object.freeze({
   trappedMs: 60_000,
   respawnMs: 120_000,
+  outsideWedgedMs: 180_000,
 });
 
 export type GoalId = "wander" | "escape";
@@ -82,14 +88,22 @@ export function judge(
     mind.noRouteSince = now;
     mind.noRoutePlace = sense.place;
   }
+  // A bot that is already outside has nowhere to escape to. It never starts
+  // Escape, and one that arrives outside lets go at once. Wander finds it a walk.
+  if (out) {
+    mind.escapeSince = undefined;
+    return {
+      goal: "wander",
+      priority: WANDER_PRIORITY,
+      trapped: false,
+      escapeMs: 0,
+      respawn: sense.msNoProgress >= tuning.outsideWedgedMs,
+    };
+  }
   const wedged = sense.msNoProgress >= tuning.trappedMs;
   const walled = mind.noRouteSince !== undefined && now - mind.noRouteSince >= tuning.trappedMs;
   const trapped = wedged || walled;
-  if (mind.escapeSince === undefined) {
-    if (trapped) mind.escapeSince = now;
-  } else if (out && !wedged) {
-    mind.escapeSince = undefined;
-  }
+  if (mind.escapeSince === undefined && trapped) mind.escapeSince = now;
   if (mind.escapeSince === undefined) {
     return { goal: "wander", priority: WANDER_PRIORITY, trapped, escapeMs: 0, respawn: false };
   }
