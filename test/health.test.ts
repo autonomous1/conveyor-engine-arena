@@ -7,6 +7,7 @@ import { AuthoritativeWorld } from "conveyor-engine-world";
 import { createPawnLayer } from "../src/client/presentation.ts";
 import type { CharacterTemplates } from "../src/client/arena-scene.ts";
 import { createArenaFire } from "../dist/server/fire.js";
+import { createHeldInputs, startWanderLoop } from "../dist/server/game.js";
 import { loadArena } from "../dist/server/world-loader.js";
 import { startArenaServer } from "../dist/server/main.js";
 import {
@@ -107,6 +108,65 @@ test("a dead pawn keeps the killer and respawn clears the record", () => {
   assert.deepEqual(health.lastDamage(2), recorded);
 });
 
+test("wound records a damage cause and respawn clears it", () => {
+  let t = 1000;
+  const health = createPawnHealth(() => t);
+  health.note(2);
+  health.wound(2, 1, 25, "laser");
+  assert.deepEqual(health.lastDamage(2), { attacker: 1, at: 1000, cause: "laser" });
+  t = 2000;
+  health.wound(2, 3, 25, "grenade");
+  assert.deepEqual(health.lastDamage(2), { attacker: 3, at: 2000, cause: "grenade" });
+  // A later wound without a cause overwrites the record and drops the old cause.
+  t = 3000;
+  health.wound(2, 4);
+  assert.deepEqual(health.lastDamage(2), { attacker: 4, at: 3000 });
+  health.wound(2, 5, 25, "grenade");
+  assert.equal(health.get(2).dead, true);
+  assert.equal(health.lastDamage(2)?.cause, "grenade");
+  t += RESPAWN_MS;
+  assert.deepEqual(health.takeRespawns(), [2]);
+  assert.equal(health.lastDamage(2), undefined);
+  health.wound(2, 1, 25, "laser");
+  assert.equal(health.lastDamage(2)?.cause, "laser");
+});
+
+test("healthFrame and parseHealth carry a cause only on a death frame", () => {
+  assert.deepEqual(parseHealth({ t: "health", entity: 4, hp: 0, dead: true, cause: "grenade" }), {
+    t: "health",
+    entity: 4,
+    hp: 0,
+    dead: true,
+    cause: "grenade",
+  });
+  assert.deepEqual(parseHealth({ t: "health", entity: 4, hp: 0, dead: true, cause: "laser" }), {
+    t: "health",
+    entity: 4,
+    hp: 0,
+    dead: true,
+    cause: "laser",
+  });
+  // Unknown or live-frame causes are dropped. The rest of the frame is kept.
+  assert.deepEqual(parseHealth({ t: "health", entity: 4, hp: 0, dead: true, cause: "melee" }), {
+    t: "health",
+    entity: 4,
+    hp: 0,
+    dead: true,
+  });
+  assert.deepEqual(parseHealth({ t: "health", entity: 4, hp: 50, dead: false, cause: "grenade" }), {
+    t: "health",
+    entity: 4,
+    hp: 50,
+    dead: false,
+  });
+  assert.deepEqual(parseHealth({ t: "health", entity: 4, hp: 0, dead: true }), {
+    t: "health",
+    entity: 4,
+    hp: 0,
+    dead: true,
+  });
+});
+
 test("a blocked spawn is skipped and a full block uses the first spawn", () => {
   const first = { x: 0, y: 0, z: 0, yaw: 0 };
   const second = { x: 10, y: 0, z: 0, yaw: 0.4 };
@@ -176,7 +236,10 @@ test("a pawn hit subtracts 25, a repeated seq does not, and a dead pawn cannot f
   for (const frame of rig.healthFrames) {
     assert.ok(frame.hp >= MIN_HP && frame.hp <= MAX_HP);
     assert.equal(frame.t, "health");
+    if (frame.dead) assert.equal(frame.cause, "laser");
+    else assert.equal(frame.cause, undefined);
   }
+  assert.ok(rig.healthFrames.some((frame) => frame.entity === victim && frame.dead && frame.cause === "laser"));
 });
 
 test("a hit on obstacle 188 does not damage a pawn", () => {
@@ -246,6 +309,49 @@ test("a baked obstacle hit does not damage the shooter", () => {
   for (const agent of loaded.agents) assert.equal(health.get(agent.id).hp, MAX_HP);
   assert.equal(rig.healthFrames.length, 0);
   assert.deepEqual(position(loaded.world, shooter), stood);
+});
+
+test("a grenade-killed bot stands idle and a laser-killed bot falls", async () => {
+  async function deathClips(cause: "grenade" | "laser"): Promise<string[]> {
+    const world = new AuthoritativeWorld({ worldVersion: "death-clip" });
+    world.pawnHeight = 1.8;
+    const id = world.createEntity(0n, { type: "pawn", shape: "capsule" }, 1);
+    world.enqueue({
+      kind: "setTransform",
+      entity: id,
+      position: { x: 0, y: 0, z: 0 },
+      rotation: { x: 0, y: 0, z: 0, w: 1 },
+      scale: { x: 1, y: 1, z: 1 },
+    });
+    world.enqueue({ kind: "setBounds", entity: id, radius: 0.5 });
+    world.commit(0n);
+    const health = createPawnHealth(() => 0);
+    health.note(id);
+    health.wound(id, 2, 100, cause);
+    assert.equal(health.get(id).dead, true);
+    const clips: string[] = [];
+    const enqueue = world.enqueue.bind(world);
+    world.enqueue = ((cmd: { kind: string; clip?: string }) => {
+      if (cmd.kind === "setClip" && cmd.clip) clips.push(cmd.clip);
+      enqueue(cmd);
+    }) as typeof world.enqueue;
+    const agent = { id, heading: 0, gait: "walk" as const, nextTurn: 1, speeds: { idle: 0, walk: 1, run: 2, fall: 0, angry: 0 } };
+    const server = {
+      connected: [],
+      gateway: { drainTimeouts: () => [], get: () => undefined },
+      replicator: { get: () => undefined, publish: () => new Map() },
+      setTick: () => {},
+      sendSnapshot: () => {},
+    };
+    const stop = startWanderLoop(world, [agent], server as never, createHeldInputs(), () => {}, health, undefined, undefined, false, [], true);
+    try {
+      return await waitFor(1000, () => (clips.length > 0 ? [...clips] : undefined));
+    } finally {
+      stop();
+    }
+  }
+  assert.deepEqual(await deathClips("grenade"), ["idle"]);
+  assert.deepEqual(await deathClips("laser"), ["fall"]);
 });
 
 test("fall plays once and does not loop", () => {

@@ -9,11 +9,15 @@ export const MIN_HP = 0;
 export const HIT_DAMAGE = 25;
 export const RESPAWN_MS = 3000;
 
+export type DamageCause = "grenade" | "laser";
+
 export type HealthFrame = {
   t: "health";
   entity: number;
   hp: number;
   dead: boolean;
+  /** Present only on a frame that reports death, and only when known. */
+  cause?: DamageCause;
 };
 
 export type PawnHealthState = {
@@ -22,7 +26,11 @@ export type PawnHealthState = {
 };
 
 /** Who last wounded a pawn and when (`now()` clock). `attacker` is undefined when unknown. */
-export type DamageNote = { attacker: number | undefined; at: number };
+export type DamageNote = { attacker: number | undefined; at: number; cause?: DamageCause };
+
+export function isDamageCause(value: unknown): value is DamageCause {
+  return value === "grenade" || value === "laser";
+}
 
 export function clampHealth(hp: number): number {
   if (!Number.isFinite(hp)) return MIN_HP;
@@ -31,8 +39,10 @@ export function clampHealth(hp: number): number {
   return hp;
 }
 
-export function healthFrame(entity: number, hp: number, dead: boolean): HealthFrame {
-  return { t: "health", entity, hp: clampHealth(hp), dead };
+export function healthFrame(entity: number, hp: number, dead: boolean, cause?: DamageCause): HealthFrame {
+  const frame: HealthFrame = { t: "health", entity, hp: clampHealth(hp), dead };
+  if (dead && isDamageCause(cause)) frame.cause = cause;
+  return frame;
 }
 
 export function parseHealth(frame: unknown): HealthFrame | undefined {
@@ -42,10 +52,10 @@ export function parseHealth(frame: unknown): HealthFrame | undefined {
   if (typeof rec.entity !== "number" || !Number.isInteger(rec.entity)) return undefined;
   if (typeof rec.hp !== "number" || !Number.isFinite(rec.hp)) return undefined;
   if (typeof rec.dead !== "boolean") return undefined;
-  return healthFrame(rec.entity, rec.hp, rec.dead);
+  return healthFrame(rec.entity, rec.hp, rec.dead, isDamageCause(rec.cause) ? rec.cause : undefined);
 }
 
-type Vital = { hp: number; dead: boolean; respawnAt?: number; lastAttacker?: number; lastDamageAt?: number };
+type Vital = { hp: number; dead: boolean; respawnAt?: number; lastAttacker?: number; lastDamageAt?: number; lastCause?: DamageCause };
 
 /** One row per pawn the host has noted. Unknown pawns read as full health. */
 export function createPawnHealth(now: () => number = Date.now) {
@@ -76,13 +86,15 @@ export function createPawnHealth(now: () => number = Date.now) {
     lastDamage(id: number): DamageNote | undefined {
       const row = rows.get(id);
       if (!row || row.lastDamageAt === undefined) return undefined;
-      return { attacker: row.lastAttacker, at: row.lastDamageAt };
+      const note: DamageNote = { attacker: row.lastAttacker, at: row.lastDamageAt };
+      if (row.lastCause) note.cause = row.lastCause;
+      return note;
     },
     /**
      * Subtract one hit. `amount` defaults to {@link HIT_DAMAGE}. A pawn already
      * at 0 is unchanged so a later shot does not restart the respawn clock.
      */
-    wound(id: number, attacker?: number, amount: number = HIT_DAMAGE): PawnHealthState | undefined {
+    wound(id: number, attacker?: number, amount: number = HIT_DAMAGE, cause?: DamageCause): PawnHealthState | undefined {
       const row = ensure(id);
       if (row.dead) return undefined;
       const dealt = Number.isFinite(amount) && amount > 0 ? amount : HIT_DAMAGE;
@@ -92,6 +104,7 @@ export function createPawnHealth(now: () => number = Date.now) {
       row.respawnAt = row.dead ? now() + RESPAWN_MS : undefined;
       row.lastAttacker = Number.isInteger(attacker) ? attacker : undefined;
       row.lastDamageAt = now();
+      row.lastCause = isDamageCause(cause) ? cause : undefined;
       return { hp: row.hp, dead: row.dead };
     },
     /** Add health and stay inside [0, 100]. A dead pawn is unchanged. */
@@ -113,13 +126,14 @@ export function createPawnHealth(now: () => number = Date.now) {
         row.respawnAt = undefined;
         row.lastAttacker = undefined;
         row.lastDamageAt = undefined;
+        row.lastCause = undefined;
         ids.push(id);
       }
       return ids;
     },
     frames(): HealthFrame[] {
       const out: HealthFrame[] = [];
-      for (const [entity, row] of rows) out.push(healthFrame(entity, row.hp, row.dead));
+      for (const [entity, row] of rows) out.push(healthFrame(entity, row.hp, row.dead, row.dead ? row.lastCause : undefined));
       return out;
     },
   };

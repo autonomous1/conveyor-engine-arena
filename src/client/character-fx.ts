@@ -39,7 +39,12 @@ type State = {
   /** Spawn: the beam and the fade-in start. Despawn: the beam and the fade-out start. */
   visualAt: number;
   visualDone: boolean;
+  /** Fade length for this timeline, ms. */
+  fade: number;
 };
+
+/** Per-despawn override of the configured delay and fade (a grenade kill fades with its blast). */
+export type DespawnTiming = { delayMs?: number; fadeMs?: number };
 
 export function createCharacterFx(config: CharacterFxConfig, hooks: CharacterFxHooks) {
   const states = new Map<number, State>();
@@ -58,10 +63,10 @@ export function createCharacterFx(config: CharacterFxConfig, hooks: CharacterFxH
 
   function opacityOf(state: State, now: number): number {
     if (state.kind === "spawn") {
-      const t = (now - state.visualAt) / fade;
+      const t = (now - state.visualAt) / state.fade;
       return t <= 0 ? 0 : t >= 1 ? 1 : t;
     }
-    const t = (now - state.visualAt) / fade;
+    const t = (now - state.visualAt) / state.fade;
     return t <= 0 ? 1 : t >= 1 ? 0 : 1 - t;
   }
 
@@ -76,11 +81,15 @@ export function createCharacterFx(config: CharacterFxConfig, hooks: CharacterFxH
         soundDone: false,
         visualAt: now,
         visualDone: false,
+        fade,
       });
       fire(id, states.get(id)!, now);
     },
-    /** A character went at `at`. The sequence starts at `now + holdMs`. A despawn already running keeps its start. */
-    despawn(id: number, at: Point, now: number, holdMs = 0) {
+    /**
+     * A character went at `at`. The sequence starts at `now + holdMs`. A despawn already running keeps its start.
+     * `timing` replaces the configured despawn delay and fade for this despawn only.
+     */
+    despawn(id: number, at: Point, now: number, holdMs = 0, timing: DespawnTiming = {}) {
       const current = states.get(id);
       if (current?.kind === "despawn") return;
       const t0 = now + Math.max(0, holdMs);
@@ -90,8 +99,9 @@ export function createCharacterFx(config: CharacterFxConfig, hooks: CharacterFxH
         t0,
         soundAt: t0 + config.despawnSoundDelayMs,
         soundDone: false,
-        visualAt: t0 + config.despawnDelayMs,
+        visualAt: t0 + Math.max(0, timing.delayMs ?? config.despawnDelayMs),
         visualDone: false,
+        fade: Math.max(1, timing.fadeMs ?? fade),
       });
       fire(id, states.get(id)!, now);
     },
@@ -99,7 +109,7 @@ export function createCharacterFx(config: CharacterFxConfig, hooks: CharacterFxH
     update(now: number) {
       for (const [id, state] of states) {
         fire(id, state, now);
-        if (state.kind === "spawn" && state.visualDone && state.soundDone && now - state.visualAt >= fade) states.delete(id);
+        if (state.kind === "spawn" && state.visualDone && state.soundDone && now - state.visualAt >= state.fade) states.delete(id);
       }
     },
     /** 1 plain, 0 gone, between: fading. */
@@ -114,7 +124,7 @@ export function createCharacterFx(config: CharacterFxConfig, hooks: CharacterFxH
     /** True once a despawn has fully faded: the model should stay hidden. */
     gone(id: number, now: number): boolean {
       const state = states.get(id);
-      return state?.kind === "despawn" && now - state.visualAt >= fade;
+      return state?.kind === "despawn" && now - state.visualAt >= state.fade;
     },
     /** Total time of a despawn from its event, with no hold, in ms. */
     get despawnMs() {

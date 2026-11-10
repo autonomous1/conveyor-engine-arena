@@ -179,6 +179,8 @@ export async function boot(
     },
   });
   const explosionSheet = view.explosion;
+  // One play of the grenade blast sheet, ms (30 frames at 30 fps: 1000). A grenade kill fades over it.
+  const grenadeBlastMs = explosionSheet && explosionSheet.fps > 0 ? (explosionSheet.frameCount / explosionSheet.fps) * 1000 : 1000;
   void explosions.load(async () => {
     if (!explosionSheet) throw new Error("manifest has no grenade-explosion sprite");
     return new THREE.TextureLoader().loadAsync(explosionSheet.texture);
@@ -443,8 +445,16 @@ export async function boot(
       if (characterFx && before && before.dead !== health.dead) {
         const feet = authoritativeFeet(health.entity);
         if (feet) {
-          if (health.dead) characterFx.despawn(health.entity, feet, performance.now(), beamConfig?.deathHoldMs ?? 0);
-          else characterFx.spawn(health.entity, feet, performance.now());
+          if (health.dead) {
+            if (health.cause === "grenade") {
+              // The bot fades out with the blast: no hold, no despawn delay, fade over the blast sheet.
+              characterFx.despawn(health.entity, feet, performance.now(), 0, { delayMs: 0, fadeMs: grenadeBlastMs });
+            } else {
+              characterFx.despawn(health.entity, feet, performance.now(), beamConfig?.deathHoldMs ?? 0);
+            }
+          } else {
+            characterFx.spawn(health.entity, feet, performance.now());
+          }
         }
       }
     },

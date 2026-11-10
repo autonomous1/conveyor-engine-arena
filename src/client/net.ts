@@ -1,7 +1,7 @@
 import { EngineClient } from "conveyor-engine-client";
 import { fireShotFrame, summarizeInbound } from "../shared/fire-debug.js";
 import { parseAudit, type AuditCounters } from "../shared/audit.js";
-import { parseHealth } from "../shared/health.js";
+import { parseHealth, type DamageCause } from "../shared/health.js";
 import { parseSpawn, type SpawnFrame } from "../shared/spawn-frame.js";
 import { parseQaCapture, parseSceneGraphFrame, type QaCaptureFrame, type SceneGraphFrame } from "../shared/bot-protocol.js";
 import { parseDoor, parseDoorSet, useFrame, type DoorFrame } from "../shared/doors.js";
@@ -36,6 +36,7 @@ export type HealthNotice = {
   entity: number;
   hp: number;
   dead: boolean;
+  cause?: DamageCause;
 };
 
 /**
@@ -105,7 +106,9 @@ function closeInfo(ev: unknown): { code?: number; reason: string } {
 function asHealth(msg: Record<string, unknown>): HealthNotice | undefined {
   const frame = parseHealth(msg);
   if (!frame) return undefined;
-  return { entity: frame.entity, hp: frame.hp, dead: frame.dead };
+  const notice: HealthNotice = { entity: frame.entity, hp: frame.hp, dead: frame.dead };
+  if (frame.cause) notice.cause = frame.cause;
+  return notice;
 }
 
 export function connectLive(opts: {

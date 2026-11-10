@@ -55,9 +55,9 @@ export function createArenaGrenades(opts: {
 
   function wound(hitId: number, attacker: number) {
     if (!opts.health) return;
-    const next = opts.health.wound(hitId, attacker, opts.damage ?? GRENADE_DAMAGE);
+    const next = opts.health.wound(hitId, attacker, opts.damage ?? GRENADE_DAMAGE, "grenade");
     if (!next) return;
-    deliverHealthFrames(opts.server, opts.server.connected, [healthFrame(hitId, next.hp, next.dead)]);
+    deliverHealthFrames(opts.server, opts.server.connected, [healthFrame(hitId, next.hp, next.dead, next.dead ? "grenade" : undefined)]);
   }
 
   return {

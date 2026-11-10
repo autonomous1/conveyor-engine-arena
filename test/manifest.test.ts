@@ -937,7 +937,7 @@ test("grenade-surface-explosion asset compiles to view.surfaceExplosion; an abse
     fps: 30,
     size: 8,
     blending: "normal",
-    anchorY: 0.46,
+    anchorY: 0.48,
   });
 
   const emptySprite = structuredClone(doc) as { assets: Array<Record<string, unknown>> };

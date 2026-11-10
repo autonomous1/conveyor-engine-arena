@@ -105,10 +105,10 @@ export function createArenaFire(opts: {
         if (hitId !== undefined && hitId !== owned && capsules.some((cap) => cap.id === hitId)) {
           let killed = false;
           if (opts.health) {
-            const next = opts.health.wound(hitId, owned);
+            const next = opts.health.wound(hitId, owned, undefined, "laser");
             if (next) {
               log.writePawn(`health pawn=${hitId} ${next.hp}`);
-              deliverHealthFrames(opts.server, opts.server.connected, [healthFrame(hitId, next.hp, next.dead)]);
+              deliverHealthFrames(opts.server, opts.server.connected, [healthFrame(hitId, next.hp, next.dead, next.dead ? "laser" : undefined)]);
               killed = next.hp === 0;
             }
           }

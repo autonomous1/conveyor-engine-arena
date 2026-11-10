@@ -182,3 +182,26 @@ test("a respawn while the despawn beam is already playing cancels only the pendi
   assert.equal(fx.opacity(5, 4700), 1);
   assert.equal(fx.active, 0);
 });
+
+test("a despawn timing override starts the beam at once and fades over its own length", () => {
+  // A grenade kill: no despawn delay, fade over the 1 s blast sheet instead of the configured 1.7 s.
+  const { fx, hits, at } = setup();
+  at(0);
+  fx.despawn(5, spot, 0, 0, { delayMs: 0, fadeMs: 1000 });
+  assert.deepEqual(hits.map((h) => `${h.what}:${h.kind}@${h.at}`), ["sound:despawn@0", "beam:despawn@0"]);
+  assert.equal(fx.opacity(5, 500), 0.5);
+  assert.equal(fx.gone(5, 999), false);
+  assert.equal(fx.gone(5, 1000), true);
+  assert.equal(fx.opacity(5, 1000), 0);
+});
+
+test("an override does not change the next despawn's configured timing", () => {
+  const { fx, at } = setup();
+  at(0);
+  fx.despawn(5, spot, 0, 0, { delayMs: 0, fadeMs: 1000 });
+  fx.spawn(5, spot, 3000);
+  fx.despawn(5, spot, 5000);
+  assert.equal(fx.opacity(5, 6200), 1);
+  assert.equal(fx.opacity(5, 6200 + 850), 0.5);
+  assert.equal(fx.gone(5, 6200 + 1700), true);
+});

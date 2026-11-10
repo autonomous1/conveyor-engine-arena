@@ -1094,3 +1094,55 @@ test("the host puts n on surface stop poses and omits it for a pawn hit", () => 
   assert.ok(pawnStop);
   assert.equal(pawnStop.n, undefined);
 });
+
+test("a grenade kill's health frame carries cause grenade", () => {
+  const health = createPawnHealth(() => 0);
+  health.note(1);
+  health.note(2);
+  // One launcher hit is half health, so a prior wound is needed for a kill.
+  health.wound(2, 1, grenade.GRENADE_DAMAGE);
+  const pawns = [
+    { id: 1, position: { x: 0, y: 0, z: 0 }, lifecycle: "alive" as const, radius: 0.5 },
+    { id: 2, position: { x: 0, y: 0, z: 3 }, lifecycle: "alive" as const, radius: 0.5 },
+  ];
+  const world = {
+    store: { view: (id: number) => pawns.find((pawn) => pawn.id === id) },
+    pawnHeight: 1.8,
+    listObstacles: () => [],
+    query: () => pawns,
+  };
+  const sent: grenade.GrenadePose[] = [];
+  const healthFrames: Array<{ t?: string; entity?: number; hp?: number; dead?: boolean; cause?: string }> = [];
+  const host = createArenaGrenades({
+    world: world as never,
+    server: {
+      session: () => ({
+        sessionId: 1,
+        socket: {
+          send(text: string) {
+            const frame = JSON.parse(text) as (typeof healthFrames)[number];
+            if (frame.t === "health") healthFrames.push(frame);
+          },
+        },
+      }),
+      replicator: { get: () => ({ ownedEntity: 1, connected: true, known: new Set<number>([1, 2]) }) },
+      connected: [1],
+    } as never,
+    now: () => 0,
+    health,
+    send(_clientId, frame) {
+      sent.push(frame);
+    },
+  });
+  host.onFrame(1, grenade.grenadeFrame(1, 0, 0));
+  let stopped = false;
+  for (let i = 0; i < 40 && !stopped; i++) {
+    host.tick();
+    stopped = sent.some((frame) => frame.stop === true);
+  }
+  assert.equal(stopped, true);
+  assert.deepEqual(health.get(2), { hp: 0, dead: true });
+  assert.equal(health.lastDamage(2)?.cause, "grenade");
+  assert.ok(healthFrames.some((frame) => frame.entity === 2 && frame.dead === true && frame.hp === 0 && frame.cause === "grenade"));
+  assert.equal(healthFrames.some((frame) => frame.cause !== undefined && frame.dead !== true), false);
+});

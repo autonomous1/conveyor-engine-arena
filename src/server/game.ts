@@ -629,8 +629,10 @@ export function startWanderLoop(
         if (agent.gait !== "fall") {
           agent.gait = "fall";
           // clearInput bumps the replication version. setClip alone does not,
-          // so the fall clip would never leave this process.
-          world.enqueue({ kind: "setClip", entity: agent.id, clip: "fall", speed: 0 });
+          // so the clip would never leave this process. A grenade kill stays
+          // on idle so the body does not play fall while it fades and beams out.
+          const clip = health.lastDamage(agent.id)?.cause === "grenade" ? "idle" : "fall";
+          world.enqueue({ kind: "setClip", entity: agent.id, clip, speed: 0 });
           world.enqueue({ kind: "clearInput", entity: agent.id });
         }
         continue;
