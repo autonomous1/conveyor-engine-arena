@@ -228,6 +228,18 @@ export type ArenaView = {
   /** Thrown grenade mesh. Absent when the manifest has no `grenade` model. */
   grenade?: string;
   /**
+   * First-contact mode for the bound grenade launcher, from the `grenade` model's
+   * `projectile.impact`. `"explode"` detonates on the first surface or pawn.
+   * `"bounce"` is the toss (one bounce, then a stop). Absent: the host uses `"explode"`.
+   * Not part of either content hash.
+   */
+  grenadeImpact?: "explode" | "bounce";
+  /**
+   * Direct-hit damage for a grenade, from the `grenade` model's `projectile.damage`.
+   * Absent: the host uses half of max health. Not part of either content hash.
+   */
+  grenadeDamage?: number;
+  /**
    * Grenade blast sprite sheet from the `grenade-explosion` texture asset and its `sprite` block.
    * Absent when the manifest has no such asset. Not part of either content hash.
    */
@@ -299,7 +311,7 @@ export type ArenaCharacterBeam = {
 /** One decoded-once sound effect. `uri` is under `/assets/`, like every other asset. */
 export type ArenaSoundEffect = {
   uri: string;
-  /** Effect gain, 0 to 1, under the master volume. */
+  /** Effect gain under the master volume. 1 is unity; values above 1 boost, up to 2. */
   volume: number;
   /** Overlapping plays at once. A new play past the cap stops the oldest. */
   maxVoices: number;

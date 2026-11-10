@@ -105,7 +105,7 @@ export function createArenaFire(opts: {
         if (hitId !== undefined && hitId !== owned && capsules.some((cap) => cap.id === hitId)) {
           let killed = false;
           if (opts.health) {
-            const next = opts.health.wound(hitId);
+            const next = opts.health.wound(hitId, owned);
             if (next) {
               log.writePawn(`health pawn=${hitId} ${next.hp}`);
               deliverHealthFrames(opts.server, opts.server.connected, [healthFrame(hitId, next.hp, next.dead)]);

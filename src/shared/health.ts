@@ -21,6 +21,9 @@ export type PawnHealthState = {
   dead: boolean;
 };
 
+/** Who last wounded a pawn and when (`now()` clock). `attacker` is undefined when unknown. */
+export type DamageNote = { attacker: number | undefined; at: number };
+
 export function clampHealth(hp: number): number {
   if (!Number.isFinite(hp)) return MIN_HP;
   if (hp < MIN_HP) return MIN_HP;
@@ -42,7 +45,7 @@ export function parseHealth(frame: unknown): HealthFrame | undefined {
   return healthFrame(rec.entity, rec.hp, rec.dead);
 }
 
-type Vital = { hp: number; dead: boolean; respawnAt?: number };
+type Vital = { hp: number; dead: boolean; respawnAt?: number; lastAttacker?: number; lastDamageAt?: number };
 
 /** One row per pawn the host has noted. Unknown pawns read as full health. */
 export function createPawnHealth(now: () => number = Date.now) {
@@ -69,17 +72,26 @@ export function createPawnHealth(now: () => number = Date.now) {
     isDead(id: number): boolean {
       return rows.get(id)?.dead ?? false;
     },
+    /** Last wound on this pawn since it last spawned. Survives death (kill credit), cleared on respawn. */
+    lastDamage(id: number): DamageNote | undefined {
+      const row = rows.get(id);
+      if (!row || row.lastDamageAt === undefined) return undefined;
+      return { attacker: row.lastAttacker, at: row.lastDamageAt };
+    },
     /**
-     * Subtract one hit. A pawn already at 0 is unchanged so a later shot
-     * does not restart the respawn clock.
+     * Subtract one hit. `amount` defaults to {@link HIT_DAMAGE}. A pawn already
+     * at 0 is unchanged so a later shot does not restart the respawn clock.
      */
-    wound(id: number): PawnHealthState | undefined {
+    wound(id: number, attacker?: number, amount: number = HIT_DAMAGE): PawnHealthState | undefined {
       const row = ensure(id);
       if (row.dead) return undefined;
-      const hp = clampHealth(row.hp - HIT_DAMAGE);
+      const dealt = Number.isFinite(amount) && amount > 0 ? amount : HIT_DAMAGE;
+      const hp = clampHealth(row.hp - dealt);
       row.hp = hp;
       row.dead = hp === MIN_HP;
       row.respawnAt = row.dead ? now() + RESPAWN_MS : undefined;
+      row.lastAttacker = Number.isInteger(attacker) ? attacker : undefined;
+      row.lastDamageAt = now();
       return { hp: row.hp, dead: row.dead };
     },
     /** Add health and stay inside [0, 100]. A dead pawn is unchanged. */
@@ -99,6 +111,8 @@ export function createPawnHealth(now: () => number = Date.now) {
         row.hp = MAX_HP;
         row.dead = false;
         row.respawnAt = undefined;
+        row.lastAttacker = undefined;
+        row.lastDamageAt = undefined;
         ids.push(id);
       }
       return ids;

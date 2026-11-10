@@ -744,6 +744,34 @@ test("scene.sceneGraph is optional, a missing file is an issue, and invalid json
   }
 });
 
+test("grenade projectile.impact compiles to view.grenadeImpact; a bad value is an issue", () => {
+  const doc = document();
+  const files = filesFromDisk();
+  const read = (uri: string) => files.get(uri);
+  const compiled = compile(doc, read);
+  assert.equal(compiled.view.grenadeImpact, "explode");
+  assert.equal(compiled.view.grenadeDamage, 50);
+
+  const missing = structuredClone(doc) as { assets: Array<Record<string, unknown>> };
+  const row = missing.assets.find((asset) => asset.id === "grenade");
+  assert.ok(row);
+  delete row.projectile;
+  const bare = compile(missing, read);
+  assert.equal(bare.view.grenadeImpact, undefined);
+  assert.equal(bare.view.grenadeDamage, undefined);
+
+  const bad = structuredClone(doc) as { assets: Array<Record<string, unknown>> };
+  const grenade = bad.assets.find((asset) => asset.id === "grenade");
+  assert.ok(grenade);
+  grenade.projectile = { impact: "ricochet", damage: 0 };
+  assert.throws(() => compile(bad, read), (err: unknown) => {
+    assert.ok(err instanceof GameManifestError);
+    assert.ok(err.issues.some((issue) => issue.path.endsWith(".projectile.impact")));
+    assert.ok(err.issues.some((issue) => issue.path.endsWith(".projectile.damage")));
+    return true;
+  });
+});
+
 test("grenade-explosion asset compiles to view.explosion; a bad sprite block is an issue", () => {
   const doc = document();
   const files = filesFromDisk();
@@ -799,7 +827,7 @@ test("audio assets compile to view.sounds; a bad sound block or file is an issue
   assert.deepEqual(compile(doc, read).view.sounds, {
     laser: { uri: "/assets/audio/laser-blast-sfx.mp3", volume: 0.6, maxVoices: 4, positional: true, refDistance: 4 },
     grenadeLaunch: { uri: "/assets/audio/grenade-launch.wav", volume: 0.8, maxVoices: 2, positional: true, refDistance: 3 },
-    grenadeBlast: { uri: "/assets/audio/grenade-launch-grenade-blast.wav", volume: 1, maxVoices: 4, positional: true, refDistance: 8 },
+    grenadeBlast: { uri: "/assets/audio/grenade-launch-grenade-blast.wav", volume: 2, maxVoices: 4, positional: true, refDistance: 8 },
     cratePickup: { uri: "/assets/audio/crate-pickup.wav", volume: 0.8, maxVoices: 2, positional: true, refDistance: 3, pickupKinds: ["ammo"] },
     keyPickup: { uri: "/assets/audio/key-pickup.wav", volume: 0.8, maxVoices: 2, positional: true, refDistance: 3, pickupKinds: ["key"] },
     medkitPickup: { uri: "/assets/audio/medkit-pickup.wav", volume: 0.8, maxVoices: 2, positional: true, refDistance: 3, pickupKinds: ["health"] },
@@ -823,7 +851,7 @@ test("audio assets compile to view.sounds; a bad sound block or file is an issue
   };
   const laser = (assets: Array<Record<string, unknown>>) => assets.find((asset) => asset.id === "laser-blast")!;
   const bad = issuesOf((assets) => {
-    laser(assets).sound = { volume: 1.5, maxVoices: 0, positional: "yes", refDistance: -1 };
+    laser(assets).sound = { volume: 3, maxVoices: 0, positional: "yes", refDistance: -1 };
   });
   for (const key of ["volume", "maxVoices", "positional", "refDistance"]) {
     assert.ok(bad.some((issue) => issue.includes(`.sound.${key}`)), `${key}: ${bad.join("; ")}`);
@@ -862,7 +890,7 @@ test("pickup sound assets are audio entries with their own sound blocks", () => 
   }
   const bad = structuredClone(doc) as { assets: Array<Record<string, unknown>> };
   const key = bad.assets.find((asset) => asset.id === "key-pickup")!;
-  key.sound = { volume: 2, maxVoices: 2 };
+  key.sound = { volume: 3, maxVoices: 2 };
   assert.throws(() => compile(bad, read), (err: unknown) => {
     assert.ok(err instanceof GameManifestError);
     assert.ok(err.issues.some((issue) => issue.path.endsWith(".sound.volume")));
@@ -1163,4 +1191,3 @@ test("scene.characterBeam and the beam sprites reject bad values with the field 
   // `optional` is for audio and texture assets only.
   assert.ok(paths((c) => void (c.assets.find((asset) => asset.kind === "model")!.optional = true)).some((path) => path.endsWith(".optional")));
 });
-

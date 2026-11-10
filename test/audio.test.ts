@@ -37,8 +37,20 @@ class FakeContext implements AudioContextLike {
   panners = 0;
   decodes = 0;
   failDecode = new Set<number>();
+  compressors: Array<FakeNode & { threshold: { value: number }; knee: { value: number }; ratio: { value: number }; attack: { value: number }; release: { value: number } }> = [];
   createGain() {
     return Object.assign(new FakeNode(), { gain: param() });
+  }
+  createDynamicsCompressor() {
+    const node = Object.assign(new FakeNode(), {
+      threshold: param(),
+      knee: param(),
+      ratio: param(),
+      attack: param(),
+      release: param(),
+    });
+    this.compressors.push(node);
+    return node;
   }
   createPanner() {
     this.panners += 1;
@@ -73,7 +85,7 @@ class FakeContext implements AudioContextLike {
 const sounds: ArenaSounds = {
   laser: { uri: "/assets/audio/laser-blast-sfx.mp3", volume: 0.6, maxVoices: 4, positional: true, refDistance: 4 },
   grenadeLaunch: { uri: "/assets/audio/grenade-launch.wav", volume: 0.8, maxVoices: 2, positional: true, refDistance: 3 },
-  grenadeBlast: { uri: "/assets/audio/grenade-launch-grenade-blast.wav", volume: 1, maxVoices: 4, positional: true, refDistance: 8 },
+  grenadeBlast: { uri: "/assets/audio/grenade-launch-grenade-blast.wav", volume: 2, maxVoices: 4, positional: true, refDistance: 8 },
 };
 
 const sizes: Record<string, number> = {
@@ -149,6 +161,10 @@ test("positional plays use the panner at the point; own plays skip it", async ()
   assert.equal(panner.positionX.value, 3);
   assert.equal(panner.positionZ.value, -2);
   assert.equal(panner.refDistance, 8);
+  assert.equal(ctx.compressors.length, 1, "a limiter sits on the master output");
+  assert.equal(ctx.compressors[0]!.threshold.value, -1);
+  assert.equal(ctx.compressors[0]!.ratio.value, 20);
+  assert.equal(ctx.compressors[0]!.connected[0], ctx.destination);
   sfx.play("grenadeBlast");
   const own = ctx.sources.at(-1)!;
   assert.ok(own.connected[0] && "gain" in (own.connected[0] as object), "straight into the effect gain");

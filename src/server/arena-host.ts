@@ -258,6 +258,9 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
     health,
     // The rendered floor, or the bottom of the world when there is none.
     floorY: loaded.view.floor?.y ?? loaded.view.bounds.minY,
+    // From the grenade model's `projectile.impact` and `projectile.damage`.
+    impact: loaded.view.grenadeImpact ?? "explode",
+    damage: loaded.view.grenadeDamage,
     send(clientId, frame) {
       engine.session(clientId)?.socket.send(encodeFrame(frame));
     },

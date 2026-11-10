@@ -60,6 +60,53 @@ test("health stays inside 0 to 100", () => {
   assert.equal(parseHealth({ t: "health", entity: 4, hp: Number.NaN, dead: true }), undefined);
 });
 
+test("wound records the attacker and lastDamage reads it", () => {
+  let t = 1000;
+  const health = createPawnHealth(() => t);
+  health.note(1);
+  health.note(2);
+  assert.equal(health.lastDamage(2), undefined);
+  assert.deepEqual(health.wound(2, 1), { hp: 75, dead: false });
+  assert.deepEqual(health.lastDamage(2), { attacker: 1, at: 1000 });
+  assert.deepEqual(health.get(2), { hp: 75, dead: false });
+  t = 2000;
+  health.wound(2, 3);
+  assert.deepEqual(health.lastDamage(2), { attacker: 3, at: 2000 });
+  health.wound(2);
+  assert.deepEqual(health.lastDamage(2), { attacker: undefined, at: 2000 });
+  t = 3000;
+  health.wound(2, 1.5);
+  assert.deepEqual(health.lastDamage(2), { attacker: undefined, at: 3000 });
+  t = 4000;
+  health.wound(1, Number.NaN);
+  assert.deepEqual(health.lastDamage(1), { attacker: undefined, at: 4000 });
+});
+
+test("a dead pawn keeps the killer and respawn clears the record", () => {
+  let t = 1000;
+  const health = createPawnHealth(() => t);
+  health.note(2);
+  health.wound(2, 1);
+  health.wound(2, 1);
+  health.wound(2, 1);
+  health.wound(2, 3);
+  assert.deepEqual(health.get(2), { hp: 0, dead: true });
+  assert.deepEqual(health.lastDamage(2), { attacker: 3, at: 1000 });
+  t += 500;
+  assert.equal(health.wound(2, 9), undefined);
+  assert.equal(health.lastDamage(2)?.attacker, 3);
+  assert.equal(health.lastDamage(2)?.at, 1000);
+  t += RESPAWN_MS;
+  assert.deepEqual(health.takeRespawns(), [2]);
+  assert.equal(health.lastDamage(2), undefined);
+  assert.deepEqual(health.get(2), { hp: MAX_HP, dead: false });
+  health.wound(2, 4);
+  const recorded = health.lastDamage(2);
+  assert.deepEqual(recorded, { attacker: 4, at: t });
+  health.heal(2, 10);
+  assert.deepEqual(health.lastDamage(2), recorded);
+});
+
 test("a blocked spawn is skipped and a full block uses the first spawn", () => {
   const first = { x: 0, y: 0, z: 0, yaw: 0 };
   const second = { x: 10, y: 0, z: 0, yaw: 0.4 };
@@ -102,6 +149,8 @@ test("a pawn hit subtracts 25, a repeated seq does not, and a dead pawn cannot f
   assert.equal(health.get(victim).hp, 75);
   assert.equal(health.get(shooter).hp, MAX_HP);
   assert.equal(health.get(victim).dead, false);
+  assert.equal(health.lastDamage(victim)?.attacker, shooter);
+  assert.equal(health.lastDamage(shooter), undefined);
   assert.equal(rig.lasers.length, 2);
   assert.ok(rig.healthFrames.some((frame) => frame.entity === victim && frame.hp === 75 && frame.dead === false));
   for (const seq of [2, 3, 4]) {

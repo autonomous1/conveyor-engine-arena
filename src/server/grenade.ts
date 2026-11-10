@@ -6,6 +6,7 @@ import { MOVE_DT } from "../shared/movements.js";
 import {
   admitGrenade,
   freshGrenadeGate,
+  GRENADE_DAMAGE,
   GRENADE_SPEED,
   grenadePose,
   launchGrenade,
@@ -13,6 +14,7 @@ import {
   stepGrenade,
   type GrenadeBody,
   type GrenadeGate,
+  type GrenadeImpact,
   type GrenadePose,
 } from "../shared/grenade.js";
 import type { TraceCapsule } from "../shared/hitscan.js";
@@ -30,6 +32,13 @@ export function createArenaGrenades(opts: {
   health?: PawnHealth;
   /** Ground plane. A grenade bounces on it, then stops, like any other surface. */
   floorY?: number;
+  /**
+   * First-contact mode for the bound launcher. Default `"explode"`.
+   * Pass `"bounce"` for a toss (one bounce, then a stop).
+   */
+  impact?: GrenadeImpact;
+  /** Direct pawn hit. Default {@link GRENADE_DAMAGE}. */
+  damage?: number;
 }) {
   const now = opts.now ?? Date.now;
   const gates = new Map<number, { sessionId: number; gate: GrenadeGate }>();
@@ -43,9 +52,9 @@ export function createArenaGrenades(opts: {
     }
   }
 
-  function wound(hitId: number) {
+  function wound(hitId: number, attacker: number) {
     if (!opts.health) return;
-    const next = opts.health.wound(hitId);
+    const next = opts.health.wound(hitId, attacker, opts.damage ?? GRENADE_DAMAGE);
     if (!next) return;
     deliverHealthFrames(opts.server, opts.server.connected, [healthFrame(hitId, next.hp, next.dead)]);
   }
@@ -75,6 +84,7 @@ export function createArenaGrenades(opts: {
         aimDirection(thrown.yaw, clampPitch(thrown.pitch)),
         GRENADE_SPEED,
         thrown.yaw,
+        opts.impact ?? "explode",
       );
       nextId += 1;
       if (!finiteBody(body)) return;
@@ -88,7 +98,7 @@ export function createArenaGrenades(opts: {
       const boxes = opts.world.listObstacles();
       const kept: GrenadeBody[] = [];
       for (const body of bodies) {
-        const step = stepGrenade(body, dt, boxes, pawnCapsules(opts.world, body.owner), opts.floorY);
+        const step = stepGrenade(body, dt, boxes, pawnCapsules(opts.world), opts.floorY);
         const point = step.kind === "fly"
           ? { x: step.body.x, y: step.body.y, z: step.body.z }
           : step.kind === "bounce"
@@ -97,7 +107,7 @@ export function createArenaGrenades(opts: {
         if (!finitePoint(point)) continue;
         if (step.kind === "stop") {
           broadcast(body.owner, grenadePose(body.id, point, body.yaw, true));
-          if (step.hit.pawn && step.hit.id !== undefined && step.hit.id !== body.owner) wound(step.hit.id);
+          if (step.hit.pawn && step.hit.id !== undefined) wound(step.hit.id, body.owner);
           continue;
         }
         broadcast(body.owner, grenadePose(body.id, point, body.yaw));
@@ -116,12 +126,13 @@ function finitePoint(p: { x: number; y: number; z: number }): boolean {
   return Number.isFinite(p.x) && Number.isFinite(p.y) && Number.isFinite(p.z);
 }
 
-function pawnCapsules(world: AuthoritativeWorld, shooter: number): TraceCapsule[] {
+/** Every living pawn, including the owner. {@link stepGrenade} ignores the owner until it is armed. */
+function pawnCapsules(world: AuthoritativeWorld): TraceCapsule[] {
   const height = world.pawnHeight;
   if (!Number.isFinite(height)) return [];
   const out: TraceCapsule[] = [];
   for (const entity of world.query()) {
-    if (entity.id === shooter || entity.lifecycle !== "alive" || !(entity.radius > 0)) continue;
+    if (entity.lifecycle !== "alive" || !(entity.radius > 0)) continue;
     out.push({
       id: entity.id,
       x: entity.position.x,

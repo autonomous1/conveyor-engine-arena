@@ -28,6 +28,14 @@ type NodeLike = {
 
 type GainLike = NodeLike & { gain: ParamLike };
 
+type CompressorLike = NodeLike & {
+  threshold: ParamLike;
+  knee: ParamLike;
+  ratio: ParamLike;
+  attack: ParamLike;
+  release: ParamLike;
+};
+
 type PannerLike = NodeLike & {
   panningModel: string;
   distanceModel: string;
@@ -67,6 +75,8 @@ export type AudioContextLike = {
   createGain(): GainLike;
   createPanner(): PannerLike;
   createBufferSource(): SourceLike;
+  /** Optional. When present, a peak limiter sits between the master gain and the destination. */
+  createDynamicsCompressor?(): CompressorLike;
   decodeAudioData(data: ArrayBuffer): Promise<{ duration: number }>;
   resume(): Promise<void>;
   suspend(): Promise<void>;
@@ -226,7 +236,21 @@ export function createSfx(opts: SfxOptions = {}) {
       ctx = made;
       try {
         master = ctx.createGain();
-        master.connect(ctx.destination);
+        // There was no compressor. A blast gain of 2 (+6 dB) would hard-clip a
+        // near-full-scale sample at the destination, and stacked voices would be worse.
+        // A peak limiter between master and destination holds that down.
+        if (typeof ctx.createDynamicsCompressor === "function") {
+          const limiter = ctx.createDynamicsCompressor();
+          limiter.threshold.value = -1;
+          limiter.knee.value = 0;
+          limiter.ratio.value = 20;
+          limiter.attack.value = 0.003;
+          limiter.release.value = 0.25;
+          master.connect(limiter);
+          limiter.connect(ctx.destination);
+        } else {
+          master.connect(ctx.destination);
+        }
         applyMaster();
         for (const effect of effects.values()) {
           effect.gain = ctx.createGain();

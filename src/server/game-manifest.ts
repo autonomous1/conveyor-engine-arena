@@ -238,6 +238,40 @@ function drawsAsProp(asset: AssetRec): boolean {
 const EXPLOSION_ASSET = "grenade-explosion";
 
 /**
+ * `projectile` block on the `grenade` model. Absent is not an issue: the host
+ * defaults to explode-on-impact and half of max health. A present block with a
+ * bad `impact` or `damage` is a manifest issue.
+ */
+function grenadeProjectile(docAssets: unknown, issues: GameIssue[]): { impact?: "explode" | "bounce"; damage?: number } | undefined {
+  const index = Array.isArray(docAssets) ? docAssets.findIndex((item) => isObject(item) && item.id === "grenade") : -1;
+  if (index < 0) return undefined;
+  const path = `assets[${index}].projectile`;
+  const item = (docAssets as unknown[])[index];
+  if (!isObject(item) || item.projectile === undefined) return undefined;
+  if (!isObject(item.projectile)) {
+    issues.push({ path, message: "must be an object" });
+    return undefined;
+  }
+  const out: { impact?: "explode" | "bounce"; damage?: number } = {};
+  if (item.projectile.impact !== undefined) {
+    if (item.projectile.impact !== "explode" && item.projectile.impact !== "bounce") {
+      issues.push({ path: `${path}.impact`, message: "must be explode or bounce" });
+    } else {
+      out.impact = item.projectile.impact;
+    }
+  }
+  if (item.projectile.damage !== undefined) {
+    const damage = item.projectile.damage;
+    if (typeof damage !== "number" || !Number.isFinite(damage) || damage <= 0) {
+      issues.push({ path: `${path}.damage`, message: "must be a number > 0" });
+    } else {
+      out.damage = damage;
+    }
+  }
+  return out;
+}
+
+/**
  * `sprite` block of the `grenade-explosion` texture asset. Bad fields are manifest issues.
  * A PNG whose size is not columns × frameWidth by rows × frameHeight is a warning only.
  */
@@ -440,6 +474,8 @@ const SOUND_ASSETS: ReadonlyArray<readonly [ArenaSoundName, string]> = [
   ["beamDespawn", "beam-despawn-sfx"],
 ];
 const MAX_SOUND_VOICES = 16;
+/** Linear effect gain. 1 is unity; 2 is +6 dB, used by the grenade blast. */
+const MAX_SOUND_VOLUME = 2;
 
 /**
  * `sound` block of each effect's `audio` asset. Bad fields are manifest issues.
@@ -464,8 +500,8 @@ function soundEffects(docAssets: unknown, assets: ReadonlyMap<string, AssetRec>,
       continue;
     }
     const volume = sound.volume;
-    const volumeOk = typeof volume === "number" && Number.isFinite(volume) && volume >= 0 && volume <= 1;
-    if (!volumeOk) issues.push({ path: `${path}.volume`, message: "must be a number from 0 to 1" });
+    const volumeOk = typeof volume === "number" && Number.isFinite(volume) && volume >= 0 && volume <= MAX_SOUND_VOLUME;
+    if (!volumeOk) issues.push({ path: `${path}.volume`, message: `must be a number from 0 to ${MAX_SOUND_VOLUME}` });
     const voices = sound.maxVoices;
     const voicesOk = typeof voices === "number" && Number.isInteger(voices) && voices >= 1 && voices <= MAX_SOUND_VOICES;
     if (!voicesOk) issues.push({ path: `${path}.maxVoices`, message: `must be an integer from 1 to ${MAX_SOUND_VOICES}` });
@@ -1832,6 +1868,7 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
     return !!placed && assets.get(placed.model)?.kind === "model";
   });
   const explosion = explosionSheet(doc.assets, assets.get(EXPLOSION_ASSET), fileBytes, issues);
+  const grenadeProj = grenadeProjectile(doc.assets, issues);
   const sounds = soundEffects(doc.assets, assets, absentOptional, issues);
   const characterBeam: ArenaCharacterBeam | undefined = beamTiming
     ? {
@@ -2037,6 +2074,8 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
     lights,
     ...(elevators.length ? { elevators } : {}),
     ...(grenadeModel ? { grenade: grenadeModel } : {}),
+    ...(grenadeProj?.impact ? { grenadeImpact: grenadeProj.impact } : {}),
+    ...(grenadeProj?.damage !== undefined ? { grenadeDamage: grenadeProj.damage } : {}),
     ...(explosion ? { explosion } : {}),
     ...(sounds ? { sounds } : {}),
     ...(characterBeam ? { characterBeam } : {}),

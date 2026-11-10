@@ -8,7 +8,7 @@ import { allowKtx2 } from "./ktx2-stub.ts";
 import { attachPlayInput } from "../src/client/input.ts";
 import { createGrenadeProps, GRENADE_DRAW_MS } from "../src/client/grenade.ts";
 import { aimDirection, EYE_HEIGHT } from "../src/shared/look.ts";
-import { createPawnHealth, HIT_DAMAGE } from "../src/shared/health.ts";
+import { createPawnHealth, MAX_HP } from "../src/shared/health.ts";
 import { sweepSegment, traceHitscan, type TraceAabb, type TraceCapsule } from "../src/shared/hitscan.ts";
 import { startArenaServer } from "../dist/server/main.js";
 import { loadArena } from "../dist/server/world-loader.js";
@@ -160,8 +160,11 @@ test("a pawn hit applies the existing damage and a grenade frame is not a laser"
   }
   assert.equal(stopped, true);
   assert.equal(sent.every((frame) => frame.t === "grenade"), true);
-  assert.equal(health.get(2).hp, 100 - HIT_DAMAGE);
+  assert.equal(grenade.GRENADE_DAMAGE, MAX_HP / 2);
+  assert.equal(health.get(2).hp, 100 - grenade.GRENADE_DAMAGE);
   assert.equal(health.get(1).hp, 100);
+  assert.equal(health.lastDamage(2)?.attacker, 1);
+  assert.equal(health.lastDamage(1), undefined);
 });
 
 test("P throws on its own clock and does not fire", () => {
@@ -327,6 +330,7 @@ test("replicated yaw stays the launch yaw after the arc bends", () => {
       connected: [1],
     } as never,
     now: () => 0,
+    impact: "bounce",
     send(_clientId, frame) {
       sent.push(frame);
     },
@@ -719,6 +723,203 @@ function installDom() {
   };
 }
 
+test("impact explode stops on the first box, with no bounce, and backs the blast off the wall", () => {
+  const wall: TraceAabb = { id: 10, minX: -2, maxX: 2, minY: 0, maxY: 3, minZ: 4, maxZ: 4.4 };
+  const origin = { x: 0, y: EYE_HEIGHT, z: 0 };
+  const dir = aimDirection(0, 0);
+  let body = grenade.launchGrenade(1, 7, origin, dir, grenade.GRENADE_SPEED, 0, "explode");
+  assert.equal(body.impact, "explode");
+  let bounce = 0;
+  let stop: grenade.GrenadeHit | undefined;
+  for (let i = 0; i < 80 && !stop; i++) {
+    const step = grenade.stepGrenade(body, DT, [wall], []);
+    body = step.body;
+    if (step.kind === "bounce") bounce += 1;
+    if (step.kind === "stop") stop = step.hit;
+  }
+  assert.equal(bounce, 0);
+  assert.ok(stop);
+  assert.equal(stop.pawn, false);
+  assert.equal(stop.id, wall.id);
+  assert.ok(stop.point.z < wall.minZ, `blast is inside the wall (z ${stop.point.z})`);
+  const stand = wall.minZ - stop.point.z;
+  assert.ok(Math.abs(stand - grenade.GRENADE_IMPACT_STANDOFF) < 0.03, `standoff ${stand}`);
+});
+
+test("impact explode stops on the first floor contact, with no bounce", () => {
+  const origin = { x: 0, y: EYE_HEIGHT, z: 0 };
+  const dir = aimDirection(0, -0.3);
+  let body = grenade.launchGrenade(1, 7, origin, dir, grenade.GRENADE_SPEED, 0, "explode");
+  let bounce = 0;
+  let stop: grenade.GrenadeHit | undefined;
+  let t = 0;
+  for (let i = 0; i < 200 && !stop; i++) {
+    const step = grenade.stepGrenade(body, DT, [], [], 0);
+    t += DT;
+    body = step.body;
+    if (step.kind === "bounce") bounce += 1;
+    if (step.kind === "stop") stop = step.hit;
+  }
+  assert.equal(bounce, 0);
+  assert.ok(stop);
+  assert.ok(stop.point.y > 0, `blast should sit above the floor (y ${stop.point.y})`);
+  assert.ok(stop.point.y < 0.2, `standoff too large (y ${stop.point.y})`);
+  assert.ok(t < 2, `explode should not wait for a second bounce (${t.toFixed(2)} s)`);
+});
+
+test("toss mode still bounces once when impact is bounce", () => {
+  const wall: TraceAabb = { id: 10, minX: -2, maxX: 2, minY: 0, maxY: 3, minZ: 4, maxZ: 4.4 };
+  const floor: TraceAabb = { id: 11, minX: -8, maxX: 8, minY: -0.2, maxY: 0, minZ: -4, maxZ: 8 };
+  const origin = { x: 0, y: EYE_HEIGHT, z: 0 };
+  const implicit = grenade.launchGrenade(1, 7, origin, aimDirection(0, 0));
+  const explicit = grenade.launchGrenade(2, 7, origin, aimDirection(0, 0), grenade.GRENADE_SPEED, 0, "bounce");
+  assert.equal(implicit.impact, "bounce");
+  assert.equal(explicit.impact, "bounce");
+  let body = explicit;
+  let bounce = 0;
+  let stop: grenade.GrenadeHit | undefined;
+  for (let i = 0; i < 80 && !stop; i++) {
+    const step = grenade.stepGrenade(body, DT, [wall, floor], []);
+    body = step.body;
+    if (step.kind === "bounce") bounce += 1;
+    if (step.kind === "stop") stop = step.hit;
+  }
+  assert.equal(bounce, 1);
+  assert.ok(stop);
+  assert.equal(stop.id, floor.id);
+  assert.ok(Math.abs(stop.point.z - wall.minZ) > 0.5, "toss should leave the wall before it stops");
+});
+
+test("impact explode does not tunnel through a thin wall at launcher speed", () => {
+  const wall: TraceAabb = { id: 10, minX: -2, maxX: 2, minY: 0, maxY: 3, minZ: 5, maxZ: 5.1 };
+  const origin = { x: 0, y: 1, z: 4.4 };
+  const body = grenade.launchGrenade(1, 7, origin, { x: 0, y: 0, z: 1 }, grenade.GRENADE_SPEED, 0, "explode");
+  const travel = grenade.GRENADE_SPEED * DT;
+  assert.ok(travel > 0.2, "launcher should cross the thin wall in one tick");
+  const step = grenade.stepGrenade(body, DT, [wall], []);
+  assert.equal(step.kind, "stop");
+  const hit = (step as { hit: grenade.GrenadeHit }).hit;
+  assert.equal(hit.id, wall.id);
+  assert.equal(hit.pawn, false);
+  assert.ok(hit.point.z < wall.minZ, `tunneled past the face (z ${hit.point.z})`);
+  assert.ok(hit.point.z > origin.z);
+});
+
+test("impact explode ignores the owner until armed, then can hit them", () => {
+  const owner: TraceCapsule = { id: 7, x: 0, y: 0, z: 0, radius: 0.5, height: 1.8 };
+  const wall: TraceAabb = { id: 10, minX: -2, maxX: 2, minY: 0, maxY: 3, minZ: 8, maxZ: 8.4 };
+  const origin = { x: 0, y: 1, z: 0 };
+  let body = grenade.launchGrenade(1, 7, origin, { x: 0, y: 0, z: 1 }, grenade.GRENADE_SPEED, 0, "explode");
+  let left = false;
+  for (let i = 0; i < 10; i++) {
+    const step = grenade.stepGrenade(body, DT, [wall], [owner]);
+    if (step.kind === "stop" && step.hit.pawn) {
+      assert.fail("exploded on the owner before leaving the capsule");
+    }
+    body = step.body;
+    if (body.z > 1) {
+      left = true;
+      break;
+    }
+  }
+  assert.equal(left, true);
+
+  body = grenade.launchGrenade(2, 7, origin, { x: 0, y: 0, z: 1 }, grenade.GRENADE_SPEED, 0, "explode");
+  while (body.age < grenade.GRENADE_ARMING_S) {
+    const step = grenade.stepGrenade(body, DT, [], []);
+    assert.equal(step.kind, "fly");
+    body = step.body;
+  }
+  const ahead: TraceCapsule = { id: 7, x: body.x, y: 0, z: body.z + 1, radius: 0.5, height: 1.8 };
+  let stop: grenade.GrenadeHit | undefined;
+  for (let i = 0; i < 20 && !stop; i++) {
+    const step = grenade.stepGrenade(body, DT, [], [ahead]);
+    body = step.body;
+    if (step.kind === "stop") stop = step.hit;
+  }
+  assert.ok(stop);
+  assert.equal(stop.pawn, true);
+  assert.equal(stop.id, 7);
+});
+
+test("the launcher host explodes on first impact and still damages a pawn", () => {
+  const health = createPawnHealth(() => 0);
+  health.note(1);
+  health.note(2);
+  const wall: TraceAabb = { id: 10, minX: -2, maxX: 2, minY: 0, maxY: 3, minZ: 6, maxZ: 6.4 };
+  const pawns = [
+    { id: 1, position: { x: 0, y: 0, z: 0 }, lifecycle: "alive" as const, radius: 0.5 },
+    { id: 2, position: { x: 0, y: 0, z: 3 }, lifecycle: "alive" as const, radius: 0.5 },
+  ];
+  const world = {
+    store: { view: (id: number) => pawns.find((pawn) => pawn.id === id) },
+    pawnHeight: 1.8,
+    listObstacles: () => [wall],
+    query: () => pawns,
+  };
+  const sent: grenade.GrenadePose[] = [];
+  const host = createArenaGrenades({
+    world: world as never,
+    server: {
+      session: () => ({ sessionId: 1 }),
+      replicator: { get: () => ({ ownedEntity: 1, connected: true, known: new Set<number>([1]) }) },
+      connected: [1],
+    } as never,
+    now: () => 0,
+    health,
+    send(_clientId, frame) {
+      sent.push(frame);
+    },
+  });
+  host.onFrame(1, grenade.grenadeFrame(1, 0, 0));
+  let stopped: grenade.GrenadePose | undefined;
+  for (let i = 0; i < 40 && !stopped; i++) {
+    host.tick();
+    stopped = sent.find((pose) => pose.stop === true);
+  }
+  assert.ok(stopped);
+  assert.ok(stopped.z < 3 + 0.5, `should detonate on the pawn, not the wall (z ${stopped.z})`);
+  assert.equal(health.get(2).hp, 100 - grenade.GRENADE_DAMAGE);
+  assert.equal(health.lastDamage(2)?.attacker, 1);
+
+  sent.length = 0;
+  const wallWorld = {
+    store: { view: (id: number) => pawns.find((pawn) => pawn.id === id) },
+    pawnHeight: 1.8,
+    listObstacles: () => [wall],
+    query: () => [pawns[0]!],
+  };
+  const wallHost = createArenaGrenades({
+    world: wallWorld as never,
+    server: {
+      session: () => ({ sessionId: 1 }),
+      replicator: { get: () => ({ ownedEntity: 1, connected: true, known: new Set<number>([1]) }) },
+      connected: [1],
+    } as never,
+    now: () => grenade.GRENADE_INTERVAL_MS,
+    send(_clientId, frame) {
+      sent.push(frame);
+    },
+  });
+  wallHost.onFrame(1, grenade.grenadeFrame(1, 0, 0));
+  stopped = undefined;
+  let peakZ = 0;
+  const zs: number[] = [];
+  for (let i = 0; i < 40 && !stopped; i++) {
+    wallHost.tick();
+    for (const pose of sent) {
+      zs.push(pose.z);
+      if (pose.z > peakZ) peakZ = pose.z;
+      if (pose.stop === true) stopped = pose;
+    }
+  }
+  assert.ok(stopped);
+  assert.ok(peakZ < wall.minZ + 0.01, `went through or bounced past the face (peak ${peakZ})`);
+  assert.ok(stopped.z < wall.minZ, `stop inside the wall (z ${stopped.z})`);
+  const after = zs.filter((z, i) => i > 0 && zs[i - 1]! >= peakZ - 1e-9 && z < peakZ - 0.2);
+  assert.equal(after.length, 0, "launcher should not bounce back off the wall");
+});
+
 test("the floor plane stops a grenade: one bounce on it, then a stop at floor height", () => {
   const origin = { x: 0, y: EYE_HEIGHT, z: 0 };
   const dir = aimDirection(0, -0.3);
@@ -759,4 +960,3 @@ test("the floor plane stops a grenade: one bounce on it, then a stop at floor he
   assert.equal(first.kind, "bounce");
   assert.equal((first as { hit: grenade.GrenadeHit }).hit.id, 3);
 });
-

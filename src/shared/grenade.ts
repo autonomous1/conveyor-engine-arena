@@ -5,19 +5,33 @@
  * Grenades do not collide with each other. There is no second dynamic body.
  */
 
+import { MAX_HP } from "./health.js";
 import { sweepSegment, type SweepHit, type TraceAabb, type TraceCapsule, type Vec3 } from "./hitscan.js";
 
 export const GRENADE_INTERVAL_MS = 1000;
 /** Finite toss. A hitscan ray crosses its range in one trace, so this is slower. */
 export const GRENADE_SPEED = 24;
+/** Direct pawn hit. Half of {@link MAX_HP}, because a grenade is harder to land than a laser. */
+export const GRENADE_DAMAGE = MAX_HP / 2;
 /** Meters per second squared, subtracted from velocity Y once per host tick. */
 export const GRENADE_GRAVITY = 9.81;
 /** Scales the velocity into the surface. Below 1, so a bounce loses speed. */
 export const GRENADE_RESTITUTION = 0.5;
 /** Push off the face after a bounce so the next segment does not re-enter it. */
 export const GRENADE_SKIN = 0.01;
+/** Back off the blast along incoming velocity so the sprite is not inside the wall. */
+export const GRENADE_IMPACT_STANDOFF = 0.08;
+/** Owner capsules are ignored until this age, so a launch can leave the shooter's body. */
+export const GRENADE_ARMING_S = 0.1;
 /** A miss that never meets a volume is removed after this many seconds. */
 export const GRENADE_LIFE_S = 4;
+
+/** `"explode"` detonates on first contact. `"bounce"` is the toss: one bounce, then a stop. */
+export type GrenadeImpact = "explode" | "bounce";
+
+export function parseGrenadeImpact(value: unknown): GrenadeImpact | undefined {
+  return value === "explode" || value === "bounce" ? value : undefined;
+}
 
 export type GrenadeFrame = {
   t: "grenade";
@@ -115,6 +129,8 @@ export type GrenadeBody = {
   yaw: number;
   bounced: boolean;
   age: number;
+  /** First-contact mode. Default on {@link launchGrenade} is the toss. */
+  impact: GrenadeImpact;
 };
 
 export type GrenadeHit = {
@@ -136,6 +152,7 @@ export function launchGrenade(
   dir: Vec3,
   speed = GRENADE_SPEED,
   yaw = 0,
+  impact: GrenadeImpact = "bounce",
 ): GrenadeBody {
   const aim = unit(dir);
   return {
@@ -150,18 +167,21 @@ export function launchGrenade(
     yaw,
     bounced: false,
     age: 0,
+    impact,
   };
 }
 
 /**
- * One host tick. Gravity is added on Y, then the segment is swept.
- * An obstacle bounces once. The next obstacle hit stops the body.
- * A pawn hit stops it and is marked so the caller can apply the existing damage.
- */
-/**
- * One tick. `floorY` is the ground plane. The arena floor is not a collision box
- * (pawns stand on a height scan), so without it a grenade falls through the floor and
- * only stops on {@link GRENADE_LIFE_S}, far below the map.
+ * One tick. Gravity is added on Y, then the segment is swept so a fast body
+ * cannot tunnel through a thin box. `floorY` is the ground plane: the arena
+ * floor is not a collision box (pawns stand on a height scan), so without it a
+ * grenade falls through the floor and only stops on {@link GRENADE_LIFE_S}.
+ *
+ * `"bounce"` (toss): an obstacle bounces once, the next obstacle hit stops.
+ * A pawn hit stops immediately. `"explode"` (launcher): the first box, floor,
+ * or pawn contact stops, with no bounce. The owner is ignored until
+ * {@link GRENADE_ARMING_S} so the launch can leave the shooter's capsule.
+ * A pawn hit is marked so the caller can apply the existing damage.
  */
 export function stepGrenade(
   body: GrenadeBody,
@@ -179,7 +199,7 @@ export function stepGrenade(
     y: body.y + next.vy * dt,
     z: body.z + next.vz * dt,
   };
-  const hit = closerFloorHit(from, to, sweepSegment(from, to, aabbs, capsules), floorY);
+  const hit = closerFloorHit(from, to, sweepSegment(from, to, aabbs, capsulesFor(body, next.age, capsules)), floorY);
   if (!hit) {
     next.x = to.x;
     next.y = to.y;
@@ -193,12 +213,16 @@ export function stepGrenade(
     }
     return { kind: "fly", body: next };
   }
-  const contact: GrenadeHit = { point: hit.point, normal: hit.normal, pawn: hit.pawn };
+  const explode = body.impact === "explode";
+  const point = explode
+    ? standoffPoint(hit.point, { x: next.vx, y: next.vy, z: next.vz }, hit.normal)
+    : hit.point;
+  const contact: GrenadeHit = { point, normal: hit.normal, pawn: hit.pawn };
   if (hit.id !== undefined) contact.id = hit.id;
-  if (hit.pawn || body.bounced) {
-    next.x = hit.point.x;
-    next.y = hit.point.y;
-    next.z = hit.point.z;
+  if (hit.pawn || body.bounced || explode) {
+    next.x = point.x;
+    next.y = point.y;
+    next.z = point.z;
     next.vx = 0;
     next.vy = 0;
     next.vz = 0;
@@ -235,6 +259,30 @@ export function bounceVelocity(velocity: Vec3, normal: Vec3, restitution: number
     x: velocity.x - scale * normal.x,
     y: velocity.y - scale * normal.y,
     z: velocity.z - scale * normal.z,
+  };
+}
+
+function capsulesFor(body: GrenadeBody, age: number, capsules: readonly TraceCapsule[]): readonly TraceCapsule[] {
+  const allowOwner = body.impact === "explode" && age >= GRENADE_ARMING_S;
+  if (allowOwner) return capsules;
+  return capsules.filter((cap) => cap.id !== body.owner);
+}
+
+/** Move the blast back along incoming velocity, or along the face normal if speed is ~0. */
+function standoffPoint(point: Vec3, velocity: Vec3, normal: Vec3): Vec3 {
+  const speed = Math.hypot(velocity.x, velocity.y, velocity.z);
+  if (speed > 1e-8) {
+    const s = GRENADE_IMPACT_STANDOFF / speed;
+    return {
+      x: point.x - velocity.x * s,
+      y: point.y - velocity.y * s,
+      z: point.z - velocity.z * s,
+    };
+  }
+  return {
+    x: point.x + normal.x * GRENADE_IMPACT_STANDOFF,
+    y: point.y + normal.y * GRENADE_IMPACT_STANDOFF,
+    z: point.z + normal.z * GRENADE_IMPACT_STANDOFF,
   };
 }
 

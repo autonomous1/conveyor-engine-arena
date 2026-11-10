@@ -1014,6 +1014,10 @@
       "instance": "static",
       "uri": "/assets/models/grenade-launched.glb",
       "mediaType": "model/gltf-binary",
+      "projectile": {
+        "impact": "explode",
+        "damage": 50
+      },
       "license": {
         "id": "CC0-1.0",
         "status": "spdx"
@@ -1094,7 +1098,7 @@
       "uri": "/assets/audio/grenade-launch-grenade-blast.wav",
       "mediaType": "audio/wav",
       "sound": {
-        "volume": 1,
+        "volume": 2,
         "maxVoices": 4,
         "positional": true,
         "refDistance": 8
