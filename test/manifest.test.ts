@@ -811,6 +811,97 @@ test("grenade-explosion asset compiles to view.explosion; a bad sprite block is 
   assert.equal(compile(none, read).view.explosion, undefined);
 });
 
+test("laser-impact asset compiles to view.laserImpact; an absent optional file is dropped with a warning", () => {
+  const doc = document();
+  const files = filesFromDisk();
+  const uri = "/assets/textures/laser-impact-sheet.png";
+  const row = (doc.assets as Array<Record<string, unknown>>).find((asset) => asset.id === "laser-impact")!;
+  assert.equal(row.kind, "texture");
+  assert.equal(row.optional, true);
+  assert.equal("type" in row, false, "no placement type");
+  assert.equal(row.uri, uri);
+  const reader = (extra: Record<string, Uint8Array | undefined> = {}) => (path: string) => (path in extra ? extra[path] : files.get(path));
+
+  const warnings: string[] = [];
+  const warn = console.warn;
+  console.warn = (...args: unknown[]) => void warnings.push(args.join(" "));
+  let bare;
+  try {
+    bare = compile(doc, reader({ [uri]: undefined }));
+  } finally {
+    console.warn = warn;
+  }
+  assert.equal(bare.view.laserImpact, undefined);
+  assert.ok(bare.view.explosion, "grenade sheet is still there for the client fallback");
+  assert.equal(warnings.filter((line) => line.includes("laser-impact") && line.includes("effect is skipped")).length >= 1, true);
+
+  // Real sheet is 1536x1280 (6x5 frames of 256x256). The client still uses width/cols by height/rows.
+  const view = compile(doc, reader({ [uri]: pngHeader(1536, 1280) })).view;
+  assert.deepEqual(view.laserImpact, {
+    texture: uri,
+    columns: 6,
+    rows: 5,
+    frameCount: 30,
+    frameWidth: 256,
+    frameHeight: 256,
+    fps: 30,
+    size: 0.8,
+    blending: "normal",
+    laserImpactSize: 0.8,
+  });
+
+  const emptySprite = structuredClone(doc) as { assets: Array<Record<string, unknown>> };
+  emptySprite.assets.find((asset) => asset.id === "laser-impact")!.sprite = {};
+  const defaults = compile(emptySprite, reader({ [uri]: pngHeader(1536, 1280) })).view.laserImpact;
+  assert.deepEqual(defaults, {
+    texture: uri, columns: 6, rows: 5, frameCount: 30, frameWidth: 256, frameHeight: 256, fps: 30, size: 0.8, blending: "normal",
+  }, "defaults; no laserImpactSize or rotation when omitted");
+
+  const custom = structuredClone(doc) as { assets: Array<Record<string, unknown>> };
+  custom.assets.find((asset) => asset.id === "laser-impact")!.sprite = {
+    columns: 4, rows: 4, frameCount: 16, frameWidth: 128, frameHeight: 128, fps: 12, size: 1.2, laserImpactSize: 0.5, blending: "additive", rotation: 90,
+  };
+  assert.deepEqual(compile(custom, reader({ [uri]: pngHeader(512, 512) })).view.laserImpact, {
+    texture: uri, columns: 4, rows: 4, frameCount: 16, frameWidth: 128, frameHeight: 128, fps: 12, size: 1.2, blending: "additive", laserImpactSize: 0.5, rotation: 90,
+  });
+
+  const none = structuredClone(doc) as { assets: Array<Record<string, unknown>> };
+  none.assets = none.assets.filter((asset) => asset.id !== "laser-impact");
+  assert.equal(compile(none, (path) => files.get(path)).view.laserImpact, undefined);
+});
+
+test("laser-impact sprite rejects bad values with the field path", () => {
+  const doc = document();
+  const files = filesFromDisk();
+  const uri = "/assets/textures/laser-impact-sheet.png";
+  const read = (path: string) => (path === uri ? pngHeader(1536, 1280) : files.get(path));
+  const paths = (edit: (copy: { assets: Array<Record<string, unknown>> }) => void): string[] => {
+    const copy = structuredClone(doc) as { assets: Array<Record<string, unknown>> };
+    edit(copy);
+    try {
+      compile(copy, read);
+    } catch (err) {
+      assert.ok(err instanceof GameManifestError);
+      return err.issues.map((issue) => issue.path);
+    }
+    return [];
+  };
+  const columnPaths = paths((c) => void (c.assets.find((asset) => asset.id === "laser-impact")!.sprite = { columns: 0 }));
+  assert.ok(columnPaths.some((path) => path.endsWith(".sprite.columns")), String(columnPaths));
+  const blendPaths = paths((c) => void (c.assets.find((asset) => asset.id === "laser-impact")!.sprite = { blending: "screen" }));
+  assert.ok(blendPaths.some((path) => path.endsWith(".sprite.blending")), String(blendPaths));
+  const rotPaths = paths((c) => void (c.assets.find((asset) => asset.id === "laser-impact")!.sprite = { rotation: "cw" }));
+  assert.ok(rotPaths.some((path) => path.endsWith(".sprite.rotation")), String(rotPaths));
+  const countPaths = paths((c) => void (c.assets.find((asset) => asset.id === "laser-impact")!.sprite = { columns: 6, rows: 5, frameCount: 31 }));
+  assert.ok(countPaths.some((path) => path.endsWith(".sprite.frameCount")), String(countPaths));
+  const sizePaths = paths((c) => void (c.assets.find((asset) => asset.id === "laser-impact")!.sprite = { laserImpactSize: 0 }));
+  assert.ok(sizePaths.some((path) => path.endsWith(".sprite.laserImpactSize")), String(sizePaths));
+  const kindPaths = paths((c) => void (c.assets.find((asset) => asset.id === "laser-impact")!.kind = "model"));
+  assert.ok(kindPaths.some((path) => path.endsWith(".kind")), String(kindPaths));
+  const objPaths = paths((c) => void (c.assets.find((asset) => asset.id === "laser-impact")!.sprite = "sheet"));
+  assert.ok(objPaths.some((path) => path.endsWith(".sprite")), String(objPaths));
+});
+
 test("audio assets compile to view.sounds; a bad sound block or file is an issue", () => {
   const doc = document();
   const files = filesFromDisk();

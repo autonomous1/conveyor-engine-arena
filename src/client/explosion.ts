@@ -319,3 +319,45 @@ export function createExplosionFx(
 }
 
 export type ExplosionFx = ReturnType<typeof createExplosionFx>;
+
+/** Default world size of a laser hit, in metres, when the sheet does not say otherwise. */
+export const LASER_IMPACT_SIZE = 0.8;
+/**
+ * Playback rate used when laser hits fall back to the grenade-explosion sheet.
+ * A dedicated `laser-impact` sheet plays at its own `fps` (30 in the manifest).
+ */
+export const LASER_IMPACT_FALLBACK_FPS = 60;
+
+export type LaserImpactSheet = ExplosionSheet & { texture: string; laserImpactSize?: number };
+
+/** The `laser-impact` asset, or the grenade sheet when that optional file is missing. */
+export function resolveLaserImpactSheet(
+  laserImpact?: LaserImpactSheet,
+  explosion?: LaserImpactSheet,
+): { sheet: LaserImpactSheet; fallback: boolean } | undefined {
+  if (laserImpact) return { sheet: laserImpact, fallback: false };
+  if (explosion) return { sheet: explosion, fallback: true };
+  return undefined;
+}
+
+export type LaserImpactSource = NonNullable<ReturnType<typeof resolveLaserImpactSheet>>;
+
+/** World size of a laser hit. Prefers `laserImpactSize`, then the dedicated sheet's `size`, then 0.8. */
+export function laserImpactWorldSize(source: LaserImpactSource | undefined, fallback = LASER_IMPACT_SIZE): number {
+  const impact = source?.sheet.laserImpactSize;
+  if (typeof impact === "number" && Number.isFinite(impact) && impact > 0) return impact;
+  if (source && !source.fallback) {
+    const size = source.sheet.size;
+    if (typeof size === "number" && Number.isFinite(size) && size > 0) return size;
+  }
+  return fallback;
+}
+
+/** Playback fps. The dedicated sheet uses its own `fps`; a grenade-sheet fallback stays at 60. */
+export function laserImpactPlaybackFps(source: LaserImpactSource | undefined, fallback = LASER_IMPACT_FALLBACK_FPS): number {
+  if (source && !source.fallback) {
+    const fps = source.sheet.fps;
+    if (typeof fps === "number" && Number.isFinite(fps) && fps > 0) return fps;
+  }
+  return fallback;
+}

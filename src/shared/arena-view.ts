@@ -245,6 +245,12 @@ export type ArenaView = {
    */
   explosion?: ArenaExplosionSheet;
   /**
+   * Laser hit sprite sheet from the `laser-impact` texture asset and its `sprite` block.
+   * Absent when the manifest has no such asset or the optional file is missing; the client
+   * then uses `explosion`. Not part of either content hash.
+   */
+  laserImpact?: ArenaExplosionSheet;
+  /**
    * Sound effects from the `audio` assets `laser-blast`, `grenade-launch`, `grenade-blast`, `crate-pickup`, `key-pickup`, `medkit-pickup`, `door-open`, `door-close`, `elevator-start`, `beam-spawn-sfx`, and `beam-despawn-sfx`
    * and their `sound` blocks. A key is absent when the manifest has no such asset.
    * Not part of either content hash.

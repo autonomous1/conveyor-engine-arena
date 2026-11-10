@@ -6,6 +6,11 @@ import {
   EXPLOSION_MAX_DT,
   EXPLOSION_POOL_CAP,
   explosionFrameOffset,
+  LASER_IMPACT_FALLBACK_FPS,
+  LASER_IMPACT_SIZE,
+  laserImpactPlaybackFps,
+  laserImpactWorldSize,
+  resolveLaserImpactSheet,
 } from "../src/client/explosion.ts";
 
 const close = (actual: number, expected: number) => assert.ok(Math.abs(actual - expected) < 1e-9, `${actual} vs ${expected}`);
@@ -209,4 +214,35 @@ test("sheet.rotation turns SpriteMaterial.rotation; 8×6 beam sheet plays 48 fra
   fx.update(0.1); // 2.0 s → frame 48, done
   assert.equal(fx.activeCount, 0);
   assert.equal(sprite.visible, false);
+});
+
+test("resolveLaserImpactSheet prefers the dedicated sheet and falls back to the grenade sheet", () => {
+  const laser = { texture: "/assets/textures/laser-impact-sheet.png", fps: 30, size: 0.8, laserImpactSize: 0.8 };
+  const grenade = { texture: "/assets/textures/grenade-explosion-sheet.png", fps: 30, size: 8, laserImpactSize: 0.8 };
+  const dedicated = resolveLaserImpactSheet(laser, grenade);
+  assert.deepEqual(dedicated, { sheet: laser, fallback: false });
+  assert.equal(laserImpactWorldSize(dedicated), 0.8);
+  assert.equal(laserImpactPlaybackFps(dedicated), 30);
+  const fallback = resolveLaserImpactSheet(undefined, grenade);
+  assert.deepEqual(fallback, { sheet: grenade, fallback: true });
+  assert.equal(laserImpactWorldSize(fallback), 0.8, "fallback uses laserImpactSize, not the grenade blast size");
+  assert.equal(laserImpactPlaybackFps(fallback), LASER_IMPACT_FALLBACK_FPS);
+  const sizeOnly = resolveLaserImpactSheet({ texture: laser.texture, fps: 24, size: 1.1 });
+  assert.equal(laserImpactWorldSize(sizeOnly), 1.1);
+  assert.equal(laserImpactPlaybackFps(sizeOnly), 24);
+  assert.equal(resolveLaserImpactSheet(undefined, undefined), undefined);
+  assert.equal(laserImpactWorldSize(undefined), LASER_IMPACT_SIZE);
+  assert.equal(laserImpactPlaybackFps(undefined), LASER_IMPACT_FALLBACK_FPS);
+});
+
+test("a 1536x1280 laser-impact sheet of 6 x 5 uses square 256x256 frames from the image", () => {
+  const fx = createExplosionFx(new THREE.Scene(), { sheet: { columns: 6, rows: 5, frameCount: 30, frameWidth: 256, frameHeight: 256 } });
+  const tex = new THREE.Texture({ width: 1536, height: 1280 } as unknown as HTMLImageElement);
+  tex.needsUpdate = true;
+  fx.setAtlas(tex);
+  close(fx.layout.aspect, 1);
+  assert.equal(fx.spawn(0, 0, 0, 0.8), true);
+  const sprite = (fx.group.children as THREE.Sprite[])[0]!;
+  close(sprite.scale.x, 0.8);
+  close(sprite.scale.y, 0.8);
 });

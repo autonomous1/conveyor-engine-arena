@@ -1053,6 +1053,32 @@
       }
     },
     {
+      "id": "laser-impact",
+      "kind": "texture",
+      "optional": true,
+      "uri": "/assets/textures/laser-impact-sheet.png",
+      "mediaType": "image/png",
+      "sprite": {
+        "columns": 6,
+        "rows": 5,
+        "frameCount": 30,
+        "frameWidth": 256,
+        "frameHeight": 256,
+        "fps": 30,
+        "size": 0.8,
+        "laserImpactSize": 0.8,
+        "blending": "normal"
+      },
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
+      "provenance": {
+        "origin": "manual",
+        "notes": "Laser hit sprite sheet, 1536x1280: 30 frames of 256x256 in 6 columns x 5 rows at 30 fps. The client derives frame size from the loaded image (width/columns by height/rows). Optional rotation is degrees. Optional: while the file is absent, laser hits use the grenade-explosion sheet."
+      }
+    },
+    {
       "id": "laser-blast",
       "kind": "audio",
       "uri": "/assets/audio/laser-blast-sfx.mp3",

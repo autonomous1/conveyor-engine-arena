@@ -28,7 +28,7 @@ import { createDoorSounds } from "./door-sound.js";
 import { createElevatorSounds } from "./elevator-sound.js";
 import { createPickupSounds, kindSoundsOf } from "./pickup-sound.js";
 import { createCharacterFx, type CharacterFx, type Point as FxPoint } from "./character-fx.js";
-import { createExplosionFx, type ExplosionFx } from "./explosion.js";
+import { createExplosionFx, type ExplosionFx, resolveLaserImpactSheet, laserImpactWorldSize, laserImpactPlaybackFps, LASER_IMPACT_SIZE } from "./explosion.js";
 import { createGrenadeProps } from "./grenade.js";
 import { createHitMarker } from "./hit-marker.js";
 import { createHud, localHealthLabel } from "./hud.js";
@@ -46,9 +46,7 @@ import { installQaApi, type QaApi } from "./qa.js";
 import { createRateWindow, formatOverlay } from "./rates.js";
 import { formatFireLog, presentShot } from "./shot-view.js";
 
-/** Laser hit point: a small, quick blast. Grenades use the manifest `sprite.size` at 30 fps. */
-const LASER_IMPACT_SIZE = 0.8;
-const LASER_IMPACT_FPS = 60;
+/** Laser hit point: a small blast. Size is 0.8 m unless the sheet sets `laserImpactSize` (or `size` on `laser-impact`). */
 /** Grenade blast centre above the stop point, as a fraction of the sprite size. */
 const GRENADE_BLAST_LIFT = 0.25;
 /** A grenade's first pose is the thrower's eye. Within this of your own eye, it is yours. */
@@ -183,10 +181,31 @@ export async function boot(
     },
   });
   const explosionSheet = view.explosion;
-  const laserImpactSize = explosionSheet?.laserImpactSize ?? LASER_IMPACT_SIZE;
   void explosions.load(async () => {
     if (!explosionSheet) throw new Error("manifest has no grenade-explosion sprite");
     return new THREE.TextureLoader().loadAsync(explosionSheet.texture);
+  }, arena.renderer);
+  // Laser hits use their own pool and the `laser-impact` sheet (`view.laserImpact`).
+  // If that optional file is missing, this falls back to the grenade-explosion sheet
+  // and logs once through diag (console, not the HUD).
+  const laserSource = resolveLaserImpactSheet(view.laserImpact, view.explosion);
+  if (laserSource?.fallback) {
+    diag.report({
+      level: "warn",
+      fields: { source: "fx", category: "laser-impact-atlas", reason: "fallback-to-grenade-explosion" },
+    });
+  }
+  const laserImpacts = createExplosionFx(arena.scene, {
+    sheet: laserSource?.sheet,
+    onLoadError(err) {
+      diag.report({ level: "error", error: err, fields: { source: "fx", category: "laser-impact-atlas" } });
+    },
+  });
+  const laserImpactSize = laserImpactWorldSize(laserSource, LASER_IMPACT_SIZE);
+  const laserImpactFps = laserImpactPlaybackFps(laserSource);
+  void laserImpacts.load(async () => {
+    if (!laserSource) throw new Error("manifest has no laser-impact or grenade-explosion sprite");
+    return new THREE.TextureLoader().loadAsync(laserSource.sheet.texture);
   }, arena.renderer);
   // Character spawn and despawn: sound, beam sheet, and a fade of the model. `view.characterBeam`
   // sets the timings; absent, characters appear and go at once. Triggers: a `spawn` host frame (a
@@ -516,6 +535,7 @@ export async function boot(
       grenadeQueue.length = 0;
       grenades.drop();
       explosions.clear();
+      laserImpacts.clear();
       pickupSounds.clear();
       doorSounds.clear();
       elevatorSounds.clear();
@@ -700,7 +720,7 @@ export async function boot(
       const ly = laser.to.y - laser.from.y;
       const lz = laser.to.z - laser.from.z;
       if (lx * lx + ly * ly + lz * lz < (TRACE_RANGE - 0.01) ** 2) {
-        explosions.spawn(laser.to.x, laser.to.y, laser.to.z, laserImpactSize, LASER_IMPACT_FPS);
+        laserImpacts.spawn(laser.to.x, laser.to.y, laser.to.z, laserImpactSize, laserImpactFps);
       }
       const remain = laser.until - Date.now();
       if (!(remain > 0)) continue;
@@ -726,6 +746,7 @@ export async function boot(
     grenadeQueue.length = 0;
     grenades.expire(now);
     explosions.update(frozen ? 0 : dt);
+    laserImpacts.update(frozen ? 0 : dt);
     pickupSounds.update(performance.now());
     doorSounds.update(performance.now());
     {

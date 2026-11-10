@@ -1,12 +1,14 @@
 import { decodeFrame, encodeFrame, EngineWsServer } from "conveyor-engine-transport-ws";
 import type { TransportSocket } from "conveyor-engine-transport-ws";
 import { createAudit } from "../shared/audit.js";
+import type { BotSenseReader } from "../shared/bots/sense.js";
 import { createPawnHealth, type SpawnPick } from "../shared/health.js";
 import { helloModel, parseModelFrame } from "../shared/model-choice.js";
 import { createPawnKit, createPickupHost } from "../shared/pickups.js";
 import { decodeMoveButtons } from "../shared/movements.js";
 import { canonicalJson, sceneGraphPayload, sha256Hex } from "../shared/scene-graph.js";
 import { spawnFrame } from "../shared/spawn-frame.js";
+import { createHostBotSense } from "./bot-sense.js";
 import { createArenaDoors, createDoorBlockers } from "./doors.js";
 import { createArenaElevators } from "./elevators.js";
 import { createArenaFire } from "./fire.js";
@@ -62,6 +64,8 @@ export type ArenaSession = {
   /** Hex SHA-256 of {@link regionsJson}. Set when {@link sceneGraphReady} resolves. */
   regionsHash?: string;
   sceneGraphReady: Promise<void>;
+  /** Read-only sensed state of the wander bots. Nothing in the host acts on it yet. */
+  botSense: BotSenseReader;
   attach(conn: HostConn): void;
   stop(): void;
 };
@@ -265,9 +269,28 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
       engine.session(clientId)?.socket.send(encodeFrame(frame));
     },
   });
+  const botSense = createHostBotSense({
+    world: loaded.world,
+    agents: loaded.agents,
+    health,
+    sceneGraph: loaded.sceneGraph,
+    doors: () => doorHost.snapshot(),
+    pickups: loaded.view.pickups ?? [],
+    remainingPickups: () => pickupHost.remainingIds(),
+    log: (line) => console.error(line),
+    ownedEntities() {
+      const owned: number[] = [];
+      for (const clientId of engine.connected) {
+        const record = engine.gateway.get(clientId);
+        if (record?.connected && record.ownedEntity !== undefined) owned.push(record.ownedEntity);
+      }
+      return owned;
+    },
+  });
   const stopLoop = startWanderLoop(loaded.world, loaded.agents, engine, held, (line) => console.error(line), health, audit, () => {
     reservedPads.clear();
-    const grants = pickupHost.take(pawnBodies(loaded.world, health), health, kit);
+    const bodies = pawnBodies(loaded.world, health);
+    const grants = pickupHost.take(bodies, health, kit);
     for (const grant of grants) {
       releasePickupObstacle(loaded.world, loaded.view.aabbs, grant.id);
       const gone = encodeFrame(grant.gone);
@@ -283,6 +306,7 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
       }
     }
     grenades.tick();
+    botSense.update(bodies);
   }, loaded.view.noclip === true, loaded.playerSpawns, holdNpcs, elevatorHost, {
     sceneGraph: loaded.sceneGraph,
     regions: loaded.regions,
@@ -333,6 +357,7 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
       return regionsHash;
     },
     sceneGraphReady,
+    botSense: { get: (id) => botSense.get(id), ids: () => botSense.ids() },
     attach(conn) {
       const denyTeleport = (clientId: number): void => {
         const now = Date.now();
