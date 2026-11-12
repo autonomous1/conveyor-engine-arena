@@ -129,7 +129,7 @@ Each asset keeps its own license id and provenance origin.
 | `npm run build` | Clean `dist/`, compile the server with `tsc`, bundle the client with esbuild, check the web bundle, then build the solo site |
 | `npm run build:solo` | Static `dist/solo/` with the host inside the page. `npm run build` runs this too |
 | `npm run typecheck` | Typecheck server, client, and util without emitting |
-| `npm test` | Node’s test runner. Requires a prior `npm run build` |
+| `npm test` | Node’s test runner, with the `src/` `.js`→`.ts` resolver. Requires a prior `npm run build` |
 | `npm run token` | Keygen, mint, list, and revoke Ed25519 access tokens |
 | `npm run bake:scene` | Run `scripts/bake.sh` (blueprint-scene → `web/game` + cut models) |
 | `npm run bake:map` | Top-down PNG of the arena into `web/assets/map-bake.png` |
@@ -269,4 +269,4 @@ npm test
 npm run typecheck
 ```
 
-`npm test` uses `node --experimental-strip-types`. Several tests import the built `dist/` modules, and the host test requests `/` and `/client.js`, so run a full build first.
+`npm test` runs `node --import ./scripts/ts-ext-register.mjs --test test/*.test.ts`. The hook maps a `src/` import of `./file.js` to `./file.ts` when that file exists. Several tests import the built `dist/` modules, and the host test requests `/` and `/client.js`, so run a full build first. Run the suite with `npm test`, not a bare `node --test`.

@@ -18,7 +18,7 @@ import { createFireDebugLog } from "../shared/fire-debug.js";
 import { createClientDiag, presentFaultHud, reportFrameFault } from "./diag.js";
 import { doorLeafBox, pickDoorForUse } from "../shared/doors.js";
 import { advanceGrenadeClock, type GrenadePose } from "../shared/grenade.js";
-import { advanceFireClock, LASER_MS, TRACE_RANGE, traceHitscan, type TraceCapsule } from "../shared/hitscan.js";
+import { advanceFireClock, createRayBoxList, LASER_MS, TRACE_RANGE, traceIndexed, type TraceCapsule } from "../shared/hitscan.js";
 import { createAabbDebug } from "./aabb-debug.js";
 import { loadKey } from "./auth-key.js";
 import { applyDoorSwing, attachKtx2Loader, createArenaScene, loadArenaVisuals, tickDoorSwing } from "./arena-scene.js";
@@ -83,6 +83,8 @@ export async function boot(
   const visuals = await loadArenaVisuals(view, arena);
   /** Open state per door, from the file then from host frames. A shut leaf stops the predicted beam like the host shot. */
   const doorOpen = new Map((view.doors ?? []).map((door) => [door.id, door.open === true && door.locked !== true]));
+  /** Stable world boxes for the predicted shot. Rebuilt when the obstacle list or a shut leaf's XZ changes. */
+  const shotBoxes = createRayBoxList();
   const cabState = new Map<string, ElevatorState>();
   const cabPick = new Map<string, number>();
   const elevatorRooms = createElevatorRooms(view, visuals, collisionDebug);
@@ -709,10 +711,10 @@ export async function boot(
             debugPawn = ownedId;
           }
           const aim = eyeLook(pawn, sample.yaw, sample.pitch);
-          const predicted = traceHitscan(
+          const predicted = traceIndexed(
             aim.position,
             aimDirection(sample.yaw, sample.pitch),
-            [...view.aabbs, ...shutLeafBoxes()],
+            shotBoxes(view.aabbs, shutLeafBoxes()),
             shotCapsules(render.entities, ownedId, view.pawnRadius, view.pawnHeight),
           );
           shotFrom = predicted.from;

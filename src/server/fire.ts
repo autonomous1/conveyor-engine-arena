@@ -9,7 +9,7 @@ import {
   freshFireGate,
   LASER_MS,
   parseFire,
-  traceHitscan,
+  traceIndexed,
   type FireGate,
   type LaserFrame,
   type TraceCapsule,
@@ -82,7 +82,7 @@ export function createArenaFire(opts: {
         }
         const origin = { x: pawn.position.x, y: pawn.position.y + EYE_HEIGHT, z: pawn.position.z };
         const capsules = pawnCapsules(opts.world, owned);
-        const shot = traceHitscan(origin, aimDirection(fire.yaw, clampPitch(fire.pitch)), opts.world.listObstacles(), capsules);
+        const shot = traceIndexed(origin, aimDirection(fire.yaw, clampPitch(fire.pitch)), opts.world.listObstacles(), capsules);
         const hit = shot.hitId === undefined ? "none" : String(shot.hitId);
         log.trace(`hit=${hit} dist=${shot.distance.toFixed(3)}`);
         console.log(`shot shooter=${owned} eye=${origin.x.toFixed(3)},${origin.y.toFixed(3)},${origin.z.toFixed(3)} hit=${hit} dist=${shot.distance.toFixed(3)}`);
