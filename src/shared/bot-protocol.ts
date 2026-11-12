@@ -6,6 +6,7 @@ import { parseAudit, type AuditFrame } from "./audit.js";
 import { parseDoor, parseDoorSet, type DoorFrame } from "./doors.js";
 import { parseElevatorSet, parseElevatorState, type ElevatorState } from "./elevators.js";
 import { parseGrenadePose, type GrenadePose } from "./grenade.js";
+import { parseBotLabel, type BotLabelFrame } from "./bot-label.js";
 import { parseHealth, type HealthFrame } from "./health.js";
 import { parseLaser, type LaserFrame } from "./hitscan.js";
 import { parseLoadout, parsePickup, parsePickupSet, type LoadoutFrame, type PickupFrame } from "./pickups.js";
@@ -87,6 +88,7 @@ export type ArenaFrame =
   | DoorFrame
   | ElevatorState
   | HealthFrame
+  | BotLabelFrame
   | LaserFrame
   | GrenadePose
   | AuditFrame
@@ -123,6 +125,7 @@ export function parseArenaFrame(text: string): ArenaFrame | undefined {
   if (t === "door") return parseDoor(value);
   if (t === "elevator") return parseElevatorState(value);
   if (t === "health") return parseHealth(value);
+  if (t === "botLabel") return parseBotLabel(value);
   if (t === "laser") return parseLaser(value);
   if (t === "grenade") return parseGrenadePose(value);
   if (t === "audit") return parseAudit(value);

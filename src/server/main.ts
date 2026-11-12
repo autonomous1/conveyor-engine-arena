@@ -281,7 +281,7 @@ export async function startArenaServer(
   const gate = await openAuthGate();
   const gameRoot = opts?.gameRoot || process.env.ARENA_GAME_ROOT || undefined;
   const loaded = gameRoot ? loadArena(nodeGameFiles(gameRoot)) : loadArena();
-  const host = createArenaHost(loaded, { holdNpcs });
+  const host = createArenaHost(loaded, { holdNpcs, botDebug: process.env.ARENA_BOT_DEBUG === "1" });
   await host.sceneGraphReady;
   const arenaJson = withAuthRequired(host.arenaJson, gate.mode === "required");
 

@@ -121,6 +121,8 @@ export function connectLive(opts: {
   onLaser?: (laser: LaserNotice) => void;
   onGrenade?: (grenade: GrenadePose) => void;
   onHealth?: (health: HealthNotice) => void;
+  /** Host debug label. The caller draws it. A bad frame stays in that caller. */
+  onBotLabel?: (frame: unknown) => void;
   /** A player took a seat and was placed on a pad. Sent once, never replayed to a late joiner. */
   onSpawn?: (spawn: SpawnFrame) => void;
   onAudit?: (audit: AuditCounters) => void;
@@ -398,6 +400,7 @@ export function connectLive(opts: {
       if (grenade) opts.onGrenade?.(grenade);
       const health = asHealth(msg);
       if (health) opts.onHealth?.(health);
+      if (msg.t === "botLabel") opts.onBotLabel?.(msg);
       const audit = parseAudit(msg);
       if (audit) opts.onAudit?.(audit);
       const pickup = parsePickup(msg);

@@ -132,6 +132,7 @@ test("parseArenaFrame round-trips host frames and drops an unknown t", () => {
     { t: "door", id: "d", open: true, locked: false },
     { t: "elevator", id: "e1", y: 3, doorsOpen: false, stop: 1 },
     { t: "health", entity: 4, hp: 75, dead: false },
+    { t: "botLabel", id: 4, text: "Wander 100" },
     { t: "laser", shooter: 2, from: { x: 0, y: 1, z: 2 }, to: { x: 3, y: 4, z: 5 }, until: 80 },
     { t: "grenade", id: 9, x: 1, y: 2, z: 3, yaw: 0.2 },
     { t: "grenade", id: 9, x: 1, y: 2, z: 3, yaw: 0.2, stop: true },

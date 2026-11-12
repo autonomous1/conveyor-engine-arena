@@ -41,6 +41,7 @@ import { connectLive, type LaserNotice, type OpenSocket } from "./net.js";
 import { createViewModel } from "./viewmodel.js";
 import { createOptionsDialog } from "./options.js";
 import { createSceneMap, loadMapBakeBounds } from "./scene-map.js";
+import { createBotLabelLayer, type BotLabelLayer } from "./bot-label.js";
 import { createPawnLayer } from "./presentation.js";
 import { installQaApi, type QaApi } from "./qa.js";
 import { createRateWindow, formatOverlay } from "./rates.js";
@@ -66,6 +67,7 @@ export async function boot(
   const cabDebug = createCabMeshes(view.elevators ?? [], arena.scene);
   const sceneMap = createSceneMap();
   let pushModel: (id: string) => void = () => {};
+  let botLabels: BotLabelLayer | undefined;
   const options = createOptionsDialog(
     (on) => {
       collisionDebug.setVisible(on);
@@ -77,6 +79,7 @@ export async function boot(
       noclipAllowed: view.noclip === true,
       modelChoices: view.modelChoices ?? [],
       onModel: (id) => pushModel(id),
+      onBotLabels: (on) => botLabels?.setEnabled(on),
     },
   );
   const fireDebug = createFireDebugLog(() => options.fireDebug);
@@ -172,6 +175,8 @@ export async function boot(
   let statusText = "connecting";
   let consoleHint = false;
   const diag = createClientDiag();
+  botLabels = createBotLabelLayer(arena.content, view.pawnHeight, diag);
+  botLabels.setEnabled(options.botLabels);
   // Sheet and texture come from the manifest asset `grenade-explosion` (`view.explosion`).
   // The solo build already rewrites its `/assets/` uri to `./assets/`.
   const explosions = createExplosionFx(arena.scene, {
@@ -440,6 +445,7 @@ export async function boot(
     onGrenade: (grenade) => {
       grenadeQueue.push(grenade);
     },
+    onBotLabel: (frame) => botLabels?.offer(frame),
     onHealth: (health) => {
       const before = pawnVital.get(health.entity);
       pawnVital.set(health.entity, { hp: health.hp, dead: health.dead });
@@ -798,6 +804,7 @@ export async function boot(
     beamSheets.spawn?.fx.update(frozen ? 0 : dt);
     beamSheets.despawn?.fx.update(frozen ? 0 : dt);
     pawns.apply(render, frozen ? 0 : dt, (id) => client.authoritative(id)?.action, ownedId, !frozen, fadeOf);
+    botLabels?.sync(render.entities);
     sendAcc += dt;
     if (sendAcc >= sendDt) {
       sendAcc = Math.min(sendAcc - sendDt, sendDt);

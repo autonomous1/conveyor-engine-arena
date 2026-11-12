@@ -2,7 +2,7 @@
  * Options dialog. F2 or the Options button toggles the panel.
  * The button is not the canvas click, so it does not request pointer lock.
  * Escape is not handled here; the browser still unlocks the pointer.
- * Show collision, Fire debug, Scene map, and Invert look Y stay in localStorage and are not part of the input message.
+ * Show collision, Fire debug, Scene map, Invert look Y, and Bot labels stay in localStorage and are not part of the input message.
  * Noclip is localStorage too. The client sends it on the existing input `buttons` field, and only when the host set `view.noclip`.
  * The model select is sessionStorage. It is sent on hello and again when the choice changes.
  * Host fire counters are painted here. They are not part of the crosshair HUD.
@@ -16,6 +16,7 @@ export const FIRE_DEBUG_STORAGE_KEY = "arena.fireDebug.v1";
 export const SHOW_SCENE_MAP_STORAGE_KEY = "arena.showSceneMap.v1";
 export const NOCLIP_STORAGE_KEY = "arena.noclip.v1";
 export const INVERT_Y_STORAGE_KEY = "arena.invertY.v1";
+export const BOT_LABELS_STORAGE_KEY = "arena.botLabels.v1";
 export const MODEL_CHOICE_STORAGE_KEY = "arena.modelChoice.v1";
 
 export type FocusRow = {
@@ -37,6 +38,8 @@ export type OptionsModel = {
   readonly showNoclip: boolean;
   /** Right-stick forward looks down when this is on. Default off. */
   readonly invertY: boolean;
+  /** Goal and hp over unowned host bots. Default off. The host still has to send frames. */
+  readonly botLabels: boolean;
   readonly focusIndex: number;
   toggleDialog(): void;
   toggleShowCollision(): void;
@@ -44,6 +47,7 @@ export type OptionsModel = {
   toggleShowSceneMap(): void;
   toggleNoclip(): void;
   toggleInvertY(): void;
+  toggleBotLabels(): void;
   /** Wrap within the focusable rows. */
   moveFocus(delta: number): void;
   activateFocused(): void;
@@ -152,6 +156,24 @@ export function saveInvertY(storage: KeyValueStorage | null | undefined, on: boo
   }
 }
 
+export function loadBotLabels(storage: KeyValueStorage | null | undefined): boolean {
+  if (!storage) return false;
+  try {
+    return storage.getItem(BOT_LABELS_STORAGE_KEY) === "on";
+  } catch {
+    return false;
+  }
+}
+
+export function saveBotLabels(storage: KeyValueStorage | null | undefined, on: boolean): void {
+  if (!storage) return;
+  try {
+    storage.setItem(BOT_LABELS_STORAGE_KEY, on ? "on" : "off");
+  } catch {
+    // The in-memory switch still applies for this session.
+  }
+}
+
 /** First id in `choices`, or the saved id when it is still in the list. */
 export function loadModelChoice(storage: KeyValueStorage | null | undefined, choices: readonly string[]): string {
   const first = choices[0] ?? "";
@@ -181,6 +203,7 @@ export function createOptionsModel(
   onShowMap: (on: boolean) => void = () => {},
   onNoclip: (on: boolean) => void = () => {},
   noclipAllowed = false,
+  onBotLabels: (on: boolean) => void = () => {},
 ): OptionsModel {
   let open = false;
   let showCollision = loadShowCollision(storage);
@@ -188,12 +211,14 @@ export function createOptionsModel(
   let showSceneMap = loadShowSceneMap(storage);
   let noclipOn = loadNoclip(storage);
   let invertY = loadInvertY(storage);
+  let botLabels = loadBotLabels(storage);
   let focusIndex = 0;
   const focusRows: FocusRow[] = [];
   onShowCollision(showCollision);
   onFireDebug(fireDebug);
   onShowMap(showSceneMap);
   onNoclip(noclipAllowed && noclipOn);
+  onBotLabels(botLabels);
   const toggleShowCollision = () => {
     showCollision = !showCollision;
     saveShowCollision(storage, showCollision);
@@ -219,12 +244,18 @@ export function createOptionsModel(
     invertY = !invertY;
     saveInvertY(storage, invertY);
   };
+  const toggleBotLabels = () => {
+    botLabels = !botLabels;
+    saveBotLabels(storage, botLabels);
+    onBotLabels(botLabels);
+  };
   const idle = { activate() {}, adjust(_delta: number) {} };
   focusRows.push(
     { activate: toggleShowCollision, adjust: idle.adjust },
     { activate: toggleFireDebug, adjust: idle.adjust },
     { activate: toggleShowSceneMap, adjust: idle.adjust },
     { activate: toggleInvertY, adjust: idle.adjust },
+    { activate: toggleBotLabels, adjust: idle.adjust },
   );
   if (noclipAllowed) focusRows.push({ activate: toggleNoclip, adjust: idle.adjust });
   return {
@@ -246,6 +277,9 @@ export function createOptionsModel(
     get invertY() {
       return invertY;
     },
+    get botLabels() {
+      return botLabels;
+    },
     get focusIndex() {
       return focusIndex;
     },
@@ -257,6 +291,7 @@ export function createOptionsModel(
     toggleShowSceneMap,
     toggleNoclip,
     toggleInvertY,
+    toggleBotLabels,
     moveFocus(delta: number) {
       const count = focusRows.length;
       if (count <= 0 || !Number.isFinite(delta) || delta === 0) return;
@@ -316,6 +351,7 @@ export function createOptionsDialog(
   extras: {
     noclipAllowed?: boolean;
     onNoclip?: (on: boolean) => void;
+    onBotLabels?: (on: boolean) => void;
     modelChoices?: readonly string[];
     onModel?: (id: string) => void;
     /** Session store. `undefined` uses `sessionStorage`. `null` does not persist. */
@@ -323,7 +359,15 @@ export function createOptionsDialog(
   } = {},
 ): OptionsDialog {
   const noclipAllowed = extras.noclipAllowed === true;
-  const model = createOptionsModel(storage, onShowCollision, () => {}, onShowMap, extras.onNoclip ?? (() => {}), noclipAllowed);
+  const model = createOptionsModel(
+    storage,
+    onShowCollision,
+    () => {},
+    onShowMap,
+    extras.onNoclip ?? (() => {}),
+    noclipAllowed,
+    extras.onBotLabels ?? (() => {}),
+  );
   let audit = emptyAudit();
 
   const button = document.createElement("button");
@@ -384,6 +428,12 @@ export function createOptionsDialog(
   invertSwitch.setAttribute("role", "switch");
   invertSwitch.style.cssText = `${switchStyle};margin-top:8px`;
 
+  const botSwitch = document.createElement("button");
+  botSwitch.id = "bot-labels";
+  botSwitch.type = "button";
+  botSwitch.setAttribute("role", "switch");
+  botSwitch.style.cssText = `${switchStyle};margin-top:8px`;
+
   const noclipSwitch = document.createElement("button");
   noclipSwitch.id = "noclip";
   noclipSwitch.type = "button";
@@ -441,11 +491,11 @@ export function createOptionsDialog(
   help.id = "control-help";
   help.textContent = "I or Y inspects the crosshair.";
   help.style.cssText = "margin:10px 0 0;color:#c5ccd8;font:12px/1.4 ui-sans-serif,system-ui;";
-  panel.append(title, collisionSwitch, fireSwitch, mapSwitch, invertSwitch, noclipSwitch);
+  panel.append(title, collisionSwitch, fireSwitch, mapSwitch, invertSwitch, botSwitch, noclipSwitch);
   if (modelLabel) panel.append(modelLabel);
   panel.append(auditView, help);
 
-  const focusEls: HTMLElement[] = [collisionSwitch, fireSwitch, mapSwitch, invertSwitch];
+  const focusEls: HTMLElement[] = [collisionSwitch, fireSwitch, mapSwitch, invertSwitch, botSwitch];
   if (noclipAllowed) focusEls.push(noclipSwitch);
   if (modelLabel && modelSelect) {
     const select = modelSelect;
@@ -474,6 +524,7 @@ export function createOptionsDialog(
     paintSwitch(fireSwitch, model.fireDebug, "Fire debug");
     paintSwitch(mapSwitch, model.showSceneMap, "Scene map");
     paintSwitch(invertSwitch, model.invertY, "Invert look Y");
+    paintSwitch(botSwitch, model.botLabels, "Bot labels");
     paintSwitch(noclipSwitch, model.showNoclip, "Noclip");
     noclipSwitch.hidden = !noclipAllowed;
     noclipSwitch.disabled = !noclipAllowed;
@@ -511,6 +562,7 @@ export function createOptionsDialog(
   onSwitch(fireSwitch, () => model.toggleFireDebug());
   onSwitch(mapSwitch, () => model.toggleShowSceneMap());
   onSwitch(invertSwitch, () => model.toggleInvertY());
+  onSwitch(botSwitch, () => model.toggleBotLabels());
   if (noclipAllowed) onSwitch(noclipSwitch, () => model.toggleNoclip());
 
   const onKeyDown = (ev: KeyboardEvent) => {

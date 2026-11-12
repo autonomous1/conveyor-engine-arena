@@ -8,6 +8,7 @@ import { createPawnKit, createPickupHost } from "../shared/pickups.js";
 import { decodeMoveButtons } from "../shared/movements.js";
 import { canonicalJson, sceneGraphPayload, sha256Hex } from "../shared/scene-graph.js";
 import { spawnFrame } from "../shared/spawn-frame.js";
+import { createBotLabelHost, type BotLabelHost } from "./bot-label.js";
 import { createHostBotBrain } from "./bot-brain.js";
 import { createHostBotSense } from "./bot-sense.js";
 import { createArenaDoors, createDoorBlockers } from "./doors.js";
@@ -45,6 +46,8 @@ export type HostConn = {
 
 export type ArenaHostOptions = {
   holdNpcs?: boolean;
+  /** `ARENA_BOT_DEBUG=1`, read once by `main`. Off does no per-tick label work. */
+  botDebug?: boolean;
   /**
    * In-tab solo passes true. There is no JWT. `build:solo` copies `web/game`
    * into `dist/solo/game`, so `scene-graph.json` is public next to the page.
@@ -77,6 +80,8 @@ export type ArenaSession = {
  */
 export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}): ArenaSession {
   const holdNpcs = opts.holdNpcs ?? false;
+  const botDebug = opts.botDebug === true;
+  if (botDebug) console.log("[bot] labels on");
   const grantSceneGraph = opts.grantSceneGraph === true;
   const sceneGraphJson = loaded.sceneGraph ? canonicalJson(sceneGraphPayload(loaded.sceneGraph)) : undefined;
   const regionsJson = loaded.regions ? canonicalJson(loaded.regions) : undefined;
@@ -310,6 +315,27 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
       useDoor: (pawnId, door) => doorHost.useDoorAs(pawnId, { door }),
     })
     : undefined;
+  const botIds: number[] = [];
+  if (botDebug && botBrain) {
+    for (const agent of loaded.agents) if (agent.role !== "player") botIds.push(agent.id);
+  }
+  const botLabels: BotLabelHost = botDebug && botBrain
+    ? createBotLabelHost({
+      enabled: true,
+      server: engine,
+      ids: botIds,
+      brain: botBrain,
+      health,
+      sense: botSense,
+    })
+    : createBotLabelHost({
+      enabled: false,
+      server: engine,
+      ids: [],
+      brain: { goalOf: () => undefined },
+      health,
+      sense: botSense,
+    });
   const stopLoop = startWanderLoop(loaded.world, loaded.agents, engine, held, (line) => console.error(line), health, audit, () => {
     reservedPads.clear();
     const bodies = pawnBodies(loaded.world, health);
@@ -331,6 +357,7 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
     grenades.tick();
     botSense.update(bodies);
     botBrain?.update();
+    botLabels.update();
   }, loaded.view.noclip === true, loaded.playerSpawns, holdNpcs, elevatorHost, wanderNav);
   const propClips = startPropAnimation(loaded.view.props);
   const fire = createArenaFire({
