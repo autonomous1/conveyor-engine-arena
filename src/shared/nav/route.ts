@@ -68,9 +68,14 @@ type Dir = {
 /** Compiled portals for one graph and one gate snapshot. */
 export type RoadNet = { readonly roads: Roads };
 
+/** Compiled portal nets for one graph. One net per gate signature. */
 export type RoadCache = {
-  /** Times `compile` ran. A repeat with the same gate results does not increment. */
+  /** New compiles. The same gate results and `elevators` flag do not increment. */
   compiles: number;
+  /**
+   * Omitted `elevators` means false. New wrapper each call.
+   * `roads` is the live cached compile; do not mutate it.
+   */
   net(gate: (portal: ScenePortal) => Gate, elevators?: boolean): RoadNet;
 };
 

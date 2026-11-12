@@ -32,10 +32,14 @@ export type ObstacleWorld = {
   listObstacles(): readonly LiveBox[];
 };
 
+/** One live kernel obstacle per door. Opening parks it; nothing is removed. */
 export type DoorBlockers = {
-  /** Shut: the leaf box blocks. Open: the box is parked. */
+  /**
+   * Shut: the leaf box blocks. Open: the box is parked.
+   * The first call for this door adds the obstacle.
+   */
   sync(door: Pick<DoorRuntime, "id" | "open" | "position" | "yaw" | "hinge" | "size">): void;
-  /** Kernel obstacle id of this door's blocker, once synced. */
+  /** Kernel obstacle id after `sync`. An unknown door is undefined and does not create one. */
   obstacleId(doorId: string): number | undefined;
 };
 
@@ -82,6 +86,30 @@ export function createDoorBlockers(world: ObstacleWorld): DoorBlockers {
  */
 export type DoorUseResult = "none" | "open" | "lift" | "locked" | "opened" | "closed";
 
+/** Open, locked, and held doors, plus the use-seq gate. In memory, lost on restart. */
+export interface ArenaDoors {
+  /** Sorted by id. New array of detached rows. */
+  snapshot(): Array<{ id: string; open: boolean; locked: boolean }>;
+  /** Forgets this client's use seq. An unknown client is a no-op. */
+  drop(clientId: number): void;
+  /**
+   * False only for a fresh use from a live pawn with no door in reach.
+   * A toggle mutates the door, syncs its blocker, and broadcasts.
+   */
+  onFrame(clientId: number, frame: unknown): boolean;
+  /**
+   * Same reach, lock, and key rules as a player. A dead or missing pawn returns `none`.
+   * Only that door is considered, and an open door is left alone.
+   */
+  useDoorAs(pawnId: number, only: { door: string }): DoorUseResult;
+  /** Shifts the door to home y + `dy` metres and re-syncs its blocker. An unknown id is a no-op. */
+  offset(id: string, dy: number): void;
+  /** Sets open or shut, syncs the blocker, and broadcasts. No-op if missing or unchanged. */
+  force(id: string, open: boolean): void;
+  /** While held, use presses on this door are refused. An unknown id is still recorded. */
+  hold(id: string, held: boolean): void;
+}
+
 export function createArenaDoors(opts: {
   doors: ReadonlyArray<ArenaView["doors"][number]>;
   pawnOf(pawnId: number): PawnBody | undefined;
@@ -100,7 +128,7 @@ export function createArenaDoors(opts: {
    * nothing calls this. Wire it only on a future consume path.
    */
   onKeysChanged?(pawnId: number): void;
-}) {
+}): ArenaDoors {
   const state = new Map<string, DoorRuntime>();
   const homeY = new Map<string, number>();
   for (const door of opts.doors) {

@@ -71,10 +71,13 @@ export type RegionIssue = { path: string; message: string };
 
 export type RegionDoor = Pick<DoorRuntime, "id" | "position" | "yaw" | "hinge" | "size">;
 
+/** Reused region graphs, keyed like the occupancy grids. */
 export type RegionCache = {
+  /** Live graph, or undefined. Does not create a row. */
   get(key: string): RegionGraph | undefined;
+  /** Stores `graph` by reference. `misses` increments only the first time this key is stored. */
   set(key: string, graph: RegionGraph): void;
-  /** Overlays actually stored. A second lookup of the same key does not increment. */
+  /** First-time `set` count. A later `set` of the same key does not increment. */
   misses: number;
 };
 

@@ -21,6 +21,20 @@ import {
 import type { TraceCapsule } from "../shared/hitscan.js";
 import { clientSeesPawn, deliverHealthFrames } from "./health.js";
 
+/** In-flight grenades. Not world entities. Poses go to clients who can see the owner. */
+export interface ArenaGrenades {
+  /**
+   * One throw frame. A rejected, dead, or non-finite throw adds no body.
+   * A finite accepted throw broadcasts the eye pose. Clock is `opts.now`, or `Date.now`.
+   */
+  onFrame(clientId: number, frame: unknown): void;
+  /**
+   * One host tick. `dt` is seconds and defaults to {@link MOVE_DT}. No-op when nothing is flying.
+   * May wound and broadcast. A non-finite step is dropped without a pose.
+   */
+  tick(dt?: number): void;
+}
+
 /**
  * One grenade is a point and a velocity on the host tick. It is not a world
  * entity. Gravity here does not change pawn steps. Clients receive the point.
@@ -40,7 +54,7 @@ export function createArenaGrenades(opts: {
   impact?: GrenadeImpact;
   /** Direct pawn hit. Default {@link GRENADE_DAMAGE}. */
   damage?: number;
-}) {
+}): ArenaGrenades {
   const now = opts.now ?? Date.now;
   const gates = new Map<number, { sessionId: number; gate: GrenadeGate }>();
   let bodies: GrenadeBody[] = [];

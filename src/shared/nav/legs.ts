@@ -34,10 +34,13 @@ export type LegPlan =
   | { ok: true; points: Vec3[] }
   | { ok: false; step: number };
 
+/** Reused occupancy grids and the region overlays beside them. */
 export type NavCache = {
+  /** Live grid, or undefined. Does not create a row. */
   get(key: string): Grid | undefined;
+  /** Stores `grid` by reference. `misses` increments only the first time this key is stored. */
   set(key: string, grid: Grid): void;
-  /** Grids actually built. A second lookup of the same key does not increment. */
+  /** First-time `set` count. A later `set` of the same key does not increment. */
   misses: number;
   /** Region graphs, keyed like the grids (door-state hash and cab stop). */
   regions: RegionCache;

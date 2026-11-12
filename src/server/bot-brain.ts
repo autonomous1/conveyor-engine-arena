@@ -62,9 +62,14 @@ export type HostBotBrainOptions = {
   useDoor?: (pawnId: number, doorId: string) => DoorUseResult;
 };
 
+/** Goal claims for unowned wander bots. In memory, lost on restart. */
 export type HostBotBrain = {
-  /** Call once per host tick, after the sensor. Only a freshly sensed bot is looked at. */
+  /**
+   * Once per host tick, after the sensor. A bot is replanned only when its `sense.tick` changes.
+   * A claimed door press still runs. May set `agent.override` or wound the bot. Swallows errors.
+   */
   update(): void;
+  /** Last goal stored for this bot. An unknown id is undefined and does not create a slot. */
   goalOf(id: number): GoalId | undefined;
 };
 

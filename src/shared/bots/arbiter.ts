@@ -34,11 +34,13 @@ export const EXIT_PLACE = "outside";
 /** What the arbiter reads. `BotSense` satisfies it. */
 export type MindSense = Pick<BotSense, "alive" | "place" | "msNoProgress" | "routeOut">;
 
+/** Latch for one bot. Timestamps are ms on the `now` passed to `judge`. */
 export type Mind = {
-  /** First time the current place had no open route out. */
+  /** ms when this place first had no open route out. Cleared when that is no longer true. */
   noRouteSince?: number;
+  /** Place id for `noRouteSince`. Cleared with it. */
   noRoutePlace?: string;
-  /** Set while Escape holds. The time the bot became trapped. */
+  /** ms when Escape latched. Absent unless Escape holds. */
   escapeSince?: number;
 };
 

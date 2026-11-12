@@ -49,6 +49,27 @@ type Cab = {
   roomDoors: string[];
 };
 
+/** Cab calls, motion, and the pawns carried with them. In memory, lost on restart. */
+export interface ArenaElevators {
+  /** Detached cab rows for the welcome. Empty when the manifest has no elevators. */
+  snapshot(): ElevatorState[];
+  /**
+   * Requests that stop from the cab or that landing. May mutate the queue.
+   * An unparsed frame or a client with no pawn returns quietly. Any other rejection is logged.
+   */
+  onFrame(clientId: number, frame: unknown): void;
+  /**
+   * E with no door in reach. True when the pawn is in a cab or on a landing; may queue that call.
+   * A dead or unknown pawn is false.
+   */
+  onUse(pawnId: number): boolean;
+  /**
+   * Advances every cab by `dt` seconds. New array of pawn ids carried this tick, including arrival.
+   * Mutates cabs, riders, and bound doors, and broadcasts when the phase changes.
+   */
+  step(dt: number): number[];
+}
+
 export function createArenaElevators(opts: {
   elevators: readonly ArenaElevator[];
   aabbs: ArenaView["aabbs"];
@@ -61,7 +82,7 @@ export function createArenaElevators(opts: {
   alive(pawnId: number): boolean;
   sendAll(frame: ElevatorState): void;
   log?(line: string): void;
-}) {
+}): ArenaElevators {
   const doorIds = opts.doorIds ?? [];
   const cabs: Cab[] = opts.elevators.map((def) => {
     const room = def.room;

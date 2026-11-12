@@ -2,7 +2,7 @@ import type { EngineWsServer } from "conveyor-engine-transport-ws";
 import type { AuthoritativeWorld } from "conveyor-engine-world";
 import { aimDirection, clampPitch, EYE_HEIGHT } from "../shared/look.js";
 import { createFireDebugLog, fireDebugErrorLine, fireDebugLine, fireFrameWantsDebug } from "../shared/fire-debug.js";
-import { createAudit, type Audit } from "../shared/audit.js";
+import { createAudit, type Audit, type AuditCounters } from "../shared/audit.js";
 import { healthFrame, type PawnHealth } from "../shared/health.js";
 import {
   admitFire,
@@ -16,6 +16,17 @@ import {
 } from "../shared/hitscan.js";
 import { deliverAuditFrame } from "./audit.js";
 import { clientSeesPawn, deliverHealthFrames } from "./health.js";
+
+/** Hitscan for owned pawns. Sends lasers and may wound. Counters sit on the shared audit. */
+export interface ArenaFire {
+  /** Shallow copy of the six audit numbers. Mutating it does not change the counters. */
+  readonly counters: AuditCounters;
+  /**
+   * Unparsed, sessionless, or pawnless frames return before the counters. Clock is `opts.now`, or `Date.now`.
+   * A dead pawn's accepted shot is counted and not traced. May log, wound, send lasers, and publish the audit.
+   */
+  onFrame(clientId: number, frame: unknown): void;
+}
 
 /**
  * Hitscan for one owned pawn. The eye is inside that pawn's capsule, so the
@@ -31,7 +42,7 @@ export function createArenaFire(opts: {
   health?: PawnHealth;
   /** Shared with the wander tick so a later client still receives the totals. */
   audit?: Audit;
-}) {
+}): ArenaFire {
   const now = opts.now ?? Date.now;
   const gates = new Map<number, { sessionId: number; gate: FireGate }>();
   const watched = watchPawnWrites(opts.world.store);

@@ -63,7 +63,22 @@ export function formatAudit(counters: AuditCounters): string {
   return AUDIT_FIELDS.map((key) => `${key} ${counters[key]}`).join("\n");
 }
 
-export function createAudit() {
+/** Six host fire counters. In memory, lost on restart. */
+export interface Audit {
+  /** Shallow copy of the six numbers. Mutating it does not change the counters. */
+  readonly counts: AuditCounters;
+  /** Detached wire frame. Same numbers as `counts`. */
+  frame(): AuditFrame;
+  /**
+   * Result of dedupe and cadence. `repeat` is an old seq.
+   * `fast` is a new seq inside the window. `accept` passed both. Mutates the counters.
+   */
+  gate(result: "accept" | "repeat" | "fast"): void;
+  /** The trace hit another pawn. `killed` means that hit crossed health to 0. Mutates the counters. */
+  pawnHit(killed: boolean): void;
+}
+
+export function createAudit(): Audit {
   const counts = emptyAudit();
 
   function add(key: AuditField): void {
@@ -100,5 +115,3 @@ export function createAudit() {
     },
   };
 }
-
-export type Audit = ReturnType<typeof createAudit>;

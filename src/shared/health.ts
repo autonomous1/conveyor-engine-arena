@@ -57,8 +57,37 @@ export function parseHealth(frame: unknown): HealthFrame | undefined {
 
 type Vital = { hp: number; dead: boolean; respawnAt?: number; lastAttacker?: number; lastDamageAt?: number; lastCause?: DamageCause };
 
+/** Per-pawn hp, death, and respawn timers. In memory, lost on restart. */
+export interface PawnHealth {
+  /** Creates a full-health row when absent. An existing row is left as it is. */
+  note(id: number): void;
+  /** Unknown pawns read as full health and do not create a row. Detached. */
+  get(id: number): PawnHealthState;
+  /** Unknown id reads as alive. Does not create a row. */
+  isDead(id: number): boolean;
+  /**
+   * Detached note of the last wound since spawn. Survives death, cleared on respawn.
+   * Absent when this pawn has no wound. Does not create a row. `at` is ms on the injected `now`.
+   */
+  lastDamage(id: number): DamageNote | undefined;
+  /**
+   * Creates the row. Omitted, non-finite, or non-positive `amount` deals {@link HIT_DAMAGE}.
+   * A dead pawn is unchanged and returns undefined, so the respawn clock does not restart.
+   */
+  wound(id: number, attacker?: number, amount?: number, cause?: DamageCause): PawnHealthState | undefined;
+  /**
+   * Creates the row. A dead pawn is unchanged and returns undefined.
+   * A non-positive `amount` does not add. Mutates when it does, clamped to [{@link MIN_HP}, {@link MAX_HP}].
+   */
+  heal(id: number, amount: number): PawnHealthState | undefined;
+  /** Restores due pawns to full health and returns their ids. Mutates. Clock is the injected `now`. New array. */
+  takeRespawns(): number[];
+  /** Detached frames for every noted pawn. Unknown ids are absent. A cause is set only while that pawn is dead. */
+  frames(): HealthFrame[];
+}
+
 /** One row per pawn the host has noted. Unknown pawns read as full health. */
-export function createPawnHealth(now: () => number = Date.now) {
+export function createPawnHealth(now: () => number = Date.now): PawnHealth {
   const rows = new Map<number, Vital>();
 
   function ensure(id: number): Vital {
@@ -138,8 +167,6 @@ export function createPawnHealth(now: () => number = Date.now) {
     },
   };
 }
-
-export type PawnHealth = ReturnType<typeof createPawnHealth>;
 
 export type SpawnPick = { x: number; y: number; z: number; yaw: number };
 

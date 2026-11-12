@@ -51,7 +51,19 @@ export type HeldInput = {
   ascend?: number;
 };
 
-export function createHeldInputs() {
+/** Latest command per entity. In memory, lost on restart. */
+export interface HeldInputs {
+  /** Stores `cmd` by reference, replacing any previous row for this entity. */
+  admit(entity: number, cmd: HeldInput): void;
+  /** The stored command, or undefined. Does not create a row. Mutating it changes the next read. */
+  get(entity: number): HeldInput | undefined;
+  /** Deletes the row. An unknown entity is a no-op. */
+  drop(entity: number): void;
+  /** Copy of the entity ids, in insertion order. */
+  entities(): number[];
+}
+
+export function createHeldInputs(): HeldInputs {
   const latest = new Map<number, HeldInput>();
   return {
     admit(entity: number, cmd: HeldInput) {
@@ -68,8 +80,6 @@ export function createHeldInputs() {
     },
   };
 }
-
-export type HeldInputs = ReturnType<typeof createHeldInputs>;
 
 export function noteArenaInterest(server: EngineWsServer): void {
   for (const clientId of server.connected) {

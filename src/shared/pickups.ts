@@ -168,7 +168,19 @@ export function collectTouches(
   return taken;
 }
 
-export function createPawnKit() {
+/** Per-pawn ammo count and weapon id. In memory, lost on restart. */
+export interface PawnKit {
+  /** Unknown id reads as 0. Does not create a row. */
+  ammoOf(id: number): number;
+  /** Unknown id is undefined. Does not create a row. */
+  weaponOf(id: number): string | undefined;
+  /** Creates the row. A non-finite or non-positive `amount` adds nothing. Returns the stored total. */
+  addAmmo(id: number, amount: number): number;
+  /** Creates or overwrites the row. */
+  setWeapon(id: number, weaponId: string): string;
+}
+
+export function createPawnKit(): PawnKit {
   const ammo = new Map<number, number>();
   const weapon = new Map<number, string>();
   return {
@@ -190,7 +202,25 @@ export function createPawnKit() {
   };
 }
 
-export type PawnKit = ReturnType<typeof createPawnKit>;
+/** Remaining placements and the keys each pawn holds. In memory, lost on restart. */
+export interface PickupHost {
+  /** Sorted copy of ids not yet taken. */
+  remainingIds(): string[];
+  /**
+   * True when this pawn holds `keyId`, or any key when `keyId` is omitted.
+   * An unknown pawn is false and does not create a row.
+   */
+  hasKey(pawnId: number, keyId?: string): boolean;
+  /** Sorted copy of key ids. An unknown pawn is empty and does not create a row. */
+  getHeldItems(pawnId: number): string[];
+  /** Drops one key. False when this pawn does not hold it. Does not create a row. */
+  consumeKey(pawnId: number, keyId: string): boolean;
+  /**
+   * Consumes each touched id, even when health, ammo, or the weapon does not change.
+   * A key this pawn already holds stays and grants nothing. New array of detached grants.
+   */
+  take(pawns: readonly PawnBody[], health: HealthSink, kit: PawnKit): PickupGrant[];
+}
 
 /**
  * Remaining pickup ids. Seeded from placements. Taking one deletes the id.
@@ -199,7 +229,7 @@ export type PawnKit = ReturnType<typeof createPawnKit>;
  * that pawn only. Another pawn does not hold it. Touching an id that this
  * pawn already holds grants nothing.
  */
-export function createPickupHost(list: readonly PickupPlacement[]) {
+export function createPickupHost(list: readonly PickupPlacement[]): PickupHost {
   const placements = list.filter((pickup) => typeof pickup.id === "string" && pickup.id.length > 0);
   const remaining = new Set(placements.map((pickup) => pickup.id));
   const byId = new Map(placements.map((pickup) => [pickup.id, pickup]));

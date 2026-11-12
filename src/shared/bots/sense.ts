@@ -101,9 +101,16 @@ export type BotSense = {
 export type ExitPortal = Pick<ScenePortal, "id" | "kind" | "a" | "b" | "door">;
 export type ExitDoor = { open: boolean; locked: boolean };
 
+/** Which places can reach the exit. Reach sets rebuild when the door signature changes. */
 export type ExitIndex = {
+  /** No-op when the open and locked bits are unchanged. Otherwise rebuilds both floods. */
   update(doors: ReadonlyMap<string, ExitDoor>): void;
+  /**
+   * Shared object; do not mutate it. No flood path yields `{ open: false, unlocked: false }`.
+   * That includes every place before the first `update`.
+   */
   reaches(placeId: string): SensedExit;
+  /** How many times `update` rebuilt. Unchanged doors do not increment. */
   readonly rebuilds: number;
 };
 
@@ -122,10 +129,21 @@ export type SenseDeps = {
   log?(line: string): void;
 };
 
+/** Per-bot surroundings. Each row is overwritten in place. */
 export type BotSensor = {
+  /**
+   * Once per host tick. Increments `tick` first and swallows errors.
+   * Re-senses a bot on its `everyTicks` turn. Wired doors and pickups refresh every `worldEveryTicks` calls.
+   */
   update(): void;
+  /**
+   * Live row, overwritten the next time this id is sensed.
+   * An unknown id is undefined and does not create one.
+   */
   get(id: number): BotSense | undefined;
+  /** Sorted copy of ids sensed at least once. */
   ids(): number[];
+  /** How many `update` calls have started. 0 before the first. */
   readonly tick: number;
 };
 
