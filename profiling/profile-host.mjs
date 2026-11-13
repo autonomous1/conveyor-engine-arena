@@ -2,7 +2,7 @@
 // Host Bottom-Up profile. Starts dist/server/main.js in a child process (auth off, 127.0.0.1, random port),
 // optionally joins scripted players, warms up, records a CPU profile with node:inspector, then analyzes it.
 //
-// node profiling/profile-host.mjs [--root <repo>] [--scenario wander|stationary|moving|all] [--players 1]
+// node profiling/profile-host.mjs [--root <repo>] [--scenario wander|stationary|moving|fight|all] [--players 1]
 //      [--warmup 5] [--duration 30] [--out profiling/results/<label>] [--label <name>] [--no-profile-file]
 import { fork, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
@@ -67,9 +67,10 @@ async function runScenario(scenario, playerBundle) {
   console.log(`[host ${label}] ${scenario}: host at ${ready.url}`);
   const kids = [];
   try {
-    const n = scenario === "wander" ? 0 : players;
+    // Fight needs two shooters to fill four retaliators, plus one over the cap.
+    const n = scenario === "wander" ? 0 : scenario === "fight" ? Math.max(players, 3) : players;
     for (let i = 0; i < n; i++) {
-      const mode = scenario === "moving" ? "moving" : "stationary";
+      const mode = scenario === "moving" ? "moving" : scenario === "fight" ? "fight" : "stationary";
       const kid = spawn(process.execPath, [playerBundle, ready.url, mode, String((warmupMs + durationMs) / 1000 + 10), String(i + 1)], { cwd: root, stdio: ["ignore", "pipe", "pipe"] });
       kids.push(kid);
       const joined = await new Promise((res) => {

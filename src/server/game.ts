@@ -129,12 +129,42 @@ export function startPropAnimation(props: readonly Prop[]): PropClip[] {
  * speed and carries no position. Player input does not call this.
  */
 export function stepUnownedWander(world: AuthoritativeWorld, agent: WanderAgent) {
+  // A standing fight owns the yaw. A walk clip would replace angry, so the
+  // close-in step applies the move and then puts angry back on last.
+  if (agent.override?.stance === "angry" && !wanderWalks.has(agent)) {
+    faceUnowned(world, agent);
+    return;
+  }
   const scale = movementIntent(agent.speeds[agent.gait] ?? 0, Object.values(agent.speeds));
   const view = world.store.view(agent.id);
   const facing = view ? yawFromQuat(view.rotation) : agent.heading;
   const yaw = approachYaw(facing, agent.heading);
   const wish = moveIntent(yaw, scale, 0);
-  return enqueueOwnedMove(world, agent.id, wish.moveX, wish.moveZ, yaw, MOVE_DT);
+  const moved = enqueueOwnedMove(world, agent.id, wish.moveX, wish.moveZ, yaw, MOVE_DT);
+  if (agent.override?.stance === "angry") {
+    world.enqueue({ kind: "setClip", entity: agent.id, clip: "angry", speed: 0 });
+  }
+  return moved;
+}
+
+/**
+ * Stop and face. `clearInput` zeros the velocity and leaves the transform.
+ * The angry clip has no reference speed, so speed 0 still plays it.
+ */
+function faceUnowned(world: AuthoritativeWorld, agent: WanderAgent): void {
+  const view = world.store.view(agent.id);
+  if (!view) return;
+  const yaw = approachYaw(yawFromQuat(view.rotation), agent.heading);
+  world.enqueue({ kind: "setVelocity", entity: agent.id, linear: { x: 0, y: 0, z: 0 } });
+  world.enqueue({
+    kind: "setTransform",
+    entity: agent.id,
+    position: { x: view.position.x, y: view.position.y, z: view.position.z },
+    rotation: yawQuaternion(yaw),
+    scale: { x: view.scale.x, y: view.scale.y, z: view.scale.z },
+  });
+  world.enqueue({ kind: "setClip", entity: agent.id, clip: "angry", speed: 0 });
+  world.enqueue({ kind: "clearInput", entity: agent.id });
 }
 
 /** ~20 s at {@link TICK_MS}. A planned walk is not cut off by the old 1–2.5 s heading roll. */
@@ -202,6 +232,8 @@ export function steerUnownedWander(
   cache: NavCache = createNavCache(),
   others: readonly FollowPawn[] = [],
 ): void {
+  // A fight standing on its own feet must not roll a new heading or start a walk.
+  if (holdAngry(world, agent, tick)) return;
   const sceneGraph = nav?.sceneGraph;
   const regions = nav?.regions;
   if (!nav || !sceneGraph || !regions) {
@@ -263,6 +295,26 @@ export function steerUnownedWander(
     return;
   }
   installWalk(agent, chosen, pose, loaded, flags, tick, rng, others);
+}
+
+/** Metres. Inside this, an angry claim stands instead of following a path. */
+const ANGRY_STAND_M = 1.25;
+
+/**
+ * FightBack standing still. The brain owns `agent.heading`. Returns true when
+ * the pawn is close enough to its claim that this tick should not steer.
+ */
+function holdAngry(world: AuthoritativeWorld, agent: WanderAgent, tick: number): boolean {
+  if (agent.override?.stance !== "angry") return false;
+  const goal = agent.override.goal;
+  const pose = wanderPose(world, agent);
+  if (!pose || !goal) return false;
+  if (Math.hypot(pose.x - goal.x, pose.z - goal.z) > ANGRY_STAND_M) return false;
+  if (lastClaims.get(agent) !== agent.override) lastClaims.set(agent, agent.override);
+  clearWalk(agent);
+  agent.gait = "angry";
+  agent.nextTurn = tick + 1;
+  return true;
 }
 
 function rollHeading(agent: WanderAgent, tick: number, rng: () => number): void {
@@ -888,6 +940,8 @@ export function startWanderLoop(
         continue;
       }
       if (holdNpcs) continue;
+      // The follower writes the path yaw. A fight keeps the heading the brain set.
+      const fightYaw = agent.override?.stance === "angry" ? agent.heading : undefined;
       steerUnownedWander(
         world,
         agent,
@@ -897,6 +951,7 @@ export function startWanderLoop(
         navCache,
         followOthers(world, agents, agent.id, wanderNav?.pawnRadius ?? 0.5),
       );
+      if (fightYaw !== undefined) agent.heading = fightYaw;
       // The picked gait only scales the wish. The clip follows the eased speed.
       stepUnownedWander(world, agent);
     }

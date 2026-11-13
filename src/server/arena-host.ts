@@ -4,6 +4,7 @@ import { createAudit } from "../shared/audit.js";
 import type { BotSenseReader } from "../shared/bots/sense.js";
 import { createPawnHealth, type SpawnPick } from "../shared/health.js";
 import { helloModel, parseModelFrame } from "../shared/model-choice.js";
+import { hasLineOfSight } from "../shared/hitscan.js";
 import { createPawnKit, createPickupHost } from "../shared/pickups.js";
 import { decodeMoveButtons } from "../shared/movements.js";
 import { canonicalJson, sceneGraphPayload, sha256Hex } from "../shared/scene-graph.js";
@@ -302,6 +303,16 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
     pawnHeight: loaded.view.pawnHeight,
     liveDoors: () => doorHost.snapshot(),
   };
+  // Fire is built first so the brain can shoot. Without the two callbacks FightBack stays off.
+  const fire = createArenaFire({
+    world: loaded.world,
+    server: engine,
+    health,
+    audit,
+    send(clientId, frame) {
+      engine.session(clientId)?.socket.send(encodeFrame(frame));
+    },
+  });
   // Held bots stand on their pads on purpose, so they would read as trapped.
   const botBrain = !holdNpcs && wanderNav.sceneGraph && wanderNav.regions
     ? createHostBotBrain({
@@ -313,6 +324,9 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
       pickups: loaded.view.pickups ?? [],
       log: (line) => console.error(line),
       useDoor: (pawnId, door) => doorHost.useDoorAs(pawnId, { door }),
+      lineOfSight: (from, to) => hasLineOfSight(from, to, loaded.world.listObstacles()),
+      fireAsBot: (id, yaw, pitch) => fire.fireAsBot(id, yaw, pitch),
+      forgetBot: (id) => fire.forgetBot(id),
     })
     : undefined;
   const botIds: number[] = [];
@@ -360,15 +374,6 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
     botLabels.update();
   }, loaded.view.noclip === true, loaded.playerSpawns, holdNpcs, elevatorHost, wanderNav);
   const propClips = startPropAnimation(loaded.view.props);
-  const fire = createArenaFire({
-    world: loaded.world,
-    server: engine,
-    health,
-    audit,
-    send(clientId, frame) {
-      engine.session(clientId)?.socket.send(encodeFrame(frame));
-    },
-  });
   const arenaJson = JSON.stringify({ ...loaded.view, propClips });
 
   function sendClient(clientId: number, frame: object): void {

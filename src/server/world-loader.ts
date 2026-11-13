@@ -21,8 +21,14 @@ export type WanderAgent = {
   /**
    * A bot brain's claim. While set, `steerUnownedWander` walks to `goal` instead of sampling one.
    * `openDoors`: plan through shut unlocked doors. The brain presses each one as the bot reaches it.
+   * `stance: "angry"` is FightBack. Close to the goal, the pawn stands and faces. Farther, it walks.
    */
-  override?: { goal: { x: number; y: number; z: number }; openDoors?: boolean; gait?: "walk" | "run" };
+  override?: {
+    goal: { x: number; y: number; z: number };
+    openDoors?: boolean;
+    gait?: "walk" | "run";
+    stance?: "angry";
+  };
   /** The last claimed walk ended this way. The brain reads it and clears it. */
   followEnd?: "arrived" | "stuck";
 };

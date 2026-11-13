@@ -33,6 +33,16 @@ export interface ArenaGrenades {
    * May wound and broadcast. A non-finite step is dropped without a pose.
    */
   tick(dt?: number): void;
+  /**
+   * One admitted throw. A dead, missing, or non-finite throw adds no body.
+   * A finite throw broadcasts the eye pose.
+   */
+  throwAs(entity: number, yaw: number, pitch: number): "dead" | "done";
+  /**
+   * Host throw for a pawn with no client. Each entity has its own seq and gate.
+   * `dead` means the throw was admitted and the pawn is dead, so nothing is spawned.
+   */
+  throwAsBot(entity: number, yaw: number, pitch: number): "accept" | "repeat" | "fast" | "dead";
 }
 
 /**
@@ -57,6 +67,8 @@ export function createArenaGrenades(opts: {
 }): ArenaGrenades {
   const now = opts.now ?? Date.now;
   const gates = new Map<number, { sessionId: number; gate: GrenadeGate }>();
+  /** Host pawns. Seq is `lastSeq + 1` on that gate, so bots do not share a counter. */
+  const botGates = new Map<number, GrenadeGate>();
   let bodies: GrenadeBody[] = [];
   let nextId = 1;
 
@@ -74,6 +86,40 @@ export function createArenaGrenades(opts: {
     deliverHealthFrames(opts.server, opts.server.connected, [healthFrame(hitId, next.hp, next.dead, next.dead ? "grenade" : undefined)]);
   }
 
+  function throwAs(entity: number, yaw: number, pitch: number): "dead" | "done" {
+    if (opts.health?.isDead(entity)) return "dead";
+    const pawn = opts.world.store.view(entity);
+    if (!pawn) return "done";
+    const origin = { x: pawn.position.x, y: pawn.position.y + EYE_HEIGHT, z: pawn.position.z };
+    const body = launchGrenade(
+      nextId,
+      entity,
+      origin,
+      aimDirection(yaw, clampPitch(pitch)),
+      GRENADE_SPEED,
+      yaw,
+      opts.impact ?? "explode",
+    );
+    nextId += 1;
+    if (!finiteBody(body)) return "done";
+    bodies.push(body);
+    console.log(`grenade shooter=${entity} id=${body.id} eye=${origin.x.toFixed(3)},${origin.y.toFixed(3)},${origin.z.toFixed(3)}`);
+    broadcast(entity, grenadePose(body.id, origin, body.yaw));
+    return "done";
+  }
+
+  function throwAsBot(entity: number, yaw: number, pitch: number): "accept" | "repeat" | "fast" | "dead" {
+    let gate = botGates.get(entity);
+    if (!gate) {
+      gate = freshGrenadeGate();
+      botGates.set(entity, gate);
+    }
+    const admitted = admitGrenade(gate, gate.lastSeq + 1, now());
+    if (admitted !== "accept") return admitted;
+    if (throwAs(entity, yaw, pitch) === "dead") return "dead";
+    return "accept";
+  }
+
   return {
     onFrame(clientId: number, frame: unknown) {
       const thrown = parseGrenade(frame);
@@ -88,25 +134,10 @@ export function createArenaGrenades(opts: {
         gates.set(clientId, row);
       }
       if (admitGrenade(row.gate, thrown.seq, now()) !== "accept") return;
-      if (opts.health?.isDead(owned)) return;
-      const pawn = opts.world.store.view(owned);
-      if (!pawn) return;
-      const origin = { x: pawn.position.x, y: pawn.position.y + EYE_HEIGHT, z: pawn.position.z };
-      const body = launchGrenade(
-        nextId,
-        owned,
-        origin,
-        aimDirection(thrown.yaw, clampPitch(thrown.pitch)),
-        GRENADE_SPEED,
-        thrown.yaw,
-        opts.impact ?? "explode",
-      );
-      nextId += 1;
-      if (!finiteBody(body)) return;
-      bodies.push(body);
-      console.log(`grenade shooter=${owned} id=${body.id} eye=${origin.x.toFixed(3)},${origin.y.toFixed(3)},${origin.z.toFixed(3)}`);
-      broadcast(owned, grenadePose(body.id, origin, body.yaw));
+      throwAs(owned, thrown.yaw, thrown.pitch);
     },
+    throwAs,
+    throwAsBot,
     /** One host tick. Fixed {@link MOVE_DT}, matching the wander interval. */
     tick(dt = MOVE_DT) {
       if (bodies.length === 0) return;

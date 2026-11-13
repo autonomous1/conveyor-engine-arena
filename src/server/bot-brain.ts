@@ -2,25 +2,30 @@
  * Host brain for the unowned wander bots. It reads the sensed state, picks a
  * goal, and claims the bot through `agent.override`. With no claim the bot
  * wanders as before. Only Escape presses doors, and only a shut unlocked one on
- * its own way out, once, as it reaches it. An hp drop forces Evade on that tick:
- * the bot drops its leg and runs. Evade then holds until it is out of sight or
- * far enough, and does not press doors. It never closes a door, never uses a
- * key and never touches a locked door. If a door will not open the bot gives
- * up on doors and the 120 s respawn takes it.
+ * its own way out, once, as it reaches it. An hp drop forces Evade on that tick
+ * unless FightBack is wired and the bot would rather shoot. Evade then holds
+ * until it is out of sight or far enough, and does not press doors. It never
+ * closes a door, never uses a key and never touches a locked door. If a door
+ * will not open the bot gives up on doors and the 120 s respawn takes it.
+ * FightBack is on only when the host passes `fireAsBot` and `forgetBot`.
  */
 import type { AuthoritativeWorld } from "conveyor-engine-world";
+import { burstScheduler, sampleAim, turnToward } from "../shared/bots/aim.js";
 import { createBotContext, groundActions, type BotCtx } from "../shared/bots/actions.js";
 import {
   DEFAULT_ARBITER_TUNING,
   EXIT_PLACE,
+  FLEE_BELOW,
   createMind,
   judge,
   resetMind,
   type ArbiterTuning,
+  type FightFacts,
   type GoalId,
   type Mind,
   type MindSense,
 } from "../shared/bots/arbiter.js";
+import { BOT_TUNING } from "../shared/bots/bot-tuning.js";
 import { FLEE_TUNING, costInPlaces, pickFleePoint, type FleeCentre, type FleeVec } from "../shared/bots/flee.js";
 import { plan, type Action } from "../shared/bots/goap.js";
 import { reach } from "../shared/bots/goals.js";
@@ -28,13 +33,14 @@ import type { BotSenseReader } from "../shared/bots/sense.js";
 import { buildWorldState } from "../shared/bots/state.js";
 import { hasLineOfSight, losGate } from "../shared/hitscan.js";
 import { MAX_HP, type PawnHealth } from "../shared/health.js";
+import { EYE_HEIGHT } from "../shared/look.js";
 import { createNavCache } from "../shared/nav/legs.js";
 import type { BakedRegionsFile } from "../shared/nav/regions.js";
 import { createRoadCache, routePlaceCosts } from "../shared/nav/route.js";
 import type { PickupPlacement } from "../shared/pickups.js";
 import { placeAt, type SceneGraph, type Vec3 } from "../shared/scene-graph.js";
 import type { DoorUseResult } from "./doors.js";
-import { doorsOnRoute, planEscapeGoal, planWanderTarget, type WanderNav } from "./game.js";
+import { TICK_MS, doorsOnRoute, planEscapeGoal, planWanderTarget, splitMix, type WanderNav } from "./game.js";
 import type { WanderAgent } from "./world-loader.js";
 
 /** An Escape claim is checked again this often (door changes, a lost route). */
@@ -74,6 +80,15 @@ export type HostBotBrainOptions = {
    * door and plans only through open ones.
    */
   useDoor?: (pawnId: number, doorId: string) => DoorUseResult;
+  /**
+   * Host shot for this pawn. With {@link forgetBot}, FightBack is on.
+   * Absent: a hit still flees, which is what the Evade tests build.
+   */
+  fireAsBot?: (entity: number, yaw: number, pitch: number) => "accept" | "repeat" | "fast" | "dead";
+  /** Drops that pawn's fire gate. Called when the bot dies or respawns. */
+  forgetBot?: (entity: number) => void;
+  /** Aim, reaction, and bursts. Absent: one SplitMix stream per bot. */
+  rng?: () => number;
 };
 
 /** Goal claims for unowned wander bots. In memory, lost on restart. */
@@ -124,11 +139,38 @@ type Slot = {
   cornerLogged: boolean;
   /** Hp at the previous tick. A lower value forces Evade. Respawn sets it back to full. */
   lastHp: number;
+  /** Players who shot this bot. Bots and unknown attackers stay out. */
+  threats: Threat[];
+  /** Pawn the current FightBack latched onto. */
+  targetId?: number;
+  /** First shot is allowed at this clock. Set once per engagement. */
+  reactAt?: number;
+  burst?: { due(now: number): boolean };
+  /** Last fight sight sample. Held while the staggered gate is shut. */
+  aimSeen: boolean;
+  /** Clock of the previous fight turn, so the yaw step matches the host tick. */
+  actedAt?: number;
+  /** Stable angry claim. A new object would restart the walk every tick. */
+  fightClaim?: { goal: { x: number; y: number; z: number }; gait?: "walk"; stance: "angry" };
+  /** Feet the close-in claim was planned toward. */
+  closeAt?: { x: number; z: number };
+  /** Fight sight. Separate from the Evade gate so that one stays at 5 Hz. */
+  fightLos: () => boolean;
+  rng: () => number;
+};
+
+type Threat = {
+  id: number;
+  lastDamageAt: number;
+  lastSeenAt?: number;
+  lastPos: FleeVec;
+  hits: number;
 };
 
 export function createHostBotBrain(opts: HostBotBrainOptions): HostBotBrain {
   const now = opts.now ?? Date.now;
   const tuning: ArbiterTuning = { ...DEFAULT_ARBITER_TUNING, ...opts.tuning };
+  const fightOn = opts.fireAsBot !== undefined && opts.forgetBot !== undefined;
   const cache = createNavCache();
   const slots: Slot[] = [];
   const byId = new Map<number, Slot>();
@@ -151,6 +193,10 @@ export function createHostBotBrain(opts: HostBotBrainOptions): HostBotBrain {
       losDue: losGate(5, now),
       cornerLogged: false,
       lastHp: MAX_HP,
+      threats: [],
+      aimSeen: false,
+      fightLos: staggeredLos(agent.id, BOT_TUNING.losHz, now),
+      rng: opts.rng ?? splitMix(0xf16b + agent.id * 997),
     };
     slots.push(slot);
     byId.set(agent.id, slot);
@@ -440,6 +486,176 @@ export function createHostBotBrain(opts: HostBotBrainOptions): HostBotBrain {
     claimFlee(slot, to);
   }
 
+  function clearFightRuntime(slot: Slot): void {
+    if (slot.agent.override === slot.fightClaim) release(slot);
+    slot.fightClaim = undefined;
+    slot.closeAt = undefined;
+    slot.targetId = undefined;
+    slot.reactAt = undefined;
+    slot.burst = undefined;
+    slot.aimSeen = false;
+    slot.actedAt = undefined;
+  }
+
+  /** Death and respawn drop the grudge and the fire gate. The next life starts clean. */
+  function forgetFight(slot: Slot): void {
+    opts.forgetBot?.(slot.agent.id);
+    slot.threats.length = 0;
+    slot.mind.fightSince = undefined;
+    clearFightRuntime(slot);
+  }
+
+  /**
+   * A player pawn only. Sense kind wins. With no kind, the agent role does.
+   * A bot, or an attacker we cannot name, never becomes a target.
+   */
+  function playerAttacker(senseAttacker: number | undefined, kind: "bot" | "player" | undefined, id: number): number | undefined {
+    const attacker = attackerOf(id, senseAttacker);
+    if (attacker === undefined) return undefined;
+    if (kind === "player") return attacker;
+    if (kind === "bot") return undefined;
+    if (opts.agents.find((item) => item.id === attacker)?.role === "player") return attacker;
+    return undefined;
+  }
+
+  function rememberThreat(slot: Slot, id: number, at: number, pos: FleeVec): void {
+    let row = slot.threats.find((item) => item.id === id);
+    if (!row) {
+      row = { id, lastDamageAt: at, lastPos: { x: pos.x, y: pos.y, z: pos.z }, hits: 0 };
+      slot.threats.push(row);
+    }
+    row.lastDamageAt = at;
+    row.lastPos = { x: pos.x, y: pos.y, z: pos.z };
+    row.hits += 1;
+    if (slot.threats.length > BOT_TUNING.maxThreats) {
+      slot.threats.sort((a, b) => b.lastDamageAt - a.lastDamageAt || a.id - b.id);
+      slot.threats.length = BOT_TUNING.maxThreats;
+    }
+  }
+
+  /** Living grudge with the newest damage. A dead pawn is not a target. */
+  function pickTarget(slot: Slot, at: number): Threat | undefined {
+    let best: Threat | undefined;
+    for (let i = 0; i < slot.threats.length; i += 1) {
+      const row = slot.threats[i]!;
+      if (at - row.lastDamageAt > BOT_TUNING.memoryMs) continue;
+      if (opts.health.isDead(row.id)) continue;
+      if (!best || row.lastDamageAt > best.lastDamageAt) best = row;
+    }
+    return best;
+  }
+
+  /**
+   * Host-wide caps. A bot already shooting this pawn keeps the slot.
+   * Slots are stepped in agent order, so the earlier bots fill the cap first.
+   */
+  function fightAllowed(slot: Slot, targetId: number): boolean {
+    let fighting = 0;
+    let onTarget = 0;
+    for (let i = 0; i < slots.length; i += 1) {
+      const other = slots[i]!;
+      if (other === slot || other.goal !== "fightback") continue;
+      fighting += 1;
+      if (other.targetId === targetId) onTarget += 1;
+    }
+    if (slot.goal === "fightback" && slot.targetId === targetId) return true;
+    return fighting < BOT_TUNING.maxFighting && onTarget < BOT_TUNING.perTarget;
+  }
+
+  function foeSpeed(id: number): number {
+    const view = opts.world.store.view(id);
+    if (!view) return 0;
+    const speed = Math.hypot(view.velocity.x, view.velocity.z);
+    return Number.isFinite(speed) ? speed : 0;
+  }
+
+  /** Stand on the current feet. The claim object stays put so the steer does not replan. */
+  function standFight(slot: Slot, me: FleeVec): void {
+    if (!slot.fightClaim || slot.fightClaim.gait !== undefined) {
+      slot.fightClaim = { goal: { x: me.x, y: me.y, z: me.z }, stance: "angry" };
+    } else {
+      slot.fightClaim.goal.x = me.x;
+      slot.fightClaim.goal.y = me.y;
+      slot.fightClaim.goal.z = me.z;
+    }
+    slot.agent.override = slot.fightClaim;
+    slot.agent.gait = "angry";
+    slot.agent.path = undefined;
+    slot.agent.goal = undefined;
+    opts.world.enqueue({ kind: "clearInput", entity: slot.agent.id });
+  }
+
+  /**
+   * Walk toward the last known feet when the pawn is still known and the
+   * shut-door plan reaches it. The claim is rebuilt only after the point moves.
+   */
+  function closeIn(slot: Slot, target: Threat): boolean {
+    const point = target.lastPos;
+    const moved = slot.closeAt === undefined || Math.hypot(point.x - slot.closeAt.x, point.z - slot.closeAt.z) > 2;
+    if (!moved && slot.fightClaim?.gait === "walk") {
+      slot.agent.override = slot.fightClaim;
+      slot.agent.gait = "walk";
+      return true;
+    }
+    const walked = planWanderTarget(opts.world, slot.agent, opts.nav, cache, point);
+    if (!walked) return false;
+    slot.fightClaim = {
+      goal: { x: point.x, y: point.y, z: point.z },
+      gait: "walk",
+      stance: "angry",
+    };
+    slot.closeAt = { x: point.x, z: point.z };
+    slot.agent.override = slot.fightClaim;
+    slot.agent.gait = "walk";
+    return true;
+  }
+
+  function fightFacts(slot: Slot, target: Threat, me: FleeVec | undefined, at: number): FightFacts {
+    const dist = me ? Math.hypot(me.x - target.lastPos.x, me.z - target.lastPos.z) : Number.POSITIVE_INFINITY;
+    const seenAgo = target.lastSeenAt === undefined ? undefined : at - target.lastSeenAt;
+    const lost = target.lastSeenAt !== undefined && slot.aimSeen === false && (seenAgo ?? 0) > BOT_TUNING.lostMs;
+    const engageable =
+      (slot.aimSeen === true || (seenAgo !== undefined && seenAgo <= BOT_TUNING.seenMs)) &&
+      dist <= BOT_TUNING.engageRangeM;
+    return {
+      threat: true,
+      engageable,
+      neutralized: opts.health.isDead(target.id),
+      lost,
+      forgotten: at - target.lastDamageAt > BOT_TUNING.memoryMs,
+    };
+  }
+
+  /** Turn, stand or close in, then shoot once the reaction and the burst say so. */
+  function fightAct(slot: Slot, me: FleeVec, target: Threat, at: number): void {
+    const dx = target.lastPos.x - me.x;
+    const dz = target.lastPos.z - me.z;
+    const want = Math.atan2(dx, dz);
+    const dt = slot.actedAt === undefined ? TICK_MS : at - slot.actedAt;
+    slot.actedAt = at;
+    slot.agent.heading = turnToward(slot.agent.heading, want, dt);
+    if (slot.targetId !== target.id) {
+      slot.targetId = target.id;
+      const span = BOT_TUNING.reactionMaxMs - BOT_TUNING.reactionMinMs;
+      slot.reactAt = at + BOT_TUNING.reactionMinMs + unitOpen(slot.rng) * span;
+      slot.burst = undefined;
+    }
+    const dist = Math.hypot(dx, dz);
+    const known = target.lastSeenAt !== undefined && at - target.lastDamageAt <= BOT_TUNING.memoryMs;
+    if (!(dist > BOT_TUNING.closeInM && known && closeIn(slot, target))) standFight(slot, me);
+    opts.world.enqueue({ kind: "setClip", entity: slot.agent.id, clip: "angry", speed: 0 });
+    if (slot.reactAt === undefined || at < slot.reactAt) return;
+    if (slot.aimSeen !== true) return;
+    if (opts.health.isDead(target.id)) return;
+    if (!slot.threats.some((row) => row.id === target.id)) return;
+    if (dist > BOT_TUNING.engageRangeM) return;
+    if (yawGap(slot.agent.heading, want) > (BOT_TUNING.fireConeDeg * Math.PI) / 180) return;
+    if (!slot.burst) slot.burst = burstScheduler(slot.rng);
+    if (!slot.burst.due(at)) return;
+    const aim = sampleAim(slot.rng, raised(me, EYE_HEIGHT), raised(target.lastPos, BOT_TUNING.chestM), dist, foeSpeed(target.id));
+    opts.fireAsBot?.(slot.agent.id, aim.yaw, aim.pitch);
+  }
+
   function takeFlee(slot: Slot, me: FleeVec | undefined, threat: FleeVec | undefined, verdict: ReturnType<typeof judge>): ReturnType<typeof judge> {
     if (me && threat) startFlee(slot, me, threat);
     else slot.agent.gait = "run";
@@ -463,6 +679,7 @@ export function createHostBotBrain(opts: HostBotBrainOptions): HostBotBrain {
       if (end) slot.agent.followEnd = undefined;
       resetMind(slot.mind);
       standDown(slot);
+      forgetFight(slot);
       slot.goal = "wander";
       slot.dying = false;
       slot.seenHitAt = undefined;
@@ -480,13 +697,14 @@ export function createHostBotBrain(opts: HostBotBrainOptions): HostBotBrain {
       slot.lastHp = MAX_HP;
       if (vital.dead && !slot.dying) {
         standDown(slot);
+        forgetFight(slot);
         slot.goal = "wander";
       }
       return;
     }
-    // Every tick, not only a sense change or a leg ending.
+    // Every tick, not only a sense change or a leg ending. A fight keeps turning between sense ticks.
     const dropped = vital.hp < slot.lastHp;
-    if (!senseNew && !end && !dropped) {
+    if (!senseNew && !end && !dropped && slot.goal !== "fightback") {
       slot.lastHp = vital.hp;
       return;
     }
@@ -510,10 +728,27 @@ export function createHostBotBrain(opts: HostBotBrainOptions): HostBotBrain {
     }
     if (dropped && me) slot.hitPos = { x: me.x, y: me.y, z: me.z };
     const attacker = attackerOf(slot.agent.id, sense.damage?.attacker);
+    if (fightOn && (newHit || dropped)) {
+      const playerId = playerAttacker(sense.damage?.attacker, sense.damage?.attackerKind, slot.agent.id);
+      const foe = playerId === undefined ? undefined : feet(playerId);
+      if (playerId !== undefined && foe) rememberThreat(slot, playerId, hitAt ?? at, foe);
+    }
+    const aimTarget = fightOn ? pickTarget(slot, at) : undefined;
+    const allowed = aimTarget !== undefined && fightAllowed(slot, aimTarget.id);
+    if (fightOn && aimTarget && allowed && me && slot.fightLos()) {
+      const clear = ray(raised(me, EYE_HEIGHT), raised(aimTarget.lastPos, BOT_TUNING.chestM));
+      slot.aimSeen = clear;
+      if (clear) {
+        aimTarget.lastSeenAt = at;
+        const live = feet(aimTarget.id);
+        if (live) aimTarget.lastPos = { x: live.x, y: live.y, z: live.z };
+      }
+    }
     let threatDist: number | undefined;
     let threatPlace: string | undefined;
     let threat: FleeVec | undefined;
-    if (me && (sense.damage !== undefined || dropped || slot.goal === "evade" || slot.mind.evadeSince !== undefined)) {
+    // Evade's own ray stays on its gate until the goal is already FightBack.
+    if (me && slot.goal !== "fightback" && (sense.damage !== undefined || dropped || slot.goal === "evade" || slot.mind.evadeSince !== undefined)) {
       threat = threatPoint(slot, attacker, me);
       threatDist = Math.hypot(me.x - threat.x, me.z - threat.z);
       threatPlace = placeAt(opts.nav.sceneGraph, threat.x, threat.y, threat.z).id;
@@ -525,18 +760,34 @@ export function createHostBotBrain(opts: HostBotBrainOptions): HostBotBrain {
       msNoProgress: sense.msNoProgress,
       routeOut: sense.routeOut,
       damage: sense.damage,
-      hpFrac: sense.hpFrac,
       threatDist,
       threatPlace,
       damageAt: hitAt,
       damageSeq: sense.damage?.seq,
       threatSeen: threat ? slot.threatSeen : undefined,
+      hpFrac: vital.hp / MAX_HP,
     };
+    if (fightOn) {
+      const latchedDead = slot.goal === "fightback" && slot.targetId !== undefined && opts.health.isDead(slot.targetId);
+      if (latchedDead) {
+        sensed.armed = true;
+        sensed.fight = { threat: false, engageable: false, neutralized: true, lost: false, forgotten: false };
+      } else if (aimTarget && allowed) {
+        sensed.armed = true;
+        sensed.fight = fightFacts(slot, aimTarget, me, at);
+      } else if (aimTarget) {
+        // Over a cap. Armed would suppress Evade, and this bot should run.
+        sensed.armed = false;
+      } else {
+        sensed.armed = true;
+      }
+    }
     let verdict = judge(slot.mind, sensed, at, tuning);
     if (verdict.respawn && !dropped) {
       // The normal death path: the host beams it out and back in at a spawn.
       slot.goal = verdict.goal;
       standDown(slot);
+      forgetFight(slot);
       slot.dying = true;
       opts.health.wound(slot.agent.id, undefined, MAX_HP);
       slot.lastHp = MAX_HP;
@@ -544,13 +795,19 @@ export function createHostBotBrain(opts: HostBotBrainOptions): HostBotBrain {
     }
     const prev = slot.goal;
     const wasCornered = slot.mind.cornered === true;
-    if (dropped) {
-      // Cool-down and cornered belong to one Evade. A new hp loss starts another.
-      slot.mind.cornered = undefined;
-      slot.cornerLogged = false;
-      slot.mind.evadeSince = at;
-      slot.mind.safeSince = undefined;
-      verdict = { ...verdict, goal: "evade" };
+    if (dropped && verdict.goal !== "fightback") {
+      const hpFrac = vital.hp / MAX_HP;
+      const armedNow = fightOn && (aimTarget === undefined || allowed);
+      // Above half health, or cornered, FightBack is the answer. A lower drop still flees.
+      const preferFight = armedNow && (slot.mind.cornered === true || hpFrac > FLEE_BELOW);
+      if (!preferFight) {
+        // Cool-down and cornered belong to one Evade. A new hp loss starts another.
+        slot.mind.cornered = undefined;
+        slot.cornerLogged = false;
+        slot.mind.evadeSince = at;
+        slot.mind.safeSince = undefined;
+        verdict = { ...verdict, goal: "evade" };
+      }
     }
     let picked = false;
     if (verdict.goal === "evade" && (prev !== "evade" || newHit || dropped)) {
@@ -579,6 +836,16 @@ export function createHostBotBrain(opts: HostBotBrainOptions): HostBotBrain {
     if (verdict.goal !== "evade") {
       slot.rePicks = 0;
       slot.settled = false;
+    }
+    if (verdict.goal !== "fightback" && prev === "fightback") clearFightRuntime(slot);
+    if (verdict.goal === "fightback") {
+      if (me && aimTarget && !opts.health.isDead(aimTarget.id)) fightAct(slot, me, aimTarget, at);
+      else {
+        standDown(slot);
+        clearFightRuntime(slot);
+        slot.goal = "wander";
+      }
+      return;
     }
     if (verdict.goal === "evade") return;
     if (verdict.goal === "wander") {
@@ -614,4 +881,39 @@ export function createHostBotBrain(opts: HostBotBrainOptions): HostBotBrain {
       return slot?.goal === "evade" && slot.threatSeen === true;
     },
   };
+}
+
+/**
+ * Fight sight. The first call is due, then one slot of the period, phased by
+ * id, so the bots do not all trace on the same tick. At least one period
+ * passes between samples.
+ */
+function staggeredLos(id: number, hz: number, clock: () => number): () => boolean {
+  const period = 1000 / Math.max(1, hz);
+  const buckets = Math.max(1, Math.round(hz));
+  const phase = (Math.abs(Math.trunc(id)) % buckets) * (period / buckets);
+  let nextAt = Number.NEGATIVE_INFINITY;
+  return () => {
+    const t = clock();
+    if (!(t >= nextAt)) return false;
+    const base = t + period;
+    const steps = Math.ceil((base - phase) / period);
+    nextAt = phase + steps * period;
+    if (!(nextAt > t)) nextAt = t + period;
+    return true;
+  };
+}
+
+/** Reaction wants the raw 0 and 1. Aim's unit clamp would move a 0 off 350 ms. */
+function unitOpen(rng: () => number): number {
+  const u = rng();
+  if (!Number.isFinite(u) || u <= 0) return 0;
+  if (u >= 1) return 1;
+  return u;
+}
+
+function yawGap(current: number, want: number): number {
+  const wrapped = (want - current) % (Math.PI * 2);
+  const delta = wrapped > Math.PI ? wrapped - Math.PI * 2 : wrapped < -Math.PI ? wrapped + Math.PI * 2 : wrapped;
+  return Math.abs(delta);
 }

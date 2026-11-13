@@ -5,6 +5,7 @@
  * Evade runs from a recent hit and holds until the bot has been safe. It does
  * not clear an Escape latch, so Escape resumes with the same timer.
  */
+import { BOT_TUNING } from "./bot-tuning.js";
 import type { BotSense } from "./sense.js";
 
 export type ArbiterTuning = {
@@ -26,7 +27,7 @@ export const DEFAULT_ARBITER_TUNING: Readonly<ArbiterTuning> = Object.freeze({
   outsideWedgedMs: 180_000,
 });
 
-export type GoalId = "wander" | "escape" | "evade";
+export type GoalId = "wander" | "escape" | "evade" | "fightback";
 
 export const WANDER_PRIORITY = 1;
 export const ESCAPE_PRIORITY = 6;
@@ -53,9 +54,12 @@ export const EVADE_COOLDOWN_MS = 5_000;
 export const SAFE_DISTANCE_M = 35;
 /**
  * Armed and above this fraction of hp, the bot would rather fight.
- * `armed` stays false until a later task, so a hit flees unless the bot is cornered.
+ * The host brain sets `armed` when FightBack is wired. Otherwise a hit flees
+ * unless the bot is cornered.
  */
-export const FLEE_BELOW = 0.5;
+export const FLEE_BELOW = BOT_TUNING.fleeBelow;
+/** FightBack, when the target is a live threat the bot can still shoot. */
+export const FIGHT_PRIORITY = 9;
 
 /** What the arbiter reads. `BotSense` satisfies it. The threat fields are optional. */
 export type MindSense = Pick<BotSense, "alive" | "place" | "msNoProgress" | "routeOut"> & {
@@ -79,6 +83,25 @@ export type MindSense = Pick<BotSense, "alive" | "place" | "msNoProgress" | "rou
    * `losGate(5)`. Absent is not hidden: only {@link SAFE_DISTANCE_M} then counts.
    */
   threatSeen?: boolean;
+  /**
+   * FightBack facts for this tick. Absent: the bot is not armed for a fight,
+   * and a latched fight is left to time out on its own only when this is set.
+   */
+  fight?: FightFacts;
+};
+
+/** What the brain knows about the pawn it might shoot. The arbiter casts no rays. */
+export type FightFacts = {
+  /** A living player who hurt this bot is still in memory. */
+  threat: boolean;
+  /** Visible, or seen within 3 s, and inside the engage range. */
+  engageable: boolean;
+  /** The pawn this fight latched onto is dead. */
+  neutralized: boolean;
+  /** Seen once, then no line of sight for the lost window. */
+  lost: boolean;
+  /** The grudge is older than the memory window. */
+  forgotten: boolean;
 };
 
 /** Latch for one bot. Timestamps are ms on the `now` passed to `judge`. */
@@ -103,6 +126,8 @@ export type Mind = {
   hurtSeq?: number;
   /** No flee point, or two more hits while fleeing. Suppresses Evade until hurt expires. */
   cornered?: boolean;
+  /** ms when FightBack latched. Absent unless FightBack holds. */
+  fightSince?: number;
 };
 
 export type Verdict = {
@@ -131,6 +156,7 @@ export function resetMind(mind: Mind): void {
   mind.coolSeq = undefined;
   mind.hurtSeq = undefined;
   mind.cornered = undefined;
+  mind.fightSince = undefined;
 }
 
 /**
@@ -152,8 +178,51 @@ export function judge(
   }
   const base = escapeVerdict(mind, sense, now, tuning);
   const evade = evadeVerdict(mind, sense, now);
+  const fight = fightVerdict(mind, sense, now);
+  // Evade under fire is 9.5. That does not clear FightBack: the margin is 1.
+  // Low hp, a dead target, and a lost grudge clear the latch themselves.
+  if (fight !== undefined && (evade === undefined || evade < fight + BOT_TUNING.margin)) {
+    return { goal: "fightback", priority: fight, trapped: base.trapped, escapeMs: base.escapeMs, respawn: base.respawn };
+  }
   if (!evade) return base;
   return { goal: "evade", priority: evade, trapped: base.trapped, escapeMs: base.escapeMs, respawn: base.respawn };
+}
+
+/**
+ * FightBack priority while the latch holds, otherwise undefined.
+ * Starts only when the brain says the target is a live, engageable player
+ * and the bot would rather fight. A target that dies ends it at once.
+ * Hp at or under {@link FLEE_BELOW} minus the hysteresis hands the bot to Evade,
+ * unless it is cornered. Losing sight does not end it until the lost flag,
+ * and not before the dwell, so a one-tick flicker does not drop the goal.
+ */
+function fightVerdict(mind: Mind, sense: MindSense, now: number): number | undefined {
+  const fight = sense.fight;
+  const armed = sense.armed === true;
+  const hpFrac = sense.hpFrac ?? 1;
+  const cornered = mind.cornered === true;
+  const fightPreferred = cornered || (armed && hpFrac > FLEE_BELOW);
+  const giveUp = !cornered && hpFrac <= FLEE_BELOW - BOT_TUNING.fightHysteresis;
+  const dead = fight?.neutralized === true;
+  const lost = fight?.lost === true;
+  const forgotten = fight?.forgotten === true;
+  const wanted =
+    fight?.threat === true &&
+    armed &&
+    fight.engageable === true &&
+    fightPreferred &&
+    !dead &&
+    !lost &&
+    !forgotten &&
+    !giveUp;
+  if (mind.fightSince !== undefined) {
+    const dwellOk = now - mind.fightSince >= BOT_TUNING.fightDwellMs;
+    const end = dead || lost || forgotten || giveUp || fight === undefined;
+    if (end && (dead || giveUp || dwellOk || fight === undefined)) mind.fightSince = undefined;
+  }
+  if (mind.fightSince === undefined && wanted) mind.fightSince = now;
+  if (mind.fightSince === undefined) return undefined;
+  return FIGHT_PRIORITY;
 }
 
 function escapeVerdict(mind: Mind, sense: MindSense, now: number, tuning: Readonly<ArbiterTuning>): Verdict {

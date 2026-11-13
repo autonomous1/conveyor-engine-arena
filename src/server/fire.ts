@@ -26,6 +26,19 @@ export interface ArenaFire {
    * A dead pawn's accepted shot is counted and not traced. May log, wound, send lasers, and publish the audit.
    */
   onFrame(clientId: number, frame: unknown): void;
+  /**
+   * One admitted shot. Dead, missing, and non-finite shots send nothing.
+   * Counts a pawn hit. Does not admit a gate or publish the audit.
+   * `debug` prints the same trace lines as a debug fire frame.
+   */
+  fireAs(entity: number, yaw: number, pitch: number, opts?: { debug?: boolean }): "dead" | "done";
+  /**
+   * Host shot for a pawn with no client. Each entity has its own seq and gate.
+   * Publishes the audit. `dead` means the shot was admitted and the pawn is dead, so nothing is sent.
+   */
+  fireAsBot(entity: number, yaw: number, pitch: number): "accept" | "repeat" | "fast" | "dead";
+  /** Drops that entity's gate so the next shot is not limited by the old one. */
+  forgetBot(entity: number): void;
 }
 
 /**
@@ -45,8 +58,79 @@ export function createArenaFire(opts: {
 }): ArenaFire {
   const now = opts.now ?? Date.now;
   const gates = new Map<number, { sessionId: number; gate: FireGate }>();
+  /** Host pawns. Seq is `lastSeq + 1` on that gate, so bots do not share a counter. */
+  const botGates = new Map<number, FireGate>();
   const watched = watchPawnWrites(opts.world.store);
   const audit = opts.audit ?? createAudit();
+
+  function fireAs(entity: number, yaw: number, pitch: number, shot?: { debug?: boolean }): "dead" | "done" {
+    const log = createFireDebugLog(() => shot?.debug === true);
+    if (opts.health?.isDead(entity)) {
+      log.trace("dead");
+      return "dead";
+    }
+    const pawn = opts.world.store.view(entity);
+    if (!pawn) {
+      log.trace("no-pawn");
+      return "done";
+    }
+    const origin = { x: pawn.position.x, y: pawn.position.y + EYE_HEIGHT, z: pawn.position.z };
+    const capsules = pawnCapsules(opts.world, entity);
+    const traced = traceIndexed(origin, aimDirection(yaw, clampPitch(pitch)), opts.world.listObstacles(), capsules);
+    const hit = traced.hitId === undefined ? "none" : String(traced.hitId);
+    log.trace(`hit=${hit} dist=${traced.distance.toFixed(3)}`);
+    console.log(`shot shooter=${entity} eye=${origin.x.toFixed(3)},${origin.y.toFixed(3)},${origin.z.toFixed(3)} hit=${hit} dist=${traced.distance.toFixed(3)}`);
+    if (!finitePoint(traced.from) || !finitePoint(traced.to)) {
+      console.error("laser skipped non-finite");
+      return "done";
+    }
+    const laser: LaserFrame = {
+      t: "laser",
+      shooter: entity,
+      from: traced.from,
+      to: traced.to,
+      until: now() + LASER_MS,
+    };
+    for (const id of opts.server.connected) {
+      if (!clientSeesPawn(opts.server, id, entity)) continue;
+      opts.send(id, laser);
+    }
+    const hitId = traced.hitId;
+    if (hitId !== undefined && hitId !== entity && capsules.some((cap) => cap.id === hitId)) {
+      let killed = false;
+      if (opts.health) {
+        const next = opts.health.wound(hitId, entity, undefined, "laser");
+        if (next) {
+          log.writePawn(`health pawn=${hitId} ${next.hp}`);
+          deliverHealthFrames(opts.server, opts.server.connected, [healthFrame(hitId, next.hp, next.dead, next.dead ? "laser" : undefined)]);
+          killed = next.hp === 0;
+        }
+      }
+      audit.pawnHit(killed);
+    }
+    return "done";
+  }
+
+  function fireAsBot(entity: number, yaw: number, pitch: number): "accept" | "repeat" | "fast" | "dead" {
+    let gate = botGates.get(entity);
+    if (!gate) {
+      gate = freshFireGate();
+      botGates.set(entity, gate);
+    }
+    const admitted = admitFire(gate, gate.lastSeq + 1, now());
+    audit.gate(admitted);
+    let result: "accept" | "repeat" | "fast" | "dead" = admitted;
+    try {
+      if (admitted === "accept" && fireAs(entity, yaw, pitch) === "dead") result = "dead";
+      return result;
+    } finally {
+      publishAudit(opts.server, audit);
+    }
+  }
+
+  function forgetBot(entity: number): void {
+    botGates.delete(entity);
+  }
 
   return {
     get counters() {
@@ -82,49 +166,7 @@ export function createArenaFire(opts: {
         audit.gate(admitted);
         noted = true;
         if (admitted !== "accept") return;
-        if (opts.health?.isDead(owned)) {
-          log.trace("dead");
-          return;
-        }
-        const pawn = opts.world.store.view(owned);
-        if (!pawn) {
-          log.trace("no-pawn");
-          return;
-        }
-        const origin = { x: pawn.position.x, y: pawn.position.y + EYE_HEIGHT, z: pawn.position.z };
-        const capsules = pawnCapsules(opts.world, owned);
-        const shot = traceIndexed(origin, aimDirection(fire.yaw, clampPitch(fire.pitch)), opts.world.listObstacles(), capsules);
-        const hit = shot.hitId === undefined ? "none" : String(shot.hitId);
-        log.trace(`hit=${hit} dist=${shot.distance.toFixed(3)}`);
-        console.log(`shot shooter=${owned} eye=${origin.x.toFixed(3)},${origin.y.toFixed(3)},${origin.z.toFixed(3)} hit=${hit} dist=${shot.distance.toFixed(3)}`);
-        if (!finitePoint(shot.from) || !finitePoint(shot.to)) {
-          console.error("laser skipped non-finite");
-          return;
-        }
-        const laser: LaserFrame = {
-          t: "laser",
-          shooter: owned,
-          from: shot.from,
-          to: shot.to,
-          until: now() + LASER_MS,
-        };
-        for (const id of opts.server.connected) {
-          if (!clientSeesPawn(opts.server, id, owned)) continue;
-          opts.send(id, laser);
-        }
-        const hitId = shot.hitId;
-        if (hitId !== undefined && hitId !== owned && capsules.some((cap) => cap.id === hitId)) {
-          let killed = false;
-          if (opts.health) {
-            const next = opts.health.wound(hitId, owned, undefined, "laser");
-            if (next) {
-              log.writePawn(`health pawn=${hitId} ${next.hp}`);
-              deliverHealthFrames(opts.server, opts.server.connected, [healthFrame(hitId, next.hp, next.dead, next.dead ? "laser" : undefined)]);
-              killed = next.hp === 0;
-            }
-          }
-          audit.pawnHit(killed);
-        }
+        fireAs(owned, fire.yaw, fire.pitch, { debug });
       } catch (err) {
         log.thrown("fire", err);
         throw err;
@@ -132,6 +174,9 @@ export function createArenaFire(opts: {
         if (noted) publishAudit(opts.server, audit);
       }
     },
+    fireAs,
+    fireAsBot,
+    forgetBot,
   };
 }
 
