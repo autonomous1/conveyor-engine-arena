@@ -19,7 +19,7 @@ register(
     `),
 );
 
-const { createMind, judge, ESCAPE_PRIORITY, WANDER_PRIORITY } = await import("../src/shared/bots/arbiter.ts");
+const { createMind, judge, ESCAPE_PRIORITY, WANDER_PRIORITY, EVADE_HURT_PRIORITY, EVADE_UNDER_FIRE_PRIORITY } = await import("../src/shared/bots/arbiter.ts");
 const { createExitIndex } = await import("../src/shared/bots/sense.ts");
 const { createHostBotBrain } = await import("../src/server/bot-brain.ts");
 const { splitMix, steerUnownedWander } = await import("../src/server/game.ts");
@@ -96,6 +96,159 @@ test("arbiter: Escape holds through a place change or an opened door, and ends o
   assert.equal(judge(wedged, { ...calm, msNoProgress: 61 * S }, 1 * S).goal, "escape");
   assert.equal(judge(wedged, { ...calm, place: "outside", msNoProgress: 62 * S }, 2 * S).goal, "wander");
   assert.equal(judge(wedged, { ...calm, msNoProgress: 63 * S }, 3 * S).goal, "escape", "inside again and still wedged: a new Escape");
+});
+
+type HitSense = {
+  alive: boolean;
+  place: string;
+  msNoProgress: number;
+  routeOut: { open: boolean; unlocked: boolean };
+  hpFrac: number;
+  threatDist: number;
+  threatPlace: string;
+  damage?: { attacker: number | undefined; ageMs: number; seq?: number };
+  damageAt?: number;
+  damageSeq?: number;
+  threatSeen?: boolean;
+  armed?: boolean;
+};
+
+function hitSense(now: number, hitAt: number | undefined, extra: Partial<HitSense> = {}): HitSense {
+  const row: HitSense = {
+    ...calm,
+    hpFrac: 1,
+    threatDist: 25,
+    threatPlace: "hall",
+    threatSeen: false,
+    ...extra,
+  };
+  if (hitAt !== undefined) {
+    const seq = extra.damage?.seq;
+    row.damage = { attacker: extra.damage?.attacker, ageMs: now - hitAt, ...(seq !== undefined ? { seq } : {}) };
+    row.damageAt = hitAt;
+    if (seq !== undefined) row.damageSeq = seq;
+  }
+  return row;
+}
+
+test("arbiter: a hit, another hit, then 10 s quiet is wander, evade, evade, wander", () => {
+  assert.equal(EVADE_UNDER_FIRE_PRIORITY, 9.5);
+  assert.equal(EVADE_HURT_PRIORITY, 8.5);
+  const mind = createMind();
+  const goals: string[] = [];
+  const see = (now: number, hitAt: number | undefined) => {
+    const verdict = judge(mind, hitSense(now, hitAt), now);
+    goals.push(verdict.goal);
+    return verdict;
+  };
+  assert.equal(see(0, undefined).goal, "wander");
+  const first = see(1_000, 1_000);
+  assert.equal(first.goal, "evade");
+  assert.equal(first.priority, 9.5);
+  assert.equal(see(1_500, 1_500).goal, "evade");
+  const quiet = see(4_000, 1_500);
+  assert.equal(quiet.goal, "evade");
+  assert.equal(quiet.priority, 8.5);
+  // Safe begins once the last hit is 5 s old. It has to hold 3 s.
+  assert.equal(see(6_500, 1_500).goal, "evade");
+  assert.equal(see(9_499, 1_500).goal, "evade");
+  assert.equal(see(9_500, 1_500).goal, "wander");
+  assert.equal(see(11_000, 1_500).goal, "wander");
+  assert.equal(see(12_000, 1_500).goal, "wander");
+  const changes: string[] = [];
+  for (const goal of goals) {
+    if (changes[changes.length - 1] !== goal) changes.push(goal);
+  }
+  assert.deepEqual(changes, ["wander", "evade", "wander"]);
+});
+
+test("arbiter: cool-down blocks the same damage note, and a new hit starts Evade again", () => {
+  const mind = createMind();
+  judge(mind, hitSense(0, 0), 0);
+  judge(mind, hitSense(5_000, 0), 5_000);
+  assert.equal(judge(mind, hitSense(8_000, 0), 8_000).goal, "wander");
+  assert.equal(judge(mind, hitSense(9_000, 0), 9_000).goal, "wander");
+  const again = judge(mind, hitSense(9_500, 9_500), 9_500);
+  assert.equal(again.goal, "evade");
+  assert.equal(again.priority, 9.5);
+});
+
+test("arbiter: a new seq during cool-down is a new hit even when the timestamp matches", () => {
+  const mind = createMind();
+  const hit = (now: number, seq: number) => judge(mind, hitSense(now, 0, { damage: { attacker: 4, ageMs: now, seq } }), now);
+  hit(0, 1);
+  hit(5_000, 1);
+  assert.equal(hit(8_000, 1).goal, "wander");
+  assert.equal(hit(8_300, 1).goal, "wander");
+  assert.equal(hit(8_300, 2).goal, "evade");
+});
+
+test("arbiter: Evade does not end while the threat can see the bot, unless it is 35 m away", () => {
+  const mind = createMind();
+  const seen = { threatSeen: true, threatDist: 10 };
+  assert.equal(judge(mind, hitSense(0, 0, seen), 0).goal, "evade");
+  assert.equal(judge(mind, hitSense(10_000, 0, seen), 10_000).goal, "evade");
+  assert.equal(judge(mind, hitSense(20_000, 0, seen), 20_000).goal, "evade");
+  const far = { threatSeen: true, threatDist: 35 };
+  assert.equal(judge(mind, hitSense(20_000, 0, far), 20_000).goal, "evade");
+  assert.equal(judge(mind, hitSense(22_999, 0, far), 22_999).goal, "evade");
+  assert.equal(judge(mind, hitSense(23_000, 0, far), 23_000).goal, "wander");
+});
+
+test("arbiter: becoming visible again restarts the safe hold", () => {
+  const mind = createMind();
+  judge(mind, hitSense(0, 0), 0);
+  judge(mind, hitSense(5_000, 0), 5_000);
+  judge(mind, hitSense(6_000, 0, { threatDist: 5, threatSeen: true }), 6_000);
+  judge(mind, hitSense(7_000, 0), 7_000);
+  assert.equal(judge(mind, hitSense(9_999, 0), 9_999).goal, "evade");
+  assert.equal(judge(mind, hitSense(10_000, 0), 10_000).goal, "wander");
+});
+
+test("arbiter: Escape resumes after Evade with the same timer", () => {
+  const mind = createMind();
+  judge(mind, walled, 0);
+  const started = judge(mind, walled, 60 * S);
+  assert.equal(started.goal, "escape");
+  assert.equal(started.escapeMs, 0);
+  const fled = judge(mind, hitSense(70 * S, 70 * S, { ...walled, threatPlace: "other" }), 70 * S);
+  assert.equal(fled.goal, "evade");
+  assert.equal(fled.escapeMs, 10 * S);
+  assert.equal(judge(mind, hitSense(75 * S, 70 * S, { ...walled, threatPlace: "other" }), 75 * S).goal, "evade");
+  const back = judge(mind, hitSense(78 * S, 70 * S, { ...walled, threatPlace: "other" }), 78 * S);
+  assert.equal(back.goal, "escape");
+  assert.equal(back.escapeMs, 18 * S);
+  assert.equal(back.respawn, false);
+  const due = judge(mind, { ...walled }, 180 * S);
+  assert.equal(due.goal, "escape");
+  assert.equal(due.respawn, true);
+});
+
+test("arbiter: armed above half hp does not flee, and cornered does not either", () => {
+  const armed = createMind();
+  const above = judge(armed, hitSense(0, 0, { armed: true, hpFrac: 0.6, threatDist: 3 }), 0);
+  assert.equal(above.goal, "wander");
+  const atHalf = judge(createMind(), hitSense(0, 0, { armed: true, hpFrac: 0.5, threatDist: 3 }), 0);
+  assert.equal(atHalf.goal, "evade");
+  const cornered = createMind();
+  cornered.cornered = true;
+  assert.equal(judge(cornered, hitSense(0, 0, { threatDist: 3 }), 0).goal, "wander");
+  assert.equal(cornered.cornered, true);
+});
+
+test("arbiter: death clears Evade, including a cool-down and cornered", () => {
+  const mind = createMind();
+  assert.equal(judge(mind, hitSense(0, 0), 0).goal, "evade");
+  judge(mind, hitSense(5_000, 0), 5_000);
+  assert.equal(judge(mind, hitSense(8_000, 0), 8_000).goal, "wander");
+  mind.cornered = true;
+  assert.equal(judge(mind, { ...calm, alive: false }, 8_500).goal, "wander");
+  assert.equal(mind.cornered, undefined);
+  assert.equal(mind.evadeSince, undefined);
+  assert.equal(mind.evadeEndedAt, undefined);
+  assert.equal(mind.coolHitAt, undefined);
+  // The same note is still inside the old cool-down window. Death dropped it.
+  assert.equal(judge(mind, hitSense(9_000, 0), 9_000).goal, "evade");
 });
 
 test("arbiter: respawn is due 120 s after it became trapped, and death resets it", () => {
@@ -442,4 +595,371 @@ test("real arena: an exit through open doors is planned, an elevator-only floor 
   lost.tick(180 * S);
   assert.equal(lost.health.isDead(lost.agent.id), true);
   assert.equal(lost.health.get(lost.agent.id).hp, 0);
+});
+
+function foeAt(world: AuthoritativeWorld, x: number, z: number): number {
+  const id = world.createEntity(0n, { type: "pawn", shape: "capsule" });
+  world.enqueue({
+    kind: "setTransform",
+    entity: id,
+    position: { x, y: 0, z },
+    rotation: { x: 0, y: 0, z: 0, w: 1 },
+    scale: { x: 1, y: 1, z: 1 },
+  });
+  world.commit(1n);
+  return id;
+}
+
+test("brain: flee is chosen once per entry and per new hit, not per tick", () => {
+  const nav = yardNav({ open: true });
+  const { world, id, agent } = botWorld(2, 2);
+  const foe = foeAt(world, 0, 2);
+  let clock = 0;
+  const health = createPawnHealth(() => clock);
+  const sense = fakeSense([id]);
+  let calls = 0;
+  let presses = 0;
+  const threats: Array<{ x: number; z: number }> = [];
+  const brain = createHostBotBrain({
+    world,
+    agents: [agent as never],
+    health,
+    sense,
+    nav,
+    now: () => clock,
+    useDoor: () => {
+      presses += 1;
+      return "opened";
+    },
+    pickFlee(input) {
+      calls += 1;
+      threats.push({ x: input.threat.x, z: input.threat.z });
+      return { placeId: "room", x: 2, y: 0, z: 3, score: 1 };
+    },
+  });
+  const tick = (patch: Record<string, unknown> = {}) => {
+    sense.fresh(id, { at: clock, ...patch });
+    brain.update();
+  };
+  tick();
+  assert.equal(calls, 0);
+  tick({ damage: { attacker: undefined, ageMs: 0 } });
+  assert.equal(calls, 1);
+  assert.equal(brain.goalOf(id), "evade");
+  assert.deepEqual(threats[0], { x: 2, z: 2 });
+  assert.deepEqual(agent.override.goal, { x: 2, y: 0, z: 3 });
+  assert.equal(agent.override.gait, "run");
+  steerUnownedWander(world, agent as never, 1, () => 0.1, nav, createNavCache());
+  assert.equal(agent.gait, "run");
+  assert.notEqual(agent.override.openDoors, true);
+  for (let i = 0; i < 4; i += 1) {
+    clock += 200;
+    tick({ damage: { attacker: undefined, ageMs: clock } });
+  }
+  assert.equal(calls, 1);
+  assert.equal(presses, 0);
+  clock = 1_000;
+  tick({ damage: { attacker: foe, ageMs: 0 } });
+  assert.equal(calls, 2);
+  assert.equal(brain.goalOf(id), "evade");
+  assert.deepEqual(threats[1], { x: 0, z: 2 });
+  assert.equal(presses, 0);
+});
+
+test("brain: no flee point still runs and does not log cornered", () => {
+  const nav = yardNav({ open: false });
+  const { world, id, agent } = botWorld(2, 2);
+  let clock = 0;
+  const health = createPawnHealth(() => clock);
+  const sense = fakeSense([id]);
+  const logs: string[] = [];
+  let calls = 0;
+  const brain = createHostBotBrain({
+    world,
+    agents: [agent as never],
+    health,
+    sense,
+    nav,
+    now: () => clock,
+    log: (line) => logs.push(line),
+    pickFlee() {
+      calls += 1;
+      return undefined;
+    },
+  });
+  const tick = (patch: Record<string, unknown> = {}) => {
+    sense.fresh(id, { at: clock, ...patch });
+    brain.update();
+  };
+  tick({ damage: { attacker: undefined, ageMs: 0 } });
+  assert.equal(calls, 1);
+  assert.equal(brain.goalOf(id), "evade");
+  assert.equal(agent.override?.gait, "run");
+  steerUnownedWander(world, agent as never, 1, () => 0.1, nav, createNavCache());
+  assert.equal(agent.gait, "run");
+  assert.deepEqual(logs, []);
+  clock = 500;
+  tick({ damage: { attacker: undefined, ageMs: clock } });
+  assert.equal(calls, 1);
+  assert.equal(brain.goalOf(id), "evade");
+  assert.deepEqual(logs, []);
+});
+
+test("brain: another hit while fleeing picks again and does not corner", () => {
+  const nav = yardNav({ open: true });
+  const { world, id, agent } = botWorld(2, 2);
+  let clock = 0;
+  const health = createPawnHealth(() => clock);
+  const sense = fakeSense([id]);
+  const logs: string[] = [];
+  let calls = 0;
+  const brain = createHostBotBrain({
+    world,
+    agents: [agent as never],
+    health,
+    sense,
+    nav,
+    now: () => clock,
+    log: (line) => logs.push(line),
+    pickFlee() {
+      calls += 1;
+      return { placeId: "room", x: 2, y: 0, z: 3, score: 1 };
+    },
+  });
+  const hit = (seq: number) => {
+    sense.fresh(id, { at: clock, damage: { attacker: undefined, ageMs: 0, seq } });
+    brain.update();
+  };
+  hit(1);
+  assert.equal(calls, 1);
+  assert.equal(brain.goalOf(id), "evade");
+  assert.equal(agent.override.gait, "run");
+  clock = 100;
+  hit(2);
+  assert.equal(calls, 2);
+  clock = 200;
+  hit(3);
+  assert.equal(calls, 3);
+  assert.equal(brain.goalOf(id), "evade");
+  assert.ok(agent.override);
+  assert.deepEqual(logs, []);
+});
+
+test("brain: a visible arrival re-picks at most three times, then the bot is cornered", () => {
+  const nav = yardNav({ open: true });
+  const { world, id, agent } = botWorld(2, 2);
+  let clock = 0;
+  const health = createPawnHealth(() => clock);
+  const sense = fakeSense([id]);
+  const logs: string[] = [];
+  let calls = 0;
+  const brain = createHostBotBrain({
+    world,
+    agents: [agent as never],
+    health,
+    sense,
+    nav,
+    now: () => clock,
+    log: (line) => logs.push(line),
+    lineOfSight: () => true,
+    pickFlee() {
+      calls += 1;
+      return { placeId: "room", x: 2, y: 0, z: 3, score: 1 };
+    },
+  });
+  const tick = () => {
+    sense.fresh(id, { at: clock, damage: { attacker: undefined, ageMs: clock, seq: 1 } });
+    brain.update();
+  };
+  tick();
+  assert.equal(calls, 1);
+  for (let i = 1; i <= 3; i += 1) {
+    agent.followEnd = "arrived";
+    tick();
+    assert.equal(calls, 1 + i);
+    assert.equal(brain.goalOf(id), "evade");
+  }
+  agent.followEnd = "stuck";
+  tick();
+  assert.equal(calls, 4, "the fourth leave does not pick again");
+  assert.equal(brain.goalOf(id), "wander");
+  assert.equal(agent.override, undefined);
+  assert.deepEqual(logs, [`[live] brain ${id} cornered`]);
+  agent.followEnd = "arrived";
+  tick();
+  assert.equal(calls, 4);
+  assert.deepEqual(logs, [`[live] brain ${id} cornered`]);
+});
+
+test("brain: a hidden arrival keeps the claim, and the sight ray is at most 5 Hz", () => {
+  const nav = yardNav({ open: true });
+  const { world, id, agent } = botWorld(2, 2);
+  let clock = 0;
+  const health = createPawnHealth(() => clock);
+  const sense = fakeSense([id]);
+  let calls = 0;
+  let rays = 0;
+  const brain = createHostBotBrain({
+    world,
+    agents: [agent as never],
+    health,
+    sense,
+    nav,
+    now: () => clock,
+    lineOfSight() {
+      rays += 1;
+      return false;
+    },
+    pickFlee() {
+      calls += 1;
+      return { placeId: "room", x: 2, y: 0, z: 3, score: 1 };
+    },
+  });
+  const tick = (seq = 1) => {
+    sense.fresh(id, { at: clock, damage: { attacker: undefined, ageMs: clock, seq } });
+    brain.update();
+  };
+  tick();
+  assert.equal(calls, 1);
+  assert.equal(rays, 1);
+  agent.followEnd = "arrived";
+  tick();
+  assert.equal(calls, 1, "hidden arrival does not re-pick");
+  assert.equal(brain.goalOf(id), "evade");
+  assert.ok(agent.override);
+  for (let i = 0; i < 19; i += 1) {
+    clock += 50;
+    tick();
+  }
+  assert.equal(rays, 5, "one ray per 200 ms, from t = 0 through t = 950");
+  assert.equal(calls, 1);
+});
+
+test("brain: a new seq during cool-down retriggers Evade, and a grenade with no attacker does too", () => {
+  const nav = yardNav({ open: true });
+  const { world, id, agent } = botWorld(2, 2);
+  const foe = foeAt(world, 2, 40);
+  let clock = 0;
+  const health = createPawnHealth(() => clock);
+  const sense = fakeSense([id]);
+  const threats: Array<{ x: number; z: number }> = [];
+  let calls = 0;
+  const brain = createHostBotBrain({
+    world,
+    agents: [agent as never],
+    health,
+    sense,
+    nav,
+    now: () => clock,
+    lineOfSight: () => true,
+    pickFlee(input) {
+      calls += 1;
+      threats.push({ x: input.threat.x, z: input.threat.z });
+      return { placeId: "room", x: 2, y: 0, z: 3, score: 1 };
+    },
+  });
+  const tick = (patch: Record<string, unknown>) => {
+    sense.fresh(id, { at: clock, ...patch });
+    brain.update();
+  };
+  tick({ damage: { attacker: foe, ageMs: 0, seq: 1 } });
+  assert.equal(brain.goalOf(id), "evade");
+  assert.equal(calls, 1);
+  clock = 5_000;
+  tick({ damage: { attacker: foe, ageMs: 5_000, seq: 1 } });
+  assert.equal(brain.goalOf(id), "evade");
+  clock = 8_000;
+  tick({ damage: { attacker: foe, ageMs: 8_000, seq: 1 } });
+  assert.equal(brain.goalOf(id), "wander");
+  clock = 8_300;
+  tick({ damage: { attacker: foe, ageMs: 8_300, seq: 1 } });
+  assert.equal(brain.goalOf(id), "wander");
+  assert.equal(calls, 1);
+  tick({ damage: { attacker: undefined, ageMs: 8_300, seq: 2 } });
+  assert.equal(brain.goalOf(id), "evade");
+  assert.equal(calls, 2);
+  assert.deepEqual(threats[1], { x: 2, z: 2 });
+});
+
+test("brain: a point with no walk still flees, and death lets the next hit flee", () => {
+  const nav = yardNav({ open: false });
+  const { world, id, agent } = botWorld(2, 2);
+  let clock = 0;
+  const health = createPawnHealth(() => clock);
+  const sense = fakeSense([id]);
+  const logs: string[] = [];
+  let walkable = false;
+  const brain = createHostBotBrain({
+    world,
+    agents: [agent as never],
+    health,
+    sense,
+    nav,
+    now: () => clock,
+    log: (line) => logs.push(line),
+    pickFlee: () => (walkable ? { placeId: "room", x: 2, y: 0, z: 3, score: 1 } : { placeId: "nowhere", x: 500, y: 0, z: 500, score: 1 }),
+  });
+  const tick = (patch: Record<string, unknown> = {}) => {
+    sense.fresh(id, { at: clock, ...patch });
+    brain.update();
+  };
+  tick({ damage: { attacker: undefined, ageMs: 0 } });
+  assert.equal(brain.goalOf(id), "evade");
+  assert.ok(agent.override);
+  assert.notEqual(agent.override.goal.x, 500);
+  assert.equal(agent.override.gait, "run");
+  assert.deepEqual(logs, []);
+  clock = 1_000;
+  tick({ alive: false });
+  assert.equal(brain.goalOf(id), "wander");
+  assert.equal(agent.override, undefined);
+  walkable = true;
+  clock = 1_500;
+  tick({ alive: true, damage: { attacker: undefined, ageMs: 0 } });
+  assert.equal(brain.goalOf(id), "evade");
+  assert.deepEqual(agent.override.goal, { x: 2, y: 0, z: 3 });
+});
+
+test("brain: Escape resumes after Evade and still respawns on its old timer", () => {
+  const door = { open: true };
+  const nav = yardNav(door);
+  const { world, id, agent } = botWorld(2, 2);
+  // Far enough that the bot is already safe on distance, and still inside the room.
+  const foe = foeAt(world, 2, 40);
+  let clock = 0;
+  const health = createPawnHealth(() => clock);
+  const sense = fakeSense([id]);
+  const brain = createHostBotBrain({
+    world,
+    agents: [agent as never],
+    health,
+    sense,
+    nav,
+    now: () => clock,
+    // The yard is shorter than minRunM, so the real picker would corner at once.
+    pickFlee: () => ({ placeId: "room", x: 2, y: 0, z: 3, score: 1 }),
+  });
+  const inside = { place: "room", msNoProgress: 60 * S, routeOut: { open: true, unlocked: true } };
+  const tick = (patch: Record<string, unknown>) => {
+    clock = typeof patch.at === "number" ? patch.at : clock;
+    sense.fresh(id, patch);
+    brain.update();
+  };
+  tick({ ...inside, at: 60 * S });
+  assert.equal(brain.goalOf(id), "escape");
+  assert.ok(agent.override, "escape has a stand point");
+  tick({ ...inside, at: 61 * S, damage: { attacker: foe, ageMs: 0 } });
+  assert.equal(brain.goalOf(id), "evade");
+  assert.ok(agent.override);
+  assert.notEqual(agent.override.openDoors, true);
+  tick({ ...inside, at: 66 * S, damage: { attacker: foe, ageMs: 5 * S } });
+  assert.equal(brain.goalOf(id), "evade");
+  tick({ ...inside, at: 69 * S, damage: { attacker: foe, ageMs: 8 * S } });
+  assert.equal(brain.goalOf(id), "escape");
+  assert.ok(agent.override);
+  tick({ ...inside, at: 179 * S, damage: { attacker: foe, ageMs: 118 * S } });
+  assert.equal(brain.goalOf(id), "escape");
+  assert.equal(health.isDead(id), false);
+  tick({ ...inside, at: 180 * S, damage: { attacker: foe, ageMs: 119 * S } });
+  assert.equal(health.isDead(id), true);
 });

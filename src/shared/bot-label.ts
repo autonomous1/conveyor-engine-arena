@@ -14,12 +14,14 @@ export type BotLabelFrame = {
 
 /**
  * Capitalised goal and the rounded hp, for example `Wander 100`.
+ * Evade adds `·seen` while the threat can see the bot.
  * A dead pawn, or an hp that is not positive, is the text `Dead`.
  */
-export function botLabelText(goal: string, hp: number, dead = false): string {
+export function botLabelText(goal: string, hp: number, dead = false, seen = false): string {
   if (dead || !(hp > 0)) return "Dead";
   const name = goal.length === 0 ? goal : goal.charAt(0).toUpperCase() + goal.slice(1);
-  return `${name} ${Math.round(hp)}`;
+  const line = `${name} ${Math.round(hp)}`;
+  return seen && goal === "evade" ? `${line}·seen` : line;
 }
 
 /** Finite integer id and a string of at most {@link BOT_LABEL_MAX} characters. */

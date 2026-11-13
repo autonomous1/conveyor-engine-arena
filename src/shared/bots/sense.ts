@@ -73,6 +73,8 @@ export type SensedPickup = {
 export type SensedDamage = {
   attacker: number | undefined;
   ageMs: number;
+  /** Increments on every hp loss. A new value is a new hit even when `at` did not move. */
+  seq?: number;
   attackerKind?: "bot" | "player";
   dist?: number;
   dy?: number;
@@ -439,6 +441,8 @@ export function createBotSensor(deps: SenseDeps, partial?: Partial<SenseTuning>)
     const damage = held.damage;
     damage.attacker = note.attacker;
     damage.ageMs = rawAge < 0 ? 0 : rawAge;
+    if (note.seq !== undefined) damage.seq = note.seq;
+    else delete damage.seq;
     clearBearings(damage);
     if (note.attacker === undefined || !self) return damage;
     const foe = findPawn(pawns, note.attacker);

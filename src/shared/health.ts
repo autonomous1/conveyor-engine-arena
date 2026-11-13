@@ -25,8 +25,11 @@ export type PawnHealthState = {
   dead: boolean;
 };
 
-/** Who last wounded a pawn and when (`now()` clock). `attacker` is undefined when unknown. */
-export type DamageNote = { attacker: number | undefined; at: number; cause?: DamageCause };
+/**
+ * Who last wounded a pawn and when (`now()` clock). `attacker` is undefined when unknown.
+ * `seq` increments on every hp loss, including two wounds that share `at`.
+ */
+export type DamageNote = { attacker: number | undefined; at: number; seq: number; cause?: DamageCause };
 
 export function isDamageCause(value: unknown): value is DamageCause {
   return value === "grenade" || value === "laser";
@@ -55,7 +58,16 @@ export function parseHealth(frame: unknown): HealthFrame | undefined {
   return healthFrame(rec.entity, rec.hp, rec.dead, isDamageCause(rec.cause) ? rec.cause : undefined);
 }
 
-type Vital = { hp: number; dead: boolean; respawnAt?: number; lastAttacker?: number; lastDamageAt?: number; lastCause?: DamageCause };
+type Vital = {
+  hp: number;
+  dead: boolean;
+  respawnAt?: number;
+  lastAttacker?: number;
+  lastDamageAt?: number;
+  /** How many wounds have landed since spawn. Each hp loss increments it. */
+  damageSeq?: number;
+  lastCause?: DamageCause;
+};
 
 /** Per-pawn hp, death, and respawn timers. In memory, lost on restart. */
 export interface PawnHealth {
@@ -115,7 +127,7 @@ export function createPawnHealth(now: () => number = Date.now): PawnHealth {
     lastDamage(id: number): DamageNote | undefined {
       const row = rows.get(id);
       if (!row || row.lastDamageAt === undefined) return undefined;
-      const note: DamageNote = { attacker: row.lastAttacker, at: row.lastDamageAt };
+      const note: DamageNote = { attacker: row.lastAttacker, at: row.lastDamageAt, seq: row.damageSeq ?? 0 };
       if (row.lastCause) note.cause = row.lastCause;
       return note;
     },
@@ -133,6 +145,7 @@ export function createPawnHealth(now: () => number = Date.now): PawnHealth {
       row.respawnAt = row.dead ? now() + RESPAWN_MS : undefined;
       row.lastAttacker = Number.isInteger(attacker) ? attacker : undefined;
       row.lastDamageAt = now();
+      row.damageSeq = (row.damageSeq ?? 0) + 1;
       row.lastCause = isDamageCause(cause) ? cause : undefined;
       return { hp: row.hp, dead: row.dead };
     },
@@ -155,6 +168,7 @@ export function createPawnHealth(now: () => number = Date.now): PawnHealth {
         row.respawnAt = undefined;
         row.lastAttacker = undefined;
         row.lastDamageAt = undefined;
+        row.damageSeq = undefined;
         row.lastCause = undefined;
         ids.push(id);
       }

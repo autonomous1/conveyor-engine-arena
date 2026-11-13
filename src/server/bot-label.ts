@@ -43,7 +43,7 @@ export type BotLabelHostOptions = {
   server: EngineWsServer;
   /** Unowned wander bots. Fixed at start so a tick does not allocate the list. */
   ids: readonly number[];
-  brain: { goalOf(id: number): string | undefined };
+  brain: { goalOf(id: number): string | undefined; seenOf?(id: number): boolean };
   health: { get(id: number): { hp: number; dead: boolean } };
   /** Per-bot sensor tick. Unchanged means the brain did not decide again. */
   sense: { get(id: number): { tick: number } | undefined };
@@ -68,7 +68,8 @@ export function createBotLabelHost(opts: BotLabelHostOptions): BotLabelHost {
         const goal = brain.goalOf(id);
         if (goal === undefined) continue;
         const vital = health.get(id);
-        const text = botLabelText(goal, vital.hp, vital.dead);
+        const seen = goal === "evade" && brain.seenOf?.(id) === true;
+        const text = botLabelText(goal, vital.hp, vital.dead, seen);
         if (textAt.get(id) === text) continue;
         textAt.set(id, text);
         rebuild = true;

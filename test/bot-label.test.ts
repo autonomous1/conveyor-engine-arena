@@ -14,6 +14,8 @@ const MINUTE = TICKS_PER_SEC * 60;
 test("botLabelText capitalises the goal and rounds hp", () => {
   assert.equal(botLabelText("wander", 100), "Wander 100");
   assert.equal(botLabelText("evade", 40), "Evade 40");
+  assert.equal(botLabelText("evade", 40, false, true), "Evade 40·seen");
+  assert.equal(botLabelText("wander", 40, false, true), "Wander 40");
   assert.equal(botLabelText("escape", 40.4), "Escape 40");
   assert.equal(botLabelText("fightback", 40.6), "Fightback 41");
   assert.equal(botLabelText("wander", 75.2), "Wander 75");
@@ -195,6 +197,39 @@ test("flag on sends one label per bot per client, only when the text changes", (
   const died = labelsOf(client.sent).slice(steady);
   assert.equal(died.length, BOTS);
   assert.ok(died.every((frame) => frame.text === "Dead"));
+});
+
+test("Evade ·seen is one string and a repeat does not send again", () => {
+  const sense = scriptedSense(1);
+  let seen = false;
+  const server = fakeServer();
+  const client = server.join(1, sense.ids);
+  const labels = createBotLabelHost({
+    enabled: true,
+    server: server as never,
+    ids: sense.ids,
+    brain: { goalOf: () => "evade", seenOf: () => seen },
+    health: { get: () => ({ hp: 40, dead: false }) },
+    sense,
+  });
+  for (let tick = 0; tick < EVERY; tick++) {
+    sense.advance();
+    labels.update();
+  }
+  assert.deepEqual(labelsOf(client.sent).map((frame) => frame.text), ["Evade 40"]);
+  seen = true;
+  const before = labelsOf(client.sent).length;
+  for (let tick = 0; tick < EVERY; tick++) {
+    sense.advance();
+    labels.update();
+  }
+  assert.deepEqual(labelsOf(client.sent).slice(before).map((frame) => frame.text), ["Evade 40·seen"]);
+  const steady = labelsOf(client.sent).length;
+  for (let tick = 0; tick < EVERY; tick++) {
+    sense.advance();
+    labels.update();
+  }
+  assert.equal(labelsOf(client.sent).length, steady);
 });
 
 test("a new session and a newly visible bot each get the current label once", () => {

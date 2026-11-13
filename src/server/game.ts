@@ -236,6 +236,13 @@ export function steerUnownedWander(
     const step = walk.follow.step(pose, others, tick);
     agent.heading = step.input.yaw;
     if (step.status === "running") return;
+    if (agent.override && (step.status === "arrived" || step.status === "stuck")) {
+      agent.followEnd = step.status;
+      clearWalk(agent);
+      agent.gait = "idle";
+      agent.nextTurn = tick + 1;
+      return;
+    }
     clearWalk(agent);
   } else if (tick < deadline && agent.gait === "idle") {
     // A failed sample. A fresh pawn still has its spawn gait and plans now.
@@ -244,6 +251,13 @@ export function steerUnownedWander(
   const chosen = claim ? planClaimed(pose, claim, loaded, cache, flags) : chooseWanderGoal(pose, loaded, rng, cache, flags);
   if (!chosen) {
     clearWalk(agent);
+    // Evade claims run. A point the planner cannot walk still moves on the
+    // heading the brain set (away from the threat). It does not sit idle.
+    if (agent.override?.gait === "run") {
+      agent.gait = "run";
+      agent.nextTurn = tick + 1;
+      return;
+    }
     agent.gait = "idle";
     agent.nextTurn = tick + (claim ? CLAIM_RETRY_TICKS : WANDER_RETRY_TICKS);
     return;
@@ -290,13 +304,15 @@ function installWalk(
   const stepped = follow.step(pose, others, tick);
   agent.goal = planned.goal;
   agent.path = planned.points;
-  agent.gait = unit01(rng) < 0.5 ? "walk" : "run";
+  const claimedGait = agent.override?.gait;
+  agent.gait = claimedGait === "run" || claimedGait === "walk" ? claimedGait : unit01(rng) < 0.5 ? "walk" : "run";
   agent.nextTurn = tick + WANDER_GOAL_TICKS;
   agent.heading = stepped.input.yaw;
   if (stepped.status === "running") {
     wanderWalks.set(agent, { follow, watched, doorSig, claim: planned.claim });
     return;
   }
+  if (agent.override && (stepped.status === "arrived" || stepped.status === "stuck")) agent.followEnd = stepped.status;
   clearWalk(agent);
   agent.gait = "idle";
   agent.nextTurn = tick + 20;
@@ -387,6 +403,22 @@ export function planEscapeGoal(
     }
   }
   return undefined;
+}
+
+/**
+ * Waypoints from the pawn to `goal` with shut doors unusable.
+ * Evade claims a centre only when this finds a walk. It never opens a door.
+ */
+export function planWanderTarget(
+  world: AuthoritativeWorld,
+  agent: WanderAgent,
+  nav: WanderNav & { sceneGraph: SceneGraph; regions: BakedRegionsFile },
+  cache: NavCache,
+  goal: { x: number; y: number; z: number },
+): Vec3[] | undefined {
+  const pose = wanderPose(world, agent);
+  if (!pose) return undefined;
+  return planWanderTo(pose, goal, nav, cache, doorFlags(nav, false));
 }
 
 /**

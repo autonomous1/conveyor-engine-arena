@@ -22,7 +22,9 @@ export type WanderAgent = {
    * A bot brain's claim. While set, `steerUnownedWander` walks to `goal` instead of sampling one.
    * `openDoors`: plan through shut unlocked doors. The brain presses each one as the bot reaches it.
    */
-  override?: { goal: { x: number; y: number; z: number }; openDoors?: boolean };
+  override?: { goal: { x: number; y: number; z: number }; openDoors?: boolean; gait?: "walk" | "run" };
+  /** The last claimed walk ended this way. The brain reads it and clears it. */
+  followEnd?: "arrived" | "stuck";
 };
 
 export type LoadedArena = {

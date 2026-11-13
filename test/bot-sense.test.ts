@@ -133,6 +133,7 @@ test("hp and wound", () => {
   assert.equal(hit.damage?.dist, 5);
   assert.equal(hit.damage?.yawTo, 0);
   near(hit.damage?.relYaw, -Math.PI / 2);
+  const firstSeq = hit.damage?.seq;
 
   health.wound(1);
   sensor.update();
@@ -140,6 +141,38 @@ test("hp and wound", () => {
   assert.equal(anon.damage?.attacker, undefined);
   assert.equal(anon.damage?.dist, undefined);
   assert.equal(anon.damage?.attackerKind, undefined);
+  assert.equal(firstSeq, 1);
+  assert.equal(anon.damage?.seq, 2);
+});
+
+test("two hits 300 ms apart from the same attacker get two seq values", () => {
+  let t = 1_000;
+  const health = createPawnHealth(() => t);
+  const sensor = createBotSensor({
+    now: () => t,
+    botIds: () => [1],
+    pawns: () => [{ id: 1, kind: "bot", x: 0, y: 0, z: 0, alive: true }],
+    headingOf: () => 0,
+    health: (id) => health.get(id),
+    lastDamage: (id) => health.lastDamage(id),
+  }, { everyTicks: 1 });
+  health.wound(1, 7);
+  sensor.update();
+  const firstSeq = sensor.get(1)!.damage?.seq;
+  t += 300;
+  health.wound(1, 7);
+  sensor.update();
+  const second = sensor.get(1)!.damage;
+  assert.equal(firstSeq, 1);
+  assert.equal(second?.seq, 2);
+  assert.equal(second?.attacker, 7);
+  assert.equal(second?.ageMs, 0);
+  health.wound(1, undefined, 10, "grenade");
+  sensor.update();
+  const grenade = sensor.get(1)!.damage;
+  assert.equal(grenade?.attacker, undefined);
+  assert.equal(grenade?.seq, 3);
+  assert.equal(sensor.get(1)!.hp, 40);
 });
 
 test("expiry, dead attacker, respawn", () => {
