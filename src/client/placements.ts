@@ -19,7 +19,26 @@ const COMPOSED = new THREE.Matrix4();
  * Show or hide one placement. Clones use `visible`. An instanced prop keeps
  * its slot and the matrix is scaled to zero, so the batch count does not change.
  */
-export function createPlacementVisibility() {
+/** Show, hide, and shift placements. Clones use `visible`. Instances keep their slot and scale to zero. */
+export interface PlacementVisibility {
+  /** Remember a clone and name it `id`. Does not parent it. */
+  addClone(id: string, object: THREE.Object3D): void;
+  /** Remember one instanced slot and copy its matrix. The batch count stays. */
+  addInstance(id: string, mesh: THREE.InstancedMesh, index: number): void;
+  /**
+   * Shift up by `dy` metres from the loaded pose. An instance composes world T(0, dy, 0).
+   * A clone stores home y on the first call.
+   */
+  setOffsetY(id: string, dy: number): void;
+  /** Recompute bounds of instanced batches changed since the last flush. No-op when none changed. */
+  flushBounds(): void;
+  /** Unknown id is a no-op. An instance writes a zero scale and does not change the batch count. */
+  setVisible(id: string, visible: boolean): void;
+  /** Unknown id is false. A clone reads `visible`. An instance allocates one matrix to read scale. */
+  hidden(id: string): boolean;
+}
+
+export function createPlacementVisibility(): PlacementVisibility {
   const clones = new Map<string, THREE.Object3D>();
   const cloneHomeY = new Map<string, number>();
   const instances = new Map<string, Slot[]>();
@@ -101,5 +120,3 @@ export function createPlacementVisibility() {
     },
   };
 }
-
-export type PlacementVisibility = ReturnType<typeof createPlacementVisibility>;

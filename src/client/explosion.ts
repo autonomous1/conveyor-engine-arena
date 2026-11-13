@@ -281,6 +281,65 @@ function createExplosion(parent: THREE.Object3D, atlas: THREE.Texture, blending:
 
 type Slot = ReturnType<typeof createExplosion>;
 
+/** Pooled sprites in a group on `parent`. A camera parent throws. dispose frees each slot's material and cloned map. */
+export interface ExplosionFx {
+  /** Group added to `parent`. Sprites live here. */
+  group: THREE.Group;
+  /** Load once. A failure is reported once and turns blasts off. Never throws. */
+  load(
+    fetchAtlas: () => Promise<THREE.Texture>,
+    renderer?: { initTexture(texture: THREE.Texture): void },
+  ): Promise<boolean>;
+  /** Install a texture the caller holds. A load that already failed stays off. */
+  setAtlas(texture: THREE.Texture): void;
+  /** True when an atlas is installed and load has not failed. */
+  readonly enabled: boolean;
+  /** Sprites created so far, at most the cap. */
+  readonly poolSize: number;
+  /** Blasts currently playing. */
+  readonly activeCount: number;
+  /** Default sprite height in metres. */
+  readonly size: number;
+  /** Live sheet. `aspect` can change when the image loads. Not a copy. */
+  readonly layout: Readonly<{
+    columns: number;
+    rows: number;
+    frameCount: number;
+    aspect: number;
+    anchorY: number;
+  }>;
+  /** Seconds one blast lasts at `fps`. Omitted fps is the sheet's. */
+  duration(fps?: number): number;
+  /** Start one blast, in metres. False when off or the point is not finite. A full pool restarts the oldest. */
+  spawn(x: number, y: number, z: number, size?: number, fps?: number): boolean;
+  /**
+   * Surface blast: the bottom edge sits on the point, texture up along the normal.
+   * Needs update with the camera. False for a bad normal, or when spawn would be false.
+   */
+  spawnSurface(
+    x: number,
+    y: number,
+    z: number,
+    normal: { x: number; y: number; z: number },
+    size?: number,
+    fps?: number,
+  ): boolean;
+  /**
+   * Once per frame. `dt` is seconds, clamped to 0..EXPLOSION_MAX_DT. No-op when nothing plays.
+   * With a camera, allocates one look basis and one pose per surface blast.
+   */
+  update(dt: number, camera?: ExplosionCamera): void;
+  /** Apply to the pool and every sprite. Later spawns use it too. */
+  setBlending(mode: ExplosionBlending): void;
+  readonly blending: ExplosionBlending;
+  /** Sheet rotation in radians. Zero when the sheet omitted it. Fixed for this pool. */
+  readonly rotation: number;
+  /** Hide every blast. The pool stays for reuse. */
+  clear(): void;
+  /** Remove the group. Free each slot's material and cloned map. The source atlas stays. */
+  dispose(): void;
+}
+
 export function createExplosionFx(
   parent: THREE.Object3D,
   opts: {
@@ -289,7 +348,7 @@ export function createExplosionFx(
     /** Called once when the atlas fails to load. Explosions stay off after that. */
     onLoadError?: (err: unknown) => void;
   } = {},
-) {
+): ExplosionFx {
   if ((parent as { isCamera?: boolean }).isCamera) {
     throw new Error("explosions must not be parented to the camera");
   }
@@ -411,7 +470,6 @@ export function createExplosionFx(
     get activeCount() {
       return running;
     },
-    /** Start one blast. False when the atlas isn't ready or failed, or the point isn't finite. */
     /** Default sprite height in metres. */
     get size() {
       return defaultSize;
@@ -423,6 +481,7 @@ export function createExplosionFx(
     duration(fps = defaultFps): number {
       return layout.frameCount / fps;
     },
+    /** Start one blast. False when the atlas isn't ready or failed, or the point isn't finite. */
     spawn(x: number, y: number, z: number, size = defaultSize, fps = defaultFps): boolean {
       return begin(x, y, z, size, fps);
     },
@@ -476,8 +535,6 @@ export function createExplosionFx(
     },
   };
 }
-
-export type ExplosionFx = ReturnType<typeof createExplosionFx>;
 
 /** Default world size of a laser hit, in metres, when the sheet does not say otherwise. */
 export const LASER_IMPACT_SIZE = 0.8;

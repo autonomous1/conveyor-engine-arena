@@ -58,14 +58,15 @@ type Extents = {
 };
 
 export type AabbDebug = {
+  /** Wireframe group. The caller parents it. There is no dispose. */
   group: THREE.Group;
-  /** Replace meshes from a newly loaded obstacle list. Does not change visibility. */
+  /** Replace the lines from a new obstacle list. Frees the old line geometry. The shared material and visibility stay. */
   rebuild(obstacles: readonly WorldAabb[]): void;
   /** Hide or show the group. Does not rebuild meshes. */
   setVisible(on: boolean): void;
-  /** Remove the wireframe for a placement id. The other boxes stay. */
+  /** Remove the line named `id` or `${id}-box`. Frees that geometry. The other boxes stay. */
   remove(id: string): void;
-  /** Shift meshes whose source name starts with `prefix` by `dy` from their home center. */
+  /** Shift lines whose name starts with `prefix` by `dy` metres from their home center. */
   offsetY(prefix: string, dy: number): void;
 };
 

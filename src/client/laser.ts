@@ -6,7 +6,17 @@ import type { Vec3 } from "../shared/hitscan.js";
  * `expire` takes it out of the scene at `until`. It does not raycast.
  * The parent is the scene. A camera parent is refused.
  */
-export function createLaserBeams(parent: THREE.Object3D) {
+/** One reused line per shooter, in a group on `parent`. A camera parent throws. The material is never freed. */
+export interface LaserBeams {
+  /** Show that shooter's segment until `until`. A non-finite value logs and returns. Geometry is made once. */
+  show(shooter: number, from: Vec3, to: Vec3, until: number): void;
+  /** Once per frame. Hide lines past `until` and take them out of the group. They stay allocated. */
+  expire(now: number): void;
+  /** Hide every line and take it out of the group. The lines stay allocated. */
+  drop(): void;
+}
+
+export function createLaserBeams(parent: THREE.Object3D): LaserBeams {
   if ((parent as { isCamera?: boolean }).isCamera) {
     throw new Error("laser line must not be parented to the camera");
   }

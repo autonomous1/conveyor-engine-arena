@@ -100,7 +100,32 @@ function motionBoneOf(model: THREE.Object3D, clips: Map<string, THREE.AnimationC
   return model.getObjectByName(name) ?? undefined;
 }
 
-export function createPawnLayer(parent: THREE.Object3D, templates: CharacterTemplates, pawnHeight: number) {
+/** Cloned characters under `parent`, or a capsule when the asset is missing. The owned pawn stays hidden. */
+export interface PawnLayer {
+  /**
+   * Once per frame. Snapshot pose and clip (`movementOf` is called, its result unused).
+   * Hides the owned pawn. Removes missing ids, frees a fallback's geometry and material and any fade clones, and writes `__pawnAnim`.
+   */
+  apply(
+    render: RenderSnapshot,
+    dt: number,
+    movementOf: (id: number) => string | undefined,
+    ownedId?: number,
+    stepMixers?: boolean,
+    /** 1 plain, 0 hidden, between faded. Absent: every pawn plain. */
+    opacityOf?: (id: number) => number,
+  ): void;
+  /** Ids in the layer, including the hidden owned pawn. */
+  readonly count: number;
+  /** Pawns holding private material clones for a fade right now. */
+  readonly fading: number;
+  /** Pawns drawn as a capsule because the asset was missing. */
+  readonly fallbacks: number;
+  /** Presentation xz, lowest id first, labeled A, B, C. New string. */
+  positionLine(): string;
+}
+
+export function createPawnLayer(parent: THREE.Object3D, templates: CharacterTemplates, pawnHeight: number): PawnLayer {
   const pawns = new Map<number, Pawn>();
 
   function capsule(id: number): THREE.Mesh {

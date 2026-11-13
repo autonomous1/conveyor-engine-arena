@@ -44,6 +44,24 @@ type Point = { x: number; y: number; z: number };
 
 type Pending = { id: string; sound: ArenaSoundName; kind: "ammo" | "key"; at: number; where: Point };
 
+/** One play per placement. Your follow-up has no position. Anyone else's plays at the pickup. */
+export interface PickupSounds {
+  /** Welcome ids still present. Anything else is already spent. Silent, and drops waits. */
+  onSet(ids: readonly string[]): void;
+  /** One placement, at most once. Health and weapons play at once. Ammo and keys wait. Unknown is silent. */
+  onGone(id: string, now: number): void;
+  /** Oldest waiting ammo inside the grace, with no position. A welcome loadout must not call this. */
+  onLoadout(now: number): void;
+  /** A waiting key listed in `keys`, inside the grace. Plays with no position. `now` is ms. */
+  onInventory(keys: readonly string[], now: number): void;
+  /** Once per frame. No-op when nothing waits. A wait past the grace plays at the pickup. `now` is ms. */
+  update(now: number): void;
+  /** Gone frames still inside the grace. */
+  readonly waiting: number;
+  /** Drop waits. A placement already gone stays spent. */
+  clear(): void;
+}
+
 export function createPickupSounds(opts: {
   pickups: readonly PickupPlacement[];
   /** `at` set: positional. Unset: your own. */
@@ -51,7 +69,7 @@ export function createPickupSounds(opts: {
   /** Kind to effect. Default {@link DEFAULT_KIND_SOUND}. */
   kindSounds?: Readonly<Record<string, ArenaSoundName | undefined>>;
   graceMs?: number;
-}) {
+}): PickupSounds {
   const graceMs = opts.graceMs ?? 250;
   const kindSounds = opts.kindSounds ?? DEFAULT_KIND_SOUND;
   const byId = new Map<string, PickupPlacement>();

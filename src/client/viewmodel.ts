@@ -36,7 +36,19 @@ export function mountWeaponMesh(root: THREE.Object3D, source: THREE.Object3D): T
  * First-person weapon, parented to this client's camera. Other clients do not
  * get this object. It is not a snapshot entity.
  */
-export function createViewModel(camera: THREE.Camera, scene: THREE.Scene, renderer?: THREE.WebGLRenderer) {
+/** Weapon group on the camera, which is parented to the scene if needed. clear and show do not dispose meshes. */
+export interface ViewModel {
+  /** Group added to the camera. */
+  root: THREE.Group;
+  /** Id from the last show that finished. Undefined before that, and after clear. */
+  readonly weapon: string | undefined;
+  /** Remove the mesh and cancel a load still in flight. Geometry and materials stay allocated. */
+  clear(): void;
+  /** Load `url` unless this id is already showing. A newer call wins. Failure warns and keeps the old mesh. */
+  show(weaponId: string, url: string): Promise<void>;
+}
+
+export function createViewModel(camera: THREE.Camera, scene: THREE.Scene, renderer?: THREE.WebGLRenderer): ViewModel {
   if (camera.parent !== scene) scene.add(camera);
   const root = new THREE.Group();
   root.name = "viewmodel";

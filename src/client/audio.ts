@@ -131,7 +131,46 @@ function setParam(param: ParamLike | undefined, value: number): void {
   if (param && param.value !== value) param.value = value;
 }
 
-export function createSfx(opts: SfxOptions = {}) {
+/** One Web Audio context. Files are fetched up front and decoded after unlock. */
+export interface Sfx {
+  /** Fetches each file. A bad file calls onError and turns that effect off. Never rejects. */
+  load(): Promise<void>;
+  /** Call from a user gesture. Creates the context once and resumes it. True when one exists. Never throws. */
+  unlock(): boolean;
+  /**
+   * One play. False when locked, hidden, not running, or the effect is off.
+   * Master mute still starts the voice, silent. `at` is world metres when the effect is positional.
+   */
+  play(name: ArenaSoundName, at?: Point): boolean;
+  /** Like play, plus a handle. `move` allocates nothing and returns false once the voice ends or is replaced. */
+  playTracked(name: ArenaSoundName, at: Point): SoundHandle | undefined;
+  /** Listener pose in world metres. No-op until the context is running. Allocates nothing. */
+  setListener(px: number, py: number, pz: number, fx: number, fy: number, fz: number, ux: number, uy: number, uz: number): void;
+  /** Hidden suspends the context and stops voices. Shown resumes. A repeat is a no-op. */
+  setHidden(value: boolean): void;
+  /** Master gain, clamped to 0..1. A non-finite value is ignored. */
+  setVolume(value: number): void;
+  /** Pass false to unmute. Omitted means mute. The stored volume stays. */
+  mute(value?: boolean): void;
+  readonly volume: number;
+  readonly muted: boolean;
+  /** True once a context exists, even when it is not running. */
+  readonly unlocked: boolean;
+  /** True when the context state is running. */
+  readonly running: boolean;
+  /** Decoded and able to play. An unknown name is false. */
+  ready(name: ArenaSoundName): boolean;
+  /** Failed, or absent from the manifest. An unknown name is true. */
+  off(name: ArenaSoundName): boolean;
+  /** Voices of this effect still sounding. Zero when there is no context. */
+  playing(name: ArenaSoundName): number;
+  /** Slots made so far, never more than the effect's maxVoices. */
+  voices(name: ArenaSoundName): number;
+  /** Stop every voice. The context stays open. */
+  stopAll(): void;
+}
+
+export function createSfx(opts: SfxOptions = {}): Sfx {
   const fetchBytes = opts.fetchBytes ?? defaultFetch;
   const makeContext = opts.createContext ?? defaultContext;
   const effects = new Map<ArenaSoundName, Effect>();
@@ -455,14 +494,24 @@ export function createSfx(opts: SfxOptions = {}) {
   };
 }
 
-export type Sfx = ReturnType<typeof createSfx>;
-
 /**
  * Your own shot plays on the local press. The host echo of that shot must not play again.
  * `noteLocal` records a local play. `echo` returns true when an own echo should still play:
  * there is no local play waiting inside `windowMs`. Fixed storage: no allocation per call.
  */
-export function createEchoDedupe(windowMs = 1000, capacity = 8) {
+/** Fixed-slot gate so a host echo of your own shot does not play twice. No allocation per call. */
+export interface EchoDedupe {
+  /** Record a local play. Notes older than the window are dropped. `now` is ms. */
+  noteLocal(now: number): void;
+  /** True: play this echo. False: a waiting local play covered it and is consumed. */
+  echo(now: number): boolean;
+  /** Local plays still inside the window. */
+  readonly pending: number;
+  /** Drop every waiting local play. */
+  clear(): void;
+}
+
+export function createEchoDedupe(windowMs = 1000, capacity = 8): EchoDedupe {
   const at = new Float64Array(capacity);
   let head = 0;
   let count = 0;

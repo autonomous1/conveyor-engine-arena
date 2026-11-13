@@ -20,13 +20,28 @@ type Point = { x: number; y: number; z: number };
 
 type Handle = { move(x: number, y: number, z: number): boolean };
 
+/** `elevatorStart` when a cab leaves a stop. The voice follows the cab until the doors open. */
+export interface ElevatorSounds {
+  /** Welcome. Records motion and does not play. Drops any follow handles. */
+  onSet(rows: readonly ElevatorState[]): void;
+  /**
+   * Plays when a known cab goes from stopped to moving. Unknown ids are silent.
+   * Doors opening drops the follow handle. The node keeps playing.
+   */
+  onCab(row: ElevatorState): void;
+  /** Forget follow handles and remembered motion. Sounding nodes keep playing. */
+  clear(): void;
+  /** Cabs whose voice is still being moved. */
+  readonly following: number;
+}
+
 export function createElevatorSounds(opts: {
   /** `x`, `z`: the cab centre. `y` of a frame is the cab floor; the sound sits `earHeight` above it. */
   cabs: ReadonlyArray<{ id: string; x: number; z: number }>;
   /** Starts the sound; the handle follows the cab while it plays. Undefined when nothing started. */
   play: (name: ArenaSoundName, at: Point) => Handle | undefined;
   earHeight?: number;
-}) {
+}): ElevatorSounds {
   const earHeight = opts.earHeight ?? 1.2;
   const centres = new Map(opts.cabs.map((cab) => [cab.id, cab] as const));
   const moving = new Map<string, boolean>();

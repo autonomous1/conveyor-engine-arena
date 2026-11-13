@@ -25,6 +25,20 @@ type Point = { x: number; y: number; z: number };
 
 type Pending = { id: string; sound: ArenaSoundName; due: number };
 
+/** Door open and close from host frames. Welcome and repeats are silent. Plays sit at the leaf. */
+export interface DoorSounds {
+  /** Welcome list. Sets the baseline and drops a waiting close. Silent. */
+  onSet(doors: ReadonlyArray<Pick<DoorFrame, "id" | "open" | "locked">>): void;
+  /** An open change of a known door. An unknown id or a repeat is silent. A close can wait for update. */
+  onDoor(door: Pick<DoorFrame, "id" | "open">, now: number): void;
+  /** Once per frame. No-op when nothing waits. Plays a close whose delay has elapsed. `now` is ms. */
+  update(now: number): void;
+  /** Close sounds not played yet. */
+  readonly waiting: number;
+  /** Drop waiting closes. Remembered open state stays. */
+  clear(): void;
+}
+
 export function createDoorSounds(opts: {
   /** `at` is the leaf centre in world metres. */
   doors: ReadonlyArray<{ id: string; at: Point; open?: boolean; locked?: boolean }>;
@@ -33,7 +47,7 @@ export function createDoorSounds(opts: {
   closeDelayMs?: number;
   mergeMetres?: number;
   mergeMs?: number;
-}) {
+}): DoorSounds {
   const closeDelayMs = opts.closeDelayMs ?? 0;
   const mergeSq = (opts.mergeMetres ?? 2) ** 2;
   const mergeMs = opts.mergeMs ?? 150;

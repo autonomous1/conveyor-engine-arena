@@ -12,10 +12,13 @@ import { createPlacementVisibility, type PlacementVisibility } from "./placement
 import { collectInstanceSamples, collectObjectSamples, type MapAnchor, type MapSample, type SampleMeta } from "./scene-map.ts";
 
 export type ArenaScene = {
+  /** Canvas appended to document.body. The factory does not dispose it. */
   renderer: THREE.WebGLRenderer;
   scene: THREE.Scene;
   camera: THREE.PerspectiveCamera;
+  /** Group added to the scene at creation. */
   content: THREE.Group;
+  /** Camera aspect and canvas size from the window. QA stays 1280×720. */
   resize: () => void;
   /** QA owns the camera. Pawn follow stays off while this is set. */
   cameraLocked: boolean;

@@ -27,10 +27,23 @@ export type GrenadeDraw = {
   stop?: boolean;
 };
 
+/** Grenade meshes under a group on `parent`. A camera parent throws. A sphere stands in until the GLB loads. */
+export interface GrenadeProps {
+  /**
+   * Sets the position. The first finite pose builds the mesh and yaws it once. A non-finite pose returns undefined.
+   * "launch" is a new throw. "stop" is the first detonation and arms removal. Omitted `now` is 0.
+   */
+  place(pose: GrenadeDraw, now?: number): "launch" | "stop" | undefined;
+  /** Once per frame. Remove a mesh GRENADE_DRAW_MS after its stop. Does not free geometry or materials. */
+  expire(now: number): void;
+  /** Take every mesh out of the group. Does not free geometry or materials. */
+  drop(): void;
+}
+
 export function createGrenadeProps(
   parent: THREE.Object3D,
   loadTemplate: () => Promise<THREE.Object3D | undefined> = async () => undefined,
-) {
+): GrenadeProps {
   if ((parent as { isCamera?: boolean }).isCamera) {
     throw new Error("grenade must not be parented to the camera");
   }

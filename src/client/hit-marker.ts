@@ -11,9 +11,16 @@ export type HitMarkerNote =
   | { kind: "laser"; shooter: number; ownedId: number | undefined };
 
 export type HitMarker = {
+  /** Circle appended to document.body. Display none until a note shows it. */
   readonly element: HTMLDivElement;
+  /** True while the circle is shown. */
   readonly visible: boolean;
+  /**
+   * A sent local fire shows it for HIT_MARKER_MS. An own laser shows it only when that fire did not.
+   * A miss still shows. Another pawn's laser does not. `now` is ms.
+   */
   note(event: HitMarkerNote, now: number): void;
+  /** Once per frame. Hides the circle after HIT_MARKER_MS. No-op before that. */
   tick(now: number): void;
 };
 

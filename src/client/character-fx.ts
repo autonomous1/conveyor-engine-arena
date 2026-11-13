@@ -46,7 +46,34 @@ type State = {
 /** Per-despawn override of the configured delay and fade (a grenade kill fades with its blast). */
 export type DespawnTiming = { delayMs?: number; fadeMs?: number };
 
-export function createCharacterFx(config: CharacterFxConfig, hooks: CharacterFxHooks) {
+/** Spawn and despawn timelines. No scene objects. One row per id that has an effect. */
+export interface CharacterFx {
+  /** Feet position. Stores a copy of `at`. Cancels a despawn of this id. */
+  spawn(id: number, at: Point, now: number): void;
+  /**
+   * Start a despawn at `now + holdMs`. Stores a copy of `at`. One already running is left as it is.
+   * `timing` replaces the configured delay and fade for this despawn only. `now` is ms.
+   */
+  despawn(id: number, at: Point, now: number, holdMs?: number, timing?: DespawnTiming): void;
+  /** Once per frame. `now` is ms. Fires what is due and drops a finished spawn fade. No allocation. */
+  update(now: number): void;
+  /** 1 plain, 0 gone, between while fading. An unknown id is 1. */
+  opacity(id: number, now: number): number;
+  /** True while a despawn is stored, including after it has faded. An unknown id is false. */
+  leaving(id: number): boolean;
+  /** True once this despawn has faded out. An unknown id is false. */
+  gone(id: number, now: number): boolean;
+  /** Configured delay plus fade, in ms. No hold, and not a per-call timing override. */
+  readonly despawnMs: number;
+  /** Drop one id. A pending sound or beam for it does not fire. */
+  forget(id: number): void;
+  /** Drop every id. Pending sounds and beams do not fire. */
+  clear(): void;
+  /** Rows still stored. A finished despawn stays until spawn, forget, or clear. */
+  readonly active: number;
+}
+
+export function createCharacterFx(config: CharacterFxConfig, hooks: CharacterFxHooks): CharacterFx {
   const states = new Map<number, State>();
   const fade = Math.max(1, config.fadeMs);
 
@@ -141,5 +168,3 @@ export function createCharacterFx(config: CharacterFxConfig, hooks: CharacterFxH
     },
   };
 }
-
-export type CharacterFx = ReturnType<typeof createCharacterFx>;

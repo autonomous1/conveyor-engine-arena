@@ -12,7 +12,16 @@ export type RateSample = {
   tickPerSec: number | undefined;
 };
 
-export function createRateWindow(windowMs = 500) {
+/** Half-second averages for the HUD. One sample object, updated in place. */
+export interface RateWindow {
+  /**
+   * Count one presented frame. `observedTick` is a snapshot sim tick, when that frame had one.
+   * Returns the same object. A window with no snapshot leaves tickPerSec unset. `nowMs` is ms.
+   */
+  push(nowMs: number, observedTick?: number): RateSample;
+}
+
+export function createRateWindow(windowMs = 500): RateWindow {
   const sample: RateSample = { fps: undefined, tickPerSec: undefined };
   let origin = Number.NaN;
   let frames = 0;

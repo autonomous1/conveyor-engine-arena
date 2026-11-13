@@ -15,7 +15,30 @@ export function localHealthLabel(vital: { hp: number; dead: boolean } | undefine
   return `hp ${hp}`;
 }
 
-export function createHud(opts?: { hidden?: boolean }) {
+/** Status, crosshair, inspect line, and stats, appended to document.body. Hidden creation ignores F3. */
+export interface Hud {
+  /** Status text. Still written when the bar is hidden. */
+  setStatus(text: string): void;
+  /** Gamepad profile button label. */
+  setProfile(name: string): void;
+  /** Clear when `pad` is null. A non-standard pad on the standard profile is a warning. */
+  setPad(pad: { id: string; mapping: string } | null, profile: string): void;
+  /** Replace the profile button's click handler. */
+  onProfileToggle(handler: () => void): void;
+  /** F3 flips this unless the HUD was created hidden. The key listener stays on window. */
+  readonly statsVisible: boolean;
+  /** Stats text. No-op while the panel is hidden. */
+  setStats(text: string): void;
+  /** Crosshair inspect. Empty hides the line. Does not touch status or stats. */
+  setInfo(text: string): void;
+  /**
+   * Copy an inspect hit id. Empty does nothing. A missing clipboard leaves the line up.
+   * The copied hint uses Date.now and lasts one second.
+   */
+  copyInfo(id: string): void;
+}
+
+export function createHud(opts?: { hidden?: boolean }): Hud {
   const status = document.createElement("div");
   status.id = "status";
   status.style.cssText = [

@@ -346,10 +346,13 @@ export function paintSceneMap(layout: MapLayout, draw: MapDraw): void {
 }
 
 export type SceneMap = {
+  /** False until setVisible(true). The panel stays in document.body. */
   readonly visible: boolean;
+  /** Show or hide the corner panel. Showing repaints the marker. */
   setVisible(on: boolean): void;
+  /** Store this world and the marker's mapping. Repaints only while visible. */
   setWorld(world: SceneMapWorld): void;
-  /** Panel mapping for a later pawn layer. Absent until `setWorld`. */
+  /** Fresh mapping from the stored world, not the marker cache. Undefined before setWorld or when bounds do not frame. */
   layout(): MapLayout | undefined;
   /** Local player marker. `undefined` clears it. Cheap: repaints only when visible and moved. */
   setSelf(pose: SelfPose | undefined, lifts?: readonly FloorSource[]): void;
