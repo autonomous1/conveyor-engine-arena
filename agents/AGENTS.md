@@ -17,9 +17,13 @@ Browser arena client + authoritative Node host for Conveyor Engine. The host tic
 - Forbidden: opening `codemap.md` at a random offset; scrolling; reading multiple chunks; searching vague words (`lights`, `hash`, `scene`); using codemap to decide design; opening it more than twice in one task.
 - If the Files table already names the file and symbol, open the source file directly. Skip codemap.
 
-**Do not read memory**
-Do **not** read `~/.grok/memory-v2/`, `~/.grok/memory/`, `~/.grok/bundled/skills/` (unless the task names a skill), or any other Grok memory / topic / skill file during a task. Auto-suggestions that open those files are wrong — close them and stay on the Files table. Memory topics mix arena, packages, and blueprint-scene and derail narrow tasks.
+**Do not read memory or skills**
+dsh has no built-in memory directory. Its only always-on instruction surface is `AGENTS.md`: the project file and `~/.dsh/AGENTS.md` are already injected into the session. Skill bodies under `~/.dsh/skills/` and `<repo>/.dsh/skills/` are progressively disclosed — the catalog shows only name + description until the body is loaded. Both are cheap to leave alone:
 
+- Do **not** re-read `~/.dsh/AGENTS.md` (or the project `AGENTS.md`) for “context”. It is already in the prompt. Re-reading adds noise, not information.
+- Do **not** open a `SKILL.md` body unless this task names that skill. The catalog line is enough to decide.
+- If a memory plugin is installed, do **not** call its tools (`mem_search`, `mem_pack`, `memory_*`) and do **not** read its state directories (`~/.dsh/memory*`, `~/.dsh/self-evolve`, plugin-configured paths). Auto-suggestions that open those paths are wrong — close them and stay on the Files table.
+- Memory topics mix arena, packages, and blueprint-scene and derail narrow tasks. A loaded skill body does the same: it pulls the task toward its own workflow.
 **Do not open other repos**
 Do **not** open `../conveyor-engine-packages` or `../blueprint-scene` unless the Files table names a path there. “Do not change packages / blueprint-scene” also means do not read them to invent a design or to “match bake snippets”.
 
