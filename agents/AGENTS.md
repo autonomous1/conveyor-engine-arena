@@ -30,6 +30,30 @@ If the task sketches collision / movement / lights / input, implement **exactly*
 - Grep the source only when the codemap doesn't answer the question (for example, local helpers or call sites inside a function).
 - Regenerate with `npm run codemap` after adding, moving or renaming exports. `npm run codemap:check` exits 1 if it is stale.
 
+## Comment as contract
+Comments carry what types cannot: *why*, *when*, and cross-call invariants. They are load-bearing, not decorative — the codemap extracts them and the per-task diff surfaces them. A stale comment is a bug.
+
+**Module header.** Every module that exports more than one symbol opens with four labeled slots, one line each. Omit a slot rather than fill it with filler. `src/server/arena-host.ts` is the worked example.
+
+// ARCHITECTURE: <what this module is for, one sentence>.
+// Wiring: <who constructs it, who calls it, what it composes>.
+// Order: <load/init invariants a refactor would break>.
+// Invariants: <state that must hold across calls and is not typed>.
+
+**Tag vocabulary (closed set — additions need a consumer).**
+- `@invariant` — must remain true across calls. Pair with a test in `test/` whose name contains the symbol.
+- `@pre` / `@post` — contracts the type cannot express: call order, required prior action.
+- `@why` — the non-obvious choice; the "looks wrong but isn't". Highest-value tag.
+- `@when` — lifecycle: "set once `sceneGraphReady` resolves", "call before `take`".
+- `@see` — cross-reference the codemap can link.
+- `@internal` — excluded from the exported surface.
+
+Do not tag `@param` / `@returns` when the signature already says it. Do not restate the types.
+
+**Editorial rule: why and when, not how.** "How it works" duplicates the body and rots fastest. If the *how* is non-obvious, the fix is a named type, a helper, or a test — not a comment. The exception is *how to use it* (calling convention), which is `@pre` / `@when`.
+
+**Tag on touch.** When a task edits a file, bring that file's comments up to this standard as part of the task. No bulk pass — the touched surface becomes excellent, the rest stays honestly bare, and the codemap still lists signatures and reverse deps for it. Acceptance gate for every task that edits code: *codemap diff is reviewable and includes no unexplained comment churn*.
+
 ## Layout
 - `src/server/` host: `main.ts` (HTTP + WS entry, serves `dist/web`), `game.ts` (wander loop, held inputs), `world-loader.ts`/`load-game.ts`/`game-manifest.ts` (manifest → world), `doors.ts`, `fire.ts`, `grenade.ts`, `pickups.ts`, `health.ts`, `host-path.ts`, `placements-file.ts`.
 - `src/shared/` code used by both host and client: hitscan, look, movements, doors, pickups, health, grenade, audit, arena-view (what the client gets from the manifest).
