@@ -56,7 +56,11 @@ export function seedElevator(def: ArenaElevator): ElevatorRuntime {
   };
 }
 
-/** Queue `stop`. False when the stop is out of range, already queued, or the cab is already there and not moving. */
+/**
+ * Queue `stop`.
+ * @post False when the stop is out of range, already queued, or the cab is
+ *       already there and not moving.
+ */
 export function callElevator(rt: ElevatorRuntime, def: ArenaElevator, stop: number, fromCab: boolean): boolean {
   if (!Number.isInteger(stop) || stop < 0 || stop >= def.stops.length) return false;
   if (rt.queue.includes(stop)) return false;
@@ -68,7 +72,7 @@ export function callElevator(rt: ElevatorRuntime, def: ArenaElevator, stop: numb
 
 /**
  * One tick. A dwell that ends with a queued stop departs in the same call.
- * Arrival snaps `y` onto the stop. A departure does not move `y` yet.
+ * @post Arrival snaps `y` onto the stop. A departure does not move `y` yet.
  */
 export function stepElevator(rt: ElevatorRuntime, def: ArenaElevator, dt: number): "departed" | "arrived" | undefined {
   if (rt.phase === "dwell") {
@@ -148,7 +152,10 @@ export function landingAt(def: ArenaElevator, x: number, y: number, z: number): 
   return undefined;
 }
 
-/** `Digit1` is stop 0. `Digit0` is stop 9. Undefined when the stop does not exist. */
+/**
+ * `Digit1` is stop 0. `Digit0` is stop 9.
+ * @post Undefined when the stop does not exist.
+ */
 export function stopForKey(code: string, stopCount: number): number | undefined {
   const match = /^(?:Digit|Numpad)([0-9])$/.exec(code);
   if (!match) return undefined;
@@ -164,7 +171,9 @@ export function nextStopUp(rt: ElevatorRuntime, def: ArenaElevator): number {
   return next < def.stops.length ? next : 0;
 }
 
-/** Move `delta` stops and clamp to `[0, count - 1]`. Does not wrap. */
+/**
+ * @post Clamped to `[0, count - 1]`; does not wrap.
+ */
 export function stepStop(current: number, delta: number, count: number): number {
   if (!(count > 0)) return 0;
   const base = Number.isFinite(current) ? current : 0;

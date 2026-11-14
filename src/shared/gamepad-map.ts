@@ -1,8 +1,8 @@
 /**
  * Standard-mapping gamepad buttons for the arena client.
  * Triggers use analog values with hysteresis. Digital buttons use edges.
- * `jumper-t` and a disconnected pad bind nothing. This module does not read
- * the DOM and does not change the 20 Hz input message.
+ * @why `jumper-t` and a disconnected pad bind nothing. This module does not read
+ *      the DOM and does not change the 20 Hz input message.
  */
 
 export const STD = {
@@ -102,7 +102,8 @@ export class ButtonEdge {
 
 /**
  * First step on the press frame, then one after 350 ms, then one every 120 ms.
- * A zero direction resets the hold. A large `dtMs` still emits one step per call.
+ * A zero direction resets the hold.
+ * @post A large `dtMs` still emits one step per call.
  */
 export class RepeatNav {
   private dir: Dir = 0;

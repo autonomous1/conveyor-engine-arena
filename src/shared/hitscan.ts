@@ -12,8 +12,9 @@ export const FIRE_INTERVAL_MS = 1000 / FIRE_HZ;
 export const LASER_MS = 80;
 export const TRACE_RANGE = 96;
 /**
- * The eye is inside the shooter capsule (radius 0.5). A hit closer than this
- * is that pawn, not a wall. The capsule surface of anyone else is farther.
+ * @why The eye is inside the shooter capsule (radius 0.5), so a hit closer
+ *      than this is that pawn, not a wall. The capsule surface of anyone else
+ *      is farther.
  */
 export const MIN_HIT_DISTANCE = 0.5;
 
@@ -56,7 +57,8 @@ export function fireFrame(seq: number, yaw: number, pitch: number): FireFrame {
 
 /**
  * Client send clock. A held trigger is due at most once per {@link FIRE_INTERVAL_MS}.
- * One sample with `firing` set is one shot. `nextAt` advances only when a shot is due.
+ * One sample with `firing` set is one shot.
+ * @post `nextAt` advances only when a shot is due.
  */
 export function advanceFireClock(firing: boolean, now: number, nextAt: number): { due: boolean; nextAt: number } {
   if (!firing || !(now >= nextAt)) return { due: false, nextAt };
@@ -79,7 +81,10 @@ function asVec(value: unknown): Vec3 | undefined {
   return { x: rec.x, y: rec.y, z: rec.z };
 }
 
-/** Host laser segment. `shooter` is coerced with `Number`, matching the client. */
+/**
+ * Host laser segment.
+ * @why `shooter` is coerced with `Number`, matching the client.
+ */
 export function parseLaser(frame: unknown): LaserFrame | undefined {
   if (!frame || typeof frame !== "object") return undefined;
   const msg = frame as Record<string, unknown>;
@@ -121,8 +126,8 @@ export function parseFire(frame: unknown): FireFrame | undefined {
 
 /**
  * `repeat` is a seq at or below the last one this gate has seen.
- * `fast` is a newer seq inside the 8 Hz window. That seq is consumed.
- * `accept` is the only result that should trace.
+ * `fast` is a newer seq inside the 8 Hz window.
+ * @post A `fast` seq is consumed; `accept` is the only result that should trace.
  */
 export function admitFire(gate: FireGate, seq: number, now: number): "accept" | "repeat" | "fast" {
   if (!Number.isFinite(seq) || seq <= gate.lastSeq) return "repeat";
@@ -160,6 +165,7 @@ export function traceHitscan(
  * (2 m cells). The walk is a 2D DDA on the ray's XZ projection and stops when
  * the next cell starts past the closest hit. Dynamic boxes, oversized boxes,
  * and anything the grid does not list are tested every call. Y is read live.
+ * @see traceHitscan
  */
 export function traceIndexed(
   origin: Vec3,
@@ -210,14 +216,17 @@ export function traceIndexed(
   return finishShot(origin, aim, best, hitId);
 }
 
-/** Accepted for callers that share a clock sample. The segment test does not read it. */
+/**
+ * Accepted for callers that share a clock sample.
+ * @why The segment test does not read it.
+ */
 export type LineOfSightOpts = {
   now?: number;
 };
 
 /**
  * True when the segment hits no obstacle before `to`.
- * Pawns are not tested, so a dead pawn cannot block the segment.
+ * @why Pawns are not tested, so a dead pawn cannot block the segment.
  */
 export function hasLineOfSight(
   from: Vec3,
@@ -236,8 +245,9 @@ export function hasLineOfSight(
 }
 
 /**
- * One gate per bot. The first call is due. Later calls are due once per
- * `1/hz` seconds. `clock` returns milliseconds.
+ * One gate per bot. Later calls are due once per `1/hz` seconds. `clock`
+ * returns milliseconds.
+ * @when The first call is due.
  */
 export function losGate(hz = 5, clock: () => number = Date.now): () => boolean {
   const period = 1000 / hz;
@@ -253,8 +263,9 @@ export function losGate(hz = 5, clock: () => number = Date.now): () => boolean {
 /**
  * `base` plus `extras` as one array the floor index can keep.
  * The same array comes back until `base` changes (identity, length, or last
- * element) or an extra box changes id or XZ. Extra Y is written onto the
- * cached boxes, so a height rewrite does not rebuild the index.
+ * element) or an extra box changes id or XZ.
+ * @why Extra Y is written onto the cached boxes, so a height rewrite does not
+ *      rebuild the index.
  */
 export function createRayBoxList(): (base: readonly TraceAabb[], extras: readonly TraceAabb[]) => readonly TraceAabb[] {
   let baseRef: readonly TraceAabb[] | undefined;
@@ -549,7 +560,8 @@ export type SweepHit = {
  * Closest hit of the finite segment `from` → `to` against the same volumes
  * `traceHitscan` uses. A start on a surface (t at or below the ray epsilon)
  * is not a hit, so a point that just left a face does not stick to it.
- * The first accepted hit wins. This does not apply {@link MIN_HIT_DISTANCE}.
+ * The first accepted hit wins.
+ * @why This does not apply {@link MIN_HIT_DISTANCE}.
  */
 export function sweepSegment(
   from: Vec3,

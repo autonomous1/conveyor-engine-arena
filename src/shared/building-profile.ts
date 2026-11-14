@@ -1,11 +1,12 @@
 /**
  * Building outlines from a plan SVG, in model space.
  *
- * A path point `(sx, sy)` is model `(sx, -sy)`: model +X is SVG +x and model
- * +Z is SVG −y, because the plan is toolbar Y-up while SVG y grows down.
+ * A path point `(sx, sy)` is model `(sx, -sy)`.
  * The group's matrix yaw is the authoring yaw. It is not the mesh yaw.
  * Rings are unscaled, around the model origin. The map multiplies by the
  * placement scale and turns them with the mesh.
+ * @why model +X is SVG +x and model +Z is SVG −y, because the plan is toolbar
+ *      Y-up while SVG y grows down.
  */
 
 export type ProfilePoint = [number, number];
@@ -24,7 +25,8 @@ const PATH_TOKEN = /[MmLlHhVvCcSsQqTtAaZz]|[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\
 
 /**
  * Closed subpaths of an SVG path, still in that path's SVG space.
- * Curves keep their endpoint. A ring shorter than 3 points is dropped.
+ * Curves keep their endpoint.
+ * @post A ring shorter than 3 points is dropped.
  */
 export function svgPathRings(d: string): Array<Array<[number, number]>> {
   const tokens = d.match(PATH_TOKEN) ?? [];
@@ -208,7 +210,10 @@ export function profileFileText(profiles: readonly BuildingProfile[]): string {
   return `${JSON.stringify({ formatVersion: 1, units: "model", profiles: body }, null, 2)}\n`;
 }
 
-/** Read `building-profiles.json`. Throws when the document is not that file. */
+/**
+ * Read `building-profiles.json`.
+ * @post Throws when the document is not that file.
+ */
 export function parseBuildingProfiles(text: string): ProfileTable {
   let parsed: unknown;
   try {

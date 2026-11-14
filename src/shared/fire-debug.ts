@@ -1,6 +1,7 @@
 /**
  * Step log for one shot. Quiet unless the client switch is on.
- * The logger records the failure. It does not reload, reconnect, or respawn.
+ * The logger records the failure.
+ * @why It does not reload, reconnect, or respawn.
  */
 
 export const FIRE_DEBUG_PREFIX = "fire-debug";
@@ -19,14 +20,20 @@ export function fireDebugErrorLine(where: string, err: unknown): string {
   return `${FIRE_DEBUG_PREFIX} error ${where}\n${stack}`;
 }
 
-/** Wire flag. Absent means the client switch is off. The host has no switch of its own. */
+/**
+ * Wire flag. Absent means the client switch is off.
+ * @why The host has no switch of its own.
+ */
 export function fireFrameWantsDebug(frame: unknown): boolean {
   if (!frame || typeof frame !== "object") return false;
   const debug = (frame as { debug?: unknown }).debug;
   return debug === 1 || debug === true;
 }
 
-/** Same fields as `fireFrame`. `debug` is present only when the client switch is on. */
+/**
+ * Same fields as `fireFrame`.
+ * @when `debug` is present only when the client switch is on.
+ */
 export function fireShotFrame(seq: number, yaw: number, pitch: number, debug: boolean): {
   t: "fire";
   v: 1;
@@ -118,7 +125,10 @@ export function createFireDebugLog(enabled: () => boolean, sink: FireDebugSink =
   };
 }
 
-/** Message left on screen. Logging does not clear it. */
+/**
+ * Message left on screen.
+ * @post Logging does not clear it.
+ */
 export function clientFaultText(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }

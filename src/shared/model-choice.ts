@@ -1,4 +1,7 @@
-/** Character id carried on hello. Absent or blank means the host default. */
+/**
+ * Character id carried on hello.
+ * @when Absent or blank means the host default.
+ */
 export function helloModel(hello: unknown): string | undefined {
   if (!hello || typeof hello !== "object") return undefined;
   const model = (hello as { model?: unknown }).model;
@@ -10,7 +13,10 @@ export function modelFrame(model: string): { t: "model"; v: 1; model: string } {
   return { t: "model", v: 1, model };
 }
 
-/** Arena frame `{ t: "model", v: 1, model }`. Other frames are ignored. */
+/**
+ * Arena frame `{ t: "model", v: 1, model }`.
+ * @post Other frames are ignored.
+ */
 export function parseModelFrame(frame: unknown): string | undefined {
   if (!frame || typeof frame !== "object") return undefined;
   const rec = frame as { t?: unknown; v?: unknown; model?: unknown };

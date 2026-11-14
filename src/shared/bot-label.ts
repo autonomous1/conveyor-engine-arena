@@ -3,7 +3,10 @@
  * `ARENA_BOT_DEBUG=1`, and only when the text for that client changed.
  */
 
-/** A label is a short line. Longer text is rejected, not clipped on the client. */
+/**
+ * A label is a short line.
+ * @post Longer text is rejected, not clipped on the client.
+ */
 export const BOT_LABEL_MAX = 24;
 
 export type BotLabelFrame = {

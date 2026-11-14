@@ -7,10 +7,15 @@
 export const DEFAULT_MIN_TIME_SCALE = 0.25;
 export const DEFAULT_MAX_TIME_SCALE = 2.5;
 
-/** Seconds for the speed filter to cover ~63% of a step. Hides snapshot jitter. */
+/**
+ * Seconds for the speed filter to cover ~63% of a step.
+ * @why Hides snapshot jitter.
+ */
 export const GROUND_SPEED_TAU = 0.15;
 
-/** A rendered jump faster than this is a teleport or respawn, not a stride. */
+/**
+ * @why A rendered jump faster than this is a teleport or respawn, not a stride.
+ */
 export const GROUND_SPEED_TELEPORT = 25;
 
 export type ClipRate = {
@@ -21,9 +26,10 @@ export type ClipRate = {
 };
 
 /**
- * `groundSpeed / (referenceSpeed * modelScale)`, clamped. The asset `scale`
- * grows the stride, so the same clip covers more ground per cycle.
+ * `groundSpeed / (referenceSpeed * modelScale)`, clamped.
  * No `referenceSpeed`: 1, the clip plays as authored.
+ * @why The asset `scale` grows the stride, so the same clip covers more ground
+ *      per cycle.
  */
 export function clipTimeScale(groundSpeed: number, rate: ClipRate | undefined, modelScale = 1): number {
   const reference = rate?.referenceSpeed;
@@ -43,7 +49,8 @@ export function freshGroundSpeed(): GroundSpeed {
 
 /**
  * Horizontal speed from the rendered position delta, low-pass filtered.
- * The first sample and teleports only re-anchor. Returns the smoothed m/s.
+ * @when The first sample and teleports only re-anchor; they do not report a
+ *       speed.
  */
 export function noteGroundSpeed(state: GroundSpeed, x: number, z: number, dt: number, tau = GROUND_SPEED_TAU): number {
   if (!state.seen) {
@@ -67,9 +74,9 @@ export function noteGroundSpeed(state: GroundSpeed, x: number, z: number, dt: nu
 export const GAIT_HYSTERESIS = 0.15;
 
 /**
- * Fastest the walk clip is played before the pawn changes to run. Above about
- * 1.5x a walk cycle reads as cartoon legs. A slowed run keeps the feet locked
- * and reads as a jog.
+ * Fastest the walk clip is played before the pawn changes to run.
+ * @why Above about 1.5x a walk cycle reads as cartoon legs. A slowed run keeps
+ *      the feet locked and reads as a jog.
  */
 export const WALK_MAX_TIME_SCALE = 1.5;
 
@@ -77,8 +84,9 @@ export const WALK_MAX_TIME_SCALE = 1.5;
  * Locomotion clip for a moving pawn, by ground speed (m/s). Both strides are
  * the 1x world speeds (`referenceSpeed * scale`). Walk is kept until it would
  * play faster than `WALK_MAX_TIME_SCALE` (or past the geometric mean of the
- * strides, if the strides are close). Run then holds until the speed drops
- * `band` below that point, so a pawn near it does not flick between clips.
+ * strides, if the strides are close).
+ * @why Run then holds until the speed drops `band` below that point, so a pawn
+ *      near it does not flick between clips.
  */
 export function pickLocomotion(
   current: string | undefined,
@@ -94,12 +102,13 @@ export function pickLocomotion(
 }
 
 /**
- * Take the snapshot velocity (m/s) as the ground speed, unfiltered. The host
- * velocity changes at most `MOVE_ACCEL` per tick, so it does not jitter, and a
- * filter only delays it: with a 0.15 s filter the gait was picked about 0.2 s
- * late on every start, and walk played at 2.2x until run took over.
- * Keeps the position anchor current so a later fallback to `noteGroundSpeed`
- * does not see a stale jump.
+ * Take the snapshot velocity (m/s) as the ground speed, unfiltered.
+ * @post Keeps the position anchor current so a later fallback to
+ *       `noteGroundSpeed` does not see a stale jump.
+ * @why The host velocity changes at most `MOVE_ACCEL` per tick, so it does not
+ *      jitter, and a filter only delays it: with a 0.15 s filter the gait was
+ *      picked about 0.2 s late on every start, and walk played at 2.2x until
+ *      run took over.
  */
 export function noteVelocitySpeed(state: GroundSpeed, speed: number, x: number, z: number): number {
   state.x = x;

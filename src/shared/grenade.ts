@@ -9,19 +9,36 @@ import { MAX_HP } from "./health.js";
 import { sweepSegment, type SweepHit, type TraceAabb, type TraceCapsule, type Vec3 } from "./hitscan.js";
 
 export const GRENADE_INTERVAL_MS = 1000;
-/** Finite toss. A hitscan ray crosses its range in one trace, so this is slower. */
+/**
+ * Finite toss.
+ * @why A hitscan ray crosses its range in one trace, so this is slower.
+ */
 export const GRENADE_SPEED = 24;
-/** Direct pawn hit. Half of {@link MAX_HP}, because a grenade is harder to land than a laser. */
+/**
+ * Direct pawn hit.
+ * @why Half of {@link MAX_HP}, because a grenade is harder to land than a laser.
+ */
 export const GRENADE_DAMAGE = MAX_HP / 2;
 /** Meters per second squared, subtracted from velocity Y once per host tick. */
 export const GRENADE_GRAVITY = 9.81;
-/** Scales the velocity into the surface. Below 1, so a bounce loses speed. */
+/**
+ * Scales the velocity into the surface.
+ * @why Below 1, so a bounce loses speed.
+ */
 export const GRENADE_RESTITUTION = 0.5;
-/** Push off the face after a bounce so the next segment does not re-enter it. */
+/**
+ * @why Push off the face after a bounce so the next segment does not re-enter it.
+ */
 export const GRENADE_SKIN = 0.01;
-/** Back off the blast along incoming velocity so the sprite is not inside the wall. */
+/**
+ * @why Back off the blast along incoming velocity so the sprite is not inside
+ *      the wall.
+ */
 export const GRENADE_IMPACT_STANDOFF = 0.08;
-/** Owner capsules are ignored until this age, so a launch can leave the shooter's body. */
+/**
+ * @why Owner capsules are ignored until this age, so a launch can leave the
+ *      shooter's body.
+ */
 export const GRENADE_ARMING_S = 0.1;
 /** A miss that never meets a volume is removed after this many seconds. */
 export const GRENADE_LIFE_S = 4;
@@ -70,7 +87,10 @@ export function freshGrenadeGate(): GrenadeGate {
   return { lastSeq: 0, lastAt: Number.NEGATIVE_INFINITY };
 }
 
-/** Same three results as fire. `accept` is the only result that spawns a body. */
+/**
+ * Same three results as fire.
+ * @post `accept` is the only result that spawns a body.
+ */
 export function admitGrenade(gate: GrenadeGate, seq: number, now: number): "accept" | "repeat" | "fast" {
   if (!Number.isFinite(seq) || seq <= gate.lastSeq) return "repeat";
   if (now - gate.lastAt < GRENADE_INTERVAL_MS) {
@@ -103,7 +123,10 @@ export type GrenadePose = {
   n?: GrenadeSurfaceNormal;
 };
 
-/** Snap a hit normal to the dominant unit axis. Zero or non-finite yields undefined. */
+/**
+ * Snap a hit normal to the dominant unit axis.
+ * @post Zero or non-finite yields undefined.
+ */
 export function snapSurfaceNormal(normal: Vec3): Vec3 | undefined {
   const ax = Math.abs(normal.x);
   const ay = Math.abs(normal.y);
@@ -115,7 +138,10 @@ export function snapSurfaceNormal(normal: Vec3): Vec3 | undefined {
   return undefined;
 }
 
-/** Wire `n` on a stop pose: a 3-number axis, snapped. Invalid values are dropped. */
+/**
+ * Wire `n` on a stop pose: a 3-number axis, snapped.
+ * @post Invalid values are dropped.
+ */
 export function parseGrenadeSurfaceNormal(value: unknown): GrenadeSurfaceNormal | undefined {
   if (!Array.isArray(value) || value.length !== 3) return undefined;
   const x = value[0];
@@ -127,7 +153,10 @@ export function parseGrenadeSurfaceNormal(value: unknown): GrenadeSurfaceNormal 
   return [snapped.x, snapped.y, snapped.z];
 }
 
-/** Surface axis for a stop pose. Pawn hits and lifetime timeouts have none. */
+/**
+ * Surface axis for a stop pose.
+ * @post Pawn hits and lifetime timeouts have none.
+ */
 export function stopSurfaceNormal(hit: GrenadeHit): Vec3 | undefined {
   if (hit.pawn || hit.surface !== true) return undefined;
   return snapSurfaceNormal(hit.normal);
@@ -218,10 +247,11 @@ export function launchGrenade(
 }
 
 /**
- * One tick. Gravity is added on Y, then the segment is swept so a fast body
- * cannot tunnel through a thin box. `floorY` is the ground plane: the arena
- * floor is not a collision box (pawns stand on a height scan), so without it a
- * grenade falls through the floor and only stops on {@link GRENADE_LIFE_S}.
+ * One tick. Gravity is added on Y, then the segment is swept.
+ * @why The segment is swept so a fast body cannot tunnel through a thin box,
+ *      and `floorY` is applied because the arena floor is not a collision box:
+ *      without it a grenade falls through and only stops on
+ *      {@link GRENADE_LIFE_S}.
  *
  * `"bounce"` (toss): an obstacle bounces once, the next obstacle hit stops.
  * A pawn hit stops immediately. `"explode"` (launcher): the first box, floor,
@@ -297,7 +327,10 @@ function closerFloorHit(from: Vec3, to: Vec3, hit: SweepHit | undefined, floorY:
   return { distance, point, normal: { x: 0, y: 1, z: 0 }, pawn: false };
 }
 
-/** `normal` points toward the incoming side, so `dot(velocity, normal)` is negative. */
+/**
+ * @pre `normal` points toward the incoming side, so `dot(velocity, normal)` is
+ *      negative.
+ */
 export function bounceVelocity(velocity: Vec3, normal: Vec3, restitution: number): Vec3 {
   const vn = velocity.x * normal.x + velocity.y * normal.y + velocity.z * normal.z;
   if (!(vn < 0)) return { x: velocity.x, y: velocity.y, z: velocity.z };

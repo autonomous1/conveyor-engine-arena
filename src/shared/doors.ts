@@ -12,14 +12,18 @@
  */
 import { capsuleOverlapsAabb, type PawnBody } from "./pickups.js";
 
-/** Inward depth of the stamped doorway, in meters. The leaf does not fill this. */
+/**
+ * Inward depth of the stamped doorway, in meters.
+ * @why The leaf does not fill this.
+ */
 export const DOOR_GAP_DEPTH_M = 2;
 /** Meters outside the hinge plane where a pawn in front of the leaf can still use it. */
 export const DOOR_USE_OUTWARD_M = 0.75;
 /**
- * Thinnest closed-leaf blocker, in meters. The GLB leaf is 8 cm (local z 0..depth,
- * outside the hinge plane). The blocker keeps that outer face and grows inward
- * into the stamped gap, so a fast step cannot cross the push-out midpoint.
+ * Thinnest closed-leaf blocker, in meters.
+ * @why The GLB leaf is 8 cm (local z 0..depth, outside the hinge plane). The
+ *      blocker keeps that outer face and grows inward into the stamped gap, so
+ *      a fast step cannot cross the push-out midpoint.
  */
 export const DOOR_LEAF_MIN_THICKNESS_M = 0.2;
 
@@ -59,6 +63,7 @@ export function useFrame(seq: number): UseFrame {
 /**
  * Same quarter turns as `orientDoorFrame` in the client. 90° is +π/2 about Y,
  * which sends local +Z to world +X. 270° is −π/2, which sends local +X to world +Z.
+ * @see orientDoorFrame
  */
 export function doorYawRadians(degrees: number): number {
   const wrapped = ((degrees % 360) + 360) % 360;
@@ -73,7 +78,8 @@ export function doorYawRadians(degrees: number): number {
  * World box of the passage a pawn must overlap to use this door.
  * Left hinge: local x is 0..width. Right hinge: local x is −width..0.
  * Local −Z is inward, through the stamped gap. Local +Z is outside the leaf.
- * Yaw is the placement yaw. This box is never added to the obstacle list.
+ * Yaw is the placement yaw.
+ * @why This box is never added to the obstacle list.
  */
 export function doorUseVolume(door: Pick<DoorRuntime, "position" | "yaw" | "hinge" | "size">): DoorUseVolume {
   return doorLocalBox(door, -DOOR_GAP_DEPTH_M, DOOR_USE_OUTWARD_M);
@@ -83,7 +89,8 @@ export function doorUseVolume(door: Pick<DoorRuntime, "position" | "yaw" | "hing
  * World box of the closed leaf: the panel span along the wall (hinge..hinge+width,
  * mirrored for a right hinge), y from the sill (`position[1]`) to sill + height,
  * and local z from the leaf's outer face (`size[2]`) inward by at least
- * `DOOR_LEAF_MIN_THICKNESS_M`. The host blocks with it only while the door is shut.
+ * `DOOR_LEAF_MIN_THICKNESS_M`.
+ * @when The host blocks with it only while the door is shut.
  */
 export function doorLeafBox(door: Pick<DoorRuntime, "position" | "yaw" | "hinge" | "size">): DoorUseVolume {
   const depth = door.size[2] > 0 ? door.size[2] : 0;
@@ -127,7 +134,11 @@ function doorLocalBox(
   };
 }
 
-/** Nearest overlapping door. Equal distance keeps the smaller id. */
+/**
+ * Nearest overlapping door.
+ * @invariant Equal distance keeps the smaller id.
+ *            (test: door_pick_breaks_ties_by_id)
+ */
 export function pickDoorForUse(doors: readonly DoorRuntime[], pawn: PawnBody): DoorRuntime | undefined {
   let best: DoorRuntime | undefined;
   let bestDist = Infinity;
@@ -153,8 +164,8 @@ export type KeyRing = {
 
 /**
  * Unlocked: toggle `open`. Locked while this pawn holds `door.key`: unlock and open.
- * The key stays held, so the next leaf with the same id unlocks too.
  * Locked without that key: no change.
+ * @post The key stays held, so the next leaf with the same id unlocks too.
  */
 export function tryUseDoor(door: DoorRuntime, pawnId: number, keys: KeyRing): DoorFrame | undefined {
   if (door.locked) {

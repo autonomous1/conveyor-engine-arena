@@ -6,8 +6,8 @@
  * group's `transform` (outermost first), then into world XZ with the design
  * convention used by blueprint-scene: world X = svg x, world Z = viewBox
  * height − svg y (the SVG is flipped vertically). The result is the axis-aligned
- * box of the transformed corners. No DOM: plain text parsing, so it runs in
- * Node and in tests.
+ * box of the transformed corners.
+ * @why No DOM: plain text parsing, so it runs in Node and in tests.
  */
 
 export type SvgMapBounds = { minX: number; maxX: number; minZ: number; maxZ: number };

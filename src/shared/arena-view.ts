@@ -17,8 +17,9 @@ import type { ShadowQuality } from "./shadows.js";
 export type BackdropShape = "cylinder" | "dome";
 
 /**
- * `speed` is the wander gait ratio on the host. `referenceSpeed` (m/s the feet
- * travel at 1x on the unscaled model) and the time-scale clamp are client-only.
+ * `speed` is the wander gait ratio on the host.
+ * @why `referenceSpeed` (m/s the feet travel at 1x on the unscaled model) and
+ *      the time-scale clamp are client-only.
  */
 export type CharacterAnimation = {
   clip: string;
@@ -53,7 +54,10 @@ export type Prop = {
   weapon?: string;
 };
 
-/** Clip name for a prop, from `animations[animation].clip`. Absent when the prop is still. */
+/**
+ * Clip name for a prop, from `animations[animation].clip`.
+ * @post Absent when the prop is still.
+ */
 export function propClipName(prop: {
   animation: string | undefined;
   animations?: Partial<Record<string, { clip: string }>>;
@@ -310,8 +314,9 @@ export type ArenaExplosionSheet = {
 /**
  * Timings in ms, plus the optional beam overlay sheets (`beam-spawn`, `beam-despawn` assets).
  * A sheet is left out when its file is absent. `size` of a sheet is its world height in metres
- * (defaults to the pawn height; frames are square, so the sprite is square). Beam playback length
- * is `frameCount / fps` (2 s at 48/24) and is independent of `fadeMs` (1.7 s).
+ * (defaults to the pawn height; frames are square, so the sprite is square).
+ * @why Beam playback length is `frameCount / fps` (2 s at 48/24) and is
+ *      independent of `fadeMs` (1.7 s).
  */
 export type ArenaCharacterBeam = {
   /** Fade in on a spawn and fade out on a despawn. Independent of how long the beam sheet plays. */

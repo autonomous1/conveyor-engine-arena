@@ -1,9 +1,9 @@
 /**
  * Arena pickups. A placement id is a string. The host removes that id from
  * the remaining set. It does not create or destroy a world entity.
- *
- * The obstacle resolver parks a capsule on the box face, so the touch test is
- * closed: distance <= radius counts. A strict overlap would miss the contact.
+ * @why The obstacle resolver parks a capsule on the box face, so the touch test
+ *      is closed: distance <= radius counts. A strict overlap would miss the
+ *      contact.
  */
 
 export const HEALTH_PICKUP = 25;
@@ -69,7 +69,10 @@ export function pickupBoxSource(id: string): string {
   return `${id}-box`;
 }
 
-/** Drop the box named for this placement. A second call is a no-op. */
+/**
+ * Drop the box named for this placement.
+ * @when A second call is a no-op.
+ */
 export function dropPickupAabb<T extends { source?: string }>(boxes: T[], placementId: string): void {
   const source = pickupBoxSource(placementId);
   for (let i = boxes.length - 1; i >= 0; i -= 1) {
@@ -93,7 +96,10 @@ export function loadoutFrame(ammo: number, weapon?: string): LoadoutFrame {
   return frame;
 }
 
-/** A numeric id is not a placement. It is left unread. */
+/**
+ * A numeric id is not a placement.
+ * @post It is left unread.
+ */
 export function parsePickup(frame: unknown): PickupFrame | undefined {
   if (!frame || typeof frame !== "object") return undefined;
   const rec = frame as Record<string, unknown>;
@@ -111,7 +117,10 @@ export function parseLoadout(frame: unknown): LoadoutFrame | undefined {
   return loadoutFrame(rec.ammo, typeof rec.weapon === "string" ? rec.weapon : undefined);
 }
 
-/** Remaining placement ids. Numbers are dropped, not coerced. */
+/**
+ * Remaining placement ids.
+ * @post Numbers are dropped, not coerced.
+ */
 export function parsePickupSet(value: unknown): string[] | undefined {
   if (!Array.isArray(value)) return undefined;
   const ids: string[] = [];
@@ -146,7 +155,7 @@ export function capsuleOverlapsAabb(
 
 /**
  * First living pawn in the list that touches a remaining pickup takes it.
- * The id is reported once. The caller deletes it from the set.
+ * @post The id is reported once. The caller deletes it from the set.
  */
 export function collectTouches(
   remaining: ReadonlySet<string>,
@@ -224,10 +233,10 @@ export interface PickupHost {
 
 /**
  * Remaining pickup ids. Seeded from placements. Taking one deletes the id.
- * Health already at 100, ammo that does not rise, and a weapon the pawn
- * already holds still consume the placement. A taken key is recorded on
- * that pawn only. Another pawn does not hold it. Touching an id that this
- * pawn already holds grants nothing.
+ * A taken key is recorded on that pawn only. Another pawn does not hold it.
+ * Touching an id that this pawn already holds grants nothing.
+ * @why Health already at 100, ammo that does not rise, and a weapon the pawn
+ *      already holds still consume the placement.
  */
 export function createPickupHost(list: readonly PickupPlacement[]): PickupHost {
   const placements = list.filter((pickup) => typeof pickup.id === "string" && pickup.id.length > 0);

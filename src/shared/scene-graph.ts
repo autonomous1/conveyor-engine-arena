@@ -87,7 +87,10 @@ export type SceneGraphFile = {
   portals: ScenePortal[];
 };
 
-/** Cab fields `placeAt` reads. Matches {@link ElevatorRuntime} without the queue. */
+/**
+ * Cab fields `placeAt` reads. Matches `ElevatorRuntime` without the queue.
+ * @see ElevatorRuntime
+ */
 export type CabState = {
   id: string;
   at: number;
@@ -105,7 +108,10 @@ export type SceneGraph = SceneGraphFile & {
   skip: Set<string>;
 };
 
-/** File shape only. Drops the runtime maps on {@link SceneGraph}. */
+/**
+ * File shape only.
+ * @post Drops the runtime maps on `SceneGraph`.
+ */
 export function sceneGraphPayload(graph: SceneGraph): SceneGraphFile {
   return {
     formatVersion: graph.formatVersion,
@@ -115,7 +121,11 @@ export function sceneGraphPayload(graph: SceneGraph): SceneGraphFile {
   };
 }
 
-/** Stable JSON: object keys sorted, array order kept, `undefined` omitted. */
+/**
+ * @invariant Object keys are sorted, array order is kept, and `undefined` is
+ *            omitted, so equal values hash the same.
+ *            (test: canonical_json_is_stable)
+ */
 export function canonicalJson(value: unknown): string {
   return JSON.stringify(canonicalize(value));
 }
@@ -133,7 +143,10 @@ function canonicalize(value: unknown): unknown {
   return out;
 }
 
-/** Hex SHA-256. `crypto.subtle` is global in Node 22 and the browser. */
+/**
+ * Hex SHA-256.
+ * @why `crypto.subtle` is global in Node 22 and the browser.
+ */
 export async function sha256Hex(text: string): Promise<string> {
   const digest = await globalThis.crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
   let hex = "";
@@ -155,7 +168,10 @@ function isStairs(p: AnyPlace | OutsidePlace): p is StairsPlace {
   return p.kind === "stairs" && "top" in p;
 }
 
-/** `<shaft>@<index>` from the last `@`. Anything else is not a stop id. */
+/**
+ * `<shaft>@<index>` from the last `@`.
+ * @post Anything else is not a stop id.
+ */
 export function stopOf(id: string): { shaft: string; index: number } | undefined {
   const at = id.lastIndexOf("@");
   if (at <= 0) return undefined;
@@ -171,9 +187,9 @@ export function portalsOf(graph: SceneGraph, placeId: string): ScenePortal[] {
 /**
  * Place under the feet, or `outside`.
  * Static places match the polygon and `y − 0.5 … y + 1.5`. Stairs run up to `top + 0.5`.
- * The smallest polygon wins, then the lower id. Shafts and cab rooms are skipped
- * so a stop place is not shadowed. With `cabs`, a pawn on a cab is that stop,
- * or the shaft id while the cab is moving.
+ * The smallest polygon wins, then the lower id. With `cabs`, a pawn on a cab is
+ * that stop, or the shaft id while the cab is moving.
+ * @why Shafts and cab rooms are skipped so a stop place is not shadowed.
  */
 export function placeAt(
   graph: SceneGraph,
@@ -212,8 +228,9 @@ export function placeAt(
 
 /**
  * Validate a scene-graph file against the compiled doors.
- * Structural problems leave `graph` unset. A door whose `locked` or `key`
- * disagrees is reported and rewritten from the door, and the graph still loads.
+ * @post Structural problems leave `graph` unset. A door whose `locked` or `key`
+ *       disagrees is reported and rewritten from the door, and the graph still
+ *       loads.
  */
 export function parseSceneGraph(
   value: unknown,

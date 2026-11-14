@@ -92,8 +92,8 @@ export function formatMeters(distance: number): string {
 /**
  * Feet height for `placeAt`. A pawn uses its feet. A tall wall or door uses
  * the volume base, so a hit at camera height still lands in the room band.
- * A slab that runs far above and below the hit is not a floor: sample 1.6 m
- * under the impact instead.
+ * @why A slab that runs far above and below the hit is not a floor: sample
+ *      1.6 m under the impact instead.
  */
 export function placeSampleY(hit: Pick<InfoHit, "kind" | "min" | "max" | "point">): number {
   if (hit.kind === "pawn") return hit.min.y;
@@ -106,9 +106,10 @@ export function placeSampleY(hit: Pick<InfoHit, "kind" | "min" | "max" | "point"
 }
 
 /**
- * Nearest nonnegative hit. `direction` need not be a unit. Equal distances
- * keep the semantic door or pickup ahead of a duplicate collision box, then
- * the smaller id. A miss, a backward hit, and a hit past `range` are absent.
+ * Nearest nonnegative hit. `direction` need not be a unit.
+ * @post Equal distances keep the semantic door or pickup ahead of a duplicate
+ *       collision box, then the smaller id. A miss, a backward hit, and a hit
+ *       past `range` are absent.
  */
 export function pickInfoTarget(
   origin: Vec3,
@@ -183,9 +184,10 @@ export type VolumePick = {
 };
 
 /**
- * Candidates from data the browser already has. An open door with no leaf is
- * skipped, so a stale closed box is not inspected through the doorway. A
- * pickup volume is not also emitted as collision. Gone pickups are absent.
+ * Candidates from data the browser already has. A pickup volume is not also
+ * emitted as collision. Gone pickups are absent.
+ * @why An open door with no leaf is skipped, so a stale closed box is not
+ *      inspected through the doorway.
  */
 export function collectInfoCandidates(args: {
   doors: readonly DoorPick[];

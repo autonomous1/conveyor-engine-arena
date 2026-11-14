@@ -1,7 +1,9 @@
 /**
  * One-shot host frame: a player took a seat and was placed on a spawn pad. Sent to every
- * client once, at the join. Deaths and respawns need no frame: the health frame already says so.
- * Welcome and a late join never replay it, so a character that is already there does not beam.
+ * client once, at the join.
+ * @when Welcome and a late join never replay it, so a character that is already
+ *       there does not beam.
+ * @why Deaths and respawns need no frame: the health frame already says so.
  */
 export type SpawnFrame = { t: "spawn"; id: number; x: number; y: number; z: number };
 

@@ -22,7 +22,9 @@ export function jumperStick(yAxis: number, sample: { x: number; y: number }): { 
 
 export const EYE_HEIGHT = 1.6;
 export const INPUT_HZ = 20;
-/** Stay under ±90° so the look target does not cross the up axis. */
+/**
+ * @why Stay under ±90° so the look target does not cross the up axis.
+ */
 export const PITCH_LIMIT = 1.35;
 
 export function clampPitch(pitch: number): number {
@@ -49,7 +51,10 @@ export function lookFromStick(stickX: number, stickY: number, dt: number, yawRat
   return { yaw: -stickX * yawRate * dt, pitch: -stickY * pitchRate * dt };
 }
 
-/** Local forward/strafe in the pawn yaw frame, clamped to the unit circle the server accepts. */
+/**
+ * Local forward/strafe in the pawn yaw frame.
+ * @post Clamped to the unit circle the server accepts.
+ */
 export function moveIntent(yaw: number, forward: number, strafe: number): { moveX: number; moveZ: number } {
   let f = forward;
   let s = strafe;
@@ -157,7 +162,10 @@ export type GamepadBindings = {
   right?: number;
 };
 
-/** Standard-map indexes. `jumper-t` binds none. Same numbers as `STD` in gamepad-map. */
+/**
+ * Standard-map indexes. `jumper-t` binds none.
+ * @see STD
+ */
 export function gamepadBindings(profile: GamepadProfileName): GamepadBindings {
   if (profile !== "standard") return {};
   return {
@@ -194,7 +202,9 @@ export function keyboardMove(held: { has(code: string): boolean }): { forward: n
   return { forward, strafe };
 }
 
-/** Missing, empty, or unknown stored text is `standard`. */
+/**
+ * @post Missing, empty, or unknown stored text is `standard`.
+ */
 export function gamepadProfileFromStored(value: string | null | undefined): GamepadProfileName {
   if (value === "standard" || value === "jumper-t") return value;
   return "standard";
@@ -227,7 +237,11 @@ function padAxis(axes: readonly number[], index: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
-/** Planar move in the same yaw-space units as `keyboardMove` (forward +1 is W, -1 is S). */
+/**
+ * Planar move in the same yaw-space units as `keyboardMove` (forward +1 is W,
+ * -1 is S).
+ * @see keyboardMove
+ */
 export function gamepadPlanar(profile: GamepadProfileName, axes: readonly number[]): { forward: number; strafe: number } {
   if (profile === "jumper-t") {
     const moved = jumperStick(JUMPER_MOVE_Y, {
@@ -240,8 +254,9 @@ export function gamepadPlanar(profile: GamepadProfileName, axes: readonly number
 }
 
 /**
- * Look deltas for one tick. Pitch clamp stays with the caller, shared with the mouse.
- * `invertY` flips pitch only. Stick forward stays pitch-up when it is false.
+ * Look deltas for one tick. `invertY` flips pitch only. Stick forward stays
+ * pitch-up when it is false.
+ * @pre Pitch clamp stays with the caller, shared with the mouse.
  */
 export function gamepadLook(
   profile: GamepadProfileName,

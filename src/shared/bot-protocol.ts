@@ -34,7 +34,10 @@ export type RegionsFrame = {
   regions: BakedRegionsFile;
 };
 
-/** Reply to a client `teleport` frame. Only the sender's connection gets it. */
+/**
+ * Reply to a client `teleport` frame.
+ * @post Only the sender's connection gets it.
+ */
 export type TeleportResultFrame = {
   t: "teleportResult";
   ok: boolean;
@@ -69,9 +72,9 @@ export type SnapshotResultFrame = {
 };
 
 /**
- * Host → other browsers. The requester is skipped.
- * No `lookFrom` or `follow`: any play tab may answer with its current view.
- * Either field: only a `?qa=1` tab should answer.
+ * Host → other browsers. No `lookFrom` or `follow`: any play tab may answer
+ * with its current view. Either field: only a `?qa=1` tab should answer.
+ * @post The requester is skipped.
  */
 export type QaCaptureFrame = {
   t: "qaCapture";
@@ -110,7 +113,10 @@ export type WelcomeExtras = {
   scope?: string[];
 };
 
-/** One arena `t` frame. Unknown `t`, kernel messages, and bad JSON are `undefined`. */
+/**
+ * One arena `t` frame.
+ * @post Unknown `t`, kernel messages, and bad JSON are `undefined`.
+ */
 export function parseArenaFrame(text: string): ArenaFrame | undefined {
   let value: unknown;
   try {
@@ -260,7 +266,8 @@ export function parseRegionsFrame(frame: unknown): RegionsFrame | undefined {
 
 /**
  * Welcome fields the kernel does not know about. `role` and `scope` are
- * optional. Solo omits them. The claim field is `scope`, not `scopes`.
+ * optional. Solo omits them.
+ * @why The claim field is `scope`, not `scopes`.
  */
 export function parseWelcomeExtras(welcome: unknown): WelcomeExtras | undefined {
   if (!welcome || typeof welcome !== "object" || Array.isArray(welcome)) return undefined;

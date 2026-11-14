@@ -1,7 +1,8 @@
 /**
- * Arena pawn health. It is not a kernel field. A hit subtracts
- * {@link HIT_DAMAGE}, the value stays in [{@link MIN_HP}, {@link MAX_HP}],
- * and 0 is dead until {@link RESPAWN_MS} has passed.
+ * Arena pawn health. A hit subtracts {@link HIT_DAMAGE}, the value stays in
+ * [{@link MIN_HP}, {@link MAX_HP}], and 0 is dead until {@link RESPAWN_MS} has
+ * passed.
+ * @why It is not a kernel field.
  */
 
 export const MAX_HP = 100;
@@ -69,7 +70,12 @@ type Vital = {
   lastCause?: DamageCause;
 };
 
-/** Per-pawn hp, death, and respawn timers. In memory, lost on restart. */
+/**
+ * Per-pawn hp, death, and respawn timers. In memory, lost on restart.
+ * @invariant hp stays in [{@link MIN_HP}, {@link MAX_HP}]. A dead pawn is
+ *            unchanged by `wound` and `heal`.
+ *            (test: health_stays_in_range)
+ */
 export interface PawnHealth {
   /** Creates a full-health row when absent. An existing row is left as it is. */
   note(id: number): void;
@@ -98,7 +104,10 @@ export interface PawnHealth {
   frames(): HealthFrame[];
 }
 
-/** One row per pawn the host has noted. Unknown pawns read as full health. */
+/**
+ * One row per pawn the host has noted.
+ * @post Unknown pawns read as full health.
+ */
 export function createPawnHealth(now: () => number = Date.now): PawnHealth {
   const rows = new Map<number, Vital>();
 
@@ -203,7 +212,10 @@ export type SpawnBlockers = {
   pawns: readonly BlockPawn[];
 };
 
-/** First spawn that is clear of boxes and other pawns. If none are, the first spawn. */
+/**
+ * First spawn that is clear of boxes and other pawns.
+ * @post Falls back to the first spawn when none is clear.
+ */
 export function pickRespawnSpawn<T extends SpawnPick>(spawns: readonly T[], blockers: SpawnBlockers): T | undefined {
   if (spawns.length === 0) return undefined;
   for (const spawn of spawns) {
@@ -223,7 +235,10 @@ function spawnBlocked(spawn: SpawnPick, blockers: SpawnBlockers): boolean {
   return false;
 }
 
-/** Same height rule as the kernel spawn check. A missing Y pair blocks at every height. */
+/**
+ * Same height rule as the kernel spawn check.
+ * @post A missing Y pair blocks at every height.
+ */
 export function pawnHitsBox(
   x: number,
   z: number,

@@ -1,10 +1,10 @@
 /**
  * Host-only fire counters. A client paints the latest frame.
  * It does not count shots of its own.
- *
- * A repeated seq is not a new receive: it increments `droppedDuplicate`
- * and leaves the other five counters alone. A newer seq increments `fired`.
- * `accepted` waits until that seq also clears the cadence window.
+ * @post A repeated seq is not a new receive: it increments `droppedDuplicate`
+ *       and leaves the other five counters alone. A newer seq increments
+ *       `fired`. `accepted` waits until that seq also clears the cadence
+ *       window.
  */
 
 export const AUDIT_FIELDS = [
@@ -58,7 +58,10 @@ export function parseAudit(frame: unknown): AuditFrame | undefined {
   return auditFrame(counters);
 }
 
-/** Six lines for the options panel. Not the crosshair HUD. */
+/**
+ * Six lines for the options panel.
+ * @why Not the crosshair HUD.
+ */
 export function formatAudit(counters: AuditCounters): string {
   return AUDIT_FIELDS.map((key) => `${key} ${counters[key]}`).join("\n");
 }

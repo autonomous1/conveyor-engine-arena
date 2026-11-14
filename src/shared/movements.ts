@@ -17,7 +17,10 @@ export const DEFAULT_MOVEMENT_SPEED: Record<Movement, number> = {
  * is full input, and the others keep the same ratio, so walk:1 and run:2
  * make walk half as fast as run.
  */
-/** Exact clip name, then a case-insensitive substring, matching the previous player. */
+/**
+ * Exact clip name, then a case-insensitive substring.
+ * @why Matching the previous player.
+ */
 export function findClip<T extends { name: string }>(clips: readonly T[], wanted: string): T | undefined {
   const exact = clips.find((clip) => clip.name === wanted);
   if (exact) return exact;
@@ -35,22 +38,26 @@ export function movementIntent(speed: number, speeds: readonly number[]): number
 
 /**
  * Host tick length in seconds. Matches `TICK_MS` (50) on the arena loop.
- * Acceleration is counted in ticks, so a full wish still lands in `MOVE_TICKS`.
+ * @why Acceleration is counted in ticks, so a full wish still lands in
+ *      `MOVE_TICKS`.
  */
 export const MOVE_DT = 0.05;
 
 /** Meters per second at a unit wish. Input axes stay the client's yaw-space moveX / moveZ. */
 export const MOVE_SPEED = 5;
 
-/** Meters per second added toward the wish on one tick. The same step stops the pawn. */
+/**
+ * Meters per second added toward the wish on one tick.
+ * @why The same step stops the pawn.
+ */
 export const MOVE_ACCEL = 1.25;
 
 /** Ticks from rest to `MOVE_SPEED`, and from that speed back to zero. */
 export const MOVE_TICKS = MOVE_SPEED / MOVE_ACCEL;
 
 /**
- * Radians an unowned pawn may yaw in one tick. A tenth of a full turn.
- * Player look does not use this.
+ * Radians an unowned pawn may yaw in one tick.
+ * @why A tenth of a full turn; player look does not use this.
  */
 export const PAWN_YAW_STEP = (Math.PI * 2) / 10;
 
@@ -59,7 +66,7 @@ export const MOVE_IDLE = 0.05;
 
 /**
  * Highest rise the capsule mounts in one sample.
- * A taller box stays a wall and the kernel push-out stands.
+ * @why A taller box stays a wall and the kernel push-out stands.
  */
 export const STEP_HEIGHT = 0.3;
 
@@ -80,7 +87,7 @@ function wrapPi(angle: number): number {
 
 /**
  * Turn `from` toward `to` by at most `maxStep` radians, on the short arc.
- * A gap inside one step lands on `to`.
+ * @post A gap inside one step lands on `to`.
  */
 export function approachYaw(from: number, to: number, maxStep = PAWN_YAW_STEP): number {
   if (!Number.isFinite(from)) return Number.isFinite(to) ? to : 0;
@@ -93,7 +100,11 @@ export function approachYaw(from: number, to: number, maxStep = PAWN_YAW_STEP): 
 
 export type Planar = { x: number; z: number };
 
-/** Wish velocity. Magnitude above 1 is pulled back to the unit circle, then scaled by `MOVE_SPEED`. */
+/**
+ * Wish velocity.
+ * @post Magnitude above 1 is pulled back to the unit circle, then scaled by
+ *       `MOVE_SPEED`.
+ */
 export function wishPlanar(moveX: number, moveZ: number, speed = MOVE_SPEED): Planar {
   let x = Number.isFinite(moveX) ? moveX : 0;
   let z = Number.isFinite(moveZ) ? moveZ : 0;
@@ -107,7 +118,8 @@ export function wishPlanar(moveX: number, moveZ: number, speed = MOVE_SPEED): Pl
 
 /**
  * Step XZ velocity toward `wish` by at most `accel`.
- * A gap inside one step lands on the wish. A larger gap keeps its direction.
+ * @post A gap inside one step lands on the wish. A larger gap keeps its
+ *       direction.
  */
 export function approachVelocity(velocity: Planar, wish: Planar, accel = MOVE_ACCEL): Planar {
   const dx = wish.x - velocity.x;
@@ -120,8 +132,8 @@ export function approachVelocity(velocity: Planar, wish: Planar, accel = MOVE_AC
 
 /**
  * Host label only. The client still picks its own clip from ground speed.
- * 2.69 m/s is the cyborg walk stride times the client's 1.5 walk cap
- * (referenceSpeed × scale × 1.5). There is no hysteresis on the host.
+ * @why 2.69 m/s is the cyborg walk stride times the client's 1.5 walk cap
+ *      (referenceSpeed × scale × 1.5). There is no hysteresis on the host.
  */
 export const RUN_SPEED_M_S = 2.69;
 
@@ -141,7 +153,10 @@ type MoveView = {
   radius: number;
 };
 
-/** One height-banded AABB. Missing Y blocks at every height and is not a floor. */
+/**
+ * One height-banded AABB.
+ * @why Missing Y blocks at every height and is not a floor.
+ */
 export type FloorBox = {
   minX: number;
   maxX: number;
@@ -184,7 +199,10 @@ type MoveCommand =
 
 /** Cell edge in metres. */
 export const FLOOR_INDEX_CELL = 2;
-/** Largest query radius the cells cover. Bigger radii fall back to a full scan. */
+/**
+ * Largest query radius the cells cover.
+ * @post Bigger radii fall back to a full scan.
+ */
 export const FLOOR_INDEX_PAD = 1;
 /** A box spanning more cells than this is checked every query instead. */
 const MAX_SPAN_CELLS = 256;
@@ -213,7 +231,10 @@ const dynamicBoxes = new WeakSet<object>();
 let dynamicEpoch = 0;
 const cache = new WeakMap<readonly FloorBox[], FloorIndex>();
 
-/** A box whose XZ is rewritten in place (door leaf). Bumps the epoch so indexes rebuild once. */
+/**
+ * A box whose XZ is rewritten in place (door leaf).
+ * @why Bumps the epoch so indexes rebuild once, not on every rewrite.
+ */
 export function markDynamicObstacle(box: object): void {
   if (dynamicBoxes.has(box)) return;
   dynamicBoxes.add(box);
@@ -324,8 +345,9 @@ type MoveWorld = {
 
 /**
  * Highest band top under the disc that is at most `step` above `feet`.
- * The room floor is 0. The disc test matches the kernel push-out: the
- * expanded face is outside, so a box that does not hit the body is not a floor.
+ * The room floor is 0.
+ * @why The disc test matches the kernel push-out: the expanded face is outside,
+ *      so a box that does not hit the body is not a floor.
  */
 export function floorHeight(
   boxes: readonly FloorBox[],
@@ -356,7 +378,8 @@ export function floorHeight(
 /**
  * Rest height for a planar step. Each sample may rise by at most `STEP_HEIGHT`,
  * then the next sample starts from that height, so a run of short bands is a
- * floor and one tall box is not. The last sample is where the capsule rests.
+ * floor and one tall box is not.
+ * @post The last sample is where the capsule rests.
  */
 export function floorAlongMove(
   boxes: readonly FloorBox[],
@@ -398,6 +421,7 @@ function boxFloorTop(box: FloorBox, x: number, z: number, r: number, limit: numb
  * `floorHeight` over the boxes the static grid lists for (x, z), plus the
  * always-checked ones. Off the grid, or for a radius past the grid pad, it is
  * the full scan. Same result as `floorHeight(index.boxes, ...)`.
+ * @see floorHeight
  */
 export function floorHeightIndexed(
   index: FloorIndex,
@@ -422,7 +446,10 @@ export function floorHeightIndexed(
   return floor;
 }
 
-/** `floorAlongMove` on the static grid. Same samples, same result. */
+/**
+ * `floorAlongMove` on the static grid. Same samples, same result.
+ * @see floorAlongMove
+ */
 export function floorAlongMoveIndexed(
   index: FloorIndex,
   x0: number,
@@ -450,9 +477,10 @@ export type PlanarStep = { vx: number; vz: number; speed: number };
 /**
  * Approach XZ velocity, then step the capsule by that velocity.
  * Feet then rest on the band tops along that step. A rise of at most
- * `STEP_HEIGHT` mounts the box. A taller box keeps this height so the
- * kernel push-out still stops the body. Yaw does not rotate velocity.
- * The caller commits. `setClip` is separate and does not write this position.
+ * `STEP_HEIGHT` mounts the box. Yaw does not rotate velocity. The caller
+ * commits. `setClip` is separate and does not write this position.
+ * @why A taller box keeps this height so the kernel push-out still stops the
+ *      body.
  */
 export function enqueuePlanarMove(
   world: MoveWorld,
@@ -482,6 +510,7 @@ export function enqueuePlanarMove(
 /**
  * Same wish and yaw as `enqueuePlanarMove`, with no obstacle or floor query.
  * `ascend` is -1, 0, or 1. Vertical speed is `MOVE_SPEED`. Yaw is not a second frame.
+ * @see enqueuePlanarMove
  */
 export function enqueueNoclipMove(
   world: MoveWorld,
@@ -533,7 +562,7 @@ export function decodeMoveButtons(buttons: number | undefined): { noclip: boolea
 
 /**
  * `ARENA_NOCLIP=1` at host start. Any other value leaves the field absent.
- * Not part of either content hash.
+ * @why Not part of either content hash.
  */
 export function applyHostNoclip(view: { noclip?: boolean }, env: { ARENA_NOCLIP?: string | undefined }): void {
   if (env.ARENA_NOCLIP === "1") view.noclip = true;
@@ -602,7 +631,8 @@ export type OwnedMoveOptions = {
 
 /**
  * Owned pawn step. `setClip` records the planar speed and the gait it selects.
- * It does not carry a position. A numeric `dt` is the colliding step.
+ * A numeric `dt` is the colliding step.
+ * @post `setClip` does not carry a position.
  */
 export function enqueueOwnedMove(
   world: MoveWorld,
