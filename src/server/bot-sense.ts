@@ -1,6 +1,10 @@
 /**
  * Host adapter for {@link createBotSensor}. Reads the world. Writes nothing.
  */
+// ARCHITECTURE: Host adapter around the shared bot sensor: reads the world into
+//   `BotSense`, writes nothing.
+// Wiring: arena-host.ts builds it; the tick calls `update(bodies)` after
+//   pickups and grenades in `onTick`.
 import type { AuthoritativeWorld } from "conveyor-engine-world";
 import { yawFromQuat } from "../shared/look.js";
 import type { PawnBody, PickupPlacement } from "../shared/pickups.js";

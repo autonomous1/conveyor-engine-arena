@@ -9,6 +9,12 @@
  * will not open the bot gives up on doors and the 120 s respawn takes it.
  * FightBack is on only when the host passes `fireAsBot` and `forgetBot`.
  */
+// ARCHITECTURE: Host brain for unowned bots: sense → arbiter → GOAP plan → a
+//   claim through `agent.override`.
+// Wiring: arena-host.ts builds it with fire.ts's `fireAsBot`/`forgetBot` and
+//   doors.ts's `useDoorAs`; game.ts's wander loop honours the claim.
+// Order: sense and the brain update inside `onTick`, after the tick commit.
+// Invariants: FightBack is on only when both fire callbacks were passed.
 import type { AuthoritativeWorld } from "conveyor-engine-world";
 import { burstScheduler, sampleAim, turnToward } from "../shared/bots/aim.js";
 import { createBotContext, groundActions, type BotCtx } from "../shared/bots/actions.js";

@@ -1,3 +1,9 @@
+// ARCHITECTURE: Hitscan for owned pawns and bots: fire gates, traces, laser
+//   frames, and wound application.
+// Wiring: arena-host.ts builds it and hands `fireAsBot`/`forgetBot` to
+//   bot-brain.ts; the inbound `fire` frames arrive through arena-host.ts.
+// Invariants: A bot's seq is `lastSeq + 1` on its own gate, so bot shots do not
+//   consume a client's fire gate.
 import type { EngineWsServer } from "conveyor-engine-transport-ws";
 import type { AuthoritativeWorld } from "conveyor-engine-world";
 import { aimDirection, clampPitch, EYE_HEIGHT } from "../shared/look.js";

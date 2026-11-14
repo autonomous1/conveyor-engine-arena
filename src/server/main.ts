@@ -1,3 +1,8 @@
+// ARCHITECTURE: The Node entry: static files, auth routes, WS upgrade, and the
+//   arena host lifecycle.
+// Wiring: imports arena-host.ts, world-loader.ts, and auth/gate.ts; no other
+//   server module imports it.
+// Order: auth and static routes are installed before the host attaches.
 import { randomUUID } from "node:crypto";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";

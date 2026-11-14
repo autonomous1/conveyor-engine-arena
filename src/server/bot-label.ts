@@ -4,6 +4,11 @@
  * Text is built only when that bot's sensor tick changes (the brain's decision
  * rate). Delivery uses the same per-session cache as health.
  */
+// ARCHITECTURE: Host debug labels: one text line per bot, built on the sensor
+//   tick and delivered to watching clients.
+// Wiring: arena-host.ts builds it (enabled by `ARENA_BOT_DEBUG=1`) and the tick
+//   calls `update`; health.ts's `sentFor`/`clientSeesPawn` gate delivery.
+// Invariants: The disabled path returns before building any string or frame.
 import { encodeFrame, type EngineWsServer } from "conveyor-engine-transport-ws";
 import { botLabelText, type BotLabelFrame } from "../shared/bot-label.js";
 import { clientSeesPawn, sentFor } from "./health.js";

@@ -1,3 +1,9 @@
+// ARCHITECTURE: Manifest compilation and validation: doors, regions, props,
+//   sounds, sprites, and hashes into the arena view.
+// Wiring: load-game.ts compiles through it; game-files-node.ts and
+//   game-files-fetch.ts feed it bytes; placements-file.ts builds placements it
+//   consumes.
+// Order: compilation finishes before `loadArena` builds the world.
 import {
   DEFAULT_CAPABILITIES,
   encodeGlb,

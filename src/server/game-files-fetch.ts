@@ -1,3 +1,7 @@
+// ARCHITECTURE: Fetch the manifest, scene files, profiles, and asset bytes over
+//   HTTP into the synchronous `GameFiles` map.
+// Wiring: client/solo.ts preloads through it; game-manifest.ts supplies the
+//   placement refs it follows.
 import { placementRefsOf } from "./game-manifest.js";
 import type { GameFiles } from "./game-files.js";
 

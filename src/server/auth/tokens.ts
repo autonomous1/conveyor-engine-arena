@@ -1,3 +1,7 @@
+// ARCHITECTURE: Ed25519 access tokens: mint/verify, role and scope tables, and
+//   the mtime-throttled revocation list.
+// Wiring: main.ts verifies on every gate; auth/gate.ts verifies hellos;
+//   auth/token-cli.ts mints tokens and writes the revocation file.
 // Ed25519 access tokens. Signed only: no encryption, and this module never writes a key.
 import { importPKCS8, importSPKI, jwtVerify, SignJWT } from "jose";
 import { randomUUID } from "node:crypto";

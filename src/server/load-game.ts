@@ -1,3 +1,9 @@
+// ARCHITECTURE: Load and cache the installed game: disk reads, path resolution,
+//   and the compiled result.
+// Wiring: world-loader.ts calls it; game-files-node.ts supplies the root and
+//   file provider.
+// Invariants: A provided file set skips the disk cache; the boot path caches by
+//   root.
 import { applyHostNoclip } from "../shared/movements.js";
 import type { GameFiles } from "./game-files.js";
 import { nodeGameFiles, nodeHostEnv, projectRoot as findProjectRoot } from "./game-files-node.js";

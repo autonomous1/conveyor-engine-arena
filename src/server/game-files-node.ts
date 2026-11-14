@@ -1,3 +1,7 @@
+// ARCHITECTURE: Disk-backed `GameFiles`: manifest discovery, path resolution,
+//   and placement resolution against this repo or the sibling checkout.
+// Wiring: load-game.ts reads the installed game through it; main.ts uses its
+//   root for boot.
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import process from "node:process";

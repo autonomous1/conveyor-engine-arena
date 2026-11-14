@@ -1,3 +1,9 @@
+// ARCHITECTURE: Pawn hp, death, and respawn timers, plus the per-session
+//   sent-state cache for health, labels, and audit frames.
+// Wiring: arena-host.ts builds the store; game.ts, fire.ts, grenade.ts,
+//   bot-label.ts, and audit.ts call it.
+// Order: respawns apply after the agent steps and before the tick commit.
+// Invariants: Sent state is per session — a reconnect starts with an empty row.
 import { encodeFrame, type EngineWsServer } from "conveyor-engine-transport-ws";
 import type { HealthFrame } from "../shared/health.js";
 

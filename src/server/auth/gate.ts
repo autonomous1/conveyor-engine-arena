@@ -1,3 +1,7 @@
+// ARCHITECTURE: The WebSocket hello gate and the two HTTP Bearer gates: auth
+//   mode, claim checks, and the 401/403 decisions.
+// Wiring: main.ts installs it on the WS upgrade and the two HTTP routes;
+//   auth/gate.ts calls auth/tokens.ts to verify claims.
 // WebSocket hello gate. The access key arrives in `auth`. `token` stays the reconnect token.
 import { AuthError, isRole, verify, type Claims, type RevocationList } from "./tokens.js";
 

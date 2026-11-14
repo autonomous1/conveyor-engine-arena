@@ -1,3 +1,7 @@
+// ARCHITECTURE: Pure snapshot-job bookkeeping: one job per requester and id;
+//   owns no timers.
+// Wiring: arena-host.ts creates it; the `qaSnapshot` handler checks, begins,
+//   and takes; `stop()` clears all.
 /**
  * @why Pure bookkeeping: no timers are created, cleared, or fired here. The
  *      caller creates the timer, stores the handle in the job, and clears it

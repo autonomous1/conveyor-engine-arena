@@ -5,6 +5,12 @@
  * obstacle per door in the world and parks it while the door is open.
  * Changes are broadcast by the caller on the socket, not as a snap envelope.
  */
+// ARCHITECTURE: Runtime door state: open/locked/hold, use gating, and one live
+//   blocker box per door.
+// Wiring: arena-host.ts builds it (:241) and hands `useDoorAs` to bot-brain.ts
+//   as `useDoor`; elevators.ts rides the `ride` surface for cab doors.
+// Order: blockers are created before the doors; the first sync adds each box
+//   before the first tick.
 import type { ArenaView } from "../shared/arena-view.js";
 import type { ElevatorDoors } from "./elevators.js";
 import { markDynamicObstacle } from "../shared/movements.js";

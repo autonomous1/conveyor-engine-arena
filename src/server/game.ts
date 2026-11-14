@@ -1,3 +1,12 @@
+// ARCHITECTURE: The 20 Hz host tick and the per-pawn movement it drives:
+//   input application, wander steering, floor queries, spawns, and teleports.
+// Wiring: arena-host.ts starts the loop (`startWanderLoop`, :373) and places
+//   pawns; elevators.ts imports `placePawn`; bot-brain.ts imports the planning
+//   helpers (`doorsOnRoute`, `planEscapeGoal`, `planWanderTarget`).
+// Order: drain timeouts, step elevators, step agents, commit, run `onTick`
+//   (pickups, grenades, bot updates), publish snapshots.
+// Invariants: One branch per agent per tick — a rider, a timed-out pawn, a dead
+//   pawn, an owned pawn, an unowned bot are mutually exclusive.
 import type { AuthoritativeWorld } from "conveyor-engine-world";
 import type { EngineWsServer } from "conveyor-engine-transport-ws";
 import type { Audit } from "../shared/audit.js";

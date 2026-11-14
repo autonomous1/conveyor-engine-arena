@@ -4,6 +4,15 @@
  * landing the pawn is standing on. Riders are carried with setTransform and
  * shielded by the wander loop so a hall slab cannot push them out of the shaft.
  */
+// ARCHITECTURE: Host elevator cabs: calls, motion, riders, and the room walls
+//   that ride with the cab.
+// Wiring: arena-host.ts builds it (:265); startWanderLoop steps it before the
+//   agents; doors.ts provides the `ride` surface a cab calls while it moves.
+// Order: a cab steps before the agents, and a rider skips its own input that
+//   tick.
+// Invariants: A rider is shielded from the tick commit, so a hall slab cannot
+//   push it out of the cab; room walls move in Y only, so the floor index never
+//   rebuilds for a cab.
 import type { AuthoritativeWorld } from "conveyor-engine-world";
 import type { ArenaElevator, ArenaView } from "../shared/arena-view.js";
 import {

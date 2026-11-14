@@ -1,3 +1,7 @@
+// ARCHITECTURE: Boot loader: compile the installed game and build the
+//   authoritative world, view, scene graph, regions, and wander agents.
+// Wiring: main.ts calls `loadArena`; game.ts, arena-host.ts, bot-sense.ts, and
+//   bot-brain.ts consume `LoadedArena`.
 import { AuthoritativeWorld, applyStaticWorldDefinition } from "conveyor-engine-world";
 import type { GameFiles } from "./game-files.js";
 import { loadInstalledGame } from "./load-game.js";

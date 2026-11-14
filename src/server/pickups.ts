@@ -1,3 +1,10 @@
+// ARCHITECTURE: Host pickup grants: remaining ids, per-pawn keys/loadout, and
+//   obstacle release.
+// Wiring: arena-host.ts builds `createPickupHost`, calls `take` and
+//   `releasePickupObstacle` in `onTick`, and reads `pawnBodies`.
+// Order: `take` runs before grenades in `onTick`.
+// Invariants: A taken id leaves the remaining set; a key is recorded on one
+//   pawn only.
 import type { AuthoritativeWorld } from "conveyor-engine-world";
 import type { PawnHealth } from "../shared/health.js";
 import { pickupBoxSource, type PawnBody } from "../shared/pickups.js";

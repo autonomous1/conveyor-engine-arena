@@ -1,3 +1,7 @@
+// ARCHITECTURE: The host's frame paths: snapshot dispatch, wire framing, and
+//   the inbound/outbound socket adapters.
+// Wiring: arena-host.ts creates the socket paths; game.ts dispatches snapshots
+//   through `hostSnapPath`.
 import type { ClientId } from "conveyor-engine-core";
 import { DirectNetPath, type NetPath, type NetSendOptions, type SnapshotEnvelope } from "conveyor-engine-replication";
 import { decodeFrame, encodeFrame } from "conveyor-engine-transport-ws";

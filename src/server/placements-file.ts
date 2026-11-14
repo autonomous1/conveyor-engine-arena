@@ -1,3 +1,6 @@
+// ARCHITECTURE: Blueprint-scene placements: building instances, numbered
+//   collision AABBs, and the reserved-id rules.
+// Wiring: game-manifest.ts reads placements through `interpretPlacements`.
 /**
  * First free id for baked obstacles.
  * @why Hand-authored collision ids stay below this, so baked obstacle ids

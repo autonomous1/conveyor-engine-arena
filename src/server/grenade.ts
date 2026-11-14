@@ -1,3 +1,8 @@
+// ARCHITECTURE: Host grenade bodies: gates, launch, sweep, bounce/explode, and
+//   pose broadcast.
+// Wiring: arena-host.ts builds it and ticks it in `onTick`; inbound grenade
+//   frames arrive through arena-host.ts.
+// Order: `tick` runs after pickups in `onTick`, before `replicator.publish`.
 import type { EngineWsServer } from "conveyor-engine-transport-ws";
 import type { AuthoritativeWorld } from "conveyor-engine-world";
 import { aimDirection, clampPitch, EYE_HEIGHT } from "../shared/look.js";
