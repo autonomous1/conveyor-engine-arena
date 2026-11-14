@@ -38,6 +38,7 @@ type Entry = {
   doc: string;
   exported: boolean;
   tags: ExtractedTag[];
+  calls: string[];
   members: Entry[];
 };
 
@@ -219,14 +220,14 @@ function memberName(sf: ts.SourceFile, name: ts.PropertyName | undefined): strin
   return name ? text(sf, name) : "";
 }
 
-function classMembers(sf: ts.SourceFile, node: ts.ClassDeclaration, max: number): Entry[] {
+function classMembers(sf: ts.SourceFile, node: ts.ClassDeclaration, max: number, file: string, calls: CallsContext): Entry[] {
   const out: Entry[] = [];
   for (const m of node.members) {
     if (hasModifier(m, ts.SyntaxKind.PrivateKeyword) || hasModifier(m, ts.SyntaxKind.ProtectedKeyword)) continue;
     if (m.name && ts.isPrivateIdentifier(m.name)) continue;
     const isStatic = hasModifier(m, ts.SyntaxKind.StaticKeyword) ? "static " : "";
     let entry: Entry | undefined;
-    const base = { line: lineOf(sf, m), doc: docOf(m), exported: true, tags: extractTags(m), members: [] };
+    const base = { line: lineOf(sf, m), doc: docOf(m), exported: true, tags: extractTags(m), calls: [] as string[], members: [] };
     if (ts.isConstructorDeclaration(m)) {
       entry = { ...base, name: "constructor", kind: "ctor", sig: clip(callSig(sf, m), max) };
     } else if (ts.isMethodDeclaration(m)) {
@@ -237,7 +238,10 @@ function classMembers(sf: ts.SourceFile, node: ts.ClassDeclaration, max: number)
       const ro = hasModifier(m, ts.SyntaxKind.ReadonlyKeyword) ? "readonly " : "";
       entry = { ...base, name: memberName(sf, m.name), kind: `${isStatic}${ro}prop`, sig: clip(m.type ? `: ${text(sf, m.type)}` : "", max) };
     }
-    if (entry) out.push(entry);
+    if (entry) {
+      entry.calls = extractCalls(m, entry.name, file, calls);
+      out.push(entry);
+    }
   }
   return out;
 }
@@ -270,6 +274,97 @@ function resolveLocal(fromFile: string, spec: string, known: Set<string>): strin
   for (const c of candidates) if (known.has(c)) return rel(c);
   for (const c of candidates) if (existsSync(c) && statSync(c).isFile()) return rel(c);
   return rel(base);
+}
+
+export type CallsContext = {
+  declares(file: string): ReadonlySet<string>;
+  importsIn(file: string): ReadonlyMap<string, { file: string; name: string }>;
+};
+
+/** Top-level names per project-relative file, plus local import aliases. */
+export function createCallsContext(files: readonly string[], known: ReadonlySet<string>): CallsContext {
+  const declared = new Map<string, Set<string>>();
+  const imports = new Map<string, Map<string, { file: string; name: string }>>();
+  for (const file of files) {
+    const sf = ts.createSourceFile(file, readFileSync(file, "utf8"), ts.ScriptTarget.Latest, true);
+    const names = new Set<string>();
+    for (const st of sf.statements) {
+      if ((ts.isFunctionDeclaration(st) || ts.isClassDeclaration(st) || ts.isInterfaceDeclaration(st) ||
+        ts.isTypeAliasDeclaration(st) || ts.isEnumDeclaration(st)) && st.name) names.add(st.name.text);
+      if (ts.isVariableStatement(st)) {
+        for (const d of st.declarationList.declarations) if (ts.isIdentifier(d.name)) names.add(d.name.text);
+      }
+    }
+    declared.set(rel(file), names);
+    const map = new Map<string, { file: string; name: string }>();
+    for (const st of sf.statements) {
+      if (!ts.isImportDeclaration(st) || !ts.isStringLiteral(st.moduleSpecifier) || !st.importClause) continue;
+      const spec = st.moduleSpecifier.text;
+      if (!spec.startsWith(".")) continue;
+      const target = resolveLocal(file, spec, known);
+      const bind = st.importClause.namedBindings;
+      if (bind && ts.isNamedImports(bind)) {
+        for (const el of bind.elements) map.set(el.name.text, { file: target, name: el.propertyName?.text ?? el.name.text });
+      }
+      if (st.importClause.name) map.set(st.importClause.name.text, { file: target, name: "default" });
+    }
+    imports.set(rel(file), map);
+  }
+  // Keys are rel() (cwd-relative); the accessors normalize so callers may pass
+  // either the absolute path from `walk` or the relative path `analyze` stores.
+  return {
+    declares: (file) => declared.get(rel(file)) ?? new Set(),
+    importsIn: (file) => imports.get(rel(file)) ?? new Map(),
+  };
+}
+
+function shadowedNames(node: ts.Node): Set<string> {
+  const out = new Set<string>();
+  const visit = (n: ts.Node): void => {
+    if (ts.isParameter(n) && ts.isIdentifier(n.name)) out.add(n.name.text);
+    if (ts.isVariableDeclaration(n) && ts.isIdentifier(n.name)) out.add(n.name.text);
+    if (ts.isCatchClause(n) && n.variableDeclaration && ts.isIdentifier(n.variableDeclaration.name)) out.add(n.variableDeclaration.name.text);
+    if (ts.isFunctionExpression(n) && n.name) out.add(n.name.text);
+    if (ts.isClassDeclaration(n) && n.name) out.add(n.name.text);
+    ts.forEachChild(n, visit);
+  };
+  visit(node);
+  return out;
+}
+
+/** Local top-level symbols this declaration calls, sorted and deduped. */
+export function extractCalls(node: ts.Node, owner: string, file: string, ctx: CallsContext): string[] {
+  const shadow = shadowedNames(node);
+  const local = ctx.declares(file);
+  const imports = ctx.importsIn(file);
+  const out = new Set<string>();
+  const visit = (n: ts.Node): void => {
+    const callee = ts.isCallExpression(n) || ts.isNewExpression(n) ? n.expression : undefined;
+    if (callee && ts.isIdentifier(callee)) {
+      const name = callee.text;
+      if (name !== owner && !shadow.has(name)) {
+        if (local.has(name)) out.add(name);
+        else {
+          const imp = imports.get(name);
+          if (imp && ctx.declares(imp.file).has(imp.name)) out.add(imp.name);
+        }
+      }
+    }
+    ts.forEachChild(n, visit);
+  };
+  visit(node);
+  return [...out].sort();
+}
+
+export const MAX_CALLS = 24;
+
+/** The `calls:` line(s) under a symbol: one line, capped, two-space indent. */
+export function renderCallLines(calls: readonly string[], indent = ""): string[] {
+  if (calls.length === 0) return [];
+  const shown = calls.slice(0, MAX_CALLS).map((name) => `\`${name}\``);
+  const rest = calls.length - shown.length;
+  const more = rest > 0 ? ` … (+${rest} more)` : "";
+  return [`${indent}  calls: ${shown.join(", ")}${more}`];
 }
 
 function packageName(spec: string): string {
@@ -311,7 +406,7 @@ function declarationByName(sf: ts.SourceFile, name: string): ts.Node | undefined
   return undefined;
 }
 
-function analyze(file: string, known: Set<string>, opts: Options): FileInfo {
+function analyze(file: string, known: Set<string>, opts: Options, calls: CallsContext): FileInfo {
   const source = readFileSync(file, "utf8");
   const sf = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
   const info: FileInfo = {
@@ -332,7 +427,7 @@ function analyze(file: string, known: Set<string>, opts: Options): FileInfo {
   const max = opts.maxSig;
   const push = (node: ts.Node, name: string, kind: string, sig: string, exported: boolean, members: Entry[] = [], tagNode: ts.Node = node): void => {
     if (!exported && !opts.all) return;
-    info.entries.push({ name, kind, line: lineOf(sf, node), sig, doc: docOf(node), exported, tags: extractTags(tagNode), members });
+    info.entries.push({ name, kind, line: lineOf(sf, node), sig, doc: docOf(node), exported, tags: extractTags(tagNode), calls: extractCalls(node, name, file, calls), members });
   };
 
   for (const st of sf.statements) {
@@ -366,7 +461,7 @@ function analyze(file: string, known: Set<string>, opts: Options): FileInfo {
       const name = st.name ? st.name.text : "default";
       const abs = hasModifier(st, ts.SyntaxKind.AbstractKeyword) ? "abstract " : "";
       const sig = clip(`${typeParams(sf, st.typeParameters)}${heritage(sf, st.heritageClauses)}`, max);
-      push(st, name, `${abs}class`, sig, exported, exported || opts.all ? classMembers(sf, st, max) : []);
+      push(st, name, `${abs}class`, sig, exported, exported || opts.all ? classMembers(sf, st, max, file, calls) : []);
     } else if (ts.isInterfaceDeclaration(st)) {
       const body = `{ ${st.members.map((m) => text(sf, m).replace(/;$/, "")).join("; ")} }`;
       push(st, st.name.text, "interface", clip(`${typeParams(sf, st.typeParameters)}${heritage(sf, st.heritageClauses)} ${body}`, max), exported);
@@ -388,6 +483,12 @@ function analyze(file: string, known: Set<string>, opts: Options): FileInfo {
         }
       }
     }
+  }
+  // Same-file aliases inherit the declaration's calls, like their tags.
+  for (const e of info.entries) {
+    if (e.kind !== "export" || !e.sig.startsWith("= ")) continue;
+    const target = info.entries.find((x) => x.name === e.sig.slice(2));
+    if (target) e.calls = [...target.calls];
   }
   info.localImports = [...local].sort();
   info.packages = [...pkgs].sort();
@@ -418,7 +519,8 @@ function entryLines(e: Entry, indent: string): string[] {
   const doc = e.doc ? ` — ${e.doc}` : "";
   const head = `${indent}- \`${e.name}\` ${e.kind}${mark} :${e.line}${sig}${doc}`;
   const tags = renderTagLines(e.tags, indent);
-  return tags.length ? [head, ...tags] : [head];
+  const calls = renderCallLines(e.calls, indent);
+  return [head, ...tags, ...calls];
 }
 
 function render(files: FileInfo[], opts: Options, argv: string[]): string {
@@ -431,7 +533,7 @@ function render(files: FileInfo[], opts: Options, argv: string[]): string {
     "",
     `Generated by \`${cmd}\` — do not edit; regenerate after adding, moving or renaming functions or types (\`npm run codemap\`).`,
     `Scope: ${opts.projects.length ? `tsconfig ${opts.projects.join(", ")}` : opts.roots.map((r) => `${toPosix(r)}/`).join(", ")}; ${opts.all ? "exported + local" : "exported"} top-level symbols; parsed only, not type-checked.`,
-    "Format: `name` kind :line `signature` — first JSDoc sentence. Paths are repo-relative. Find a symbol: grep the Symbol index for `` `name` ``.",
+    "Format: `name` kind :line `signature` — first JSDoc sentence. Tag lines and a `calls:` line (local call edges; capped) follow. Paths are repo-relative. Find a symbol: grep the Symbol index for `` `name` ``.",
     "Per file: `imports` = local modules it imports, `pkgs` = packages, `used by` = local files importing it.",
     "",
     "## Files",
@@ -478,7 +580,8 @@ function main(argv: string[]): number {
   const sortKey = (f: string): string => `${posix.dirname(rel(f))}\0${posix.basename(rel(f))}`;
   const files = [...new Set(found)].filter((f) => f !== outAbs).sort((a, b) => (sortKey(a) < sortKey(b) ? -1 : 1));
   const known = new Set(files);
-  const infos = files.map((f) => analyze(f, known, opts));
+  const callsCtx = createCallsContext(files, known);
+  const infos = files.map((f) => analyze(f, known, opts, callsCtx));
   const md = render(infos, opts, argv);
 
   if (opts.check) {
