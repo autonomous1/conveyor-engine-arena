@@ -34,6 +34,7 @@ import { placeAt, type SceneGraph, type ScenePortal, type Vec3 } from "../shared
 import { deliverAuditFrame } from "./audit.js";
 import { deliverHealthFrames } from "./health.js";
 import { dispatchHostFrame, hostSnapPath } from "./host-path.js";
+import { createTickMetrics } from "./tick-metrics.js";
 import type { WanderAgent } from "./world-loader.js";
 
 /**
@@ -908,11 +909,15 @@ export function startWanderLoop(
   const snaps = hostSnapPath((clientId, envelope) => {
     server.sendSnapshot(clientId, envelope);
   });
+  const metrics = createTickMetrics({ tickMs: TICK_MS });
+  // Log the tick budget every 200 ticks (10 s).
+  const TICK_LOG_EVERY = 200;
   let tick = 0;
   let open = true;
   const timer = setInterval(() => {
     if (!open) return;
     tick += 1;
+    metrics.beginTick();
     const timedOut = new Set(server.gateway.drainTimeouts());
     for (const entity of timedOut) {
       world.clearInput(entity);
@@ -926,8 +931,11 @@ export function startWanderLoop(
     for (const entity of held.entities()) {
       if (!owned.has(entity)) held.drop(entity);
     }
+    metrics.endPhase("timeouts");
     noteArenaInterest(server);
+    metrics.endPhase("interest");
     const riders = elevators?.step(MOVE_DT) ?? [];
+    metrics.endPhase("elevators");
     const noclipIds: number[] = [];
     for (const agent of agents) {
       if (riders.includes(agent.id)) continue;
@@ -979,15 +987,18 @@ export function startWanderLoop(
     if (health) {
       for (const id of health.takeRespawns()) respawnPawn(world, agents, id, playerSpawns);
     }
+    metrics.endPhase("agents");
     const shielded = [...noclipIds, ...riders];
     const snap = shielded.length > 0
       ? commitShielded(world, BigInt(tick), shielded)
       : world.commit(BigInt(tick));
+    metrics.endPhase("commit");
     try {
       onTick?.();
     } catch (err) {
       log(`[live] pickup ${err instanceof Error ? err.message : String(err)}`);
     }
+    metrics.endPhase("hooks");
     server.setTick(BigInt(tick));
     const envelopes = server.replicator.publish(world, snap);
     const snapped: number[] = [];
@@ -997,6 +1008,7 @@ export function startWanderLoop(
       dispatchHostFrame(snaps, { type: "snap", clientId, envelope: env }, { to: `client:${clientId}`, kind: "snap" });
       snapped.push(clientId);
     }
+    metrics.endPhase("publish");
     // Only changed or not-yet-seen rows leave; a new session gets every visible pawn once.
     if (health && snapped.length > 0) deliverHealthFrames(server, snapped, health.frames());
     if (audit) deliverAuditFrame(server, audit.frame());
@@ -1007,6 +1019,9 @@ export function startWanderLoop(
         worldEntities: snap.entities.length,
       })}`);
     }
+    metrics.endPhase("frames");
+    metrics.endTick();
+    if (tick % TICK_LOG_EVERY === 0) log(`[live] ${metrics.format()}`);
   }, TICK_MS);
   const handle = timer as { unref?: () => void };
   handle.unref?.();
