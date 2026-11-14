@@ -2,9 +2,9 @@
 
 Browser arena client + authoritative Node host for Conveyor Engine. The host ticks at 20 Hz and sends snapshots over a same-origin WebSocket; a Three.js client renders them.
 
-**Repo:** /home/tim/dev/conveyor-engine-arena. Run every command from this folder.
+**Repo:** ~/dev/conveyor-engine-arena. Run every command from this folder.
 
-**Node version:** use `/home/tim/.nvm/versions/node/v24.0.2/bin/node`. PATH `node` is nvm v4.4.2, which can't run this repo. Start shell commands with `cd /home/tim/dev/conveyor-engine-arena && export PATH=/home/tim/.nvm/versions/node/v24.0.2/bin:$PATH &&` so `node`, `npm` and `npx` are Node 24. Don't try other Node versions.
+**Node version:** use `~/.nvm/versions/node/v24.0.2/bin/node`. PATH `node` is nvm v4.4.2, which can't run this repo. Start shell commands with `cd ~/dev/conveyor-engine-arena && export PATH=~/.nvm/versions/node/v24.0.2/bin:$PATH &&` so `node`, `npm` and `npx` are Node 24. Don't try other Node versions.
 
 **Read order for every task (hard stop)**
 1. The task file the user named — only once.
@@ -45,7 +45,7 @@ Comments carry what types cannot: *why*, *when*, and cross-call invariants. They
 // Invariants: <state that must hold across calls and is not typed>.
 
 **Tag vocabulary (closed set — additions need a consumer).**
-- `@invariant` — must remain true across calls. Pair with a test in `test/` whose name contains the symbol.
+- `@invariant` — must remain true across calls. Pair with an explicit `(test: <name>)` reference to an existing test in `test/`, or defer with `(test lands …)` if the test is scheduled for a later task. Silence is a bug; `test/contract-grep.test.ts` enforces this.
 - `@pre` / `@post` — contracts the type cannot express: call order, required prior action.
 - `@why` — the non-obvious choice; the "looks wrong but isn't". Highest-value tag.
 - `@when` — lifecycle: "set once `sceneGraphReady` resolves", "call before `take`".
