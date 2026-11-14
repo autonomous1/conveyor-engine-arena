@@ -24,7 +24,7 @@ import { encodeMoveButtons } from "../shared/movements.js";
 import { dropPickupAabb } from "../shared/pickups.js";
 import { createFireDebugLog } from "../shared/fire-debug.js";
 import { createClientDiag, presentFaultHud, reportFrameFault } from "./diag.js";
-import { doorLeafBox, pickDoorForUse } from "../shared/doors.js";
+import { doorInReach, doorLeafBox } from "../shared/doors.js";
 import { advanceGrenadeClock, type GrenadePose } from "../shared/grenade.js";
 import { advanceFireClock, createRayBoxList, LASER_MS, TRACE_RANGE, traceIndexed, type TraceCapsule } from "../shared/hitscan.js";
 import { createAabbDebug } from "./aabb-debug.js";
@@ -1009,17 +1009,7 @@ export async function boot(
   }
 
   function overlapsDoor(pawn: { x: number; y: number; z: number }): boolean {
-    const doors = (view.doors ?? []).map((door) => ({
-      id: door.id,
-      hinge: door.hinge,
-      open: doorOpen.get(door.id) === true,
-      locked: door.locked === true,
-      key: door.key,
-      position: door.position,
-      size: door.size,
-      yaw: door.yaw,
-    }));
-    return pickDoorForUse(doors, {
+    const body = {
       id: 0,
       x: pawn.x,
       y: pawn.y,
@@ -1027,7 +1017,8 @@ export async function boot(
       radius: view.pawnRadius,
       height: view.pawnHeight,
       alive: true,
-    }) !== undefined;
+    };
+    return (view.doors ?? []).some((door) => doorInReach(door, body));
   }
 
   function elevatorCall(

@@ -139,6 +139,34 @@ function doorLocalBox(
   };
 }
 
+type DoorShape = Pick<DoorRuntime, "position" | "yaw" | "hinge" | "size">;
+
+/**
+ * The use volume when the pawn overlaps it, else undefined. The squared-distance
+ * reject is exact for this volume: every point is within
+ * `hypot(width, max(gap, outward))` of `door.position`, and a capsule that
+ * overlaps is within `pawn.radius` of a volume point.
+ */
+function overlapVolume(door: DoorShape, pawn: PawnBody): DoorUseVolume | undefined {
+  const dx = pawn.x - door.position[0];
+  const dz = pawn.z - door.position[2];
+  // sqrt, not Math.hypot: the same bound, but hypot is the bulk of a 98-door scan.
+  const depth = Math.max(DOOR_GAP_DEPTH_M, DOOR_USE_OUTWARD_M);
+  const reach = Math.sqrt(door.size[0] * door.size[0] + depth * depth) + pawn.radius;
+  if (dx * dx + dz * dz > reach * reach) return undefined;
+  const volume = doorUseVolume(door);
+  return capsuleOverlapsAabb(pawn.x, pawn.y, pawn.z, pawn.radius, pawn.height, volume) ? volume : undefined;
+}
+
+/**
+ * True when the pawn's capsule overlaps this door's use volume.
+ * @post Conservative: the squared-distance reject never rejects a pawn whose
+ *       capsule overlaps the volume.
+ */
+export function doorInReach(door: DoorShape, pawn: PawnBody): boolean {
+  return overlapVolume(door, pawn) !== undefined;
+}
+
 /**
  * Nearest overlapping door.
  * @invariant Equal distance keeps the smaller id.
@@ -148,8 +176,8 @@ export function pickDoorForUse(doors: readonly DoorRuntime[], pawn: PawnBody): D
   let best: DoorRuntime | undefined;
   let bestDist = Infinity;
   for (const door of doors) {
-    const volume = doorUseVolume(door);
-    if (!capsuleOverlapsAabb(pawn.x, pawn.y, pawn.z, pawn.radius, pawn.height, volume)) continue;
+    const volume = overlapVolume(door, pawn);
+    if (!volume) continue;
     const cx = (volume.minX + volume.maxX) / 2;
     const cz = (volume.minZ + volume.maxZ) / 2;
     const dist = (pawn.x - cx) * (pawn.x - cx) + (pawn.z - cz) * (pawn.z - cz);
