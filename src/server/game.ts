@@ -252,6 +252,7 @@ export function steerUnownedWander(
   nav?: WanderNav,
   cache: NavCache = createNavCache(),
   others: readonly FollowPawn[] = [],
+  flags?: ReadonlyMap<string, boolean>,
 ): void {
   // A fight standing on its own feet must not roll a new heading or start a walk.
   if (holdAngry(world, agent, tick)) return;
@@ -264,7 +265,7 @@ export function steerUnownedWander(
   const loaded = { ...nav, sceneGraph, regions };
   const pose = wanderPose(world, agent);
   if (!pose) return;
-  const flags = doorFlags(loaded, agent.override?.openDoors === true);
+  const openFlags = flags ?? doorFlags(loaded, agent.override?.openDoors === true);
   const claim = agent.override?.goal;
   if (lastClaims.get(agent) !== agent.override) {
     if (agent.override) lastClaims.set(agent, agent.override);
@@ -276,11 +277,11 @@ export function steerUnownedWander(
   const deadline = agent.nextTurn;
   if (walk && tick >= deadline) {
     clearWalk(agent);
-  } else if (walk && agent.goal && doorSignature(walk.watched, flags) !== walk.doorSig) {
-    const again = planWanderTo(pose, agent.goal, loaded, cache, flags);
+  } else if (walk && agent.goal && doorSignature(walk.watched, openFlags) !== walk.doorSig) {
+    const again = planWanderTo(pose, agent.goal, loaded, cache, openFlags);
     if (again) {
       const goal = agent.goal;
-      installWalk(agent, { points: again, goal, claim: walk.claim }, pose, loaded, flags, tick, rng, others);
+      installWalk(agent, { points: again, goal, claim: walk.claim }, pose, loaded, openFlags, tick, rng, others);
       if (wanderWalks.has(agent)) agent.nextTurn = deadline;
       return;
     }
@@ -301,7 +302,7 @@ export function steerUnownedWander(
     // A failed sample. A fresh pawn still has its spawn gait and plans now.
     return;
   }
-  const chosen = claim ? planClaimed(pose, claim, loaded, cache, flags) : chooseWanderGoal(pose, loaded, rng, cache, flags);
+  const chosen = claim ? planClaimed(pose, claim, loaded, cache, openFlags) : chooseWanderGoal(pose, loaded, rng, cache, openFlags);
   if (!chosen) {
     clearWalk(agent);
     // Evade claims run. A point the planner cannot walk still moves on the
@@ -315,7 +316,7 @@ export function steerUnownedWander(
     agent.nextTurn = tick + (claim ? CLAIM_RETRY_TICKS : WANDER_RETRY_TICKS);
     return;
   }
-  installWalk(agent, chosen, pose, loaded, flags, tick, rng, others);
+  installWalk(agent, chosen, pose, loaded, openFlags, tick, rng, others);
 }
 
 /** Metres. Inside this, an angry claim stands instead of following a path. */
@@ -689,15 +690,20 @@ function appendPoints(out: Vec3[], extra: readonly Vec3[]): void {
 /**
  * Open bit per door. `passUnlocked` (Escape only) also counts a shut unlocked
  * door as passable, so the plan goes through it and the brain presses it.
+ * @post Reads `nav.liveDoors` only when `live` is omitted; a supplied array is
+ *       used as-is.
  */
-function doorFlags(nav: WanderNav, passUnlocked = false): Map<string, boolean> {
+export function doorFlags(
+  nav: WanderNav,
+  passUnlocked = false,
+  live: readonly { id: string; open: boolean; locked?: boolean }[] | undefined = nav.liveDoors?.(),
+): Map<string, boolean> {
   const flags = new Map<string, boolean>();
   const locked = new Map<string, boolean>();
   for (const door of nav.doors) {
     flags.set(door.id, door.open === true);
     locked.set(door.id, door.locked === true);
   }
-  const live = nav.liveDoors?.();
   if (live) {
     for (const door of live) {
       flags.set(door.id, door.open === true);
@@ -936,6 +942,10 @@ export function startWanderLoop(
     metrics.endPhase("interest");
     const riders = elevators?.step(MOVE_DT) ?? [];
     metrics.endPhase("elevators");
+    // Door state is fixed for the tick after the cab step; build both variants once.
+    const liveDoors = wanderNav?.liveDoors?.();
+    const flagsOpen = wanderNav ? doorFlags(wanderNav, false, liveDoors) : undefined;
+    const flagsPass = wanderNav ? doorFlags(wanderNav, true, liveDoors) : undefined;
     const noclipIds: number[] = [];
     for (const agent of agents) {
       if (riders.includes(agent.id)) continue;
@@ -979,6 +989,7 @@ export function startWanderLoop(
         wanderNav,
         navCache,
         followOthers(world, agents, agent.id, wanderNav?.pawnRadius ?? 0.5),
+        agent.override?.openDoors === true ? flagsPass : flagsOpen,
       );
       if (fightYaw !== undefined) agent.heading = fightYaw;
       // The picked gait only scales the wish. The clip follows the eased speed.
