@@ -1,6 +1,9 @@
 import type { GameFiles } from "../server/game-files.js";
 
-/** Solo bundle stand-in. The page always passes fetched `GameFiles` and never calls these. */
+/**
+ * Solo bundle stand-in.
+ * @why The page always passes fetched `GameFiles` and never calls these.
+ */
 export function projectRoot(): string {
   throw new Error("node-only");
 }

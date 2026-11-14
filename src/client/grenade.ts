@@ -27,7 +27,11 @@ export type GrenadeDraw = {
   stop?: boolean;
 };
 
-/** Grenade meshes under a group on `parent`. A camera parent throws. A sphere stands in until the GLB loads. */
+/**
+ * Grenade meshes under a group on `parent`. A sphere stands in until the GLB
+ * loads.
+ * @pre A camera parent throws.
+ */
 export interface GrenadeProps {
   /**
    * Sets the position. The first finite pose builds the mesh and yaws it once. A non-finite pose returns undefined.

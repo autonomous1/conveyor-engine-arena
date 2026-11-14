@@ -3,8 +3,9 @@ import { clone as cloneWithSkeleton } from "three/addons/utils/SkeletonUtils.js"
 import { findClip } from "../shared/movements.ts";
 
 /**
- * Idle soles that float about 10 cm are parented that far above the floor.
- * Poses already within 5 cm are left where they are, so a grounded idle is not buried.
+ * @why Idle soles that float about 10 cm are parented that far above the floor.
+ *      Poses already within 5 cm are left where they are, so a grounded idle
+ *      is not buried.
  */
 export const SKIN_PARENT_DROP = 0.1;
 const GROUNDED_SOLE = 0.05;
@@ -38,7 +39,8 @@ export function skinnedSoleGap(root: THREE.Object3D): number {
 
 /**
  * Move `bone` along its parent's up axis so the skinned sole changes by `-gap`
- * meters in world Y. The animation mixer does not write this component.
+ * meters in world Y.
+ * @why The animation mixer does not write this component.
  */
 export function lowerRootToFeet(bone: THREE.Object3D, gap: number): void {
   const parent = bone.parent;
@@ -91,7 +93,10 @@ function componentTrack(
   return new THREE.NumberKeyframeTrack(name, Float32Array.from(times), out);
 }
 
-/** Drop every position track so the mixer cannot write position.y. */
+/**
+ * Drop every position track.
+ * @why The mixer cannot write position.y.
+ */
 export function withoutPositionTracks(clip: THREE.AnimationClip): THREE.AnimationClip {
   return new THREE.AnimationClip(
     clip.name,
@@ -102,7 +107,8 @@ export function withoutPositionTracks(clip: THREE.AnimationClip): THREE.Animatio
 
 /**
  * Fall keeps root-motion X and Z. Root-motion Y is omitted, and so is every
- * other position track, so the mixer never writes position.y.
+ * other position track.
+ * @why The mixer never writes position.y.
  */
 export function withoutRootMotionY(clip: THREE.AnimationClip): THREE.AnimationClip {
   const root = rootPositionTrack(clip);
@@ -132,7 +138,10 @@ function lowestIdleSole(root: THREE.Object3D, clip: THREE.AnimationClip | undefi
   return lowest;
 }
 
-/** Drop the skinned mesh parent by `meters` in world space. The pawn root is not moved. */
+/**
+ * Drop the skinned mesh parent by `meters` in world space.
+ * @post The pawn root is not moved.
+ */
 export function dropSkinnedParent(root: THREE.Object3D, meters: number): void {
   root.updateMatrixWorld(true);
   const seen = new Set<THREE.Object3D>();
@@ -150,9 +159,9 @@ export function dropSkinnedParent(root: THREE.Object3D, meters: number): void {
 }
 
 /**
- * Clone a character for spawning. Scale stays on this object, not the cached
- * GLB. An idle whose soles float is lowered by {@link SKIN_PARENT_DROP}.
- * The fall clip ignores root-motion Y.
+ * Clone a character for spawning. An idle whose soles float is lowered by
+ * {@link SKIN_PARENT_DROP}. The fall clip ignores root-motion Y.
+ * @why Scale stays on this object, not the cached GLB.
  */
 export function prepareCharacter(
   source: THREE.Object3D,

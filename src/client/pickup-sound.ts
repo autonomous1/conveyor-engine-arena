@@ -44,7 +44,10 @@ type Point = { x: number; y: number; z: number };
 
 type Pending = { id: string; sound: ArenaSoundName; kind: "ammo" | "key"; at: number; where: Point };
 
-/** One play per placement. Your follow-up has no position. Anyone else's plays at the pickup. */
+/**
+ * One play per placement. Anyone else's plays at the pickup.
+ * @post Your follow-up has no position.
+ */
 export interface PickupSounds {
   /** Welcome ids still present. Anything else is already spent. Silent, and drops waits. */
   onSet(ids: readonly string[]): void;

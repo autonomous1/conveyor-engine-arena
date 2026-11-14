@@ -25,7 +25,10 @@ type Point = { x: number; y: number; z: number };
 
 type Pending = { id: string; sound: ArenaSoundName; due: number };
 
-/** Door open and close from host frames. Welcome and repeats are silent. Plays sit at the leaf. */
+/**
+ * Door open and close from host frames. Plays sit at the leaf.
+ * @post Welcome and repeats are silent.
+ */
 export interface DoorSounds {
   /** Welcome list. Sets the baseline and drops a waiting close. Silent. */
   onSet(doors: ReadonlyArray<Pick<DoorFrame, "id" | "open" | "locked">>): void;

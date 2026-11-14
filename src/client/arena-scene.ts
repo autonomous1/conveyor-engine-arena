@@ -44,8 +44,8 @@ let basisLoader: KTX2Loader | undefined;
 
 /**
  * Decode KTX2 images in GLBs. One transcoder, matched to the drawing renderer.
- * A renderer with no WebGL extensions cannot run the Basis worker. The stand-in
- * still satisfies KHR_texture_basisu so the mesh loads.
+ * @why A renderer with no WebGL extensions cannot run the Basis worker. The
+ *      stand-in still satisfies KHR_texture_basisu so the mesh loads.
  */
 export function attachKtx2Loader(loader: GLTFLoader, renderer: THREE.WebGLRenderer): void {
   if (!renderer.extensions) {
@@ -345,8 +345,9 @@ export function wallAnchor(face: WallFace, wall: Pick<Bounds2, "minX" | "maxX" |
 }
 
 /**
- * Closed is yaw 0 on the hinge. Open is about 100° so the panel clears the
- * doorway. Sliding is not a door motion. The swing is not a GLB clip.
+ * Closed is yaw 0 on the hinge.
+ * @why Open is about 100° so the panel clears the doorway. Sliding is not a
+ *      door motion. The swing is not a GLB clip.
  */
 export const DOOR_OPEN_DEGREES = 100;
 
@@ -367,6 +368,7 @@ export const DOOR_SWING_SECONDS = 0.4;
 /**
  * Retarget the hinge only. With `animate`, `tickDoorSwing` eases it there over `seconds`
  * (default {@link DOOR_SWING_SECONDS}).
+ * @see tickDoorSwing
  */
 export function applyDoorSwing(
   group: THREE.Object3D,
@@ -445,7 +447,8 @@ export function placeDoorModel(
 
 /**
  * Load each door from `door.model` and clone that scene. Two models are two
- * loads. A second placement is not a clone of the first placement's group.
+ * loads.
+ * @why A second placement is not a clone of the first placement's group.
  */
 export async function placeDoorPlacements(
   doors: readonly ArenaView["doors"][number][],
@@ -615,7 +618,10 @@ export function placeStaticDoorFrames(
   }, doors));
 }
 
-/** Degrees for a wall that omitted yaw. These are the four `wallAnchor` results, not a new turn. */
+/**
+ * Degrees for a wall that omitted yaw.
+ * @why These are the four `wallAnchor` results, not a new turn.
+ */
 export function wallInstancePose(wall: ArenaView["walls"][number], bounds: ArenaView["bounds"]): InstancePose {
   const anchor = wallAnchor(wall.face, wall, bounds);
   const position: [number, number, number] = wall.position ?? [anchor.x, 0, anchor.z];
@@ -628,7 +634,8 @@ export function wallInstancePose(wall: ArenaView["walls"][number], bounds: Arena
 
 /**
  * Play `clipName` on this prop's cloned mesh and loop it.
- * No clip name means no mixer. The host does not run this.
+ * No clip name means no mixer.
+ * @why The host does not run this.
  */
 export function playPropClip(
   root: THREE.Object3D,

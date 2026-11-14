@@ -43,10 +43,16 @@ type State = {
   fade: number;
 };
 
-/** Per-despawn override of the configured delay and fade (a grenade kill fades with its blast). */
+/**
+ * Per-despawn override of the configured delay and fade.
+ * @why A grenade kill fades with its blast.
+ */
 export type DespawnTiming = { delayMs?: number; fadeMs?: number };
 
-/** Spawn and despawn timelines. No scene objects. One row per id that has an effect. */
+/**
+ * Spawn and despawn timelines. One row per id that has an effect.
+ * @why No scene objects.
+ */
 export interface CharacterFx {
   /** Feet position. Stores a copy of `at`. Cancels a despawn of this id. */
   spawn(id: number, at: Point, now: number): void;

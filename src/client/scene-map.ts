@@ -16,8 +16,9 @@ export { MAP_BAKE_URL, SCENE_MAP_SIZE };
 
 /**
  * World XZ bounds the baked PNG was framed on (`map-bake.json`, written by
- * bake:map from the SVG bounds layer). Undefined when absent or malformed, so
- * the caller falls back to the scene bounds.
+ * bake:map from the SVG bounds layer).
+ * @post Undefined when absent or malformed, so the caller falls back to the
+ *       scene bounds.
  */
 export async function loadMapBakeBounds(url = MAP_BAKE_META_URL): Promise<SceneMapWorld["bounds"] | undefined> {
   try {

@@ -1,6 +1,6 @@
 /**
- * Headless QA hooks. Installed only when the page search is `qa=1`.
- * The normal client does not call `installQaApi`.
+ * Headless QA hooks. The normal client does not call `installQaApi`.
+ * @when Installed only when the page search is `qa=1`.
  */
 
 export type V3 = { x: number; y: number; z: number };
@@ -37,15 +37,19 @@ export type QaApi = {
 
 type QaWindow = { __qa?: QaApi };
 
-/** True only for the search `qa=1`. `qa=true` and a bare `qa` are not QA mode. */
+/**
+ * @why True only for the search `qa=1`; `qa=true` and a bare `qa` are not QA
+ *      mode.
+ */
 export function isQaMode(search: string): boolean {
   const query = search.startsWith("?") ? search.slice(1) : search;
   return new URLSearchParams(query).get("qa") === "1";
 }
 
 /**
- * Read `#token=` and drop the fragment with `replaceState`.
- * The fragment is not part of the request URL. An empty token is left in place.
+ * Read `#token=` and drop the fragment with `replaceState`. An empty token is
+ * left in place.
+ * @why The fragment is not part of the request URL.
  */
 export function takeHashToken(
   loc: { hash: string; pathname: string; search: string },

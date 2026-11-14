@@ -7,7 +7,10 @@ function shortPadId(id: string): string {
   return cut.length > 0 ? cut : trimmed;
 }
 
-/** Local health from a `{ t: "health" }` frame. Dead stays until a respawn frame clears it. */
+/**
+ * Local health from a `{ t: "health" }` frame.
+ * @post Dead stays until a respawn frame clears it.
+ */
 export function localHealthLabel(vital: { hp: number; dead: boolean } | undefined): string {
   if (!vital || !Number.isFinite(vital.hp)) return "";
   const hp = Math.min(MAX_HP, Math.max(MIN_HP, vital.hp));

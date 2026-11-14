@@ -8,8 +8,8 @@ export function finiteVec(p: Vec3 | undefined | null): p is Vec3 {
 
 /**
  * Puts the camera on the pawn eye. A shot may draw a segment.
- * The laser endpoint is not written onto the pawn or the camera.
- * A non-finite endpoint draws nothing.
+ * @post The laser endpoint is not written onto the pawn or the camera. A
+ *       non-finite endpoint draws nothing.
  */
 export function presentShot(opts: {
   camera: PerspectiveCamera;

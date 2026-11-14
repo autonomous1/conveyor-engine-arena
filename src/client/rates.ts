@@ -12,7 +12,13 @@ export type RateSample = {
   tickPerSec: number | undefined;
 };
 
-/** Half-second averages for the HUD. One sample object, updated in place. */
+/**
+ * Half-second averages for the HUD.
+ * @why One sample object, updated in place.
+ * @invariant A window with no snapshot leaves `tickPerSec` unset, so the HUD
+ *            shows an em dash instead of 0 or the previous window's value.
+ *            (test: rate_window_tick_unset_without_snapshot)
+ */
 export interface RateWindow {
   /**
    * Count one presented frame. `observedTick` is a snapshot sim tick, when that frame had one.

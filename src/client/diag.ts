@@ -76,7 +76,10 @@ function sensitive(value: string): boolean {
   return false;
 }
 
-/** Short label safe to print. Credentials and long payloads become "omitted". */
+/**
+ * Short label safe to print.
+ * @post Credentials and long payloads become "omitted".
+ */
 export function boundLabel(value: unknown): string | undefined {
   if (typeof value !== "string" || value.length === 0) return undefined;
   if (sensitive(value)) return "omitted";
@@ -185,7 +188,10 @@ export function createClientDiag(opts?: {
 
 const CONSOLE_HINT = "see console";
 
-/** Gameplay or connection line. A fault adds a short hint and never the raw message. */
+/**
+ * Gameplay or connection line.
+ * @why A fault adds a short hint and never the raw message.
+ */
 export function presentFaultHud(gameplay: string, hint: boolean): string {
   if (!hint) return gameplay;
   return `${gameplay} · ${CONSOLE_HINT}`;

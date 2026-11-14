@@ -6,7 +6,9 @@ import { findClip, MOVE_IDLE, MOVEMENTS } from "../shared/movements.ts";
 import { lowerRootToFeet, skinnedSoleGap } from "./pawn-feet.ts";
 import { clipTimeScale, freshGroundSpeed, noteGroundSpeed, noteVelocitySpeed, pickLocomotion, type ClipRate, type GroundSpeed } from "../shared/anim-speed.ts";
 
-/** Fall holds its last frame. Every other gait repeats. */
+/**
+ * @post Fall holds its last frame; every other gait repeats.
+ */
 export function configureClip(action: THREE.AnimationAction, movement: string): void {
   if (movement === "fall") {
     action.setLoop(THREE.LoopOnce, 1);
@@ -100,7 +102,10 @@ function motionBoneOf(model: THREE.Object3D, clips: Map<string, THREE.AnimationC
   return model.getObjectByName(name) ?? undefined;
 }
 
-/** Cloned characters under `parent`, or a capsule when the asset is missing. The owned pawn stays hidden. */
+/**
+ * Cloned characters under `parent`, or a capsule when the asset is missing.
+ * @post The owned pawn stays hidden.
+ */
 export interface PawnLayer {
   /**
    * Once per frame. Snapshot pose and clip (`movementOf` is called, its result unused).

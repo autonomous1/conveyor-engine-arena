@@ -66,7 +66,10 @@ type ListenerLike = {
   setOrientation?(fx: number, fy: number, fz: number, ux: number, uy: number, uz: number): void;
 };
 
-/** The part of AudioContext this module uses, so tests can pass a fake. */
+/**
+ * The part of AudioContext this module uses.
+ * @why Tests can pass a fake.
+ */
 export type AudioContextLike = {
   readonly state: string;
   readonly currentTime: number;
@@ -94,7 +97,10 @@ export type SfxOptions = {
 
 export type Point = { x: number; y: number; z: number };
 
-/** A positional play that can still be moved. See `playTracked`. */
+/**
+ * A positional play that can still be moved.
+ * @see playTracked
+ */
 export type SoundHandle = { move(x: number, y: number, z: number): boolean };
 
 type Voice = {
@@ -495,11 +501,14 @@ export function createSfx(opts: SfxOptions = {}): Sfx {
 }
 
 /**
- * Your own shot plays on the local press. The host echo of that shot must not play again.
- * `noteLocal` records a local play. `echo` returns true when an own echo should still play:
- * there is no local play waiting inside `windowMs`. Fixed storage: no allocation per call.
+ * Your own shot plays on the local press; the host echo of that shot must not
+ * play again.
+ * @pre Call `noteLocal` on the local press, before that echo arrives.
+ * @invariant A waiting local play inside `windowMs` covers exactly one echo and
+ *            is consumed; an echo after the window plays.
+ *            (test: echo_dedupe_consumes_once)
+ * @why Fixed storage: no allocation per call.
  */
-/** Fixed-slot gate so a host echo of your own shot does not play twice. No allocation per call. */
 export interface EchoDedupe {
   /** Record a local play. Notes older than the window are dropped. `now` is ms. */
   noteLocal(now: number): void;

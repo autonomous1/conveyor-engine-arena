@@ -1,6 +1,8 @@
 // Browser-only access key. This file does not verify the signature. The host does.
 
-/** Separate from the reconnect token `ce-arena-token`. */
+/**
+ * @why Separate from the reconnect token `ce-arena-token`.
+ */
 export const AUTH_KEY = "ce-arena-auth";
 
 /** Set by the game client before it sends the player back to the landing page. */
@@ -22,8 +24,9 @@ export function isArenaSolo(): boolean {
 
 /**
  * Read `sub`, `role`, and `exp` from a JWT-shaped string.
- * Checks shape, a non-empty subject, one of the four roles, and `exp` (unix seconds) after now.
- * Does not verify the signature.
+ * Checks shape, a non-empty subject, one of the four roles, and `exp` (unix
+ * seconds) after now.
+ * @why Does not verify the signature.
  */
 export function decodeClaims(key: string, nowMs = Date.now()): DecodeResult {
   const parts = key.split(".");
@@ -43,14 +46,20 @@ export function decodeClaims(key: string, nowMs = Date.now()): DecodeResult {
   return { sub: rec.sub, role: rec.role, exp: rec.exp };
 }
 
-/** Session always. `localStorage` only when `remember` is set, so an unchecked box does not keep a key. */
+/**
+ * Session always. `localStorage` only when `remember` is set.
+ * @why An unchecked box does not keep a key.
+ */
 export function saveKey(key: string, remember: boolean): void {
   sessionStore().setItem(AUTH_KEY, key);
   if (remember) localStore().setItem(AUTH_KEY, key);
   else localStore().removeItem(AUTH_KEY);
 }
 
-/** Session, then local. An unusable key is removed. A later store is tried after that. */
+/**
+ * Session, then local.
+ * @post An unusable key is removed. A later store is tried after that.
+ */
 export function loadKey(nowMs = Date.now()): string | undefined {
   const session = readStore(sessionStore());
   if (session !== undefined) {

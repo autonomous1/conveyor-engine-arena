@@ -3,26 +3,30 @@ import * as THREE from "three";
 /**
  * Wireframe overlay for obstacles the client already loaded.
  * Meshes are built when that list is applied. The frame loop only sets
- * `group.visible`. Nothing here raycasts, and nothing is sent to the host.
+ * `group.visible`.
+ * @why Nothing here raycasts, and nothing is sent to the host.
  */
 
 export const AABB_DEBUG_NAME = "aabb-debug";
 
-/** Walls and building runs share this color. Door gaps are not drawn. */
+/**
+ * Walls and building runs share this color.
+ * @why Door gaps are not drawn.
+ */
 export const AABB_DEBUG_COLOR = 0x3dff9a;
 
 /**
- * Scene meshes use group order 0. This group is later, and the material is
- * transparent, so the lines are drawn after those meshes have filled the
- * depth buffer. depthTest clips an edge behind a wall. depthWrite stays off
- * so the wireframe does not hide the scene.
+ * @why Scene meshes use group order 0. This group is later, and the material is
+ *      transparent, so the lines are drawn after those meshes have filled the
+ *      depth buffer. depthTest clips an edge behind a wall. depthWrite stays off
+ *      so the wireframe does not hide the scene.
  */
 export const AABB_DEBUG_RENDER_ORDER = 1;
 
 /**
  * A prop mesh box is drawn this far outside the obstacle on every side.
  * Small protrusions then sit behind the wireframe. Wall runs are not grown.
- * The host obstacle is unchanged.
+ * @why The host obstacle is unchanged.
  */
 export const AABB_DEBUG_MESH_MARGIN = 0.02;
 

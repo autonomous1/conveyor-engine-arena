@@ -45,7 +45,10 @@ export type ElevatorRoomDebug = {
 
 export type RenderPawn = { x: number; y: number; z: number };
 
-/** Cab-room meshes, lights, doors, and view boxes shift with host cab frames. Nothing is added or removed. */
+/**
+ * Cab-room meshes, lights, doors, and view boxes shift with host cab frames.
+ * @why Nothing is added or removed.
+ */
 export interface ElevatorRooms {
   /** One cab frame. An unknown id is a no-op. The stamp is performance.now. Two frames are kept. */
   onCab(row: ElevatorState): void;

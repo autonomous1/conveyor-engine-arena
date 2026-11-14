@@ -174,7 +174,9 @@ export function saveBotLabels(storage: KeyValueStorage | null | undefined, on: b
   }
 }
 
-/** First id in `choices`, or the saved id when it is still in the list. */
+/**
+ * @post First id in `choices`, or the saved id when it is still in the list.
+ */
 export function loadModelChoice(storage: KeyValueStorage | null | undefined, choices: readonly string[]): string {
   const first = choices[0] ?? "";
   if (!storage || choices.length === 0) return first;
@@ -341,8 +343,8 @@ function browserSession(): KeyValueStorage | null {
 }
 
 /**
- * HTML panel. Call once the status bar exists. The returned model is the
- * same state the panel paints.
+ * HTML panel. The returned model is the same state the panel paints.
+ * @pre Call once the status bar exists.
  */
 export function createOptionsDialog(
   onShowCollision: (on: boolean) => void,

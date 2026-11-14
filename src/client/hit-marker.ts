@@ -1,7 +1,8 @@
 /**
- * One screen circle at the crosshair. It is not a decal and not a scene mesh.
- * A sent local fire shows it for 150 ms. The shooter's own laser shows it
- * only when that send did not. A miss still shows it. Another pawn's laser does not.
+ * One screen circle at the crosshair. A sent local fire shows it for 150 ms.
+ * The shooter's own laser shows it only when that send did not. A miss still
+ * shows it. Another pawn's laser does not.
+ * @why It is not a decal and not a scene mesh.
  */
 
 export const HIT_MARKER_MS = 150;

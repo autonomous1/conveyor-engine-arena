@@ -47,8 +47,10 @@ export type FloorSource = { polygon: ReadonlyArray<readonly [number, number]>; s
 export const FLOOR_LIFT_REACH_M = 30;
 
 /**
- * "F<n>" from the stop heights of the nearest elevator within reach (floor 1
- * is the lowest stop). Falls back to "y <m>m" away from any elevator.
+ * "F<n>" from the stop heights of the nearest elevator within reach.
+ * @invariant Floor 1 is the lowest stop.
+ *            (test: floor_label_uses_lowest_stop)
+ * @post Falls back to "y <m>m" away from any elevator.
  */
 export function floorLabel(pose: Pick<SelfPose, "x" | "y" | "z">, lifts: readonly FloorSource[] = []): string {
   let best: { stops: readonly number[]; d: number } | undefined;

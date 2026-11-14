@@ -36,7 +36,10 @@ export function mountWeaponMesh(root: THREE.Object3D, source: THREE.Object3D): T
  * First-person weapon, parented to this client's camera. Other clients do not
  * get this object. It is not a snapshot entity.
  */
-/** Weapon group on the camera, which is parented to the scene if needed. clear and show do not dispose meshes. */
+/**
+ * Weapon group on the camera, which is parented to the scene if needed.
+ * @post clear and show do not dispose meshes.
+ */
 export interface ViewModel {
   /** Group added to the camera. */
   root: THREE.Group;

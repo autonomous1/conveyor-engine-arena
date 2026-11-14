@@ -63,7 +63,10 @@ export function cameraAim(camera: THREE.Camera): { origin: Vec3; direction: Vec3
   };
 }
 
-/** World bounds of the swinging leaf. The frame is not included. */
+/**
+ * World bounds of the swinging leaf.
+ * @post The frame is not included.
+ */
 export function leafAabb(group: THREE.Object3D): Aabb | undefined {
   let leaf: THREE.Object3D | undefined;
   group.traverse((obj) => {

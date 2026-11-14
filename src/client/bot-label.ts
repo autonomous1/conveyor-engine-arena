@@ -13,8 +13,8 @@ export const LABEL_H = 32;
 /** Metres from the top of the pawn (its height) up to the label centre. */
 export const LABEL_ABOVE_M = 0.4;
 /**
- * World metres. Height 0.4 reads at about 10–20 m with the play camera.
- * Width matches the 128×32 canvas.
+ * World metres. Width matches the 128×32 canvas.
+ * @why Height 0.4 reads at about 10–20 m with the play camera.
  */
 export const LABEL_SCALE_X = 1.6;
 export const LABEL_SCALE_Y = 0.4;

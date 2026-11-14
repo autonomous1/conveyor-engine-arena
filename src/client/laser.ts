@@ -6,7 +6,11 @@ import type { Vec3 } from "../shared/hitscan.js";
  * `expire` takes it out of the scene at `until`. It does not raycast.
  * The parent is the scene. A camera parent is refused.
  */
-/** One reused line per shooter, in a group on `parent`. A camera parent throws. The material is never freed. */
+/**
+ * One reused line per shooter, in a group on `parent`.
+ * @pre A camera parent throws.
+ * @post The material is never freed.
+ */
 export interface LaserBeams {
   /** Show that shooter's segment until `until`. A non-finite value logs and returns. Geometry is made once. */
   show(shooter: number, from: Vec3, to: Vec3, until: number): void;

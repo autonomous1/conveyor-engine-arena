@@ -24,15 +24,22 @@ export const EXPLOSION_FRAMES = 30;
 export const EXPLOSION_FPS = 30;
 export const EXPLOSION_SIZE = 4;
 export const EXPLOSION_POOL_CAP = 8;
-/** Longest step one update takes, in seconds. A long frame doesn't skip the whole blast. */
+/**
+ * Longest step one update takes, in seconds.
+ * @why A long frame doesn't skip the whole blast.
+ */
 export const EXPLOSION_MAX_DT = 0.1;
-/** Tiny push along the surface normal so the billboard does not z-fight the face. */
+/**
+ * @why A tiny push along the surface normal, so the billboard does not z-fight
+ *      the face.
+ */
 export const SURFACE_BLAST_STANDOFF = 0.02;
 /**
- * If the surface normal projected into the camera plane is shorter than this,
- * the view is nearly along the normal (looking down at a floor, or head-on at a
- * wall). Then the sprite is centred and pushed out along the normal so the art's
- * ground line (`anchorY`) is on the surface, so the blast stays a facing quad.
+ * @why If the surface normal projected into the camera plane is shorter than
+ *      this, the view is nearly along the normal (looking down at a floor, or
+ *      head-on at a wall). Then the sprite is centred and pushed out along the
+ *      normal so the art's ground line (`anchorY`) is on the surface, so the
+ *      blast stays a facing quad.
  */
 export const SURFACE_BLAST_DEGENERATE = 0.08;
 
@@ -149,7 +156,10 @@ export type ExplosionSheet = {
 /** `aspect` is frame width over height. `size` is the sprite height; width is `size * aspect`. */
 type Layout = { columns: number; rows: number; frameCount: number; aspect: number; anchorY: number };
 
-/** UV offset of `frame` in the atlas. Row 0 is the image top, so v counts down from 1. */
+/**
+ * UV offset of `frame` in the atlas.
+ * @post Row 0 is the image top, so v counts down from 1.
+ */
 export function explosionFrameOffset(
   frame: number,
   columns = EXPLOSION_COLUMNS,
@@ -281,7 +291,11 @@ function createExplosion(parent: THREE.Object3D, atlas: THREE.Texture, blending:
 
 type Slot = ReturnType<typeof createExplosion>;
 
-/** Pooled sprites in a group on `parent`. A camera parent throws. dispose frees each slot's material and cloned map. */
+/**
+ * Pooled sprites in a group on `parent`. dispose frees each slot's material and
+ * cloned map.
+ * @pre A camera parent throws.
+ */
 export interface ExplosionFx {
   /** Group added to `parent`. Sprites live here. */
   group: THREE.Group;
@@ -546,7 +560,10 @@ export const LASER_IMPACT_FALLBACK_FPS = 60;
 
 export type LaserImpactSheet = ExplosionSheet & { texture: string; laserImpactSize?: number };
 
-/** The `laser-impact` asset, or the grenade sheet when that optional file is missing. */
+/**
+ * @post The `laser-impact` asset, or the grenade sheet when that optional file
+ *       is missing.
+ */
 export function resolveLaserImpactSheet(
   laserImpact?: LaserImpactSheet,
   explosion?: LaserImpactSheet,
@@ -579,7 +596,10 @@ export function laserImpactPlaybackFps(source: LaserImpactSource | undefined, fa
 }
 export type SurfaceExplosionSheet = ExplosionSheet & { texture: string };
 
-/** The `grenade-surface-explosion` asset, or the grenade sheet when that optional file is missing. */
+/**
+ * @post The `grenade-surface-explosion` asset, or the grenade sheet when that
+ *       optional file is missing.
+ */
 export function resolveSurfaceExplosionSheet(
   surfaceExplosion?: SurfaceExplosionSheet,
   explosion?: SurfaceExplosionSheet,
