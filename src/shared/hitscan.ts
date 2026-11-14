@@ -609,6 +609,59 @@ export function sweepSegment(
   return shot;
 }
 
+/**
+ * `sweepSegment` over the floor grid: the segment walks the cells its XZ
+ * projection crosses and tests the boxes listed there, plus the always-list.
+ * @invariant Same closest hit as `sweepSegment` for the same inputs.
+ *            (test: grenade_sweep_indexed_matches_linear)
+ */
+export function sweepIndexed(
+  from: Vec3,
+  to: Vec3,
+  aabbs: readonly TraceAabb[],
+  capsules: readonly TraceCapsule[],
+): SweepHit | undefined {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const dz = to.z - from.z;
+  const length = Math.hypot(dx, dy, dz);
+  if (!(length > HIT_EPS)) return undefined;
+  const dir = { x: dx / length, y: dy / length, z: dz / length };
+  let best = length;
+  let normal: Vec3 | undefined;
+  let hitId: number | undefined;
+  let pawn = false;
+  const take = (hit: FaceHit | undefined, id: number | undefined, isPawn: boolean) => {
+    if (!hit || !(hit.t < best)) return;
+    best = hit.t;
+    normal = hit.normal;
+    hitId = id;
+    pawn = isPawn;
+  };
+  prepareSeen(aabbs.length);
+  const mark = stamp;
+  const consider = (index: number) => {
+    if (seen[index] === mark) return;
+    seen[index] = mark;
+    const box = aabbs[index];
+    if (!box) return;
+    take(segmentAabb(from, dir, box, best), box.id, false);
+  };
+  const grid = floorIndexFor(aabbs);
+  for (let i = 0; i < grid.always.length; i++) consider(grid.always[i]!);
+  const extra = uncoveredBoxes(grid);
+  for (let i = 0; i < extra.length; i++) consider(extra[i]!);
+  walkFloorCells(grid, from, dir, () => best, (cell) => {
+    const start = grid.cellStart[cell]!;
+    const end = grid.cellStart[cell + 1]!;
+    for (let i = start; i < end; i++) consider(grid.items[i]!);
+  });
+  for (const cap of capsules) take(segmentCapsule(from, dir, cap, best), cap.id, true);
+  if (!normal) return undefined;
+  const point = { x: from.x + dir.x * best, y: from.y + dir.y * best, z: from.z + dir.z * best };
+  return { distance: best, point, normal, id: hitId, pawn };
+}
+
 type FaceHit = { t: number; normal: Vec3 };
 
 /** Entry face of a finite ray. `dir` is unit. A point already inside is a miss. */

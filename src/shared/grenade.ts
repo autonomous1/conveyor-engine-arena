@@ -10,7 +10,7 @@
 // Wiring: server/grenade.ts owns bodies; client/boot.ts and client/net.ts apply
 //   poses; shared/bot-protocol.ts parses the frame.
 import { MAX_HP } from "./health.js";
-import { sweepSegment, type SweepHit, type TraceAabb, type TraceCapsule, type Vec3 } from "./hitscan.js";
+import { sweepIndexed, type SweepHit, type TraceAabb, type TraceCapsule, type Vec3 } from "./hitscan.js";
 
 export const GRENADE_INTERVAL_MS = 1000;
 /**
@@ -279,7 +279,7 @@ export function stepGrenade(
     y: body.y + next.vy * dt,
     z: body.z + next.vz * dt,
   };
-  const hit = closerFloorHit(from, to, sweepSegment(from, to, aabbs, capsulesFor(body, next.age, capsules)), floorY);
+  const hit = closerFloorHit(from, to, sweepIndexed(from, to, aabbs, capsulesFor(body, next.age, capsules)), floorY);
   if (!hit) {
     next.x = to.x;
     next.y = to.y;

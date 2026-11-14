@@ -148,9 +148,10 @@ export function createArenaGrenades(opts: {
     tick(dt = MOVE_DT) {
       if (bodies.length === 0) return;
       const boxes = opts.world.listObstacles();
+      const capsules = pawnCapsules(opts.world);
       const kept: GrenadeBody[] = [];
       for (const body of bodies) {
-        const step = stepGrenade(body, dt, boxes, pawnCapsules(opts.world), opts.floorY);
+        const step = stepGrenade(body, dt, boxes, capsules, opts.floorY);
         const point = step.kind === "fly"
           ? { x: step.body.x, y: step.body.y, z: step.body.z }
           : step.kind === "bounce"
