@@ -25,7 +25,7 @@ export function nodeHostEnv(): Record<string, string | undefined> {
 /**
  * Resolve `scene.placements` against the arena root.
  * The file may live in this repo or in the sibling `blueprint-scene` checkout.
- * Absolute paths and anything outside those two trees are rejected.
+ * @post Absolute paths and anything outside those two trees are rejected.
  */
 export function resolvePlacementsPath(root: string, ref: string): string {
   const trimmed = ref.trim();

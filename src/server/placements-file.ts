@@ -1,4 +1,8 @@
-/** First free id for baked obstacles. Hand-authored collision stays below this. */
+/**
+ * First free id for baked obstacles.
+ * @why Hand-authored collision ids stay below this, so baked obstacle ids
+ *      cannot clash with them.
+ */
 export const PLACEMENT_ID_START = 100;
 
 const ID_RE = /^[A-Za-z0-9][A-Za-z0-9_.-]*$/;
@@ -25,7 +29,10 @@ export type BakedBox = {
   maxZ: number;
 };
 
-/** A hinged panel. It is not a building and it has no AABB. `model` is an asset id. */
+/**
+ * A hinged panel. `model` is an asset id.
+ * @why It is not a building and it has no AABB.
+ */
 export type BakedDoor = {
   id: string;
   model: string;
@@ -41,9 +48,9 @@ export type BakedDoor = {
 };
 
 /**
- * Turn a blueprint-scene placements file into building instances and numbered AABBs.
- * `knownModels` is the set of manifest asset ids. Collision ids start at 100 and
- * skip ids already used by the manifest or reserved for the room shell.
+ * Turn a blueprint-scene placements file into building instances and numbered
+ * AABBs.
+ * @pre `knownModels` is the set of manifest asset ids.
  */
 export function interpretPlacements(
   value: unknown,

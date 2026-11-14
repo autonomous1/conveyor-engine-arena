@@ -880,7 +880,7 @@ type CollisionBox = {
 
 /**
  * `scene.placements` is a list of paths. A single string is a one-element list.
- * An absent field is an empty list, not an error.
+ * @post An absent field is an empty list, not an error.
  */
 export function placementRefsOf(scene: unknown): { refs: PlacementRef[]; issues: GameIssue[] } {
   const issues: GameIssue[] = [];

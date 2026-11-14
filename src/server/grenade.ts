@@ -46,8 +46,9 @@ export interface ArenaGrenades {
 }
 
 /**
- * One grenade is a point and a velocity on the host tick. It is not a world
- * entity. Gravity here does not change pawn steps. Clients receive the point.
+ * One grenade is a point and a velocity on the host tick. Clients receive the
+ * point.
+ * @why It is not a world entity: its gravity must not change pawn steps.
  */
 export function createArenaGrenades(opts: {
   world: AuthoritativeWorld;

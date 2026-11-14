@@ -4,7 +4,10 @@ import { sentFor } from "./health.js";
 
 const sentAudit = new WeakMap<EngineWsServer, Map<number, { sessionId: number; key: string }>>();
 
-/** One host counter frame on the same socket as health. Only to client sessions that have not seen these counts. */
+/**
+ * One host counter frame on the same socket as health.
+ * @why Only to client sessions that have not seen these counts.
+ */
 export function deliverAuditFrame(server: EngineWsServer, frame: AuditFrame): void {
   if (server.connected.length === 0) return;
   const key = AUDIT_FIELDS.map((field) => frame[field]).join(",");

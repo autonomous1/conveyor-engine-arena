@@ -8,7 +8,7 @@ const PROFILES_REF = "./web/game/building-profiles.json";
  * Fetch the manifest, every scene file it names, optional building profiles,
  * and every asset uri into memory. `compileGame` stays synchronous over the map.
  * `./web/game/x.json` becomes `${base}game/x.json`. `/assets/...` becomes `${base}assets/...`.
- * `..` and paths outside `game/` and `assets/` are rejected.
+ * @post `..` and paths outside `game/` and `assets/` are rejected.
  */
 export async function preloadGameFiles(base = "./"): Promise<GameFiles> {
   const texts = new Map<string, string>();
@@ -97,7 +97,10 @@ function assetUris(doc: unknown): string[] {
   return uris;
 }
 
-/** Manifest ref → URL under `base`. Undefined when the ref may not be fetched. */
+/**
+ * Manifest ref → URL under `base`.
+ * @post Undefined when the ref may not be fetched.
+ */
 export function mapRef(base: string, ref: string): string | undefined {
   const trimmed = ref.trim();
   if (!trimmed || trimmed.includes("\0") || trimmed.includes("\\") || trimmed.startsWith("/")) return undefined;
@@ -109,7 +112,10 @@ export function mapRef(base: string, ref: string): string | undefined {
   return joinBase(base, rel);
 }
 
-/** Asset uri → URL under `base`. Undefined when the uri leaves `assets/`. */
+/**
+ * Asset uri → URL under `base`.
+ * @post Undefined when the uri leaves `assets/`.
+ */
 export function mapUri(base: string, uri: string): string | undefined {
   if (uri.charCodeAt(0) !== 47 || !uri.startsWith("assets/", 1)) return undefined;
   if (uri.includes("..") || uri.includes("\\") || uri.includes("\0")) return undefined;

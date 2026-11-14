@@ -36,7 +36,7 @@ import type { LoadedArena } from "./world-loader.js";
 
 /**
  * Verified access claims. Same fields as `Claims` in `auth/tokens.ts`.
- * Declared here so this module does not import the Node token signer.
+ * @why Declared here so this module does not import the Node token signer.
  */
 export type HostClaims = {
   sub: string;
@@ -47,7 +47,10 @@ export type HostClaims = {
   exp: number;
 };
 
-/** A duplex the host can attach. The Node wrapper adapts `ws`. Solo adapts `memoryPair`. */
+/**
+ * A duplex the host can attach.
+ * @why The Node wrapper adapts `ws`; Solo adapts `memoryPair`.
+ */
 export type HostConn = {
   send(text: string): void;
   close(): void;
@@ -741,10 +744,10 @@ function clientIdFor(engine: EngineWsServer, socket: TransportSocket): number | 
 }
 
 /**
- * Cheap pre-check before parsing an outbound frame. Every frame on this path is
- * produced by JSON.stringify (encodeFrame), so a welcome always contains this
- * exact token. False positives fall through to the full parse; there are no
- * false negatives for stringify output.
+ * Cheap pre-check before parsing an outbound frame.
+ * @why Every frame on this path is produced by JSON.stringify (encodeFrame), so
+ *      a welcome always contains this exact token. False positives fall through
+ *      to the full parse; there are no false negatives for stringify output.
  */
 export function mayBeWelcome(text: string): boolean {
   return text.includes('"type":"welcome"');

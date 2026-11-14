@@ -44,7 +44,7 @@ export type BearerAuth =
 /**
  * `GET /scene-graph.json`. Missing, bad, or expired is 401.
  * A verified token whose `scope` omits `scene-graph` is 403.
- * Auth-off still needs a Bearer that verifies. No public graph.
+ * @why Auth-off still needs a Bearer that verifies. No public graph.
  */
 export async function checkSceneGraphAuth(
   authorization: string | undefined,
@@ -56,7 +56,8 @@ export async function checkSceneGraphAuth(
 /**
  * `POST /qa/snapshots`. Missing, bad, or expired is 401.
  * A verified token whose `scope` omits `qa` is 403.
- * Auth-off still needs a Bearer that verifies. Solo has no JWT, so it cannot upload.
+ * @why Auth-off still needs a Bearer that verifies. Solo has no JWT, so it
+ *      cannot upload.
  */
 export async function checkQaSnapshotAuth(
   authorization: string | undefined,

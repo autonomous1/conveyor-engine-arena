@@ -13,9 +13,11 @@ export function projectRoot(): string {
 let cached: CompiledGame | undefined;
 
 /**
- * Compile the installed game. Omit `files` to read the repo from disk and cache
- * that result. A provided `files` skips the cache. `env` supplies `ARENA_NOCLIP`;
- * the disk path defaults to the process environment.
+ * Compile the installed game.
+ * @why Omit `files` to read the repo from disk and cache that result. A provided
+ *      `files` skips the cache.
+ * @pre `env` supplies `ARENA_NOCLIP`; the disk path defaults to the process
+ *      environment.
  */
 export function loadInstalledGame(files?: GameFiles, env?: Record<string, string | undefined>): CompiledGame {
   if (files) return compileInstalled(files, env ?? {});
@@ -55,10 +57,10 @@ function readManifestText(files: GameFiles): string {
 
 /**
  * Read placements, and bounds, spawnPoints, playerSpawnPoints, lights, elevators, sceneGraph, or regions when those fields are paths.
- * Inline bounds, spawn points, and lights are left for `compileGame`. Absent placements
- * is `undefined`. An empty placements list is `{ placementFiles: [] }`.
+ * Inline bounds, spawn points, and lights are left for `compileGame`.
  * `web/game/building-profiles.json` is included when that file exists.
  * A string root reads from disk. `GameFiles` reads from that provider.
+ * @post Absent placements is `undefined`. An empty placements list is `{ placementFiles: [] }`.
  */
 export function readManifestSources(root: string, doc: unknown): CompileSources | undefined;
 export function readManifestSources(files: GameFiles, doc: unknown): CompileSources | undefined;
@@ -103,7 +105,10 @@ function readSources(files: GameFiles, doc: unknown): CompileSources | undefined
   return sources;
 }
 
-/** Read every `scene.placements` path. Absent is `undefined`. An empty list is `[]`. */
+/**
+ * Read every `scene.placements` path.
+ * @post Absent is `undefined`; a present empty list is `[]`.
+ */
 export function readPlacementFiles(root: string, doc: unknown): PlacementFileSource[] | undefined {
   return placementFilesFrom(nodeGameFiles(root), doc);
 }

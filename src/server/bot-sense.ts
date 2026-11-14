@@ -20,7 +20,10 @@ import type { WanderAgent } from "./world-loader.js";
 
 const EMPTY_BODIES: readonly PawnBody[] = [];
 
-/** Per-bot sense for the host. Reads the world during `update` and writes nothing. */
+/**
+ * Per-bot sense for the host.
+ * @post Reads the world during `update` and writes nothing.
+ */
 export type HostBotSense = {
   /** Once per host tick, before the brain. The array is held only for this call, then dropped. */
   update(bodies: readonly PawnBody[]): void;

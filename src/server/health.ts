@@ -1,7 +1,10 @@
 import { encodeFrame, type EngineWsServer } from "conveyor-engine-transport-ws";
 import type { HealthFrame } from "../shared/health.js";
 
-/** Owner always sees their pawn. Everyone else needs it in the last interest set. */
+/**
+ * @post Owner always sees their pawn. Everyone else needs it in the last
+ *       interest set.
+ */
 export function clientSeesPawn(server: EngineWsServer, clientId: number, entity: number): boolean {
   const state = server.replicator.get(clientId);
   if (!state?.connected) return false;
@@ -37,7 +40,7 @@ export function sentFor<T>(
 
 /**
  * Arena health frame on the same socket that already carries snapshots.
- * Only a value this client session has not seen for that pawn is sent.
+ * @post Only a value this client session has not seen for that pawn is sent.
  */
 export function deliverHealthFrames(
   server: EngineWsServer,

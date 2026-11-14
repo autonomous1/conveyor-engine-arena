@@ -137,7 +137,8 @@ function peerIp(req: IncomingMessage): string {
 
 /**
  * Fail fast when auth is required and the verify key cannot be read.
- * A missing revocation file revokes nothing. Unset `ARENA_REVOKED_FILE` uses the CLI default path.
+ * @why A missing revocation file revokes nothing. Unset `ARENA_REVOKED_FILE`
+ *      uses the CLI default path.
  */
 export async function openAuthGate(env: NodeJS.ProcessEnv = process.env): Promise<AuthGate> {
   const mode = authMode(env);

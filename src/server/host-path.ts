@@ -21,8 +21,9 @@ export function hostFrameKind(frame: unknown): string | undefined {
 }
 
 /**
- * Arena frames use `t` and have no kernel `type`. `parseWire` would reject
- * them, so the inbound path hands them to the arena and does not forward them.
+ * Arena frames use `t` and have no kernel `type`.
+ * @why `parseWire` would reject them, so the inbound path hands them to the
+ *      arena and does not forward them.
  */
 export function isArenaFrame(frame: unknown): frame is { t: string } {
   if (!frame || typeof frame !== "object") return false;

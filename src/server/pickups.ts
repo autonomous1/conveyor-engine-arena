@@ -2,7 +2,10 @@ import type { AuthoritativeWorld } from "conveyor-engine-world";
 import type { PawnHealth } from "../shared/health.js";
 import { pickupBoxSource, type PawnBody } from "../shared/pickups.js";
 
-/** Living capsules. A dead pawn stays in the list with `alive: false` so it cannot take. */
+/**
+ * Living capsules.
+ * @why A dead pawn stays in the list with `alive: false` so it cannot take.
+ */
 export function pawnBodies(world: AuthoritativeWorld, health: PawnHealth): PawnBody[] {
   const height = Number.isFinite(world.pawnHeight) ? world.pawnHeight : 1.8;
   const out: PawnBody[] = [];
@@ -22,8 +25,8 @@ export function pawnBodies(world: AuthoritativeWorld, health: PawnHealth): PawnB
 }
 
 /**
- * Remove the placement's obstacle. `listObstacles` is the live array.
- * The kernel has no remove, and this does not destroy an entity.
+ * @why The kernel has no remove and this does not destroy an entity, so the
+ *      live `listObstacles` array is spliced in place.
  */
 export function releasePickupObstacle(
   world: AuthoritativeWorld,

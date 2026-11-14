@@ -9,7 +9,10 @@ export type Role = (typeof ROLES)[number];
 export const SCOPES = ["play", "spectate", "scene-graph", "qa", "teleport", "chat", "voice", "admin"] as const;
 export type Scope = (typeof SCOPES)[number];
 
-/** Role defaults. `mint` adds any extra scopes on top of these. */
+/**
+ * Role defaults. `mint` adds any extra scopes on top of these.
+ * @see mint
+ */
 export const DEFAULT_SCOPES: Record<Role, readonly Scope[]> = {
   player: ["play", "chat", "voice"],
   bot: ["play", "chat"],
@@ -53,7 +56,11 @@ export function isScope(value: unknown): value is Scope {
   return typeof value === "string" && (SCOPES as readonly string[]).includes(value);
 }
 
-/** Defaults for `role`, plus `extra`. Extras never remove a default scope. */
+/**
+ * Defaults for `role`, plus `extra`.
+ * @invariant Extras never remove a default scope.
+ *            (test: resolved_scopes_keep_defaults)
+ */
 export function resolvedScopes(role: Role, extra?: readonly Scope[]): Scope[] {
   if (!isRole(role)) throw new AuthError("bad-claims");
   const merged = [...new Set<Scope>([...DEFAULT_SCOPES[role], ...(extra ?? [])])];
@@ -120,9 +127,10 @@ export async function verify(
 export type RevocationList = { has(jti: string): boolean };
 
 /**
- * JSON array of revoked `jti`s. A missing file is an empty list.
- * The mtime is checked at most once every {@link REVOCATION_RELOAD_MS}.
- * `now` defaults to `Date.now` and is only the throttle clock.
+ * JSON array of revoked `jti`s. The mtime is checked at most once every
+ * {@link REVOCATION_RELOAD_MS}.
+ * @post A missing file is an empty list.
+ * @why `now` defaults to `Date.now` and is only the throttle clock.
  */
 export function createRevocationList(file: string, now: () => number = Date.now): RevocationList {
   let revoked = new Set<string>();

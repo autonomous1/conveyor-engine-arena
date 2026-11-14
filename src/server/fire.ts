@@ -42,9 +42,10 @@ export interface ArenaFire {
 }
 
 /**
- * Hitscan for one owned pawn. The eye is inside that pawn's capsule, so the
- * shooter is left out of the capsule list. Pitch is clamped to the same limit
- * as the client camera. `until` is the host clock plus {@link LASER_MS}.
+ * Hitscan for one owned pawn. Pitch is clamped to the same limit as the client
+ * camera. `until` is the host clock plus {@link LASER_MS}.
+ * @why The eye is inside that pawn's capsule, so the shooter is left out of the
+ *      capsule list.
  */
 export function createArenaFire(opts: {
   world: AuthoritativeWorld;

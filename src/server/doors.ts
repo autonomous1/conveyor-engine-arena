@@ -26,13 +26,20 @@ type DoorGate = { sessionId: number; lastSeq: number };
 /** Live obstacle shape the kernel keeps. Only these fields are read or written. */
 type LiveBox = { id: number; minX: number; maxX: number; minZ: number; maxZ: number; minY?: number; maxY?: number };
 
-/** The two public kernel calls a blocker needs. No kernel change, no splice. */
+/**
+ * The two public kernel calls a blocker needs.
+ * @why No kernel change, no splice.
+ */
 export type ObstacleWorld = {
   addObstacle(obstacle: LiveBox): void;
   listObstacles(): readonly LiveBox[];
 };
 
-/** One live kernel obstacle per door. Opening parks it; nothing is removed. */
+/**
+ * @invariant One live kernel obstacle per door. Opening parks it; nothing is
+ *            removed.
+ *            (test: door_blockers_one_obstacle_per_door)
+ */
 export type DoorBlockers = {
   /**
    * Shut: the leaf box blocks. Open: the box is parked.
@@ -47,9 +54,10 @@ export type DoorBlockers = {
 const PARKED = -1e6;
 
 /**
- * One kernel obstacle per door, added once with `addObstacle`. Opening and
- * closing rewrite that live box in place (the kernel loops every obstacle each
- * commit, so the next tick sees it). Nothing is spliced out of `listObstacles`.
+ * One kernel obstacle per door, added once with `addObstacle`.
+ * @why Opening and closing rewrite that live box in place (the kernel loops
+ *      every obstacle each commit, so the next tick sees it). Nothing is
+ *      spliced out of `listObstacles`.
  */
 export function createDoorBlockers(world: ObstacleWorld): DoorBlockers {
   const ids = new Map<string, number>();

@@ -27,7 +27,10 @@ import { deliverHealthFrames } from "./health.js";
 import { dispatchHostFrame, hostSnapPath } from "./host-path.js";
 import type { WanderAgent } from "./world-loader.js";
 
-/** 20 Hz. Measured later; not a competitive tick rate. */
+/**
+ * 20 Hz.
+ * @why Measured later; not a competitive tick rate.
+ */
 export const TICK_MS = 50;
 
 if (MOVE_DT !== TICK_MS / 1000) {
@@ -35,8 +38,8 @@ if (MOVE_DT !== TICK_MS / 1000) {
 }
 
 /**
- * Kernel default interest is 48. The authored floor's opposite corners are
- * about 168 m apart. This host override covers that diagonal.
+ * @why Kernel default interest is 48, and the authored floor's opposite corners
+ *      are about 168 m apart. This host override covers that diagonal.
  */
 export const ARENA_INTEREST_RADIUS = 192;
 
@@ -92,7 +95,10 @@ function unit01(next: () => number): number {
   return next();
 }
 
-/** SplitMix64, local so the production host does not import the simulator. */
+/**
+ * SplitMix64.
+ * @why Local so the production host does not import the simulator.
+ */
 export function splitMix(seed: number): () => number {
   let state = BigInt(seed) & 0xffffffffffffffffn;
   if (state === 0n) state = 1n;
@@ -110,7 +116,7 @@ export type PropClip = { id: string; clip: string };
 
 /**
  * Props are string ids, not entities. The clip name is `animations[animation].clip`.
- * The host does not enqueue a world command and does not run the mixer.
+ * @why The host does not enqueue a world command and does not run the mixer.
  */
 export function startPropAnimation(props: readonly Prop[]): PropClip[] {
   const clips: PropClip[] = [];
@@ -212,7 +218,11 @@ const lastClaims = new WeakMap<WanderAgent, object>();
 /** A claimed goal that cannot be planned waits this long, then tries again. */
 const CLAIM_RETRY_TICKS = 20;
 
-/** Follower installed by {@link steerUnownedWander}. Tests step this; the loop does too. */
+/**
+ * Follower installed by {@link steerUnownedWander}. Tests step this; the loop
+ * does too.
+ * @see steerUnownedWander
+ */
 export function wanderFollower(agent: WanderAgent): WanderWalk["follow"] | undefined {
   return wanderWalks.get(agent)?.follow;
 }
@@ -222,6 +232,7 @@ export function wanderFollower(agent: WanderAgent): WanderWalk["follow"] | undef
  * With a scene graph and baked regions, the pawn samples a region point and
  * walks `planRoute` / `planLegs` waypoints. Without them, the old heading roll runs.
  * Does not apply the wish — {@link stepUnownedWander} still does that.
+ * @see stepUnownedWander
  */
 export function steerUnownedWander(
   world: AuthoritativeWorld,
@@ -406,7 +417,8 @@ const ESCAPE_TRIES = 6;
 
 /**
  * Brain seam: a stand point in `outside` that `agent` can walk to now, or
- * `keep` while that still holds. Shut doors stay unusable, as for wander.
+ * `keep` while that still holds.
+ * @post Shut doors stay unusable, as for wander.
  */
 export function planEscapeGoal(
   world: AuthoritativeWorld,
@@ -459,7 +471,7 @@ export function planEscapeGoal(
 
 /**
  * Waypoints from the pawn to `goal` with shut doors unusable.
- * Evade claims a centre only when this finds a walk. It never opens a door.
+ * @why Evade claims a centre only when this finds a walk. It never opens a door.
  */
 export function planWanderTarget(
   world: AuthoritativeWorld,
@@ -1019,9 +1031,10 @@ function respawnPawn(world: AuthoritativeWorld, agents: WanderAgent[], id: numbe
 }
 
 /**
- * First player pad clear of obstacles and other pawns.
- * `pending` is a pad already chosen for another pawn but not committed yet.
- * A pad that is still blocked is left unused. Respawn keeps the "first pad anyway" fallback.
+ * First player pad clear of obstacles and other pawns. Respawn keeps the "first
+ * pad anyway" fallback.
+ * @pre `pending` is a pad already chosen for another pawn but not committed yet.
+ * @post A pad that is still blocked is left unused.
  */
 export function claimClearSpawn(
   world: AuthoritativeWorld,
@@ -1086,9 +1099,10 @@ export function placePawn(world: AuthoritativeWorld, id: number, spawn: SpawnPic
 export type TeleportBlock = "bounds" | "blocked";
 
 /**
- * Why this landing cannot be used. `undefined` means the capsule is inside
- * `bounds` and clear of static obstacles, including a shut door leaf.
- * Another pawn nearby is not a reason.
+ * Why this landing cannot be used.
+ * @post `undefined` means the capsule is inside `bounds` and clear of static
+ *       obstacles, including a shut door leaf. Another pawn nearby is not a
+ *       reason.
  */
 export function teleportBlockReason(
   world: AuthoritativeWorld,
