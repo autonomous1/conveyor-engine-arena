@@ -72,6 +72,7 @@ type Sample = { tick: number; dist: number };
 /**
  * Wish toward `target`. Yaw 0 faces world +Z, the same frame `moveIntent` uses.
  * `scale` is the forward fraction the host multiplies by `MOVE_SPEED`.
+ * @see moveIntent
  */
 export function wishTo(pose: Pose, target: { x: number; z: number }, scale: number): FollowInput {
   const yaw = Math.atan2(target.x - pose.x, target.z - pose.z);
@@ -81,8 +82,9 @@ export function wishTo(pose: Pose, target: { x: number; z: number }, scale: numb
 
 /**
  * Point 0.3 m outside `doorUseVolume` on `side`, facing the opening.
- * `out` is local +Z (in front of the leaf). `in` is local −Z (through the gap).
- * A pawn radius of 0.5 m at this point overlaps the volume, so `pickDoorForUse` can hit it.
+ * @post `out` is local +Z (in front of the leaf); `in` is local −Z (through
+ *       the gap). A pawn radius of 0.5 m at this point overlaps the volume, so
+ *       `pickDoorForUse` can hit it.
  */
 export function doorStand(
   door: Pick<DoorRuntime, "position" | "yaw" | "hinge" | "size">,

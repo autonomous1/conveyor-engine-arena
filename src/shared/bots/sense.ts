@@ -103,7 +103,10 @@ export type BotSense = {
 export type ExitPortal = Pick<ScenePortal, "id" | "kind" | "a" | "b" | "door">;
 export type ExitDoor = { open: boolean; locked: boolean };
 
-/** Which places can reach the exit. Reach sets rebuild when the door signature changes. */
+/**
+ * Which places can reach the exit.
+ * @when Reach sets rebuild when the door signature changes.
+ */
 export type ExitIndex = {
   /** No-op when the open and locked bits are unchanged. Otherwise rebuilds both floods. */
   update(doors: ReadonlyMap<string, ExitDoor>): void;
@@ -131,7 +134,10 @@ export type SenseDeps = {
   log?(line: string): void;
 };
 
-/** Per-bot surroundings. Each row is overwritten in place. */
+/**
+ * Per-bot surroundings.
+ * @why Each row is overwritten in place.
+ */
 export type BotSensor = {
   /**
    * Once per host tick. Increments `tick` first and swallows errors.
@@ -175,9 +181,9 @@ function compareNear(a: SensedPawn, b: SensedPawn): number {
 }
 
 /**
- * Adjacency is built once. The two reach sets rebuild only when the door
- * signature changes. An elevator never counts. A locked door never counts.
- * A door missing from the rows counts as open.
+ * @why Adjacency is built once; the two reach sets rebuild only when the door
+ *      signature changes. An elevator never counts. A locked door never counts.
+ *      A door missing from the rows counts as open.
  */
 export function createExitIndex(portals: readonly ExitPortal[], exit = "outside"): ExitIndex {
   const adj = new Map<string, ExitPortal[]>();

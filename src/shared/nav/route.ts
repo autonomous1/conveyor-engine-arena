@@ -81,7 +81,11 @@ export type RoadCache = {
 
 /**
  * One compiled net per gate signature.
- * `plan` asks for hundreds of routes under the same doors; compiling each one is the hang.
+ * @why `plan` asks for hundreds of routes under the same doors; compiling each
+ *      one is the hang.
+ * @invariant The same gate results and `elevators` flag reuse one compile; a
+ *            changed signature compiles again.
+ *            (test: road_cache_one_net_per_signature)
  */
 export function createRoadCache(graph: SceneGraph): RoadCache {
   const bucket = new Map<string, Roads>();
@@ -122,8 +126,8 @@ function gateSignature(graph: SceneGraph, gate: (portal: ScenePortal) => Gate): 
 
 /**
  * Strict metres from `from` to every reachable place.
- * One Dijkstra. The origin place is 0. Missing ids are unreachable.
- * `net` already baked the gate, so several origins share one compile.
+ * @post The origin place is 0; missing ids are unreachable. One Dijkstra;
+ *       `net` already baked the gate, so several origins share one compile.
  */
 export function routePlaceCosts(
   graph: SceneGraph,

@@ -97,8 +97,9 @@ export function crossingGridArea(graph: SceneGraph, fromId: string, toId: string
 
 /**
  * Shafts whose footprint meets `area`, except a shaft named by one of
- * `placeIds` (`<shaft>@<i>`). Slabs cover the shaft, so the hall grid has to
- * block it; the stop grid is the cab and its landing.
+ * `placeIds` (`<shaft>@<i>`).
+ * @why Slabs cover the shaft, so the hall grid has to block it; the stop grid
+ *      is the cab and its landing.
  */
 export function shaftBlocks(
   graph: SceneGraph,
@@ -147,8 +148,10 @@ export function specForCrossing(graph: SceneGraph, fromId: string, toId: string)
 }
 
 /**
- * Static obstacles for a grid. Elevator room walls ride with the cab, so they
- * are dropped until `cabs` supplies a height. A shut door contributes its leaf.
+ * Static obstacles for a grid.
+ * @why Elevator room walls ride with the cab, so they are dropped until `cabs`
+ *      supplies a height.
+ * @post A shut door contributes its leaf.
  */
 export function navBoxes(
   view: Pick<ArenaView, "aabbs" | "doors">,

@@ -1,7 +1,8 @@
 /**
- * Choose where an Evade bot runs. Pure: no clock and no Node.
- * The caller supplies path costs (place routing, Euclidean inside a place)
- * and, if it wants, an occlusion test. Rays run only on the cheap top N.
+ * Choose where an Evade bot runs.
+ * @why Pure: no clock and no Node. The caller supplies path costs (place
+ *      routing, Euclidean inside a place) and, if it wants, an occlusion test.
+ *      Rays run only on the cheap top N.
  */
 export type FleeVec = { readonly x: number; readonly y: number; readonly z: number };
 
@@ -51,7 +52,10 @@ export type FleeTuning = {
   wAmmo: number;
 };
 
-/** Weights from the flee score. Medkit and ammo stay 0. */
+/**
+ * Weights from the flee score.
+ * @why Medkit and ammo stay 0.
+ */
 export const FLEE_TUNING: Readonly<FleeTuning> = Object.freeze({
   maxPathM: 45,
   minRunM: 12,
@@ -107,7 +111,8 @@ export type FleeChoice = {
 
 /**
  * Metres along the place graph, or Euclidean when `toPlace` is `fromPlace`.
- * `placeCosts` is a `routePlaceCosts` map from `from`. A missing place is unreachable.
+ * @pre `placeCosts` is a `routePlaceCosts` map from `from`.
+ * @post A missing place is unreachable.
  */
 export function costInPlaces(
   from: FleeVec,
@@ -131,8 +136,8 @@ type Ranked = {
 };
 
 /**
- * Highest-scoring region centre that is away from the threat, or undefined
- * when every centre is toward it, too far, or unreachable.
+ * Highest-scoring region centre that is away from the threat.
+ * @post Undefined when every centre is toward it, too far, or unreachable.
  */
 export function pickFleePoint(input: FleeInput, tuning: Readonly<FleeTuning> = FLEE_TUNING): FleeChoice | undefined {
   const away = unit(input.me.x - input.threat.x, input.me.y - input.threat.y, input.me.z - input.threat.z);

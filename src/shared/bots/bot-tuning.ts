@@ -1,7 +1,8 @@
 /**
- * Every FightBack knob. One frozen object so a playtest change is a number,
- * not a hunt through the arbiter and the executor.
- * Degrees here are degrees. Callers convert when they need radians.
+ * Every FightBack knob. Degrees here are degrees. Callers convert when they
+ * need radians.
+ * @why One frozen object so a playtest change is a number, not a hunt through
+ *      the arbiter and the executor.
  */
 export const BOT_TUNING = Object.freeze({
   /** Seeded wait after the target first becomes engageable. */

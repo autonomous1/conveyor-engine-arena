@@ -73,8 +73,8 @@ export function createBotContext(graph: SceneGraph, pickups: readonly PickupPlac
 
 /**
  * One action per place, door, locked leaf, and pickup.
- * A key pickup is grounded only when `lockedAlternative` names that key,
- * cheapest alternative first, so unused keys never enter the search.
+ * @why A key pickup is grounded only when `lockedAlternative` names that key,
+ *      cheapest alternative first, so unused keys never enter the search.
  */
 export function groundActions(
   graph: SceneGraph,
@@ -186,7 +186,7 @@ export function pickup(item: PickupPlacement, place: string): Action<BotCtx> {
 /**
  * Place under the pickup, or `outside`.
  * Floor boxes sit on `minY`. A chest-high box matches a metre under its centre.
- * The first sample that lands inside a place wins.
+ * @post The first sample that lands inside a place wins.
  */
 export function placeOfPickup(graph: SceneGraph, item: PickupPlacement): string {
   const x = (item.minX + item.maxX) / 2;
@@ -281,8 +281,8 @@ function walkToStand(graph: SceneGraph, place: string, stand: Point): number {
  * Seconds still to pay.
  * An open walk is one strict route, reused so the direct `goTo` is popped
  * next. A locked walk names the alternative doors once; any other door is
- * unreachable and `plan` drops that state. No finite bound (elevator-only,
- * missing id) stops the search.
+ * unreachable and `plan` drops that state.
+ * @post No finite bound (elevator-only, missing id) stops the search.
  */
 export function estimateSeconds(
   goal: { want: WorldState },

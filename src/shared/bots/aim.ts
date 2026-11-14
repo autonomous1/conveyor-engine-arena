@@ -43,7 +43,7 @@ export function sampleAim(
 
 /**
  * Turn toward `wantYaw` by at most the tuning rate times `dtMs`.
- * A gap inside the step lands on `wantYaw`. The short arc wins.
+ * @post A gap inside the step lands on `wantYaw`; the short arc wins.
  */
 export function turnToward(currentYaw: number, wantYaw: number, dtMs: number): number {
   if (!Number.isFinite(currentYaw)) return Number.isFinite(wantYaw) ? wantYaw : 0;
@@ -57,7 +57,7 @@ export function turnToward(currentYaw: number, wantYaw: number, dtMs: number): n
 
 /**
  * Bursts of 2–4 shots at {@link BOT_TUNING.burstHz}, then a pause.
- * The first call is due. A true result consumes that shot.
+ * @post The first call is due. A true result consumes that shot.
  */
 export function burstScheduler(rng: () => number): { due(now: number): boolean } {
   const gap = 1000 / BOT_TUNING.burstHz;

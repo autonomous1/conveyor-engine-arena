@@ -40,28 +40,44 @@ export const EXIT_PLACE = "outside";
 
 /** Recent damage still counts as hurt. */
 export const HURT_MS = 10_000;
-/** Recent damage counts as under fire, which raises Evade's priority. */
+/**
+ * @why Recent damage counts as under fire, which raises Evade's priority.
+ */
 export const UNDER_FIRE_MS = 2_000;
 /** No damage for this long is the quiet half of `safe`. */
 export const SAFE_QUIET_MS = 5_000;
-/** `safe` must stay true this long, with no new damage, before Evade lets go. */
+/**
+ * @why `safe` must stay true this long, with no new damage, before Evade lets
+ *      go.
+ */
 export const SAFE_HOLD_MS = 3_000;
-/** Evade does not end before this, even when `safe` already held. */
+/**
+ * @why Evade does not end before this, even when `safe` already held.
+ */
 export const EVADE_DWELL_MS = 1_500;
-/** After Evade ends, the same damage note cannot start it again until this passes. A new `seq` does not wait. */
+/**
+ * @post After Evade ends, the same damage note cannot start it again until
+ *       this passes. A new `seq` does not wait.
+ */
 export const EVADE_COOLDOWN_MS = 5_000;
-/** Metres from the threat. This far is `safe` even while the threat can still see the bot. */
+/**
+ * Metres from the threat.
+ * @why This far is `safe` even while the threat can still see the bot.
+ */
 export const SAFE_DISTANCE_M = 35;
 /**
  * Armed and above this fraction of hp, the bot would rather fight.
- * The host brain sets `armed` when FightBack is wired. Otherwise a hit flees
- * unless the bot is cornered.
+ * @why The host brain sets `armed` when FightBack is wired; otherwise a hit
+ *      flees unless the bot is cornered.
  */
 export const FLEE_BELOW = BOT_TUNING.fleeBelow;
 /** FightBack, when the target is a live threat the bot can still shoot. */
 export const FIGHT_PRIORITY = 9;
 
-/** What the arbiter reads. `BotSense` satisfies it. The threat fields are optional. */
+/**
+ * What the arbiter reads. The threat fields are optional.
+ * @see BotSense
+ */
 export type MindSense = Pick<BotSense, "alive" | "place" | "msNoProgress" | "routeOut"> & {
   damage?: BotSense["damage"];
   hpFrac?: number;
@@ -90,7 +106,10 @@ export type MindSense = Pick<BotSense, "alive" | "place" | "msNoProgress" | "rou
   fight?: FightFacts;
 };
 
-/** What the brain knows about the pawn it might shoot. The arbiter casts no rays. */
+/**
+ * What the brain knows about the pawn it might shoot.
+ * @why The arbiter casts no rays.
+ */
 export type FightFacts = {
   /** A living player who hurt this bot is still in memory. */
   threat: boolean;
@@ -104,7 +123,10 @@ export type FightFacts = {
   forgotten: boolean;
 };
 
-/** Latch for one bot. Timestamps are ms on the `now` passed to `judge`. */
+/**
+ * Latch for one bot. Timestamps are ms on the `now` passed to `judge`.
+ * @see judge
+ */
 export type Mind = {
   /** ms when this place first had no open route out. Cleared when that is no longer true. */
   noRouteSince?: number;
@@ -161,10 +183,12 @@ export function resetMind(mind: Mind): void {
 
 /**
  * One decision. Wander is 1, Escape is 6 while it holds, and Evade is 9.5
- * under fire or 8.5 while the hurt memory lasts. Escape is latched: it begins
- * when the bot is trapped and ends only once the bot is outside, so a place
- * change or an opened door on the way out does not drop it. Evade is latched
- * the same way and does not clear that Escape timer.
+ * under fire or 8.5 while the hurt memory lasts.
+ * @invariant Escape is latched: it begins when the bot is trapped and ends
+ *            only once the bot is outside, so a place change or an opened door
+ *            on the way out does not drop it. Evade is latched the same way
+ *            and does not clear that Escape timer.
+ *            (test: escape_stays_latched_until_outside)
  */
 export function judge(
   mind: Mind,

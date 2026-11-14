@@ -37,7 +37,10 @@ export function doorLockedFact(doorId: string): string {
   return `doorLocked:${doorId}`;
 }
 
-/** Retrieve is satisfied when this is true. For a key it matches `hasKey`. */
+/**
+ * Retrieve is satisfied when this is true. For a key it matches `hasKey`.
+ * @see hasKeyFact
+ */
 export function holdingFact(pickupId: string): string {
   return `holding:${pickupId}`;
 }
@@ -66,7 +69,12 @@ export type WorldSnapshot = {
   ammo?: number;
 };
 
-/** Flat record `plan` reads. Missing facts compare as false. */
+/**
+ * Flat record `plan` reads.
+ * @invariant A held key sets both `hasKey` and `holding`. An absent fact is
+ *            omitted, so readers treat it as false.
+ *            (test: world_state_key_sets_both_facts)
+ */
 export function buildWorldState(world: WorldSnapshot): WorldState {
   const gone = new Set(world.gone ?? []);
   const state: Record<string, Fact> = { [AT]: world.at };

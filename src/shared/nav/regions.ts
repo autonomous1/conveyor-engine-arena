@@ -113,8 +113,9 @@ export function indexRegions(file: BakedRegionsFile): Map<string, RegionGraph> {
 }
 
 /**
- * Drop portals a shut leaf covers. An open door leaves the bake unchanged.
- * The returned graph shares `regions` with `graph`. Cab motion is not applied here.
+ * Drop portals a shut leaf covers.
+ * @post An open door leaves the bake unchanged; the returned graph shares
+ *       `regions` with `graph`. Cab motion is not applied here.
  */
 export function overlayShutDoors(
   graph: RegionGraph,
@@ -133,7 +134,10 @@ export function overlayShutDoors(
   return { placeId: graph.placeId, regions: graph.regions, portals };
 }
 
-/** `scene.regions` file. Absent and invalid are the caller's problem; this only parses. */
+/**
+ * `scene.regions` file.
+ * @post Absent and invalid are the caller's problem; this only parses.
+ */
 export function parseBakedRegions(value: unknown): { file?: BakedRegionsFile; issues: RegionIssue[] } {
   const issues: RegionIssue[] = [];
   if (!value || typeof value !== "object" || Array.isArray(value)) {
