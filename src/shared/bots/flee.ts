@@ -1,3 +1,6 @@
+// ARCHITECTURE: Evade destination scoring: flee vectors, region centres, and
+//   path costs.
+// Wiring: server/bot-brain.ts calls `pickFleePoint`.
 /**
  * Choose where an Evade bot runs.
  * @why Pure: no clock and no Node. The caller supplies path costs (place

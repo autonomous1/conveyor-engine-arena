@@ -6,6 +6,10 @@
  *       `fired`. `accepted` waits until that seq also clears the cadence
  *       window.
  */
+// ARCHITECTURE: Fire counters shared by the host and the client's options
+//   panel.
+// Wiring: server/audit.ts and server/fire.ts write; server/game.ts and
+//   server/arena-host.ts send; client/options.ts and client/net.ts read.
 
 export const AUDIT_FIELDS = [
   "fired",

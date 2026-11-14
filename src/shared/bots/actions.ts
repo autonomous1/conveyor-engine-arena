@@ -3,6 +3,10 @@
  * `routeCost` is metres from `planRoute`. A locked leaf stays impassable
  * until `unlock` opens it in the simulated state. Holding the key does not.
  */
+// ARCHITECTURE: Grounded GOAP actions over the scene graph: goTo, goToDoor,
+//   unlock, pickup, and their costs.
+// Wiring: server/bot-brain.ts plans with them; shared/nav/route.ts supplies
+//   route costs.
 import { createRoadCache, planRoute, routePlaceCosts, type Gate, type RoadCache } from "../nav/route.js";
 import type { PickupPlacement } from "../pickups.js";
 import { placeAt, type SceneGraph, type ScenePortal } from "../scene-graph.js";

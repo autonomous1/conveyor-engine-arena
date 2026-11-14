@@ -1,3 +1,6 @@
+// ARCHITECTURE: The character-id choice on hello and the model frame.
+// Wiring: server/arena-host.ts parses hello; client/net.ts sends and applies
+//   the frame.
 /**
  * Character id carried on hello.
  * @when Absent or blank means the host default.

@@ -3,6 +3,10 @@
  * The host still runs `wishPlanar` and `approachVelocity`. This module
  * only chooses `moveX`, `moveZ` and `yaw`.
  */
+// ARCHITECTURE: Turns a planned path into the per-tick input frame and the door
+//   stands a bot presses.
+// Wiring: server/game.ts's wander loop uses the follower; server/bot-brain.ts
+//   plans door stands.
 import {
   DOOR_GAP_DEPTH_M,
   DOOR_USE_OUTWARD_M,

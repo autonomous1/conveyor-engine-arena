@@ -2,6 +2,11 @@
  * Arena frame parsers for a browser client, a Worker bot, or a Node bot.
  * No Node builtin imports, no filesystem, and no WebSocket package.
  */
+// ARCHITECTURE: Arena frame parsers and the small wire types for client and bot
+//   frames (health, doors, elevators, lasers, grenades, QA).
+// Wiring: client/net.ts parses snapshots; client/boot.ts and
+//   client/info-probe.ts parse arena frames; shared/info-probe.ts reads the
+//   scene-graph frame.
 import { parseAudit, type AuditFrame } from "./audit.js";
 import { parseDoor, parseDoorSet, type DoorFrame } from "./doors.js";
 import { parseElevatorSet, parseElevatorState, type ElevatorState } from "./elevators.js";

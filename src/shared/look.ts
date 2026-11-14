@@ -1,3 +1,8 @@
+// ARCHITECTURE: The planar input frame: yaw/pitch conventions, move intent, eye
+//   height, and stick mappings.
+// Wiring: client/boot.ts samples it; client/input.ts and client/scene-map.ts
+//   use the conventions; server/game.ts, server/fire.ts, server/grenade.ts,
+//   server/bot-sense.ts, and shared/nav/follow.ts import it.
 /**
  * Engine planar frame. Yaw 0 faces world +Z, matching `integratePlanarMove`
  * (moveZ positive, moveX zero) and the yaw quaternion the server stores.

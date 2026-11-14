@@ -1,3 +1,6 @@
+// ARCHITECTURE: Shadow quality and algorithm settings for the renderer.
+// Wiring: client/arena-scene.ts applies; server/game-manifest.ts validates the
+//   manifest rows.
 /** Cheap hard maps, filtered maps, then variance maps at high resolution. */
 export const SHADOW_QUALITIES = ["off", "basic", "soft", "realistic"] as const;
 

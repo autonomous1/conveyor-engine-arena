@@ -5,6 +5,9 @@
  * Evade runs from a recent hit and holds until the bot has been safe. It does
  * not clear an Escape latch, so Escape resumes with the same timer.
  */
+// ARCHITECTURE: Goal arbitration and latches: Escape, Evade, and FightBack
+//   priorities.
+// Wiring: server/bot-brain.ts calls `judge` each tick.
 import { BOT_TUNING } from "./bot-tuning.js";
 import type { BotSense } from "./sense.js";
 

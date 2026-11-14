@@ -9,6 +9,9 @@
  * box of the transformed corners.
  * @why No DOM: plain text parsing, so it runs in Node and in tests.
  */
+// ARCHITECTURE: World bounds from an Inkscape `bounds` layer via plain text and
+//   SVG affine math.
+// Wiring: src/util/bake-map.ts reads extents at bake time; no runtime consumer.
 
 export type SvgMapBounds = { minX: number; maxX: number; minZ: number; maxZ: number };
 

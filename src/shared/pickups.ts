@@ -5,6 +5,10 @@
  *      is closed: distance <= radius counts. A strict overlap would miss the
  *      contact.
  */
+// ARCHITECTURE: Pickup ids, AABB source names, capsule overlap, and the
+//   placement/touch rules.
+// Wiring: server/pickups.ts grants; server/arena-host.ts releases; client/boot.ts
+//   and client/net.ts play frames; shared/doors.ts uses capsule overlap.
 
 export const HEALTH_PICKUP = 25;
 export const AMMO_PICKUP = 30;

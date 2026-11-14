@@ -7,6 +7,10 @@
  * blocks any cell more than a step below that place, so the path does not
  * drop off a ledge.
  */
+// ARCHITECTURE: Occupancy grid for one place: nav boxes, cells, and local
+//   paths.
+// Wiring: server/game.ts builds grids; shared/nav/follow.ts and
+//   shared/nav/legs.ts query them.
 import { doorLeafBox } from "../doors.js";
 import { pointInPolygon } from "../elevators.js";
 import { STEP_HEIGHT, floorHeight, type FloorBox } from "../movements.js";

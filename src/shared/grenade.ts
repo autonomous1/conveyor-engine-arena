@@ -5,6 +5,10 @@
  * Grenades do not collide with each other. There is no second dynamic body.
  */
 
+// ARCHITECTURE: Grenade body math: launch, step/sweep, bounce or explode, and
+//   the pose frame.
+// Wiring: server/grenade.ts owns bodies; client/boot.ts and client/net.ts apply
+//   poses; shared/bot-protocol.ts parses the frame.
 import { MAX_HP } from "./health.js";
 import { sweepSegment, type SweepHit, type TraceAabb, type TraceCapsule, type Vec3 } from "./hitscan.js";
 

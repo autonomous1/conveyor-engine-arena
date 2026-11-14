@@ -4,6 +4,11 @@
  * rebuilds it. A shut door drops any portal whose usable segment meets the leaf.
  * Task 26 turns a path into movement waypoints. Nothing here walks.
  */
+// ARCHITECTURE: Baked region adjacency: search, shut-door overlay, and the
+//   region-file parser.
+// Wiring: server/world-loader.ts loads the bake; server/game.ts and
+//   server/bot-brain.ts query; shared/nav/funnel.ts and shared/nav/legs.ts
+//   consume overlays.
 import { doorLeafBox, type DoorRuntime } from "../doors.js";
 import { STEP_HEIGHT } from "../movements.js";
 import type { Vec3 } from "../scene-graph.js";

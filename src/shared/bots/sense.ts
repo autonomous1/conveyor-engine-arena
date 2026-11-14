@@ -2,6 +2,10 @@
  * Observe-only surroundings for a wander bot.
  * The host stores the result. Nothing here aims, steers, or touches the world.
  */
+// ARCHITECTURE: Observe-only surroundings: bot rows, exit index, and sense
+//   tuning.
+// Wiring: server/bot-sense.ts adapts the world; server/bot-brain.ts and
+//   shared/bots/arbiter.ts read the rows.
 import { MAX_HP, type DamageNote } from "../health.js";
 import type { ScenePortal } from "../scene-graph.js";
 

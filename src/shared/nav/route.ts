@@ -7,6 +7,14 @@
  * so the search starts on `<shaft>@<i>` instead of failing. Elevator portals
  * stay unusable unless `opts.elevators` is set.
  */
+// ARCHITECTURE: Portal routing: one compiled net per gate signature, plus the
+//   strict place-cost map the planner reads.
+// Wiring: server/game.ts calls `planRoute`; server/bot-brain.ts builds the road
+//   cache and calls `routePlaceCosts`; shared/bots/actions.ts plans through it.
+// Order: a net is compiled once per (graph, gates, elevators) signature, before
+//   `routePlaceCosts` is called for an origin.
+// Invariants: The same signature reuses one compile; `net` returns a new
+//   wrapper each call but the same live roads.
 import {
   isElevatorShaft,
   placeAt,

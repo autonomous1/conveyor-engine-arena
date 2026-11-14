@@ -5,6 +5,15 @@
  * `traceHitscan` tests every box. `traceIndexed` asks the floor grid which
  * cells the ray crosses and tests those boxes, plus the grid's always-list.
  */
+// ARCHITECTURE: Ray and segment tests against the same obstacle and capsule
+//   volumes: the indexed shot trace, the linear trace, and the grenade sweep.
+// Wiring: server/fire.ts traces shots; server/arena-host.ts exposes
+//   `lineOfSight`; server/grenade.ts sweeps; shared/bot-protocol.ts parses the
+//   laser frame.
+// Order: the first trace on a box array builds its floor index; later traces
+//   reuse it until the array changes.
+// Invariants: `traceIndexed` and `traceHitscan` return the same closest hit;
+//   `sweepSegment` does not apply `MIN_HIT_DISTANCE`.
 import { FLOOR_INDEX_CELL, floorIndexFor, type FloorIndex } from "./movements.js";
 
 export const FIRE_HZ = 8;

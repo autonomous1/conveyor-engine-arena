@@ -2,6 +2,10 @@
  * Clip playback rate from ground speed, so walk and run feet do not skate.
  * Client visual only: the host, the world, and the snapshot are untouched.
  */
+// ARCHITECTURE: Clip and gait selection from ground speed: time scale, low-pass
+//   speed, and gait hysteresis.
+// Wiring: client/presentation.ts selects and plays the clips; nothing here runs
+//   on the host.
 
 /** Clamp used when an animation entry omits `minTimeScale` / `maxTimeScale`. */
 export const DEFAULT_MIN_TIME_SCALE = 0.25;

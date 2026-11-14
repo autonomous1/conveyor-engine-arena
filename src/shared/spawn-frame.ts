@@ -1,3 +1,5 @@
+// ARCHITECTURE: The one-shot spawn frame: who was placed where on join.
+// Wiring: server/arena-host.ts sends; client/net.ts applies.
 /**
  * One-shot host frame: a player took a seat and was placed on a spawn pad. Sent to every
  * client once, at the join.

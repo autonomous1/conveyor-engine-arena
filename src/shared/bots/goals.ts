@@ -2,6 +2,9 @@
  * Mission goals. Higher priority wins. `idle` is 0, so `chooseGoal` never plans it.
  * Retrieve stays ahead of arming: a fetch does not detour for a weapon first.
  */
+// ARCHITECTURE: Goal factories and priorities: retrieve, reach, armUp, idle.
+// Wiring: server/bot-brain.ts builds goals; shared/bots/actions.ts plans
+//   against them.
 import type { Goal, WorldState } from "./goap.js";
 import { AT, HAS_WEAPON, availFact, holdingFact } from "./state.js";
 

@@ -6,6 +6,8 @@
  * A goal within 0.5 m of the last aperture, or an explicit door axis, gets an
  * axis-aligned last step through the opening.
  */
+// ARCHITECTURE: String-pulls a region path into movement waypoints.
+// Wiring: server/game.ts and shared/nav/legs.ts consume it.
 import type { RegionPath, RegionPortal } from "./regions.js";
 import type { Vec3 } from "../scene-graph.js";
 

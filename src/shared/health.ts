@@ -4,6 +4,9 @@
  * passed.
  * @why It is not a kernel field.
  */
+// ARCHITECTURE: Pawn hp, damage notes, respawn timers, and the health frame.
+// Wiring: server/health.ts (with fire, grenade, and pickups) mutates it;
+//   server/arena-host.ts sends; client/hud.ts and client/net.ts read.
 
 export const MAX_HP = 100;
 export const MIN_HP = 0;

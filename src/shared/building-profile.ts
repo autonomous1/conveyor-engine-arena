@@ -8,6 +8,10 @@
  * @why model +X is SVG +x and model +Z is SVG −y, because the plan is toolbar
  *      Y-up while SVG y grows down.
  */
+// ARCHITECTURE: Plan-SVG building outlines to model-space rings, with the yaw
+//   convention.
+// Wiring: server/game-manifest.ts compiles; client/scene-map.ts draws;
+//   shared/arena-view.ts carries the rows.
 
 export type ProfilePoint = [number, number];
 export type ProfileRing = ProfilePoint[];

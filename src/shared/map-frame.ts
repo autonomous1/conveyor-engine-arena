@@ -1,3 +1,7 @@
+// ARCHITECTURE: World XZ to the scene-map panel: size, pad, bake URL, and
+//   metadata.
+// Wiring: client/scene-map.ts and client/map-marker.ts frame the panel;
+//   src/util/bake-map.ts writes the bake.
 import { assetBase } from "./asset-base.ts";
 
 /**

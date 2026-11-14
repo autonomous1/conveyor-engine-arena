@@ -4,6 +4,11 @@
  * The doors are open unless the cab is moving. A call from inside the cab
  * shortens a dwell to one second. A call from the landing waits out `waitS`.
  */
+// ARCHITECTURE: Elevator stops, landings, cab motion, and the cab/door frames
+//   both sides exchange.
+// Wiring: server/elevators.ts steps cabs; client/elevator-room.ts and
+//   client/map-marker.ts render; shared/nav/grid.ts and shared/scene-graph.ts
+//   read stops.
 import type { ArenaElevator } from "./arena-view.js";
 
 export type { ArenaElevator };

@@ -3,6 +3,10 @@
  * Walk places are metres, y-up. A shaft and its cab room share the stop footprint,
  * so lookup uses `<shaft>@<i>` instead of either of those.
  */
+// ARCHITECTURE: The privileged scene graph: places, portals, cab state,
+//   canonical JSON, and the file validator.
+// Wiring: server/world-loader.ts loads it; server/game.ts and
+//   server/bot-brain.ts query places; shared/nav/* route through it.
 import type { ArenaView } from "./arena-view.js";
 import { pointInPolygon, RIDE_Y_TOL_M, type ElevatorPhase } from "./elevators.js";
 

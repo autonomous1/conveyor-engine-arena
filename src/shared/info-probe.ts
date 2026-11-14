@@ -3,6 +3,10 @@
  * no socket. A hit closer than `range` wins. Combat's ray keeps its own
  * minimum distance; this one reports an origin inside a box as distance 0.
  */
+// ARCHITECTURE: The crosshair inspect pick: candidates from doors, pickups, and
+//   AABBs; tie-breaks; and the readout text.
+// Wiring: client/info-probe.ts collects browser candidates and paints;
+//   client/boot.ts drives the per-frame refresh.
 import type { ArenaView } from "./arena-view.js";
 import type { SceneGraphFrame } from "./bot-protocol.js";
 import { parseSceneGraph, placeAt, type CabState, type SceneGraph } from "./scene-graph.js";

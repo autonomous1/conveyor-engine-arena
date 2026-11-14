@@ -10,6 +10,11 @@
  * wall gap itself is never re-sealed.
  * Door frames go out on the socket. They are not snap envelopes.
  */
+// ARCHITECTURE: Door geometry and use rules shared by host and client: leaf
+//   box, use volume, yaw quarter-turns, and the key ring.
+// Wiring: server/doors.ts builds runtime doors from it; client/boot.ts and
+//   client/info-probe.ts call `pickDoorForUse`; shared/nav/follow.ts and
+//   shared/nav/grid.ts place stands and blockers.
 import { capsuleOverlapsAabb, type PawnBody } from "./pickups.js";
 
 /**

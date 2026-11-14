@@ -2,6 +2,8 @@
  * FightBack aim. Pure: the caller passes the rng and the clock.
  * Nothing here reads Date or Math.random.
  */
+// ARCHITECTURE: Aim error sampling, turn-toward, and the burst scheduler.
+// Wiring: server/bot-brain.ts uses all three.
 import { BOT_TUNING } from "./bot-tuning.js";
 
 const DEG = Math.PI / 180;

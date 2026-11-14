@@ -1,3 +1,6 @@
+// ARCHITECTURE: The single frozen FightBack tuning object.
+// Wiring: server/bot-brain.ts reads it; shared/bots/aim.ts and
+//   shared/bots/arbiter.ts read it.
 /**
  * Every FightBack knob. Degrees here are degrees. Callers convert when they
  * need radians.

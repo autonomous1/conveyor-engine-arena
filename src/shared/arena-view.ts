@@ -9,6 +9,11 @@
  * `authoritativeHash` and does force a reconnect.
  * Room lights change `presentationHash` only.
  */
+// ARCHITECTURE: The manifest projection the host serves and the client renders:
+//   arena, doors, elevators, pickups, lights, sounds, and sprites.
+// Wiring: server/game-manifest.ts builds it; server/world-loader.ts and
+//   server/game.ts read it; client/arena-scene.ts, client/boot.ts, and
+//   client/net.ts render it.
 import type { ProfileRing } from "./building-profile.js";
 import type { Movement } from "./movements.js";
 import type { PickupKind, PickupPlacement } from "./pickups.js";

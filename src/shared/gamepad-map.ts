@@ -4,6 +4,8 @@
  * @why `jumper-t` and a disconnected pad bind nothing. This module does not read
  *      the DOM and does not change the 20 Hz input message.
  */
+// ARCHITECTURE: Standard-mapping pad buttons, edges, and repeat navigation.
+// Wiring: client/input.ts reads it.
 
 export const STD = {
   A: 0,

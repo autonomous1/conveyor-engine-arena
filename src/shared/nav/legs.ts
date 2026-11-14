@@ -4,6 +4,9 @@
  * one, and the occupancy grid otherwise. Both are reused until a door or a
  * cab that touches the area changes.
  */
+// ARCHITECTURE: Walks each portal leg of a route, caching a grid and region
+//   overlay per walk.
+// Wiring: server/game.ts plans legs; server/bot-brain.ts uses the same cache.
 import type { ArenaView } from "../arena-view.js";
 import { doorLeafBox } from "../doors.js";
 import type { FloorBox } from "../movements.js";

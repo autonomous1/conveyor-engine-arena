@@ -2,6 +2,10 @@
  * Debug label over an unowned host bot. The host sends one only while
  * `ARENA_BOT_DEBUG=1`, and only when the text for that client changed.
  */
+// ARCHITECTURE: The `botLabel` frame shape and its text: goal, hp, evade/seen,
+//   Dead.
+// Wiring: server/bot-label.ts builds and sends; client/bot-label.ts renders;
+//   shared/bot-protocol.ts parses.
 
 /**
  * A label is a short line.

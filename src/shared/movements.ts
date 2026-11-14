@@ -1,3 +1,12 @@
+// ARCHITECTURE: Movement and floor queries shared by the host and the client:
+//   tick-rate constants, velocity and yaw steps, and the CSR floor index the
+//   floor and ray queries walk.
+// Wiring: server/game.ts steps movement; shared/hitscan.ts walks the floor
+//   index; server/arena-host.ts and client/boot.ts share the move-button codec.
+// Order: mark a box dynamic (`markDynamicObstacle`) before rewriting its XZ;
+//   the index rebuilds on array length, last element, or a new dynamic box.
+// Invariants: Y is never indexed, so a Y-only rewrite (a cab wall) needs no
+//   rebuild; a dynamic box is tested on every query, not from a cell.
 /** Locomotion and emote names the wander loop and the character clips share. */
 export const MOVEMENTS = ["idle", "walk", "run", "fall", "angry"] as const;
 

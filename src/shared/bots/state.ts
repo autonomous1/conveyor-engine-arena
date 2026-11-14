@@ -8,8 +8,8 @@
  */
 // ARCHITECTURE: World-state schema for the GOAP planner. Fact keys are strings
 //   consumed by actions.ts and goals.ts, and read by plan() and chooseGoal().
-// Wiring: Built by the bot client (task 15) from its world model; imported by
-//   actions.ts and goals.ts; not imported by the server.
+// Wiring: Built by server/bot-brain.ts (:222) and the bot client from their
+//   world model; imported by actions.ts and goals.ts.
 // Invariants: `hasKey:<id>` stays true once set (keys are never consumed).
 //   `avail:<id>` transitions true → false on pickup and never back.
 import type { Fact, WorldState } from "./goap.js";

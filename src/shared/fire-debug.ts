@@ -3,6 +3,10 @@
  * The logger records the failure.
  * @why It does not reload, reconnect, or respawn.
  */
+// ARCHITECTURE: The fire debug log: wire flags, one-shot step log, and the
+//   client fault line.
+// Wiring: server/fire.ts writes the host trace; client/boot.ts and client/net.ts
+//   write the client trace.
 
 export const FIRE_DEBUG_PREFIX = "fire-debug";
 

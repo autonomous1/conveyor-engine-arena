@@ -2,6 +2,9 @@
  * Snapshot revival shared by the browser client and a Node or Worker bot.
  * No Node builtin imports. Bigint tags match the transport codec.
  */
+// ARCHITECTURE: Snapshot revival from the `$i` wire form, and `asSnapshot`'s
+//   conversion into the client's snapshot type.
+// Wiring: client/net.ts revives every inbound frame; no server consumer.
 import type { IncomingSnapshot } from "conveyor-engine-client";
 
 export function revive(value: unknown): unknown {
