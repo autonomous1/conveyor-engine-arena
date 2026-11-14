@@ -3,6 +3,10 @@
  * Off: no sprites, and frames are ignored. On: one canvas texture and one
  * material per bot, redrawn only when that bot's text changes.
  */
+// ARCHITECTURE: One billboard per visible bot: canvas texture, material, and
+//   text sync.
+// Wiring: boot.ts creates the layer and calls `sync` each frame;
+//   shared/bot-label.ts supplies the text.
 import * as THREE from "three";
 import { parseBotLabel } from "../shared/bot-label.js";
 import type { ClientDiag } from "./diag.js";

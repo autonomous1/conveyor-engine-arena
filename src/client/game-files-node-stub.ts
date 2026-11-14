@@ -1,3 +1,6 @@
+// ARCHITECTURE: Solo-bundle stand-in for the Node game-files loader; the page
+//   passes fetched files instead.
+// Wiring: no importer; the solo build aliases the node-only path to it.
 import type { GameFiles } from "../server/game-files.js";
 
 /**

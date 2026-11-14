@@ -1,3 +1,6 @@
+// ARCHITECTURE: The pawn layer: cloned characters, fallback capsules, clip
+//   application, and fade/beam opacities.
+// Wiring: boot.ts calls `apply` each frame; arena-scene.ts supplies templates.
 import * as THREE from "three";
 import { clone as cloneWithSkeleton } from "three/addons/utils/SkeletonUtils.js";
 import type { RenderSnapshot } from "conveyor-engine-client";

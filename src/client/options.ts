@@ -9,6 +9,9 @@
  * A gamepad can move a focus outline and activate the focused row. Mouse and F2 are unchanged.
  */
 
+// ARCHITECTURE: The options dialog: persisted toggles, model choice, focus
+//   navigation, and host fire counters.
+// Wiring: boot.ts creates it once and reads `open`/`fireDebug` each frame.
 import { emptyAudit, formatAudit, type AuditCounters } from "../shared/audit.ts";
 
 export const SHOW_COLLISION_STORAGE_KEY = "arena.showCollision.v1";

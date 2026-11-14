@@ -1,3 +1,6 @@
+// ARCHITECTURE: Placement visibility handles: cloned vs instanced, hide, and
+//   lift shift.
+// Wiring: arena-scene.ts builds it; elevator-room.ts shifts a room's copies.
 import * as THREE from "three";
 
 const HIDDEN = new THREE.Matrix4().makeScale(0, 0, 0);

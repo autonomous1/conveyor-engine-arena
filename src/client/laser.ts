@@ -1,3 +1,5 @@
+// ARCHITECTURE: Reused laser line segments per shooter, pooled and expired.
+// Wiring: boot.ts calls `show`/`expire` each frame.
 import * as THREE from "three";
 import type { Vec3 } from "../shared/hitscan.js";
 

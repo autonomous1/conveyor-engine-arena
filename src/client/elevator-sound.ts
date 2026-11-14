@@ -1,3 +1,5 @@
+// ARCHITECTURE: Elevator start and ride loops, positional at the cab.
+// Wiring: boot.ts drains it each frame.
 import type { ArenaSoundName } from "../shared/arena-view.js";
 import type { ElevatorState } from "../shared/elevators.js";
 

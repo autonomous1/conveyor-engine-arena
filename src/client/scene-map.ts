@@ -6,6 +6,10 @@
  * yaw check. The panel does not paint them, and nothing here runs in the WebGL frame.
  */
 
+// ARCHITECTURE: The baked top-down scene panel: image, canvas self marker, and
+//   visibility.
+// Wiring: boot.ts builds it and calls `setSelf` each frame; arena-scene.ts
+//   supplies roots.
 import * as THREE from "three";
 import type { ProfileRing } from "../shared/building-profile.ts";
 import { aimDirection, yawFromQuat } from "../shared/look.ts";

@@ -1,3 +1,7 @@
+// ARCHITECTURE: Stand-in for Node built-ins that kernel barrels import and the
+//   solo host never calls.
+// Wiring: no importer; the solo build aliases `node:http`, `ws`,
+//   `node:fs/promises`, and `node:path` here.
 /**
  * Stand-in for Node built-ins that kernel barrels import and the solo host never calls.
  * esbuild aliases `node:http`, `ws`, `node:fs/promises`, and `node:path` here.

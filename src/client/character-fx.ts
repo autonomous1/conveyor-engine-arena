@@ -13,6 +13,10 @@
  * cut the sprite mid-frame. The new spawn's own beam starts independently.
  * Nothing is allocated per frame. One small state object is made per character that has an effect.
  */
+// ARCHITECTURE: Spawn/despawn timelines for sound, beam, and opacity; no
+//   Three.js.
+// Wiring: boot.ts owns the timeline and calls `spawn`/`despawn`/`update` each
+//   frame.
 
 export type Point = { x: number; y: number; z: number };
 

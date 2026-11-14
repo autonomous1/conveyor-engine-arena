@@ -5,7 +5,7 @@ import test from "node:test";
 import ts from "typescript";
 
 /** Directories this gate covers. Waves 2 and 3 append theirs. */
-const SCOPES = ["src/server", "src/shared"];
+const SCOPES = ["src/server", "src/shared", "src/client"];
 /** Byte-identical to task 09's appendix; not a header candidate. */
 const FROZEN = new Set(["src/shared/bots/goap.ts"]);
 const SLOTS = ["ARCHITECTURE", "Wiring", "Order", "Invariants"] as const;

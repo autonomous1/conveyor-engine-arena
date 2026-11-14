@@ -1,3 +1,5 @@
+// ARCHITECTURE: Pickup sounds from host gone/loadout/inventory frames.
+// Wiring: boot.ts drains frames each frame.
 import type { ArenaSoundName, ArenaSounds } from "../shared/arena-view.js";
 import type { PickupPlacement } from "../shared/pickups.js";
 

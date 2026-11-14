@@ -4,6 +4,9 @@
  * shows it. Another pawn's laser does not.
  * @why It is not a decal and not a scene mesh.
  */
+// ARCHITECTURE: The crosshair hit circle, shown per local fire/laser and faded
+//   on a timer.
+// Wiring: boot.ts creates it and calls `note`/`tick`.
 
 export const HIT_MARKER_MS = 150;
 

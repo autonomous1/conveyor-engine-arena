@@ -1,3 +1,7 @@
+// ARCHITECTURE: Character clone preparation: foot gaps, root-motion Y, and the
+//   skin parent drop.
+// Wiring: arena-scene.ts and presentation.ts call it while building pawn
+//   clones.
 import * as THREE from "three";
 import { clone as cloneWithSkeleton } from "three/addons/utils/SkeletonUtils.js";
 import { findClip } from "../shared/movements.ts";

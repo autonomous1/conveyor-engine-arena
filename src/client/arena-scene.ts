@@ -1,3 +1,12 @@
+// ARCHITECTURE: Builds the Three.js arena from the view: instanced static
+//   meshes, cloned doors and pawns, lights, props, and the placement handles
+//   the frame mutates.
+// Wiring: boot.ts calls `createArenaScene`; scene-map.ts samples its roots;
+//   pawn-feet.ts prepares the character clones.
+// Order: the GLB templates load before placements are instanced; door frames
+//   are instanced before the leaves that swing under them.
+// Invariants: Static meshes are instanced once; a door leaf is a clone because
+//   it swings on its own hinge.
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { KTX2Loader } from "three/addons/loaders/KTX2Loader.js";

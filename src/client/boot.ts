@@ -1,3 +1,11 @@
+// ARCHITECTURE: The client composition root: fetch the view, build the arena
+//   scene and input, connect the socket, and run the single RAF frame.
+// Wiring: main.ts and solo-main.ts await `boot`; it constructs hud.ts,
+//   arena-scene.ts, input.ts, net.ts, and the effect pools.
+// Order: hud, scene, then input, then the socket (`connectLive`, :427); the
+//   first frame starts only after boot resolves.
+// Invariants: One `frame` loop per page; a frame fault clears every pool and
+//   still schedules the next RAF.
 import { EngineClient } from "conveyor-engine-client";
 import * as THREE from "three";
 import type { ArenaElevator, ArenaView } from "../shared/arena-view.js";

@@ -1,3 +1,6 @@
+// ARCHITECTURE: Debug wireframes for the loaded obstacle boxes, with the
+//   debug-key toggle.
+// Wiring: boot.ts builds the group and applies the toggle each frame.
 import * as THREE from "three";
 
 /**

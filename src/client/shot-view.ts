@@ -1,3 +1,6 @@
+// ARCHITECTURE: Camera presentation for the owned pawn: eye placement and the
+//   optional shot segment.
+// Wiring: boot.ts calls `presentShot` each frame.
 import type { PerspectiveCamera } from "three";
 import type { Vec3 } from "../shared/hitscan.js";
 import { eyeLook } from "../shared/look.ts";

@@ -4,6 +4,8 @@
  * A window with no snapshot leaves `tickPerSec` unset so the HUD can show
  * an em dash instead of 0 or the previous window.
  */
+// ARCHITECTURE: Half-second FPS/tick averages and the stats overlay text.
+// Wiring: boot.ts pushes samples and formats the overlay.
 
 const EM = "\u2014";
 

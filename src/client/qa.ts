@@ -2,6 +2,9 @@
  * Headless QA hooks. The normal client does not call `installQaApi`.
  * @when Installed only when the page search is `qa=1`.
  */
+// ARCHITECTURE: The headless QA API installed only for `?qa=1`.
+// Wiring: boot.ts installs it when `isQaMode` is true; QA harnesses call the
+//   hooks.
 
 export type V3 = { x: number; y: number; z: number };
 

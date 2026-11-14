@@ -1,3 +1,11 @@
+// ARCHITECTURE: The socket link: connect, apply snapshots through the kernel
+//   client, ack them, and surface status and faults to the HUD.
+// Wiring: boot.ts calls `connectLive`; the kernel `EngineClient` owns
+//   `applySnapshot` and `renderSnapshot`.
+// Order: a snapshot is applied, then acked, then reported; a delta that renders
+//   no entities requests a resync.
+// Invariants: One ack per applied snapshot; the kernel client is the only owner
+//   of replication state.
 import { EngineClient } from "conveyor-engine-client";
 import { fireShotFrame, summarizeInbound } from "../shared/fire-debug.js";
 import { parseAudit, type AuditCounters } from "../shared/audit.js";

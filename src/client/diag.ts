@@ -3,6 +3,10 @@
  * Snapshot sequence, simulation tick, and any input acknowledgement stay separate fields.
  * An input acknowledgement is never filled from a tick or a snapshot sequence.
  */
+// ARCHITECTURE: Browser fault log: first full fault, repeats counted, bounded
+//   labels.
+// Wiring: boot.ts, net.ts, and bot-label.ts report faults; boot.ts paints the
+//   hint.
 
 const UNKNOWN = "unknown";
 const MAX_KEYS = 32;

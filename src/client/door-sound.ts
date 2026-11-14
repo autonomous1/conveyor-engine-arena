@@ -1,3 +1,6 @@
+// ARCHITECTURE: Door open/close sounds from host door frames, positional at
+//   the leaf.
+// Wiring: boot.ts drains it each frame.
 import type { ArenaSoundName } from "../shared/arena-view.js";
 import type { DoorFrame } from "../shared/doors.js";
 

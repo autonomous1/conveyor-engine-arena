@@ -1,3 +1,6 @@
+// ARCHITECTURE: Pooled explosion, laser-impact, and surface-blast sprites; each
+//   pool owns its GPU materials.
+// Wiring: boot.ts drains the queues and updates the pools each frame.
 import * as THREE from "three";
 
 /**

@@ -3,6 +3,9 @@
  * Yaw follows `aimDirection`: yaw 0 faces world +Z, so on the −Z-up map a
  * yaw of π points up and +π/2 (world +X) points right.
  */
+// ARCHITECTURE: Pure scene-map marker math: self pose, floor label, and marker
+//   geometry.
+// Wiring: scene-map.ts calls `selfMoved`/`floorLabel`; tests cover the marker.
 import { elevatorPolygonBounds } from "../shared/elevators.ts";
 import type { MapFrame } from "../shared/map-frame.ts";
 

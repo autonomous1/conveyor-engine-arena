@@ -1,3 +1,6 @@
+// ARCHITECTURE: The status, profile, pad, stats, and info DOM; QA can start
+//   hidden.
+// Wiring: boot.ts creates it and writes it in the frame and on snapshots.
 import { MAX_HP, MIN_HP } from "../shared/health.ts";
 
 function shortPadId(id: string): string {

@@ -3,6 +3,9 @@
  * string live here. The pick and the place lookup stay in `shared/info-probe`.
  * Nothing here opens a socket or reads a scene-graph file.
  */
+// ARCHITECTURE: Browser half of the crosshair probe: camera ray, leaf bounds,
+//   candidate collection, and the HUD string.
+// Wiring: boot.ts builds it and calls `inspect`/`refresh` each frame.
 import * as THREE from "three";
 import type { ArenaView } from "../shared/arena-view.js";
 import type { SceneGraphFrame } from "../shared/bot-protocol.js";

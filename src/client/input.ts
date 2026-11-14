@@ -1,3 +1,11 @@
+// ARCHITECTURE: Keyboard, mouse, pointer-lock, and gamepad input for one play
+//   session, sampled once per frame; also the menu-open gate.
+// Wiring: boot.ts calls `attachPlayInput` on the renderer canvas and reads
+//   `update`/`sample` each frame; `onPadMenu` routes pad menu events.
+// Order: listeners are attached once at creation; the frame must call `update`
+//   before `sample`.
+// Invariants: The nine window/document listeners are attached once and never
+//   removed; the page is expected to outlive the socket.
 import { GamepadInput } from "three-gamepad-controls";
 import { createPadReader, type PadFrame, type PadActions } from "../shared/gamepad-map.ts";
 import {

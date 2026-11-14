@@ -5,6 +5,10 @@
  * draw 80 ms late). Everyone else samples cab frames at `now − 80`.
  * Elevated hall meshes hide only for the owned rider, and only while moving.
  */
+// ARCHITECTURE: The bound cab room: meshes, door, lamp, and local wall copies
+//   shifted by cab motion.
+// Wiring: boot.ts builds it and ticks it each frame; shared/elevators.ts
+//   supplies cab state.
 import type { Object3D } from "three";
 import type { ArenaElevator, ArenaView } from "../shared/arena-view.ts";
 import { inCab, type ElevatorRuntime, type ElevatorState } from "../shared/elevators.ts";

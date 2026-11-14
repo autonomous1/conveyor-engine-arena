@@ -1,3 +1,5 @@
+// ARCHITECTURE: The camera-mounted weapon group and its mesh swap.
+// Wiring: boot.ts builds it; arena-scene.ts supplies the camera and renderer.
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { attachKtx2Loader } from "./arena-scene.ts";

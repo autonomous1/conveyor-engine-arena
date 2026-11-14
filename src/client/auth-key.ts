@@ -1,3 +1,7 @@
+// ARCHITECTURE: The browser auth key in session/local storage and the landing
+//   page form.
+// Wiring: main.ts checks and stores it on boot; net.ts reads it; boot.ts uses
+//   `isArenaSolo`.
 // Browser-only access key. This file does not verify the signature. The host does.
 
 /**

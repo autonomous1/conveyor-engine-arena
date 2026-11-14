@@ -1,3 +1,7 @@
+// ARCHITECTURE: The page's Web Audio context: decoded effects, positional
+//   voices, the listener, and the local/echo dedupe.
+// Wiring: boot.ts owns the context, calls `load`/`unlock`, and passes it to the
+//   sound modules.
 import type { ArenaSoundEffect, ArenaSoundName, ArenaSounds } from "../shared/arena-view.js";
 
 /**

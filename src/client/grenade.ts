@@ -1,3 +1,6 @@
+// ARCHITECTURE: Grenade pose meshes with a fallback sphere; a bounded pool with
+//   expiry.
+// Wiring: boot.ts drains pose frames and updates it each frame.
 import * as THREE from "three";
 
 /**
