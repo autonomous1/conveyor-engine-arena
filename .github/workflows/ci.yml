@@ -1,0 +1,24 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.0.2"
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm run codemap
+      - run: cp agents/codemap.md /tmp/codemap-1.md
+      - run: npm run codemap
+      - run: cmp /tmp/codemap-1.md agents/codemap.md
+      - run: npm test
