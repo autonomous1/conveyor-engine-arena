@@ -12,6 +12,7 @@ web/qa-snaps/*.png
 dist/web/qa-snaps/*.png
 *.log
 *.blend1
+*.diff
 .env
 .env.*
 .vscode

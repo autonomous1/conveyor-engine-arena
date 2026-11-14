@@ -107,6 +107,12 @@ export function groundActions(
   return actions;
 }
 
+/**
+ * @pre `at` is a place id present in the scene graph.
+ * @post `at = <place>`.
+ * @why Cost divides route metres by 4 m/s, not MOVE_SPEED 5, to allow for
+ *      turns and doors.
+ */
 export function goTo(place: string): Action<BotCtx> {
   const metres = memoMetres((s, ctx) => ctx.routeCost(String(s.at), place, s));
   return {
@@ -126,6 +132,9 @@ export function goTo(place: string): Action<BotCtx> {
  * Stand on one side of a leaf. Effect is `at = door:<id>` plus the side stood on.
  * The far side of a locked leaf is a different action and stays unusable, so a
  * later route cannot start inside the locked room.
+ *
+ * @pre A route exists on the reachable side of the door.
+ * @post `at = door:<doorId>`.
  */
 export function goToDoor(door: string, place: string, stand: Point): Action<BotCtx> {
   const metres = memoMetres((s, ctx) => (s.at === atDoor(door) ? Infinity : metresToSide(s, ctx, place, stand)));
@@ -138,6 +147,12 @@ export function goToDoor(door: string, place: string, stand: Point): Action<BotC
   };
 }
 
+/**
+ * @pre `at` is `door:<id>`, `doorLocked:<id>` is true, `hasKey:<key>` is true.
+ * @post `doorLocked:<id>` is false and `doorOpen:<id>` is true.
+ * @invariant The key stays held. One key opens every leaf that names it.
+ *            (test: unlock_keeps_key)
+ */
 export function unlock(door: string, key: string): Action<BotCtx> {
   return {
     id: `unlock:${door}`,
@@ -147,6 +162,11 @@ export function unlock(door: string, key: string): Action<BotCtx> {
   };
 }
 
+/**
+ * @pre `at` is the place containing the pickup, and `avail:<id>` is true.
+ * @post `hasKey:<id>` / `hasWeapon` / `hasAmmo` (per kind) is true, and
+ *       `avail:<id>` is false.
+ */
 export function pickup(item: PickupPlacement, place: string): Action<BotCtx> {
   const eff: Record<string, Fact> = {
     [availFact(item.id)]: false,

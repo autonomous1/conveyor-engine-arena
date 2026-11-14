@@ -15,6 +15,7 @@
  */
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join, relative, resolve, sep, posix } from "node:path";
+import { pathToFileURL } from "node:url";
 import ts from "typescript";
 
 type Options = {
@@ -26,6 +27,9 @@ type Options = {
   maxSig: number;
 };
 
+/** One contract tag, normalized to a single logical line. */
+export type ExtractedTag = { name: string; text: string };
+
 type Entry = {
   name: string;
   kind: string;
@@ -33,6 +37,7 @@ type Entry = {
   sig: string;
   doc: string;
   exported: boolean;
+  tags: ExtractedTag[];
   members: Entry[];
 };
 
@@ -133,6 +138,52 @@ function docOf(node: ts.Node): string {
   return text ? firstSentence(text) : "";
 }
 
+/**
+ * Contract tags from `agents/AGENTS.md` (`## Comment as contract`), in render
+ * order: contract first, rationale last. This order is part of the codemap
+ * format, not an accident of sort().
+ */
+const VOCABULARY = ["invariant", "pre", "post", "when", "why", "see"] as const;
+const TAG_RANK = new Map<string, number>(VOCABULARY.map((name, i) => [name, i]));
+/** Extracted so callers can see it, never rendered: filtering symbols is a separate change. */
+const RENDER_SKIP = new Set<string>(["internal"]);
+const EXTRACTABLE = new Set<string>([...VOCABULARY, ...RENDER_SKIP]);
+
+/**
+ * JSDoc contract tags on a declaration, deduped and normalized to one line each.
+ * Pure: reads only the node's own JSDoc, no I/O, clocks or randomness.
+ *
+ * Tags are read where the symbol is declared. The generator analyzes every
+ * declaration in its declaring file, so a barrel re-export cannot hide them
+ * (the ts-morph `getAliasedSymbol()` trap does not apply to this AST walker).
+ */
+export function extractTags(node: ts.Node): ExtractedTag[] {
+  const out: ExtractedTag[] = [];
+  const seen = new Set<string>();
+  for (const tag of ts.getJSDocTags(node)) {
+    const name = tag.tagName.text;
+    if (!EXTRACTABLE.has(name)) continue;
+    const text = (ts.getTextOfJSDocComment(tag.comment) ?? "").replace(/\s+/g, " ").trim();
+    const key = `${name}\u0000${text}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ name, text });
+  }
+  const rank = (name: string): number => TAG_RANK.get(name) ?? VOCABULARY.length;
+  out.sort((a, b) => rank(a.name) - rank(b.name));
+  return out;
+}
+
+/** The tag lines emitted under a symbol line: two-space indent, `@name` in backticks. */
+export function renderTagLines(tags: readonly ExtractedTag[], indent = ""): string[] {
+  const out: string[] = [];
+  for (const tag of tags) {
+    if (RENDER_SKIP.has(tag.name)) continue;
+    out.push(`${indent}  \`@${tag.name}\`${tag.text ? ` ${tag.text}` : ""}`);
+  }
+  return out;
+}
+
 function hasModifier(node: ts.Node, kind: ts.SyntaxKind): boolean {
   return ts.canHaveModifiers(node) ? (ts.getModifiers(node) ?? []).some((m) => m.kind === kind) : false;
 }
@@ -175,7 +226,7 @@ function classMembers(sf: ts.SourceFile, node: ts.ClassDeclaration, max: number)
     if (m.name && ts.isPrivateIdentifier(m.name)) continue;
     const isStatic = hasModifier(m, ts.SyntaxKind.StaticKeyword) ? "static " : "";
     let entry: Entry | undefined;
-    const base = { line: lineOf(sf, m), doc: docOf(m), exported: true, members: [] };
+    const base = { line: lineOf(sf, m), doc: docOf(m), exported: true, tags: extractTags(m), members: [] };
     if (ts.isConstructorDeclaration(m)) {
       entry = { ...base, name: "constructor", kind: "ctor", sig: clip(callSig(sf, m), max) };
     } else if (ts.isMethodDeclaration(m)) {
@@ -243,6 +294,23 @@ function fileDoc(sf: ts.SourceFile): string {
   return firstSentence(body);
 }
 
+/** The declaration a same-file `export { local as public }` points at, if any. */
+function declarationByName(sf: ts.SourceFile, name: string): ts.Node | undefined {
+  for (const st of sf.statements) {
+    if (ts.isVariableStatement(st)) {
+      for (const decl of st.declarationList.declarations) {
+        if (ts.isIdentifier(decl.name) && decl.name.text === name) return decl;
+      }
+    } else if (
+      (ts.isFunctionDeclaration(st) || ts.isClassDeclaration(st) || ts.isInterfaceDeclaration(st) ||
+        ts.isTypeAliasDeclaration(st) || ts.isEnumDeclaration(st)) && st.name?.text === name
+    ) {
+      return st;
+    }
+  }
+  return undefined;
+}
+
 function analyze(file: string, known: Set<string>, opts: Options): FileInfo {
   const source = readFileSync(file, "utf8");
   const sf = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
@@ -262,9 +330,9 @@ function analyze(file: string, known: Set<string>, opts: Options): FileInfo {
     else pkgs.add(packageName(spec));
   };
   const max = opts.maxSig;
-  const push = (node: ts.Node, name: string, kind: string, sig: string, exported: boolean, members: Entry[] = []): void => {
+  const push = (node: ts.Node, name: string, kind: string, sig: string, exported: boolean, members: Entry[] = [], tagNode: ts.Node = node): void => {
     if (!exported && !opts.all) return;
-    info.entries.push({ name, kind, line: lineOf(sf, node), sig, doc: docOf(node), exported, members });
+    info.entries.push({ name, kind, line: lineOf(sf, node), sig, doc: docOf(node), exported, tags: extractTags(tagNode), members });
   };
 
   for (const st of sf.statements) {
@@ -281,7 +349,10 @@ function analyze(file: string, known: Set<string>, opts: Options): FileInfo {
         info.reexports.push(`${what} from ${target}`);
       } else if (st.exportClause && ts.isNamedExports(st.exportClause)) {
         for (const el of st.exportClause.elements) {
-          push(el, el.name.text, "export", el.propertyName ? `= ${el.propertyName.text}` : "", true);
+          // A same-file alias re-exports a local binding: read tags from the
+          // declaration, not from the specifier, which carries none.
+          const target = declarationByName(sf, el.propertyName ? el.propertyName.text : el.name.text);
+          push(el, el.name.text, "export", el.propertyName ? `= ${el.propertyName.text}` : "", true, [], target ?? el);
         }
       }
     } else if (ts.isExportAssignment(st)) {
@@ -341,11 +412,13 @@ function tree(files: FileInfo[]): string[] {
   return out;
 }
 
-function entryLine(e: Entry, indent: string): string {
+function entryLines(e: Entry, indent: string): string[] {
   const mark = e.exported ? "" : " (local)";
   const sig = e.sig ? ` \`${e.sig}\`` : "";
   const doc = e.doc ? ` — ${e.doc}` : "";
-  return `${indent}- \`${e.name}\` ${e.kind}${mark} :${e.line}${sig}${doc}`;
+  const head = `${indent}- \`${e.name}\` ${e.kind}${mark} :${e.line}${sig}${doc}`;
+  const tags = renderTagLines(e.tags, indent);
+  return tags.length ? [head, ...tags] : [head];
 }
 
 function render(files: FileInfo[], opts: Options, argv: string[]): string {
@@ -378,8 +451,8 @@ function render(files: FileInfo[], opts: Options, argv: string[]): string {
     if (users) lines.push(`used by: ${[...users].sort().join(", ")}`);
     for (const r of f.reexports) lines.push(`- re-export ${r}`);
     for (const e of f.entries) {
-      lines.push(entryLine(e, ""));
-      for (const m of e.members) lines.push(entryLine(m, "  "));
+      lines.push(...entryLines(e, ""));
+      for (const m of e.members) lines.push(...entryLines(m, "  "));
     }
   }
 
@@ -424,9 +497,15 @@ function main(argv: string[]): number {
   return 0;
 }
 
-try {
-  process.exitCode = main(process.argv.slice(2));
-} catch (err) {
-  console.error(`codemap: ${err instanceof Error ? err.message : String(err)}`);
-  process.exitCode = 2;
+// Exported helpers are imported by test/codemap-tags.test.ts; only run the CLI
+// when this file is the process entry point.
+const isEntrypoint = process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
+
+if (isEntrypoint) {
+  try {
+    process.exitCode = main(process.argv.slice(2));
+  } catch (err) {
+    console.error(`codemap: ${err instanceof Error ? err.message : String(err)}`);
+    process.exitCode = 2;
+  }
 }

@@ -1,3 +1,14 @@
+// ARCHITECTURE: Composition root for the authoritative arena. No Node imports;
+//   main.ts serves it over HTTP, and solo attaches a memoryPair directly.
+// Wiring: main.ts and solo → createArenaHost → EngineWsServer. Sub-hosts are
+//   built below in dependency order and shared through the returned
+//   ArenaSession.
+// Order: fire is constructed before botBrain (FightBack needs the callbacks);
+//   doors and elevators are constructed before startWanderLoop. Reordering
+//   breaks line-of-sight shooting and door use on the first tick.
+// Invariants: SnapshotStore's two maps hold the same jobs (mutual
+//   membership). sceneGraphHash and regionsHash are unset until
+//   sceneGraphReady settles, then stable for the session.
 import { decodeFrame, encodeFrame, EngineWsServer } from "conveyor-engine-transport-ws";
 import type { TransportSocket } from "conveyor-engine-transport-ws";
 import { createAudit } from "../shared/audit.js";
@@ -19,6 +30,8 @@ import { applyPawnModel, claimClearSpawn, createHeldInputs, placePawn, startProp
 import { createArenaGrenades } from "./grenade.js";
 import { createHostSocketPaths } from "./host-path.js";
 import { pawnBodies, releasePickupObstacle } from "./pickups.js";
+import { createRateLimitedLog } from "./rate-limited-log.js";
+import { createSnapshotStore, type SnapJob } from "./snapshot-store.js";
 import type { LoadedArena } from "./world-loader.js";
 
 /**
@@ -86,17 +99,21 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
   const grantSceneGraph = opts.grantSceneGraph === true;
   const sceneGraphJson = loaded.sceneGraph ? canonicalJson(sceneGraphPayload(loaded.sceneGraph)) : undefined;
   const regionsJson = loaded.regions ? canonicalJson(loaded.regions) : undefined;
+  /**
+   * @when Set inside sceneGraphReady's .then; undefined until it settles.
+   * @invariant Once set, does not change for the lifetime of the session.
+   *            (test lands when arena-host gains a test harness)
+   */
   let sceneGraphHash: string | undefined;
+  /** @when Set inside sceneGraphReady's .then; undefined until it settles. */
   let regionsHash: string | undefined;
   const privilegedWaiters: HostConn[] = [];
   const held = createHeldInputs();
-  /** Last deny log per client. One line per minute, not an audit counter. */
-  const teleportDeniedAt = new Map<number, number>();
-  /** Last qaSnapshot deny log per client. One line per minute, not an audit counter. */
-  const qaSnapshotDeniedAt = new Map<number, number>();
-  /** One remote shutter in flight per requester. The PNG is not logged or stored. */
-  const snapByRequester = new Map<number, SnapJob>();
-  const snapById = new Map<string, SnapJob>();
+  /** @why One line per minute, not an audit counter. */
+  const teleportDenyLog = createRateLimitedLog();
+  /** @why One line per minute, not an audit counter. */
+  const qaSnapshotDenyLog = createRateLimitedLog();
+  const snapStore = createSnapshotStore();
   let snapSeq = 0;
   /** Pads chosen since the last commit. The next hello treats them as occupied. */
   const reservedPads = new Map<number, SpawnPick>();
@@ -408,17 +425,11 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
     botSense: { get: (id) => botSense.get(id), ids: () => botSense.ids() },
     attach(conn) {
       const denyTeleport = (clientId: number): void => {
-        const now = Date.now();
-        const prev = teleportDeniedAt.get(clientId) ?? 0;
-        if (now - prev < 60_000) return;
-        teleportDeniedAt.set(clientId, now);
+        if (!teleportDenyLog.shouldLog(clientId, Date.now())) return;
         console.log(`[teleport] denied client=${clientId} sub=${conn.claims?.sub ?? ""}`);
       };
       const denyQaSnapshot = (clientId: number): void => {
-        const now = Date.now();
-        const prev = qaSnapshotDeniedAt.get(clientId) ?? 0;
-        if (now - prev < 60_000) return;
-        qaSnapshotDeniedAt.set(clientId, now);
+        if (!qaSnapshotDenyLog.shouldLog(clientId, Date.now())) return;
         console.log(`[qaSnapshot] denied client=${clientId} sub=${conn.claims?.sub ?? ""}`);
       };
       const socket = socketFromConn(conn, refused, (clientId) => engine.disconnect(clientId), (sock, frame) => {
@@ -461,7 +472,7 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
             sendClient(clientId, { t: "snapshotResult", ok: false, id, reason: "invalid" });
             return;
           }
-          if (snapByRequester.has(clientId) || snapById.has(id)) {
+          if (snapStore.isBusy(clientId, id)) {
             sendClient(clientId, { t: "snapshotResult", ok: false, id, reason: "busy" });
             return;
           }
@@ -477,15 +488,12 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
             id,
             requesterId: clientId,
             timer: setTimeout(() => {
-              const current = snapById.get(id);
+              const current = snapStore.take(id);
               if (!current) return;
-              snapById.delete(id);
-              snapByRequester.delete(current.requesterId);
               sendClient(current.requesterId, { t: "snapshotResult", ok: false, id, reason: "noRenderer" });
             }, SNAP_TIMEOUT_MS),
           };
-          snapByRequester.set(clientId, job);
-          snapById.set(id, job);
+          snapStore.begin(job);
           const text = encodeFrame(capture);
           for (const otherId of engine.connected) {
             if (otherId === clientId) continue;
@@ -496,11 +504,9 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
         if (isQaSnapshotDataFrame(frame)) {
           const data = readQaSnapshotData(frame);
           if (data) {
-            const job = snapById.get(data.id);
+            const job = snapStore.take(data.id);
             if (job) {
               clearTimeout(job.timer);
-              snapById.delete(job.id);
-              snapByRequester.delete(job.requesterId);
               sendClient(job.requesterId, { t: "snapshotResult", ok: true, id: job.id, png: data.png });
             }
           }
@@ -543,9 +549,9 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
       engine.attach(socket);
     },
     stop() {
-      for (const job of snapById.values()) clearTimeout(job.timer);
-      snapById.clear();
-      snapByRequester.clear();
+      for (const job of snapStore.clearAll()) clearTimeout(job.timer);
+      teleportDenyLog.clear();
+      qaSnapshotDenyLog.clear();
       stopLoop();
     },
   };
@@ -615,12 +621,6 @@ const SNAP_TIMEOUT_MS = 3_000;
 const PNG_PREFIX = "data:image/png;base64,";
 const PNG_MAX_CHARS = 4_000_000;
 const SNAP_ID_MAX = 64;
-
-type SnapJob = {
-  id: string;
-  requesterId: number;
-  timer: ReturnType<typeof setTimeout>;
-};
 
 type SnapVec = { x: number; y: number; z: number };
 

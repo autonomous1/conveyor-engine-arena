@@ -2,7 +2,16 @@
  * World-state keys for the shared planner.
  * The bot client builds a record from its welcome snapshot and later frames.
  * A held key stays held: unlock does not clear `hasKey`.
+ *
+ * @why String keys, not an enum, because goap.ts is copied verbatim and cannot
+ *      change. The schema lives here, in actions.ts, and in goals.ts.
  */
+// ARCHITECTURE: World-state schema for the GOAP planner. Fact keys are strings
+//   consumed by actions.ts and goals.ts, and read by plan() and chooseGoal().
+// Wiring: Built by the bot client (task 15) from its world model; imported by
+//   actions.ts and goals.ts; not imported by the server.
+// Invariants: `hasKey:<id>` stays true once set (keys are never consumed).
+//   `avail:<id>` transitions true → false on pickup and never back.
 import type { Fact, WorldState } from "./goap.js";
 
 export const AT = "at";
