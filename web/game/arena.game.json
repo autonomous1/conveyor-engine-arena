@@ -1036,7 +1036,7 @@
         "columns": 6,
         "rows": 5,
         "frameCount": 30,
-        "frameWidth": 226,
+        "frameWidth": 256,
         "frameHeight": 256,
         "fps": 30,
         "size": 8,
@@ -1049,7 +1049,7 @@
       },
       "provenance": {
         "origin": "manual",
-        "notes": "Grenade explosion sprite sheet supplied for this arena: 1356x1280, 30 frames of 226x256, 6 columns x 5 rows."
+        "notes": "Grenade explosion sprite sheet supplied for this arena: 1536x1280, 30 frames of 256x256, 6 columns x 5 rows."
       }
     },
     {

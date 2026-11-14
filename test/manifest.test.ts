@@ -782,7 +782,7 @@ test("grenade-explosion asset compiles to view.explosion; a bad sprite block is 
     columns: 6,
     rows: 5,
     frameCount: 30,
-    frameWidth: 226,
+    frameWidth: 256,
     frameHeight: 256,
     fps: 30,
     size: 8,

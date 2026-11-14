@@ -472,6 +472,13 @@ test("a locked building-2 room door names the key", () => {
   const baked = JSON.parse(readFileSync(join(fixtureDir, "../web/game/scene-graph.json"), "utf8")) as {
     portals: ScenePortal[];
   };
+  // The shipped building-2 room doors are unlocked; force a lock locally so this
+  // still covers the locked-alternative route without depending on the data.
+  for (const portal of baked.portals) {
+    if (portal.kind !== "door" || !portal.door?.startsWith("brutalist-building-2-cbake")) continue;
+    portal.locked = true;
+    portal.key = "key";
+  }
   const parsed = parseSceneGraph(baked, doorsMatching(baked.portals));
   assert.ok(parsed.graph);
   const graph = parsed.graph;
