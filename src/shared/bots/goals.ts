@@ -6,7 +6,8 @@
 // Wiring: server/bot-brain.ts builds goals; shared/bots/actions.ts plans
 //   against them.
 import type { Goal, WorldState } from "./goap.js";
-import { AT, HAS_WEAPON, availFact, holdingFact } from "./state.js";
+import { AT, HAS_WEAPON, STAND, availFact, holdingFact } from "./state.js";
+import { standKey, type StandTarget } from "../nav/stand.js";
 
 /**
  * @why Priority 5, the mission goal. Beats armUp even when unarmed so the bot
@@ -28,6 +29,23 @@ export function reach(placeId: string): Goal {
     id: `reach:${placeId}`,
     want: { [AT]: placeId },
     priority: () => 3,
+  };
+}
+
+export type StandGoal = Goal & { stand: StandTarget };
+
+/**
+ * Stand at a point or one side of a door. The brain resolves the target and
+ * derives the `stand` fact from the pose.
+ * @why Priority 3, the reach class.
+ */
+export function standAt(target: StandTarget): StandGoal {
+  const key = standKey(target);
+  return {
+    id: `stand:${key}`,
+    want: { [STAND]: key },
+    priority: () => 3,
+    stand: target,
   };
 }
 

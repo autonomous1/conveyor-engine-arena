@@ -9,6 +9,7 @@
 //   route costs.
 import { createRoadCache, planRoute, routePlaceCosts, type Gate, type RoadCache } from "../nav/route.js";
 import type { PickupPlacement } from "../pickups.js";
+import type { Stand } from "../nav/stand.js";
 import { placeAt, type SceneGraph, type ScenePortal } from "../scene-graph.js";
 import type { Action, Fact, WorldState } from "./goap.js";
 import {
@@ -23,6 +24,7 @@ import {
   doorOpenFact,
   hasKeyFact,
   holdingFact,
+  STAND,
 } from "./state.js";
 
 /** Travel estimate, metres per second. Turns and doors sit inside this figure. */
@@ -84,6 +86,7 @@ export function groundActions(
   graph: SceneGraph,
   pickups: readonly PickupPlacement[],
   goals?: readonly { want: WorldState }[],
+  stand?: Stand,
 ): Action<BotCtx>[] {
   const actions: Action<BotCtx>[] = [];
   // No goals: every place and every door, so fixture plans stay complete.
@@ -92,6 +95,7 @@ export function groundActions(
   const ranked = rankedKeys(graph);
   const chosen = goals ? pickupsForGoals(pickups, goals, ranked) : undefined;
   const places = chosen ? relevantPlaces(graph, chosen, goals!) : graph.places.map((place) => place.id).sort(byText);
+  if (stand && !places.includes(stand.place)) places.push(stand.place);
   for (const place of places) actions.push(goTo(place));
 
   const doors = doorPortals(graph);
@@ -108,7 +112,23 @@ export function groundActions(
   for (const item of chosen ?? pickupsInOrder(pickups, ranked)) {
     actions.push(pickup(item, placeOfPickup(graph, item)));
   }
+  if (stand && goals?.some((goal) => "stand" in goal)) actions.push(standAt(stand));
   return actions;
+}
+
+/**
+ * Stand at a resolved point and face it.
+ * @post `stand:<key>` is true; `at` is the stand's place.
+ */
+export function standAt(stand: Stand): Action<BotCtx> {
+  const metres = memoMetres((s, ctx) => ctx.routeCost(String(s.at), stand.place, s));
+  return {
+    id: `standAt:${stand.key}`,
+    pre: { [AT]: stand.place },
+    eff: { [STAND]: stand.key },
+    usable: (s, ctx) => s[STAND] !== stand.key && Number.isFinite(metres(s, ctx)),
+    cost: (s, ctx) => Math.max(MIN_M, metres(s, ctx)) / WALK_MPS,
+  };
 }
 
 /**

@@ -4,15 +4,16 @@
  */
 import type { BotCtx } from "../../../src/shared/bots/actions.js";
 import { createBotContext, estimateSeconds, groundActions } from "../../../src/shared/bots/actions.js";
-import type { Goal, Plan, PlanOptions, WorldState } from "../../../src/shared/bots/goap.js";
+import type { Fact, Goal, Plan, PlanOptions, WorldState } from "../../../src/shared/bots/goap.js";
 import { chooseGoal } from "../../../src/shared/bots/goap.js";
-import { buildWorldState, type WorldSnapshot } from "../../../src/shared/bots/state.js";
-import { reach } from "../../../src/shared/bots/goals.js";
+import { buildWorldState, STAND, type WorldSnapshot } from "../../../src/shared/bots/state.js";
+import { reach, standAt, type StandGoal } from "../../../src/shared/bots/goals.js";
 import { INPUT_HZ } from "../../../src/shared/look.js";
 import type { FloorBox } from "../../../src/shared/movements.js";
 import { createFollower, doorStand, wishTo, type FollowInput, type FollowPawn, type Pose } from "../../../src/shared/nav/follow.js";
-import { buildGrid, findLocalPath, navBoxes, type Grid } from "../../../src/shared/nav/grid.js";
+import { buildGrid, findLocalPath, navBoxes, specForPlace, type Grid } from "../../../src/shared/nav/grid.js";
 import { createNavCache, planLegs, type PlanLegsOptions } from "../../../src/shared/nav/legs.js";
+import { resolveStand, type DoorView, type Stand } from "../../../src/shared/nav/stand.js";
 import type { BakedRegionsFile } from "../../../src/shared/nav/regions.js";
 import { planRoute, type Gate } from "../../../src/shared/nav/route.js";
 import { capsuleOverlapsAabb, pickupBoxSource, type PickupPlacement } from "../../../src/shared/pickups.js";
@@ -68,6 +69,7 @@ type UseState = {
 /** Run one goal, or loop a patrol until the timeout. Exit 0 met, 2 no plan, 3 timeout. */
 export async function runMission(session: BotSession, mission: Mission, opts: BrainOptions = {}): Promise<number> {
   if (mission.kind === "goal") return runBrain(session, mission.goal, opts);
+  if (mission.kind === "stand") return runBrain(session, standAt(mission.target), opts);
   const timeoutMs = opts.timeoutMs ?? 300_000;
   const deadline = Date.now() + timeoutMs;
   let index = 0;
@@ -87,6 +89,22 @@ export async function runBrain(session: BotSession, goal: Goal, opts: BrainOptio
   const startedAt = Date.now();
   const secs = () => ((Date.now() - startedAt) / 1000).toFixed(2);
   if (!(await waitForGraph(session, deadline, error))) return 2;
+
+  let stand: Stand | undefined;
+  const standTarget = (goal as Partial<StandGoal>).stand;
+  if (standTarget) {
+    const graph = session.world.sceneGraph();
+    const views: DoorView[] = [];
+    for (const state of session.world.doors()) {
+      const body = session.world.doorBody(state.id);
+      if (body) views.push({ ...body, open: state.open, locked: state.locked });
+    }
+    stand = graph ? resolveStand(standTarget, graph, views) : undefined;
+    if (!stand) {
+      error("stand: no target");
+      return 2;
+    }
+  }
 
   const predictor = createMotionPredictor(opts.predictOwned !== false);
   const cache = createNavCache();
@@ -114,7 +132,7 @@ export async function runBrain(session: BotSession, goal: Goal, opts: BrainOptio
     const hash = session.world.sceneGraphHash() ?? "local";
     if (ctx && hash === grounded) return true;
     placements = session.world.pickupPlacements();
-    actions = groundActions(graph, placements, [goal]);
+    actions = groundActions(graph, placements, [goal], stand);
     ctx = createBotContext(graph, placements);
     grounded = hash;
     return true;
@@ -139,6 +157,14 @@ export async function runBrain(session: BotSession, goal: Goal, opts: BrainOptio
       weapon: session.world.weapon(),
       ammo: session.world.ammo(),
     };
+  };
+
+  const worldState = (): WorldState => {
+    const state: Record<string, Fact> = { ...buildWorldState(snapshot(false)) };
+    const self = session.world.self();
+    if (stand && self && Math.hypot(self.x - stand.x, self.z - stand.z) <= 0.35 &&
+        Math.abs(angleDiff(self.yaw, stand.yaw)) <= 0.35) state[STAND] = stand.key;
+    return state;
   };
 
   const send = (command: FollowInput): void => {
@@ -182,6 +208,7 @@ export async function runBrain(session: BotSession, goal: Goal, opts: BrainOptio
     const kind = cut < 0 ? id : id.slice(0, cut);
     const arg = cut < 0 ? "" : id.slice(cut + 1);
     if (kind === "goTo") return beginGoTo(id, arg, pose);
+    if (kind === "standAt") return beginStand(id, arg, pose);
     if (kind === "goToDoor") return beginDoor(id, arg, pose);
     if (kind === "unlock") return beginUnlock(id, arg, pose);
     if (kind === "pickup") return beginPickup(id, arg, pose);
@@ -218,6 +245,40 @@ export async function runBrain(session: BotSession, goal: Goal, opts: BrainOptio
             return "running";
           }
           return here() === place ? "done" : "failed";
+        }
+        return "running";
+      },
+    };
+  };
+
+  const beginStand = (id: string, key: string, pose: Pose): Running | undefined => {
+    if (!stand || stand.key !== key) return undefined;
+    const walked = walkToPoint(pose, stand, new Set());
+    if (!walked) return undefined;
+    const follow = makeFollow(walked);
+    let stopped = false;
+    return {
+      id,
+      moving: true,
+      started: Date.now(),
+      tick(current, nowTick) {
+        const self = session.world.self();
+        if (self && Math.hypot(self.x - stand.x, self.z - stand.z) <= 0.25) {
+          if (!stopped) {
+            stopped = true;
+            send({ moveX: 0, moveZ: 0, yaw: stand.yaw });
+          }
+          return "done";
+        }
+        const step = follow.step(current, otherPawns(session), nowTick);
+        send(step.input);
+        if (step.status === "stuck") return "stuck";
+        if (step.status === "arrived") {
+          if (!stopped) {
+            stopped = true;
+            send({ moveX: 0, moveZ: 0, yaw: stand.yaw });
+          }
+          return "done";
         }
         return "running";
       },
@@ -365,6 +426,13 @@ export async function runBrain(session: BotSession, goal: Goal, opts: BrainOptio
       const legs = planLegs(graph, navView(session, omit), route, pose, legOpts(session, cache));
       if (!legs.ok) return undefined;
       points = legs.points.map(triple);
+    } else if (place === "outside") {
+      const grid = outsideGridFor(session, graph, omit, cache);
+      if (!grid) return undefined;
+      const local = findLocalPath(grid, { x: pose.x, z: pose.z }, { x: target.x, z: target.z });
+      if (!local) return undefined;
+      for (const point of local) pushPoint(points, point);
+      return { points, grid };
     }
     const end = points[points.length - 1] ?? [pose.x, pose.y, pose.z];
     if (Math.hypot(end[0] - target.x, end[2] - target.z) > 0.25) {
@@ -425,7 +493,7 @@ export async function runBrain(session: BotSession, goal: Goal, opts: BrainOptio
       await sleepRest(loopStart);
       continue;
     }
-    const state = buildWorldState(snapshot(exec?.moving === true));
+    const state = worldState();
     if (satisfies(state, goal.want)) return 0;
 
     const parts = watchParts(session);
@@ -462,7 +530,7 @@ export async function runBrain(session: BotSession, goal: Goal, opts: BrainOptio
       planAt = Date.now();
       pending = "";
       lastReason = reason;
-      if (!plan) return satisfies(buildWorldState(snapshot(false)), goal.want) ? 0 : 2;
+      if (!plan) return satisfies(worldState(), goal.want) ? 0 : 2;
     } else {
       watchPickups = parts.pickups;
     }
@@ -676,6 +744,32 @@ function doorList(session: BotSession): Array<{
   return [];
 }
 
+function outsideGridFor(
+  session: BotSession,
+  graph: SceneGraph,
+  omit: ReadonlySet<string>,
+  cache: ReturnType<typeof createNavCache>,
+): Grid | undefined {
+  const spec = specForPlace(graph, "outside");
+  if (!spec) return undefined;
+  const view = navView(session, omit);
+  const shut = new Set<string>();
+  for (const door of view.doors) if (!door.open) shut.add(door.id);
+  // 0.25 m is ~288 ms for the whole outside (220k cells); 0.5 m is ~166 ms.
+  const key = `outside|${[...omit].sort().join(",")}|${[...shut].sort().join(",")}|${view.pawnRadius}|${view.pawnHeight}`;
+  const hit = cache.get(key);
+  if (hit) return hit;
+  const grid = buildGrid(spec.area, navBoxes(view, graph, shut), {
+    cell: 0.5,
+    radius: view.pawnRadius,
+    height: view.pawnHeight,
+    baseY: spec.baseY,
+    block: spec.block,
+  });
+  cache.set(key, grid);
+  return grid;
+}
+
 function gridFor(
   session: BotSession,
   graph: SceneGraph,
@@ -726,6 +820,13 @@ function pushPoint(out: Triple[], point: Triple): void {
   const last = out[out.length - 1];
   if (last && Math.abs(last[0] - point[0]) < 1e-3 && Math.abs(last[2] - point[2]) < 1e-3) return;
   out.push([point[0], point[1], point[2]]);
+}
+
+function angleDiff(a: number, b: number): number {
+  let diff = a - b;
+  while (diff > Math.PI) diff -= Math.PI * 2;
+  while (diff < -Math.PI) diff += Math.PI * 2;
+  return diff;
 }
 
 function satisfies(state: WorldState, want: WorldState): boolean {

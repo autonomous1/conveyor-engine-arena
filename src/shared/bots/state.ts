@@ -17,6 +17,8 @@ import type { Fact, WorldState } from "./goap.js";
 export const AT = "at";
 export const HAS_WEAPON = "hasWeapon";
 export const HAS_AMMO = "hasAmmo";
+// Derived pose fact: near the stand point and facing it. Only the bot brain sets it.
+export const STAND = "stand";
 
 export const DOOR_AT_PREFIX = "door:";
 export const PICKUP_AT_PREFIX = "pickup:";

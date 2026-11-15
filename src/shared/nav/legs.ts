@@ -192,11 +192,64 @@ function walk(
 ): Vec3[] | undefined {
   if (!spec) return undefined;
   if (placeId) {
-    const pulled = pullPlace(cache, view, regions, shut, placeId, x0, y0, z0, x1, y1, z1, doorAxis);
+    const pulled = pullPlace(cache, view, regions, shut, placeId, spec, x0, y0, z0, x1, y1, z1, doorAxis);
     if (pulled) return pulled;
   }
   const grid = cachedGrid(cache, graph, view, obstacles, shut, cabs, cell, spec);
   return findLocalPath(grid, { x: x0, z: z0 }, { x: x1, z: z1 });
+}
+
+/**
+ * True when a polyline enters a vertical block polygon. Endpoints are tested
+ * with a ray cast and segments with a proper edge-crossing test; y is ignored.
+ * @post True for an endpoint inside a block and for a chord that crosses one
+ *       with both endpoints outside.
+ */
+export function polylineHitsBlocks(
+  points: ReadonlyArray<readonly [number, number, number]>,
+  blocks: ReadonlyArray<ReadonlyArray<readonly [number, number]>>,
+): boolean {
+  for (const poly of blocks) {
+    if (poly.length < 3) continue;
+    for (const point of points) {
+      if (pointInPolygon(point[0], point[2], poly)) return true;
+    }
+    for (let i = 0; i < points.length - 1; i += 1) {
+      const a = points[i]!;
+      const b = points[i + 1]!;
+      for (let j = 0; j < poly.length; j += 1) {
+        const c = poly[j]!;
+        const d = poly[(j + 1) % poly.length]!;
+        if (segmentsCross(a[0], a[2], b[0], b[2], c[0], c[1], d[0], d[1])) return true;
+      }
+    }
+  }
+  return false;
+}
+
+function pointInPolygon(x: number, z: number, poly: ReadonlyArray<readonly [number, number]>): boolean {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i, i += 1) {
+    const xi = poly[i]![0];
+    const zi = poly[i]![1];
+    const xj = poly[j]![0];
+    const zj = poly[j]![1];
+    if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+function segmentsCross(
+  ax: number, az: number, bx: number, bz: number,
+  cx: number, cz: number, dx: number, dz: number,
+): boolean {
+  const orient = (px: number, pz: number, qx: number, qz: number, rx: number, rz: number): number =>
+    (qx - px) * (rz - pz) - (qz - pz) * (rx - px);
+  const d1 = orient(ax, az, bx, bz, cx, cz);
+  const d2 = orient(ax, az, bx, bz, dx, dz);
+  const d3 = orient(cx, cz, dx, dz, ax, az);
+  const d4 = orient(cx, cz, dx, dz, bx, bz);
+  return ((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0));
 }
 
 function pullPlace(
@@ -205,6 +258,7 @@ function pullPlace(
   regions: Map<string, RegionGraph> | undefined,
   shut: ReadonlySet<string>,
   placeId: string,
+  spec: PlaceGridSpec,
   x0: number,
   y0: number,
   z0: number,
@@ -224,7 +278,9 @@ function pullPlace(
   const found = findRegionPath(graph, [x0, y0, z0], [x1, y1, z1]);
   if (!found) return undefined;
   const points = pullString(found, doorAxis);
-  return points.length > 0 ? points : undefined;
+  if (points.length === 0) return undefined;
+  if (polylineHitsBlocks(points, spec.block)) return undefined;
+  return points;
 }
 
 function cachedGrid(
