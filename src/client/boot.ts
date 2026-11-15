@@ -62,9 +62,11 @@ const OWN_GRENADE_RADIUS = 2.5;
 export async function boot(
   view: ArenaView,
   open: () => OpenSocket,
-  opts?: { auth?: boolean; onAuthRejected?: (reason: string) => void; qa?: boolean },
+  opts?: { auth?: boolean; onAuthRejected?: (reason: string) => void; qa?: boolean; solo?: boolean },
 ): Promise<void> {
   const qa = opts?.qa === true;
+  // Solo runs the host in this tab, so the kernel can predict the owned pawn.
+  const predictOwned = opts?.solo === true;
   const hud = createHud(qa ? { hidden: true } : undefined);
   const hitMarker = createHitMarker();
   hud.setStatus("loading arena");
@@ -179,7 +181,7 @@ export async function boot(
       return undefined;
     }
   });
-  const client = new EngineClient(1, { delayMs: 80, extraMs: 0, predictOwned: false });
+  const client = new EngineClient(1, { delayMs: 80, extraMs: 0, predictOwned });
   let statusText = "connecting";
   let consoleHint = false;
   const diag = createClientDiag();
@@ -437,6 +439,7 @@ export async function boot(
     authoritativeHash: view.authoritativeHash,
     world: view.world,
     client,
+    predict: predictOwned,
     fireDebug: () => options.fireDebug,
     onStatus: (status) => {
       statusText = status.text;
@@ -817,8 +820,8 @@ export async function boot(
     if (sendAcc >= sendDt) {
       sendAcc = Math.min(sendAcc - sendDt, sendDt);
       const move = moveIntent(sample.yaw, sample.forward, sample.strafe);
-      // predictOwned stays false, so this send is the only client move. The host
-      // integrates it with the same noclip step when the switch is on.
+      // Solo predicts this input; multiplayer sends the only client move. The
+      // host integrates it with the same noclip step when the switch is on.
       const fly = view.noclip === true && options.showNoclip;
       link.sendInput(move.moveX, move.moveZ, sample.yaw, fly ? encodeMoveButtons(true, sample.ascend) : 0);
     }
@@ -875,6 +878,7 @@ export async function boot(
         tick: snapTick,
         snaps,
         resyncs,
+        corrections: client.metrics.hardCorrections,
         seq: snaps === 0 ? undefined : render.snapshotSeq,
         calls,
         tris: Math.round(tris),

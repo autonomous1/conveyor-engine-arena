@@ -174,6 +174,8 @@ export function connectLive(opts: {
   auth?: boolean;
   /** Hello `spectate: true`. The host does not seat this client. */
   spectate?: boolean;
+  /** Solo only: the kernel owns the input sequence and predicts the owned pawn. */
+  predict?: boolean;
   /** Host closed 4401 or 4403. The page clears the key and leaves the game. */
   onAuthRejected?: (reason: string) => void;
 }): LiveLink {
@@ -237,7 +239,8 @@ export function connectLive(opts: {
     if (admittedHigh === undefined) return;
     const next = admittedHigh + 1;
     // Outstanding frames were already rejected or admitted before this later tick.
-    if (inputSeq <= admittedHigh || inputSeq > admittedHigh + ADMIT_WINDOW) inputSeq = next;
+    // With prediction the kernel owns its counter, so only the manual path rebases.
+    if (opts.predict !== true && (inputSeq <= admittedHigh || inputSeq > admittedHigh + ADMIT_WINDOW)) inputSeq = next;
     recovering = false;
     diag.report({
       level: "warn",
@@ -517,12 +520,16 @@ export function connectLive(opts: {
   return {
     sendInput(moveX, moveZ, yaw, buttons = 0) {
       if (ownedId === undefined || closed || ws.readyState !== WebSocket.OPEN || recovering) return;
-      // Do not run further ahead of the last published admission than the gateway will accept.
-      if (admittedHigh !== undefined && inputSeq > admittedHigh + ADMIT_WINDOW) {
+      // Do not run further ahead of the last published admission than the gateway
+      // will accept. The guard precedes collection so no input is left unsent.
+      const next = opts.predict === true ? (lastSentInputId ?? 0) + 1 : inputSeq;
+      if (admittedHigh !== undefined && next > admittedHigh + ADMIT_WINDOW) {
         enterRecovery("ahead");
         return;
       }
-      const seq = inputSeq++;
+      const seq = opts.predict === true
+        ? opts.client.collectInput({ moveX, moveZ, yaw, buttons }).seq
+        : inputSeq++;
       lastSentInputId = seq;
       ws.send(JSON.stringify({
         v: 1,

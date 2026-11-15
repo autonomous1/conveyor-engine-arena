@@ -70,6 +70,8 @@ export type OverlayStats = {
   tick: number | undefined;
   snaps: number;
   resyncs: number;
+  /** Kernel hard corrections (solo prediction); absent means 0. */
+  corrections?: number;
   seq: number | undefined;
   calls: number;
   tris: number;
@@ -103,7 +105,7 @@ function exposureText(value: number): string {
 export function formatOverlay(stats: OverlayStats): string {
   const lines = [
     `fps ${rateText(stats.fps)}  tick/s ${rateText(stats.tickPerSec)}  tick ${countText(stats.tick)}`,
-    `snaps ${stats.snaps}  resync ${stats.resyncs}  seq ${countText(stats.seq)}`,
+    `snaps ${stats.snaps}  resync ${stats.resyncs}  corr ${stats.corrections ?? 0}  seq ${countText(stats.seq)}`,
     `calls ${stats.calls}  tris ${stats.tris}`,
     `geoms ${stats.geoms}  tex ${stats.tex}`,
   ];

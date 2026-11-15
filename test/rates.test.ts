@@ -54,7 +54,7 @@ test("overlay prints the hud lines and an em dash when tick/s is unset", () => {
   });
   assert.equal(text, [
     "fps 60  tick/s \u2014  tick 1842",
-    "snaps 120  resync 0  seq 120",
+    "snaps 120  resync 0  corr 0  seq 120",
     "calls 42  tris 120004",
     "geoms 18  tex 9",
     "shadows on  map 1  tone 4  exp 1",
