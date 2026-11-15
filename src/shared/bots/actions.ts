@@ -47,13 +47,19 @@ export type BotCtx = {
   minActionS: number;
   /** Road compiles for this context. The same door facts compile once. */
   readonly compiles: number;
+  /** Live feet, for the final door approach. Absent: use the place anchor. */
+  position?: () => Point | undefined;
 };
 
 type Point = { x: number; y: number; z: number };
 
 type DoorBit = { id: string; locked: boolean };
 
-export function createBotContext(graph: SceneGraph, pickups: readonly PickupPlacement[] = []): BotCtx {
+export function createBotContext(
+  graph: SceneGraph,
+  pickups: readonly PickupPlacement[] = [],
+  opts: { position?: () => Point | undefined } = {},
+): BotCtx {
   const pickupPoints = new Map<string, Point>();
   for (const item of pickups) pickupPoints.set(item.id, feet(item));
   const doors = doorBits(graph);
@@ -74,6 +80,7 @@ export function createBotContext(graph: SceneGraph, pickups: readonly PickupPlac
     routeBound(fromPlace, toPlace, s) {
       return lookup(true, fromPlace, toPlace, s);
     },
+    position: opts.position,
   };
 }
 
@@ -163,7 +170,7 @@ export function goTo(place: string): Action<BotCtx> {
 export function goToDoor(door: string, place: string, stand: Point): Action<BotCtx> {
   const metres = memoMetres((s, ctx) => (s.at === atDoor(door) ? Infinity : metresToSide(s, ctx, place, stand)));
   return {
-    id: `goToDoor:${door}`,
+    id: `goToDoor:${door}:${place}`,
     pre: {},
     eff: { at: atDoor(door), [doorSideFact(door)]: place },
     usable: (s, ctx) => Number.isFinite(metres(s, ctx)),
@@ -288,10 +295,33 @@ function gateFor(portal: ScenePortal, s: WorldState): Gate {
 
 function metresToSide(s: WorldState, ctx: BotCtx, place: string, stand: Point): number {
   const at = String(s.at);
-  if (at === place) return walkToStand(ctx.graph, place, stand);
+  if (at === place) {
+    const pose = ctx.position?.();
+    if (pose) return Math.max(MIN_M, Math.hypot(pose.x - stand.x, pose.y - stand.y, pose.z - stand.z));
+    return walkToStand(ctx.graph, place, stand);
+  }
   const travel = ctx.routeCost(at, place, s);
   if (!Number.isFinite(travel)) return Infinity;
-  return travel > 0 ? travel : walkToStand(ctx.graph, place, stand);
+  return travel + nearestPlacePoint(ctx.graph, place, stand);
+}
+
+/** Distance from `stand` to the nearest edge of the place polygon. */
+function nearestPlacePoint(graph: SceneGraph, place: string, stand: Point): number {
+  const polygon = graph.placeById.get(place)?.polygon;
+  if (!polygon || polygon.length === 0) return 0;
+  let best = Infinity;
+  for (let i = 0; i < polygon.length; i += 1) {
+    const a = polygon[i]!;
+    const b = polygon[(i + 1) % polygon.length]!;
+    const dx = b[0] - a[0];
+    const dz = b[1] - a[1];
+    const length2 = dx * dx + dz * dz;
+    const t = length2 > 0 ? Math.max(0, Math.min(1, ((stand.x - a[0]) * dx + (stand.z - a[1]) * dz) / length2)) : 0;
+    const x = a[0] + t * dx;
+    const z = a[1] + t * dz;
+    best = Math.min(best, Math.hypot(stand.x - x, stand.z - z));
+  }
+  return Number.isFinite(best) ? best : 0;
 }
 
 function walkToStand(graph: SceneGraph, place: string, stand: Point): number {
@@ -312,10 +342,11 @@ export function estimateSeconds(
   goal: { want: WorldState },
   ctx: BotCtx,
   pickups: readonly PickupPlacement[],
+  stand?: Stand,
 ): (s: WorldState) => number {
   const named = goal.want[AT];
   if (typeof named === "string" && !ctx.graph.placeById.has(named)) return () => Infinity;
-  const place = goalPlace(goal, ctx.graph, pickups);
+  const place = goalPlace(goal, ctx.graph, pickups) ?? stand?.place;
   const holding = holdingId(goal);
   const pickupS = holding ? ACT_S : 0;
   let doorSides: Map<string, [string, string]> | undefined;
@@ -325,11 +356,14 @@ export function estimateSeconds(
   let altDoors: Array<{ door: string; key?: string }> = [];
   let altMetres = Infinity;
   let altSet: Set<string> | undefined;
-  const spotsOf = (at: string): readonly string[] => {
+  const spotsOf = (at: string, s: WorldState): readonly string[] => {
     if (ctx.graph.placeById.has(at)) return [at];
     if (at.startsWith(DOOR_AT_PREFIX)) {
+      const id = at.slice(DOOR_AT_PREFIX.length);
+      const stood = s[doorSideFact(id)];
+      if (typeof stood === "string") return [stood];
       if (!doorSides) doorSides = doorSideIndex(ctx.graph);
-      return doorSides.get(at.slice(DOOR_AT_PREFIX.length)) ?? [];
+      return doorSides.get(id) ?? [];
     }
     if (at.startsWith(PICKUP_AT_PREFIX)) {
       const item = pickups.find((pickup) => pickup.id === at.slice(PICKUP_AT_PREFIX.length));
@@ -364,7 +398,7 @@ export function estimateSeconds(
     if (at === place) return pickupS;
     if (mode === undefined) {
       // `at` may be `pickup:<id>` or `door:<id>` after that step finishes.
-      const spots = spotsOf(at);
+      const spots = spotsOf(at, s);
       const spot = spots.find((id) => ctx.graph.placeById.has(id));
       if (spot) classify(spot, s);
     }
@@ -373,7 +407,7 @@ export function estimateSeconds(
     if (at.startsWith(DOOR_AT_PREFIX) && !altSet.has(at.slice(DOOR_AT_PREFIX.length))) return Infinity;
     const pending = altDoors.filter((door) => s[doorOpenFact(door.door)] !== true);
     if (pending.length === 0) {
-      const spots = spotsOf(at);
+      const spots = spotsOf(at, s);
       if (spots.length === 0) return Infinity;
       let best = Infinity;
       for (const spot of spots) {

@@ -3,7 +3,8 @@
 // Wiring: bot brain resolves a StandGoal; shared/bots/goals.ts keys it and
 //   shared/bots/actions.ts grounds it.
 import { doorStand, type DoorSide } from "./follow.js";
-import { placeAt, type SceneGraph, type Vec3 } from "../scene-graph.js";
+import { planRoute, type Vec3Like } from "./route.js";
+import { placeAt, type SceneGraph, type ScenePortal, type Vec3 } from "../scene-graph.js";
 
 export type StandTarget =
   | { kind: "point"; x: number; y: number; z: number; yaw?: number }
@@ -38,13 +39,15 @@ export function standKey(target: StandTarget): string {
 
 /**
  * Resolve a target to its place, point, and facing yaw.
- * @post The place is the side's `placeAt` id; a door side prefers non-outside,
- *       then `in`. No lock or route logic runs here.
+ * @post The place is the side's `placeAt` id. An explicit side or place wins;
+ *       with `from`, the nearest side reachable under the live doors wins;
+ *       with no `from`, an exterior door prefers `out`, then `in`.
  */
 export function resolveStand(
   target: StandTarget,
   graph: SceneGraph,
   doors: readonly DoorView[],
+  opts: { from?: Vec3Like } = {},
 ): Stand | undefined {
   if (target.kind === "point") {
     const place = placeAt(graph, target.x, target.y, target.z);
@@ -69,7 +72,31 @@ export function resolveStand(
 
   let chosen = target.side !== undefined ? sides.find((item) => item.side === target.side) : undefined;
   if (!chosen && target.place !== undefined) chosen = sides.find((item) => item.place === target.place);
-  if (!chosen) chosen = sides.find((item) => item.place !== "outside") ?? sides.find((item) => item.side === "in") ?? sides[0];
+  if (!chosen && opts.from) {
+    const gate = (portal: ScenePortal) => {
+      if (portal.kind !== "door") return "open";
+      const id = portal.door ?? portal.id;
+      const row = doors.find((item) => item.id === id);
+      if (!row) return portal.locked === true ? "locked" : "closed-unlocked";
+      if (row.open === true) return "open";
+      if (row.locked === true) return "locked";
+      return "closed-unlocked";
+    };
+    let best: { side: DoorSide; cost: number } | undefined;
+    for (const side of sides) {
+      const route = planRoute(graph, opts.from, side.place, gate);
+      if (!route.ok) continue;
+      if (!best || route.cost < best.cost) best = { side: side.side, cost: route.cost };
+    }
+    if (best) chosen = sides.find((item) => item.side === best!.side);
+    else return undefined;
+  }
+  if (!chosen) {
+    const exterior = sides.find((item) => item.place === "outside");
+    chosen = exterior && sides.some((item) => item.place !== "outside")
+      ? exterior
+      : sides.find((item) => item.side === "in") ?? sides[0];
+  }
   if (!chosen) return undefined;
 
   return {

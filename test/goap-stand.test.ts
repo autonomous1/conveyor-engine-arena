@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { loadArena } from "../src/server/world-loader.ts";
-import { createBotContext, groundActions } from "../src/shared/bots/actions.ts";
+import { createBotContext, estimateSeconds, groundActions } from "../src/shared/bots/actions.ts";
 import { buildWorldState } from "../src/shared/bots/state.ts";
 import { standAt } from "../src/shared/bots/goals.ts";
 import { chooseGoal } from "../src/shared/bots/goap.ts";
@@ -26,4 +26,16 @@ test("stand_goal_plans_a_route_then_the_stand", () => {
   assert.ok(plan);
   assert.ok(plan.steps.some((id) => id.startsWith("standAt:")));
   assert.ok(plan.steps[0] === `goTo:${stand.place}` || plan.steps[0]!.startsWith("standAt:"));
+
+  // A stand goal now has a place bound: finite from another place, 0 at the stand.
+  const heuristic = estimateSeconds(goal, ctx, loaded.view.pickups ?? [], stand);
+  const openDoors = loaded.view.doors.map((item) => ({ id: item.id, open: true, locked: false }));
+  const away = buildWorldState({
+    at: "brutalist-building-1-cbake.floor-1.hall",
+    pickups: [],
+    doors: openDoors,
+  });
+  const bound = heuristic(away);
+  assert.ok(Number.isFinite(bound) && bound > 0, `stand bound ${bound}`);
+  assert.equal(heuristic({ ...away, at: stand.place }), 0);
 });

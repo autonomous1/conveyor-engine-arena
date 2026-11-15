@@ -17,7 +17,7 @@ const DOOR = "hall-b.door-ext";
 const PRIZE = "retrieve:prize@hall-b.room-1";
 const KEY_PLAN = [
   "pickup:key",
-  `goToDoor:${DOOR}`,
+  `goToDoor:${DOOR}:outside`,
   `unlock:${DOOR}`,
   "goTo:hall-b.room-1",
   "pickup:prize",
@@ -245,4 +245,16 @@ test("bot planner source has no clock and no Math.random", () => {
     assert.equal(/\bMath\.random\b/.test(text), false, name);
     assert.equal(/\bDate\.now\b/.test(text), false, name);
   }
+});
+
+test("a deadline stops the search; a later one still returns the plan", () => {
+  const { actions, ctx } = setup();
+  const state = outsideState([DOOR]);
+  const goal = retrieve("prize", "hall-b.room-1");
+  let calls = 0;
+  // First call is the start check (0 < 1); the next check is after the first
+  // expansion (2 >= 1), so the search stops before finding the 5-step plan.
+  const clock = (): number => (calls++ === 0 ? 0 : 2);
+  assert.equal(plan(state, goal, actions, ctx, { maxExpand: 1_000_000, deadlineMs: 1, now: clock }), undefined);
+  assert.ok(plan(state, goal, actions, ctx, { deadlineMs: 10_000, now: () => 0 }));
 });

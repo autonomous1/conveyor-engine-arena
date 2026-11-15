@@ -39,6 +39,8 @@ export type BrainOptions = {
   /** Passed to `plan`. A huge expand budget still stops at `timeoutMs`. */
   maxExpand?: number;
   maxEvaluations?: number;
+  /** Per-plan budget in ms. Default 250; the mission deadline still wins. */
+  planMs?: number;
 };
 
 type TickStatus = "running" | "done" | "failed" | "stuck";
@@ -99,7 +101,8 @@ export async function runBrain(session: BotSession, goal: Goal, opts: BrainOptio
       const body = session.world.doorBody(state.id);
       if (body) views.push({ ...body, open: state.open, locked: state.locked });
     }
-    stand = graph ? resolveStand(standTarget, graph, views) : undefined;
+    const self = session.world.self();
+    stand = graph ? resolveStand(standTarget, graph, views, self ? { from: { x: self.x, y: self.y, z: self.z } } : {}) : undefined;
     if (!stand) {
       error("stand: no target");
       return 2;
@@ -133,7 +136,12 @@ export async function runBrain(session: BotSession, goal: Goal, opts: BrainOptio
     if (ctx && hash === grounded) return true;
     placements = session.world.pickupPlacements();
     actions = groundActions(graph, placements, [goal], stand);
-    ctx = createBotContext(graph, placements);
+    ctx = createBotContext(graph, placements, {
+      position: () => {
+        const self = session.world.self();
+        return self ? { x: self.x, y: self.y, z: self.z } : undefined;
+      },
+    });
     grounded = hash;
     return true;
   };
@@ -285,7 +293,9 @@ export async function runBrain(session: BotSession, goal: Goal, opts: BrainOptio
     };
   };
 
-  const beginDoor = (id: string, doorId: string, pose: Pose): Running | undefined => {
+  const beginDoor = (id: string, arg: string, pose: Pose): Running | undefined => {
+    // `goToDoor:<door>:<place>` names the side; the door is the part before it.
+    const doorId = arg.includes(":") ? arg.slice(0, arg.indexOf(":")) : arg;
     const stand = chooseStand(doorId, undefined, pose);
     if (!stand) return undefined;
     const walked = walkToPoint(pose, stand, new Set());
@@ -510,10 +520,11 @@ export async function runBrain(session: BotSession, goal: Goal, opts: BrainOptio
       await delay(0);
       if (Date.now() >= deadline) return 3;
       if (reason !== "initial") log(`replan ${reason} t=${secs()}s`);
+      const planDeadline = Math.min(deadline, Date.now() + (opts.planMs ?? 250));
       const planOpts: PlanOptions = {
         minCost: groundedCtx.minActionS,
-        heuristic: estimateSeconds(goal, groundedCtx, placements),
-        deadlineMs: deadline,
+        heuristic: estimateSeconds(goal, groundedCtx, placements, stand),
+        deadlineMs: planDeadline,
         now: () => Date.now(),
         ...(opts.maxExpand !== undefined ? { maxExpand: opts.maxExpand } : {}),
         ...(opts.maxEvaluations !== undefined ? { maxEvaluations: opts.maxEvaluations } : {}),

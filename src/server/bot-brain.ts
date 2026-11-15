@@ -208,12 +208,20 @@ export function createHostBotBrain(opts: HostBotBrainOptions): HostBotBrain {
     byId.set(agent.id, slot);
   }
 
-  // Built on the first trapped bot, then kept.
+  // Built on the first trapped bot, then kept. The position closure reads the
+  // slot currently planning, not the slot that first built the context.
   let planner: { ctx: BotCtx; actions: Action<BotCtx>[] } | undefined;
+  let plannerSlot: Slot | undefined;
   const goal = reach(EXIT_PLACE);
-  function hasPlan(place: string, useDoors: boolean): boolean {
+  function hasPlan(place: string, useDoors: boolean, slot: Slot): boolean {
     if (!planner) {
-      const ctx = createBotContext(opts.nav.sceneGraph, opts.pickups ?? []);
+      const ctx = createBotContext(opts.nav.sceneGraph, opts.pickups ?? [], {
+        position: () => {
+          if (!plannerSlot) return undefined;
+          const view = opts.world.store.view(plannerSlot.agent.id);
+          return view ? { x: view.position.x, y: view.position.y, z: view.position.z } : undefined;
+        },
+      });
       planner = { ctx, actions: groundActions(opts.nav.sceneGraph, [], [goal]) };
     }
     // A bot that cannot press a door treats a shut one as locked. One that can
@@ -228,7 +236,14 @@ export function createHostBotBrain(opts: HostBotBrainOptions): HostBotBrain {
         locked: useDoors ? door.locked === true && door.open !== true : door.open !== true,
       })),
     });
-    return plan(state, goal, planner.actions, planner.ctx, { minCost: planner.ctx.minActionS, maxExpand: 64 }) !== undefined;
+    plannerSlot = slot;
+    const options = { minCost: planner.ctx.minActionS, maxExpand: 64, now: Date.now };
+    // Compile the road net before the plan clock starts; the first cold call
+    // dominates a tick while the search itself is sub-millisecond.
+    planner.ctx.routeCost(place, EXIT_PLACE, state);
+    const result = plan(state, goal, planner.actions, planner.ctx, { ...options, deadlineMs: Date.now() + 20 });
+    plannerSlot = undefined;
+    return result !== undefined;
   }
 
   function release(slot: Slot): void {
@@ -262,7 +277,7 @@ export function createHostBotBrain(opts: HostBotBrainOptions): HostBotBrain {
   function escape(slot: Slot, place: string | undefined, at: number): void {
     if (at - slot.planAt < ESCAPE_REPLAN_MS) return;
     slot.planAt = at;
-    if (place === undefined || place === EXIT_PLACE || !hasPlan(place, slot.useDoors)) {
+    if (place === undefined || place === EXIT_PLACE || !hasPlan(place, slot.useDoors, slot)) {
       release(slot);
       return;
     }

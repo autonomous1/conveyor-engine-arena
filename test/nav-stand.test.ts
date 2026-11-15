@@ -23,3 +23,23 @@ test("door_and_point_stands_resolve", () => {
   assert.equal(stand!.place, placeAt(graph, 0.54, 0, -1.78).id);
   assert.equal(standKey(p), "point:0.540,0.000,-1.780");
 });
+
+test("door_stand_auto_picks_the_reachable_side", () => {
+  const door = doors.find((item) => item.id === "brutalist-building-1-cbake.door-1-1-9-22-0");
+  assert.ok(door, "locked exterior door missing");
+  const outside = resolveStand({ kind: "door", doorId: door.id, side: "out" }, graph, doors);
+  const hall = resolveStand({ kind: "door", doorId: door.id, side: "in" }, graph, doors);
+  assert.ok(outside && hall);
+  assert.equal(outside.place, "outside");
+  assert.notEqual(hall.place, "outside");
+
+  const fromPlaza = resolveStand({ kind: "door", doorId: door.id }, graph, doors, {
+    from: { x: outside.x, y: outside.y, z: outside.z },
+  });
+  assert.equal(fromPlaza?.place, "outside", "the locked hall side must not be chosen from the plaza");
+
+  const fromHall = resolveStand({ kind: "door", doorId: door.id }, graph, doors, {
+    from: { x: hall.x, y: hall.y, z: hall.z },
+  });
+  assert.equal(fromHall?.place, hall.place);
+});
