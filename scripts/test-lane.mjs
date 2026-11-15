@@ -12,8 +12,10 @@ if (lane !== "unit" && lane !== "integration") {
 
 const files = readdirSync("test").filter((file) => file.endsWith(".test.ts")).sort();
 // Direct imports, spawn strings, and existence checks all count: any reference
-// to `dist/` means the test reads the built tree.
-const isIntegration = (file) => /dist\//.test(readFileSync(`test/${file}`, "utf8"));
+// to `dist/` means the test reads the built tree. Live host/bot tests start a
+// real server too, so they belong in the integration lane.
+const isIntegration = (file) =>
+  /dist\/|startLiveArena|startArenaServer|connectBot\b/.test(readFileSync(`test/${file}`, "utf8"));
 const chosen = files.filter((file) => isIntegration(file) === (lane === "integration"));
 if (chosen.length === 0) {
   console.error(`no ${lane} tests`);
