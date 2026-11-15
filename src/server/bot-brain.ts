@@ -237,11 +237,11 @@ export function createHostBotBrain(opts: HostBotBrainOptions): HostBotBrain {
       })),
     });
     plannerSlot = slot;
-    const options = { minCost: planner.ctx.minActionS, maxExpand: 64, now: Date.now };
+    const options = { minCost: planner.ctx.minActionS, maxExpand: 32, now: Date.now };
     // Compile the road net before the plan clock starts; the first cold call
     // dominates a tick while the search itself is sub-millisecond.
     planner.ctx.routeCost(place, EXIT_PLACE, state);
-    const result = plan(state, goal, planner.actions, planner.ctx, { ...options, deadlineMs: Date.now() + 20 });
+    const result = plan(state, goal, planner.actions, planner.ctx, { ...options, deadlineMs: Date.now() + 100 });
     plannerSlot = undefined;
     return result !== undefined;
   }

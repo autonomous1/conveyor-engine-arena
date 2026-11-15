@@ -43,7 +43,7 @@ Read `agents/AGENTS.md` first. Then this file. Then `agents/codemap.md` only for
 
 ### Acceptance (hard gate)
 
-<- `npm run build && npm run typecheck` pass; the **scoped** run from Test scope passes; **N scoped tests, 0 fail**. The full `npm test` is the merge gate — CI on push/PR and every two hours — not the per-task loop.>
+<- `npm run typecheck` passes; the **scoped** run from Test scope passes; **N scoped tests, 0 fail**. The scoped runner builds `dist` only when a selected test imports it; do not run the full `npm test` — it is the merge gate (CI on push/PR and every two hours), not the per-task loop.>
 <- Standalone scoped run of the new/edited test file passes; both test names appear in the report.>
 <- **Fail-first is demonstrated** — report includes the failing run before the fix and the passing run after, both verbatim.>
 <- `npm run codemap:check` passes.>

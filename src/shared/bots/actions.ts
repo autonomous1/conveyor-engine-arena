@@ -10,7 +10,7 @@
 import { createRoadCache, planRoute, routePlaceCosts, type Gate, type RoadCache } from "../nav/route.js";
 import type { PickupPlacement } from "../pickups.js";
 import type { Stand } from "../nav/stand.js";
-import { placeAt, type SceneGraph, type ScenePortal } from "../scene-graph.js";
+import { placeAt, stopOf, type SceneGraph, type ScenePortal } from "../scene-graph.js";
 import type { Action, Fact, WorldState } from "./goap.js";
 import {
   HAS_AMMO,
@@ -116,6 +116,11 @@ export function groundActions(
     actions.push(unlock(doorId(portal), portal.key));
   }
 
+  // The host's escape goal is on-foot; grounding 180 cab edges there makes a
+  // 10 ms plan miss. Rides are grounded for goals that actually name a stop.
+  const wantsRide = !goals || goals.some((goal) => typeof goal.want[AT] === "string" && stopOf(goal.want[AT] as string) !== undefined);
+  if (wantsRide) for (const portal of elevatorPortals(graph)) actions.push(ride(portal));
+
   for (const item of chosen ?? pickupsInOrder(pickups, ranked)) {
     actions.push(pickup(item, placeOfPickup(graph, item)));
   }
@@ -175,6 +180,28 @@ export function goToDoor(door: string, place: string, stand: Point): Action<BotC
     eff: { at: atDoor(door), [doorSideFact(door)]: place },
     usable: (s, ctx) => Number.isFinite(metres(s, ctx)),
     cost: (s, ctx) => metres(s, ctx) / WALK_MPS,
+  };
+}
+
+/**
+ * Every elevator portal, sorted by id.
+ * @post Deterministic order; no duplicate ids.
+ */
+export function elevatorPortals(graph: SceneGraph): ScenePortal[] {
+  return graph.portals.filter((portal) => portal.kind === "elevator").sort((a, b) => byText(a.id, b.id));
+}
+
+/**
+ * One cab edge from the lower stop's place to the upper stop's place.
+ * @post `at = portal.b`; the executor summons the cab and rides it.
+ */
+export function ride(portal: ScenePortal): Action<BotCtx> {
+  return {
+    id: `ride:${portal.id}`,
+    pre: { [AT]: portal.a },
+    eff: { [AT]: portal.b },
+    usable: (s) => s[AT] === portal.a && portal.a !== portal.b,
+    cost: () => Math.max(ACT_S, portal.cost / WALK_MPS),
   };
 }
 

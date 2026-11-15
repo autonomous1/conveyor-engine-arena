@@ -9,6 +9,12 @@ import { AuthoritativeWorld } from "conveyor-engine-world";
 import { createArenaElevators } from "../dist/server/elevators.js";
 import type { ArenaElevator } from "../dist/shared/arena-view.js";
 import { commitShielded, enqueuePlanarMove, MOVE_DT } from "../dist/shared/movements.js";
+import { loadArena } from "../src/server/world-loader.ts";
+import { createBotContext, groundActions } from "../src/shared/bots/actions.ts";
+import { buildWorldState } from "../src/shared/bots/state.ts";
+import { reach } from "../src/shared/bots/goals.ts";
+import { chooseGoal } from "../src/shared/bots/goap.ts";
+import { stopOf } from "../src/shared/scene-graph.ts";
 
 const RADIUS = 0.5;
 const HEIGHT = 1.8;
@@ -288,4 +294,28 @@ test("E on the upper landing brings the cab up from the ground", () => {
   }
   assert.equal(rose, true);
   assert.equal(ride.host.onUse(ride.pawn), true);
+});
+
+const loaded = loadArena();
+const goapGraph = loaded.sceneGraph!;
+const elevators = goapGraph.portals.filter((portal) => portal.kind === "elevator");
+assert.ok(elevators.length > 0, "the installed graph must have elevator portals");
+const goapPortal = elevators.find((item) => stopOf(item.a) && stopOf(item.b))!;
+const goapFrom = stopOf(goapPortal.a)!;
+const goapTo = stopOf(goapPortal.b)!;
+
+test("ground_actions_and_a_goal_plan_include_a_ride_edge", () => {
+  const actions = groundActions(goapGraph, loaded.view.pickups ?? []);
+  assert.ok(actions.some((action) => action.id === `ride:${goapPortal.id}`), "no ride action");
+  const goal = reach(goapPortal.b);
+  const ctx = createBotContext(goapGraph, loaded.view.pickups ?? []);
+  const state = buildWorldState({
+    at: goapPortal.a,
+    pickups: [],
+    doors: loaded.view.doors.map((door) => ({ id: door.id, open: door.open, locked: door.locked === true })),
+  });
+  const plan = chooseGoal(state, [goal], groundActions(goapGraph, loaded.view.pickups ?? [], [goal]), ctx, { maxExpand: 5000 });
+  assert.ok(plan, "no plan");
+  assert.ok(plan.steps.some((id) => id.startsWith("ride:")), `plan ${plan.steps.join(" > ")}`);
+  assert.equal(goapFrom.shaft, goapTo.shaft, "the fixture portal must stay in one shaft");
 });

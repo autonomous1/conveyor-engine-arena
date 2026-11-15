@@ -17,12 +17,15 @@ import { resolveStand, type DoorView, type Stand } from "../../../src/shared/nav
 import type { BakedRegionsFile } from "../../../src/shared/nav/regions.js";
 import { planRoute, type Gate } from "../../../src/shared/nav/route.js";
 import { capsuleOverlapsAabb, pickupBoxSource, type PickupPlacement } from "../../../src/shared/pickups.js";
-import { placeAt, type SceneGraph, type ScenePortal } from "../../../src/shared/scene-graph.js";
+import { placeAt, stopOf, type SceneGraph, type ScenePortal } from "../../../src/shared/scene-graph.js";
 import type { BotSession } from "./connection.js";
 import type { Mission } from "./missions.js";
 import { createMotionPredictor } from "./predict.js";
 
 const STEP_MS = 1000 / INPUT_HZ;
+const RIDE_SUMMON_MS = 30_000;
+const RIDE_WAIT_MS = 60_000;
+const RIDE_NEAR_M = 0.6;
 const REPLAN_MS = 5_000;
 const GRAPH_WAIT_MS = 1_500;
 const USE_WAIT_MS = 1_000;
@@ -217,6 +220,7 @@ export async function runBrain(session: BotSession, goal: Goal, opts: BrainOptio
     const arg = cut < 0 ? "" : id.slice(cut + 1);
     if (kind === "goTo") return beginGoTo(id, arg, pose);
     if (kind === "standAt") return beginStand(id, arg, pose);
+    if (kind === "ride") return beginRide(id, arg, pose);
     if (kind === "goToDoor") return beginDoor(id, arg, pose);
     if (kind === "unlock") return beginUnlock(id, arg, pose);
     if (kind === "pickup") return beginPickup(id, arg, pose);
@@ -289,6 +293,89 @@ export async function runBrain(session: BotSession, goal: Goal, opts: BrainOptio
           return "done";
         }
         return "running";
+      },
+    };
+  };
+
+  const beginRide = (id: string, portalId: string, pose: Pose): Running | undefined => {
+    const graph = session.world.sceneGraph();
+    if (!graph) return undefined;
+    const portal = graph.portals.find((item) => item.kind === "elevator" && item.id === portalId);
+    if (!portal) return undefined;
+    const from = stopOf(portal.a);
+    const to = stopOf(portal.b);
+    if (!from || !to || from.shaft !== to.shaft) return undefined;
+    const shaftPlace = graph.placeById.get(from.shaft);
+    if (!shaftPlace) return undefined;
+    const landing = { x: portal.at.a[0], y: portal.at.a[1], z: portal.at.a[2] };
+    const destination = { x: portal.at.b[0], y: portal.at.b[1], z: portal.at.b[2] };
+    let phase: "landing" | "summon" | "enter" | "exit" = "landing";
+    let waitAt = Date.now();
+    const firstWalk = walkToPoint(pose, landing, new Set());
+    if (!firstWalk) return undefined;
+    let follow = makeFollow(firstWalk);
+    let exitFollow: ReturnType<typeof makeFollow> | undefined;
+    return {
+      id,
+      moving: true,
+      started: Date.now(),
+      tick(current, nowTick, now) {
+        const self = session.world.self();
+        if (!self) return "running";
+        const cab = session.world.cabs().find((item) => item.id === from.shaft);
+        const atLanding = Math.hypot(self.x - landing.x, self.z - landing.z) <= RIDE_NEAR_M;
+        if (phase === "landing") {
+          this.moving = true;
+          if (atLanding) {
+            phase = "summon";
+            waitAt = now;
+            session.input.callElevator(from.shaft, from.index);
+            return "running";
+          }
+          const step = follow.step(current, otherPawns(session), nowTick);
+          send(step.input);
+          return step.status === "stuck" ? "stuck" : "running";
+        }
+        if (phase === "summon") {
+          this.moving = false;
+          if (cab && cab.at === from.index && cab.phase === "idle") {
+            const centre = cabCentre(shaftPlace.polygon, cab.y);
+            const enterWalk = walkToPoint(current, centre, new Set());
+            if (!enterWalk) return "failed";
+            follow = makeFollow(enterWalk);
+            phase = "enter";
+            return "running";
+          }
+          if (now - waitAt > RIDE_SUMMON_MS) return "failed";
+          return "running";
+        }
+        if (phase === "enter") {
+          this.moving = true;
+          if (session.world.placeOf(self)?.id === from.shaft) {
+            phase = "exit";
+            waitAt = now;
+            session.input.callElevator(from.shaft, to.index);
+            return "running";
+          }
+          const step = follow.step(current, otherPawns(session), nowTick);
+          send(step.input);
+          return step.status === "stuck" ? "stuck" : step.status === "arrived" ? "failed" : "running";
+        }
+        // Ride, then step out: wait for the destination stop and open doors.
+        if (!(cab && cab.at === to.index && cab.phase === "idle")) {
+          if (now - waitAt > RIDE_WAIT_MS) return "failed";
+          return "running";
+        }
+        this.moving = true;
+        if (Math.hypot(self.x - destination.x, self.z - destination.z) <= RIDE_NEAR_M) return "done";
+        if (!exitFollow) {
+          const outWalk = walkToPoint(current, destination, new Set());
+          if (!outWalk) return "failed";
+          exitFollow = makeFollow(outWalk);
+        }
+        const step = exitFollow.step(current, otherPawns(session), nowTick);
+        send(step.input);
+        return step.status === "stuck" ? "stuck" : "running";
       },
     };
   };
@@ -779,6 +866,17 @@ function outsideGridFor(
   });
   cache.set(key, grid);
   return grid;
+}
+
+function cabCentre(polygon: ReadonlyArray<readonly [number, number]>, y: number): { x: number; y: number; z: number } {
+  if (polygon.length === 0) return { x: 0, y, z: 0 };
+  let x = 0;
+  let z = 0;
+  for (const point of polygon) {
+    x += point[0];
+    z += point[1];
+  }
+  return { x: x / polygon.length, y, z: z / polygon.length };
 }
 
 function gridFor(

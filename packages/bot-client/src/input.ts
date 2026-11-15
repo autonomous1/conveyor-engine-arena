@@ -19,6 +19,8 @@ export type MoveCommand = {
 export type BotInput = {
   sendInput(cmd: MoveCommand): void;
   use(): boolean;
+  /** Explicit cab call: from the landing or the cab. */
+  callElevator(id: string, stop: number): boolean;
   fire(yaw?: number, pitch?: number): boolean;
   grenade(yaw?: number, pitch?: number): boolean;
   /** A new welcome starts the input sequence at 1, matching the browser client. */
@@ -72,6 +74,9 @@ export function createBotInput(link: InputLink): BotInput {
       return sendOwned(JSON.stringify(useFrame(seq)), () => {
         useSeq += 1;
       });
+    },
+    callElevator(id, stop) {
+      return sendOwned(JSON.stringify({ v: 1, t: "elevator", id, stop }), () => {});
     },
     fire(yaw = aimYaw, pitch = 0) {
       const seq = fireSeq;

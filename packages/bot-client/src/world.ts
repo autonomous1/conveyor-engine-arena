@@ -6,7 +6,7 @@ import type { ArenaView } from "../../../src/shared/arena-view.js";
 import { yawFromQuat } from "../../../src/shared/look.js";
 import type { PickupKind, PickupPlacement } from "../../../src/shared/pickups.js";
 import { parseBakedRegions, type BakedRegionsFile } from "../../../src/shared/nav/regions.js";
-import { placeAt, parseSceneGraph, type SceneGraph } from "../../../src/shared/scene-graph.js";
+import { placeAt, parseSceneGraph, type CabState, type SceneGraph } from "../../../src/shared/scene-graph.js";
 
 export type PawnPose = {
   id: number;
@@ -83,6 +83,8 @@ export type BotWorld = {
   others(): PawnPose[];
   door(id: string): DoorState | undefined;
   doors(): DoorState[];
+  /** Current cabs, including door state and last arrival stop. */
+  cabs(): readonly CabState[];
   /** Placement leaf. Open and locked stay on `door()`. */
   doorBody(id: string): DoorBody | undefined;
   pickups(): readonly string[];
@@ -172,6 +174,9 @@ export function createBotWorld(view: WorldView): BotWorld {
     },
     doors() {
       return [...doorMap.values()].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    },
+    cabs() {
+      return cabStates(cabs);
     },
     doorBody(id: string) {
       return doorBodies.get(id);
@@ -319,7 +324,7 @@ function placementsFrom(items: readonly WorldPickup[]): PickupPlacement[] {
   return out;
 }
 
-function cabStates(cabs: Map<string, ElevatorCab>) {
+function cabStates(cabs: Map<string, ElevatorCab>): CabState[] {
   return [...cabs.values()].map((cab) => ({
     id: cab.id,
     at: cab.stop,
