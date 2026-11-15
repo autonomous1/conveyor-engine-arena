@@ -3,6 +3,9 @@ name: ci
 on:
   push:
   pull_request:
+  schedule:
+    # UTC. The full suite is the gate; the scoped selector is only a dev loop.
+    - cron: "0 */2 * * *"
 
 jobs:
   verify:

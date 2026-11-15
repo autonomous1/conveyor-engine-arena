@@ -70,6 +70,7 @@ Do not tag `@param` / `@returns` when the signature already says it. Do not rest
 
 ## Commands
 - Test: `npm test` (`node --import ./scripts/ts-ext-register.mjs --test test/*.test.ts`, on Node 24.0.2, which strips types). Keep the `--import`. `src/` imports siblings as `.js`, and that hook maps them to `.ts` while tests run in place. A deploy check runs this same `npm test`, not a bare `node --test`.
+- Scoped (per task): `npm run test:scope nav,bot` or `npm run test:related -- <files>`. The full `npm test` is still the gate: every push/PR and every two hours via the CI schedule.
 - Typecheck: `npm run typecheck` (server, client and util tsconfigs).
 - Build: `npm run build` (server via `tsc -p tsconfig.server.json` → `dist/`, client via esbuild → `dist/web/client.js`). Run: `npm start` (http://127.0.0.1:4173, `PORT` overrides).
 - Scene bake: `npm run bake:scene`. Codemap: `npm run codemap`.
