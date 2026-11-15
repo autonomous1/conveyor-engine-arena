@@ -450,3 +450,9 @@ test("scene graph follows a scoped token and stays off the static host", { timeo
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("players_frame_is_strict_and_sorted", () => {
+  assert.deepEqual(parseArenaFrame(JSON.stringify({ t: "players", ids: [9, 7, 9] })), { t: "players", ids: [7, 9] });
+  assert.equal(parseArenaFrame(JSON.stringify({ t: "players", ids: [1, "x"] })), undefined);
+  assert.equal(parseArenaFrame(JSON.stringify({ t: "players", ids: [0] })), undefined);
+});

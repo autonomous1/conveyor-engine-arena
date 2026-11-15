@@ -27,6 +27,7 @@ import { createArenaDoors, createDoorBlockers } from "./doors.js";
 import { createArenaElevators } from "./elevators.js";
 import { createArenaFire } from "./fire.js";
 import { applyPawnModel, claimClearSpawn, createHeldInputs, placePawn, startPropAnimation, startWanderLoop, teleportBlockReason } from "./game.js";
+import { playerRoster } from "./players.js";
 import { createArenaGrenades } from "./grenade.js";
 import { createHostSocketPaths } from "./host-path.js";
 import { pawnBodies, releasePickupObstacle } from "./pickups.js";
@@ -125,6 +126,9 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
   const pickupHost = createPickupHost(loaded.view.pickups ?? []);
   const audit = createAudit();
   for (const agent of loaded.agents) health.note(agent.id);
+  function roster(): number[] {
+    return playerRoster(engine.connected, (clientId) => engine.gateway.get(clientId)?.ownedEntity);
+  }
   const attachPickupWelcome = (text: string, claims?: HostClaims): string => {
     if (!mayBeWelcome(text)) return text;
     let frame: unknown;
@@ -140,6 +144,7 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
     welcome.doors = doorHost.snapshot();
     const elevators = elevatorHost.snapshot();
     if (elevators.length > 0) welcome.elevators = elevators;
+    welcome.players = roster();
     const owned = welcome.ownedEntityId;
     if (typeof owned === "number") {
       const weapon = kit.weaponOf(owned);
@@ -370,7 +375,15 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
       health,
       sense: botSense,
     });
+  let lastRoster = "";
   const stopLoop = startWanderLoop(loaded.world, loaded.agents, engine, held, (line) => console.error(line), health, audit, () => {
+    const rosterIds = roster();
+    const rosterSig = rosterIds.join(",");
+    if (rosterSig !== lastRoster) {
+      lastRoster = rosterSig;
+      const frame = encodeFrame({ t: "players", ids: rosterIds });
+      for (const clientId of engine.connected) engine.session(clientId)?.socket.send(frame);
+    }
     reservedPads.clear();
     const bodies = pawnBodies(loaded.world, health);
     const grants = pickupHost.take(bodies, health, kit);

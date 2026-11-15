@@ -11,7 +11,7 @@ import { fireShotFrame, summarizeInbound } from "../shared/fire-debug.js";
 import { parseAudit, type AuditCounters } from "../shared/audit.js";
 import { parseHealth, type DamageCause } from "../shared/health.js";
 import { parseSpawn, type SpawnFrame } from "../shared/spawn-frame.js";
-import { parseQaCapture, parseSceneGraphFrame, type QaCaptureFrame, type SceneGraphFrame } from "../shared/bot-protocol.js";
+import { parsePlayers, parseQaCapture, parseSceneGraphFrame, type QaCaptureFrame, type SceneGraphFrame } from "../shared/bot-protocol.js";
 import { parseDoor, parseDoorSet, useFrame, type DoorFrame } from "../shared/doors.js";
 import { parseElevatorSet, parseElevatorState, type ElevatorState } from "../shared/elevators.js";
 import { parseGrenadePose, grenadeFrame, type GrenadePose } from "../shared/grenade.js";
@@ -174,6 +174,8 @@ export function connectLive(opts: {
   auth?: boolean;
   /** Hello `spectate: true`. The host does not seat this client. */
   spectate?: boolean;
+  /** Connected players' owned pawn ids, from welcome and roster changes. */
+  onPlayers?: (ids: readonly number[]) => void;
   /** Solo only: the kernel owns the input sequence and predicts the owned pawn. */
   predict?: boolean;
   /** Host closed 4401 or 4403. The page clears the key and leaves the game. */
@@ -396,6 +398,11 @@ export function connectLive(opts: {
       opts.onFault?.(err);
     }
     if (typeof msg.t === "string") {
+      if (msg.t === "players") {
+        const players = parsePlayers(msg);
+        if (players) opts.onPlayers?.(players.ids);
+        return;
+      }
       if (msg.t === "sceneGraph") {
         opts.onSceneGraph?.(parseSceneGraphFrame(msg));
         return;
@@ -432,6 +439,10 @@ export function connectLive(opts: {
     try {
       if (msg.type === "welcome") {
         opts.onSceneGraph?.(undefined);
+        if (Array.isArray(msg.players)) {
+          const players = parsePlayers({ t: "players", ids: msg.players });
+          if (players) opts.onPlayers?.(players.ids);
+        }
         const token = typeof msg.reconnectToken === "string" ? msg.reconnectToken : undefined;
         if (token && useAuth) sessionStorage.setItem(TOKEN_KEY, token);
         const owned = Number(msg.ownedEntityId);

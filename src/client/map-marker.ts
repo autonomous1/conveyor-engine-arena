@@ -22,6 +22,38 @@ export type SelfMarker = {
 
 export const SELF_DOT_R = 5;
 export const SELF_WEDGE_LEN = 13;
+export const SELF_COLOR = "#ff4d4d";
+export const SELF_LABEL_COLOR = "#ff9c9c";
+export const OTHER_PLAYER_COLOR = "#ffd84d";
+export const OTHER_DOT_R = 4;
+
+export type OtherPlayer = { id: number; x: number; z: number };
+
+/**
+ * Yellow dot centres for the other players, in panel pixels.
+ * @post One dot per player, in input order.
+ */
+export function otherPlayerDots(
+  frame: Pick<MapFrame, "toPixel">,
+  players: readonly OtherPlayer[],
+): Array<{ id: number; center: [number, number] }> {
+  return players.map((player) => ({ id: player.id, center: frame.toPixel(player.x, player.z) }));
+}
+
+/**
+ * True when the other-player set or a position changed by more than 5 cm.
+ * @post A length or id change is true; small jitter is false.
+ */
+export function playersMoved(prev: readonly OtherPlayer[], next: readonly OtherPlayer[]): boolean {
+  if (prev.length !== next.length) return true;
+  for (let i = 0; i < prev.length; i += 1) {
+    const a = prev[i]!;
+    const b = next[i]!;
+    if (a.id !== b.id) return true;
+    if (Math.hypot(a.x - b.x, a.z - b.z) > 0.05) return true;
+  }
+  return false;
+}
 
 export function selfMarker(frame: Pick<MapFrame, "toPixel">, pose: SelfPose): SelfMarker {
   const center = frame.toPixel(pose.x, pose.z);

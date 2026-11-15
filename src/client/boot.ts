@@ -65,6 +65,7 @@ export async function boot(
   opts?: { auth?: boolean; onAuthRejected?: (reason: string) => void; qa?: boolean; solo?: boolean },
 ): Promise<void> {
   const qa = opts?.qa === true;
+  const playerIds = new Set<number>();
   // Solo runs the host in this tab, so the kernel can predict the owned pawn.
   const predictOwned = opts?.solo === true;
   const hud = createHud(qa ? { hidden: true } : undefined);
@@ -440,6 +441,10 @@ export async function boot(
     world: view.world,
     client,
     predict: predictOwned,
+    onPlayers: (ids) => {
+      playerIds.clear();
+      for (const id of ids) playerIds.add(id);
+    },
     fireDebug: () => options.fireDebug,
     onStatus: (status) => {
       statusText = status.text;
@@ -853,6 +858,9 @@ export async function boot(
       owned ? { x: owned.position.x, y: owned.position.y, z: owned.position.z, yaw: yawFromQuat(owned.rotation) } : undefined,
       view.elevators,
     );
+    sceneMap.setPlayers(render.entities
+      .filter((entity) => entity.id !== ownedId && entity.visible && playerIds.has(entity.id))
+      .map((entity) => ({ id: entity.id, x: entity.position.x, z: entity.position.z })));
     hud.setStatus(presentFaultHud(
       `${statusText} · ${look}${hpText} · meshes ${pawns.count} models ${pawns.count - pawns.fallbacks} fallback ${pawns.fallbacks + visuals.fallbacks}${liftText}`,
       consoleHint,

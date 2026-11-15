@@ -89,6 +89,8 @@ export type QaCaptureFrame = {
   waitFrames?: number;
 };
 
+export type PlayersFrame = { t: "players"; ids: number[] };
+
 /** Host → client arena frames. Elevator is cab state. Grenade is the replicated pose. */
 export type ArenaFrame =
   | LoadoutFrame
@@ -101,6 +103,7 @@ export type ArenaFrame =
   | GrenadePose
   | AuditFrame
   | InventoryFrame
+  | PlayersFrame
   | SceneGraphFrame
   | RegionsFrame
   | TeleportResultFrame
@@ -116,6 +119,7 @@ export type WelcomeExtras = {
   keys: string[];
   role?: string;
   scope?: string[];
+  players?: number[];
 };
 
 /**
@@ -141,12 +145,25 @@ export function parseArenaFrame(text: string): ArenaFrame | undefined {
   if (t === "grenade") return parseGrenadePose(value);
   if (t === "audit") return parseAudit(value);
   if (t === "inventory") return parseInventory(value);
+  if (t === "players") return parsePlayers(value);
   if (t === "sceneGraph") return parseSceneGraphFrame(value);
   if (t === "regions") return parseRegionsFrame(value);
   if (t === "teleportResult") return parseTeleportResult(value);
   if (t === "snapshotResult") return parseSnapshotResult(value);
   if (t === "qaCapture") return parseQaCapture(value);
   return undefined;
+}
+
+export function parsePlayers(frame: unknown): PlayersFrame | undefined {
+  if (!frame || typeof frame !== "object" || Array.isArray(frame)) return undefined;
+  const rec = frame as Record<string, unknown>;
+  if (rec.t !== "players" || !Array.isArray(rec.ids)) return undefined;
+  const ids: number[] = [];
+  for (const value of rec.ids) {
+    if (typeof value !== "number" || !Number.isInteger(value) || value <= 0) return undefined;
+    ids.push(value);
+  }
+  return { t: "players", ids: [...new Set(ids)].sort((a, b) => a - b) };
 }
 
 const SNAPSHOT_REASONS = new Set<string>(["invalid", "busy", "noRenderer"]);
@@ -283,6 +300,7 @@ export function parseWelcomeExtras(welcome: unknown): WelcomeExtras | undefined 
   const role = typeof rec.role === "string" && rec.role.length > 0 ? rec.role : undefined;
   const scope = stringList(rec.scope);
   const elevators = Array.isArray(rec.elevators) ? parseElevatorSet(rec.elevators) : undefined;
+  const players = Array.isArray(rec.players) ? parsePlayers({ t: "players", ids: rec.players })?.ids : undefined;
   return {
     pickups: parsePickupSet(rec.pickups) ?? [],
     doors: parseDoorSet(rec.doors) ?? [],
@@ -290,6 +308,7 @@ export function parseWelcomeExtras(welcome: unknown): WelcomeExtras | undefined 
     ...(weapon ? { weapon } : {}),
     ammo,
     keys: parsePickupSet(rec.keys) ?? [],
+    ...(players !== undefined ? { players } : {}),
     ...(role ? { role } : {}),
     ...(scope ? { scope } : {}),
   };

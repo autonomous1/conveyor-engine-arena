@@ -1,20 +1,24 @@
 /**
  * Scene map panel. The picture is the baked top-down image from `npm run bake:map`.
- * The canvas over it draws the local player marker (`setSelf`).
+ * The canvas over it draws the local player (`setSelf`) and the other players (`setPlayers`).
  * World +X is panel right and world −Z is panel up, the same frame as the bake.
  * `layoutSceneMap` is that mapping. The footprint helpers stay for tests and a
  * yaw check. The panel does not paint them, and nothing here runs in the WebGL frame.
  */
 
 // ARCHITECTURE: The baked top-down scene panel: image, canvas self marker, and
-//   visibility.
-// Wiring: boot.ts builds it and calls `setSelf` each frame; arena-scene.ts
-//   supplies roots.
+//   visibility, and the player dots.
+// Wiring: boot.ts builds it and calls `setSelf`/`setPlayers` each frame;
+//   arena-scene.ts supplies roots.
 import * as THREE from "three";
 import type { ProfileRing } from "../shared/building-profile.ts";
 import { aimDirection, yawFromQuat } from "../shared/look.ts";
 import { MAP_BAKE_META_URL, MAP_BAKE_URL, SCENE_MAP_SIZE, mapFrame } from "../shared/map-frame.ts";
-import { SELF_DOT_R, floorLabel, selfMarker, selfMoved, type FloorSource, type SelfPose } from "./map-marker.ts";
+import {
+  OTHER_DOT_R, OTHER_PLAYER_COLOR, SELF_COLOR, SELF_DOT_R, SELF_LABEL_COLOR,
+  floorLabel, otherPlayerDots, playersMoved, selfMarker, selfMoved,
+  type FloorSource, type OtherPlayer, type SelfPose,
+} from "./map-marker.ts";
 
 export { MAP_BAKE_URL, SCENE_MAP_SIZE };
 
@@ -361,6 +365,8 @@ export type SceneMap = {
   layout(): MapLayout | undefined;
   /** Local player marker. `undefined` clears it. Cheap: repaints only when visible and moved. */
   setSelf(pose: SelfPose | undefined, lifts?: readonly FloorSource[]): void;
+  /** Other players, drawn yellow. Cheap: repaints only when the set or a position changed. */
+  setPlayers(players: readonly OtherPlayer[]): void;
 };
 
 export function createSceneMap(): SceneMap {
@@ -404,11 +410,13 @@ export function createSceneMap(): SceneMap {
   let selfLabel = "";
   let painted: SelfPose | undefined;
   let paintedLabel = "";
+  let players: readonly OtherPlayer[] = [];
+  let paintedPlayers: readonly OtherPlayer[] = [];
   let dirty = true;
   let ctx: CanvasRenderingContext2D | null | undefined;
-  const paintSelf = () => {
+  const paint = () => {
     // No marker yet and nothing on the canvas: leave the context untouched.
-    if (!self && !painted) return;
+    if (!self && players.length === 0 && !painted && paintedPlayers.length === 0) return;
     if (ctx === undefined) ctx = canvas.getContext?.("2d") ?? null;
     if (!ctx) return;
     const dpr = typeof devicePixelRatio === "number" && devicePixelRatio > 0 ? devicePixelRatio : 1;
@@ -421,14 +429,26 @@ export function createSceneMap(): SceneMap {
     ctx.clearRect(0, 0, SCENE_MAP_SIZE, SCENE_MAP_SIZE);
     painted = self;
     paintedLabel = selfLabel;
+    paintedPlayers = players;
     dirty = false;
+    if (cached) {
+      ctx.strokeStyle = "#111";
+      ctx.lineWidth = 2;
+      for (const dot of otherPlayerDots(cached, players)) {
+        ctx.beginPath();
+        ctx.arc(dot.center[0], dot.center[1], OTHER_DOT_R, 0, Math.PI * 2);
+        ctx.fillStyle = OTHER_PLAYER_COLOR;
+        ctx.fill();
+        ctx.stroke();
+      }
+    }
     if (!self || !cached) return;
     const m = selfMarker(cached, self);
     const [cx, cy] = m.center;
     ctx.lineJoin = "round";
     ctx.lineWidth = 2;
     ctx.strokeStyle = "#111";
-    ctx.fillStyle = "#ffb020";
+    ctx.fillStyle = SELF_COLOR;
     ctx.beginPath();
     ctx.moveTo(m.wedge[0][0], m.wedge[0][1]);
     ctx.lineTo(m.wedge[1][0], m.wedge[1][1]);
@@ -439,7 +459,7 @@ export function createSceneMap(): SceneMap {
     ctx.beginPath();
     ctx.arc(cx, cy, SELF_DOT_R, 0, Math.PI * 2);
     ctx.stroke();
-    ctx.fillStyle = "#ffe14a";
+    ctx.fillStyle = SELF_COLOR;
     ctx.fill();
     if (selfLabel) {
       ctx.font = "bold 11px system-ui, sans-serif";
@@ -450,7 +470,7 @@ export function createSceneMap(): SceneMap {
       const ty = cy - 9;
       ctx.lineWidth = 3;
       ctx.strokeText(selfLabel, tx, ty);
-      ctx.fillStyle = "#ffe14a";
+      ctx.fillStyle = SELF_LABEL_COLOR;
       ctx.fillText(selfLabel, tx, ty);
     }
   };
@@ -462,13 +482,13 @@ export function createSceneMap(): SceneMap {
     setVisible(on: boolean) {
       visible = on;
       root.hidden = !on;
-      if (on) paintSelf();
+      if (on) paint();
     },
     setWorld(next: SceneMapWorld) {
       world = next;
       cached = layoutSceneMap(next, SCENE_MAP_SIZE, SCENE_MAP_SIZE);
       dirty = true;
-      if (visible) paintSelf();
+      if (visible) paint();
     },
     layout() {
       if (!world) return undefined;
@@ -481,10 +501,19 @@ export function createSceneMap(): SceneMap {
       const dpr = typeof devicePixelRatio === "number" && devicePixelRatio > 0 ? devicePixelRatio : 1;
       if (canvas.width !== Math.round(SCENE_MAP_SIZE * dpr)) dirty = true;
       if (!pose) {
-        if (painted) paintSelf();
+        if (painted || players.length > 0) paint();
         return;
       }
-      if (dirty || selfMoved(painted, pose, selfLabel, paintedLabel)) paintSelf();
+      if (dirty || selfMoved(painted, pose, selfLabel, paintedLabel)) paint();
+    },
+    setPlayers(next) {
+      if (next.length === players.length && !playersMoved(players, next)) {
+        players = next;
+        return;
+      }
+      players = next;
+      if (!visible) return;
+      if (dirty || playersMoved(paintedPlayers, next)) paint();
     },
   };
 }

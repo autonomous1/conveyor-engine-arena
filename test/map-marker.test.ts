@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { mapFrame } from "../src/shared/map-frame.ts";
-import { floorLabel, selfMarker, selfMoved } from "../src/client/map-marker.ts";
+import { OTHER_PLAYER_COLOR, floorLabel, otherPlayerDots, playersMoved, selfMarker, selfMoved } from "../src/client/map-marker.ts";
 
 const frame = mapFrame({ minX: -10, maxX: 10, minZ: -10, maxZ: 10 }, 360, 360)!;
 const near = (a: number, b: number) => assert.ok(Math.abs(a - b) < 1e-9, `${a} vs ${b}`);
@@ -40,4 +40,13 @@ test("selfMoved ignores jitter", () => {
   assert.equal(selfMoved(a, { ...a, x: 0.2 }, "F1", "F1"), true);
   assert.equal(selfMoved(a, { ...a, yaw: 0.1 }, "F1", "F1"), true);
   assert.equal(selfMoved(a, a, "F2", "F1"), true);
+});
+
+test("other players are yellow dots at their map pixels", () => {
+  const dots = otherPlayerDots(frame, [{ id: 1, x: 5, z: -8 }, { id: 2, x: -5, z: 5 }]);
+  assert.deepEqual(dots[0]!.center, frame.toPixel(5, -8));
+  assert.equal(OTHER_PLAYER_COLOR, "#ffd84d");
+  assert.equal(playersMoved([{ id: 1, x: 0, z: 0 }], [{ id: 1, x: 0.01, z: 0 }]), false);
+  assert.equal(playersMoved([{ id: 1, x: 0, z: 0 }], [{ id: 1, x: 0.2, z: 0 }]), true);
+  assert.equal(playersMoved([{ id: 1, x: 0, z: 0 }], [{ id: 2, x: 0, z: 0 }]), true);
 });
