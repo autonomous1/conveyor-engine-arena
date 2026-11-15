@@ -15,6 +15,9 @@ import { createRevocationList, loadVerifier, type RevocationList } from "./auth/
 import { createArenaHost, type HostConn } from "./arena-host.js";
 import { nodeGameFiles } from "./game-files-node.js";
 import { loadArena } from "./world-loader.js";
+import { installWanderDebug } from "./wander-debug-node.js";
+
+installWanderDebug();
 
 const webRoot = fileURLToPath(new URL("../../dist/web/", import.meta.url));
 

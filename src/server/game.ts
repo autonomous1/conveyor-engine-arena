@@ -19,7 +19,7 @@ import { moveIntent, yawFromQuat } from "../shared/look.js";
 import { approachYaw, commitShielded, enqueueOwnedMove, MOVE_DT, MOVEMENTS, movementIntent, yawQuaternion } from "../shared/movements.js";
 import { createFollower, type FollowPawn, type Pose } from "../shared/nav/follow.js";
 import { pullString } from "../shared/nav/funnel.js";
-import { buildGrid, findLocalPath, navBoxes, specForPlace } from "../shared/nav/grid.js";
+import { buildGrid, findLocalPath, navBoxes, specForPlace, type Grid } from "../shared/nav/grid.js";
 import { createNavCache, planLegs, type NavCache } from "../shared/nav/legs.js";
 import {
   findRegionPath,
@@ -31,6 +31,7 @@ import {
 } from "../shared/nav/regions.js";
 import { planRoute, type Gate } from "../shared/nav/route.js";
 import { placeAt, type SceneGraph, type ScenePortal, type Vec3 } from "../shared/scene-graph.js";
+import { buildWanderStallDump, writeWanderStallDump } from "./wander-debug.js";
 import { deliverAuditFrame } from "./audit.js";
 import { deliverHealthFrames } from "./health.js";
 import { dispatchHostFrame, hostSnapPath } from "./host-path.js";
@@ -212,7 +213,55 @@ type WanderWalk = {
   doorSig: string;
   /** The `override.goal` this walk was planned for. Absent for a sampled wander goal. */
   claim?: object;
+  grid: Grid;
+  points: Vec3[];
+  baseY: number;
+  place: string;
 };
+
+const lastWanderDump = new WeakMap<WanderAgent, number>();
+
+function maybeDumpWanderStall(
+  agent: WanderAgent,
+  pose: Pose,
+  nav: WanderNav,
+  flags: ReadonlyMap<string, boolean>,
+  tick: number,
+  source: "follower" | "install",
+  grid: Grid,
+  points: Vec3[],
+  baseY: number,
+  place: string,
+): void {
+  if ((globalThis as { __wanderDebugEnabled?: boolean }).__wanderDebugEnabled !== true) return;
+  const last = lastWanderDump.get(agent);
+  if (last !== undefined && tick - last < 200) return;
+  const graph = nav.sceneGraph;
+  if (!graph) return;
+  const view = navView(nav, flags);
+  const shut = shutIds(flags);
+  const radius = view.pawnRadius + 0.5;
+  const colliders = navBoxes(view, graph, shut)
+    .filter((box) => box.maxX >= pose.x - radius && box.minX <= pose.x + radius
+      && box.maxZ >= pose.z - radius && box.minZ <= pose.z + radius)
+    .map((box, index) => ({ id: index + 1, minX: box.minX, maxX: box.maxX, minY: box.minY, maxY: box.maxY, minZ: box.minZ, maxZ: box.maxZ }));
+  const spec = specForPlace(graph, place);
+  const dump = buildWanderStallDump({
+    at: Date.now(),
+    tick,
+    agent: agent.id,
+    pose: { x: pose.x, y: pose.y, z: pose.z, yaw: pose.yaw ?? agent.heading },
+    place,
+    goal: agent.goal ? { x: agent.goal.x, y: agent.goal.y, z: agent.goal.z } : undefined,
+    claim: !!agent.override,
+    path: { points, baseY },
+    grid,
+    ...(spec ? { spec: { baseY: spec.baseY, minX: spec.area.minX, maxX: spec.area.maxX, minZ: spec.area.minZ, maxZ: spec.area.maxZ, blocks: spec.block.length } } : {}),
+    colliders,
+    source,
+  });
+  if (writeWanderStallDump(dump) !== undefined) lastWanderDump.set(agent, tick);
+}
 
 type PlannedWalk = {
   points: Vec3[];
@@ -290,6 +339,9 @@ export function steerUnownedWander(
     const step = walk.follow.step(pose, others, tick);
     agent.heading = step.input.yaw;
     if (step.status === "running") return;
+    if (step.status === "stuck") {
+      maybeDumpWanderStall(agent, pose, loaded, openFlags, tick, "follower", walk.grid, walk.points, walk.baseY, walk.place);
+    }
     if (agent.override && (step.status === "arrived" || step.status === "stuck")) {
       agent.followEnd = step.status;
       clearWalk(agent);
@@ -383,8 +435,14 @@ function installWalk(
   agent.nextTurn = tick + WANDER_GOAL_TICKS;
   agent.heading = stepped.input.yaw;
   if (stepped.status === "running") {
-    wanderWalks.set(agent, { follow, watched, doorSig, claim: planned.claim });
+    wanderWalks.set(agent, {
+      follow, watched, doorSig, claim: planned.claim, grid, points: planned.points,
+      baseY: pose.y, place: placeAt(graph, planned.goal.x, planned.goal.y, planned.goal.z).id,
+    });
     return;
+  }
+  if (stepped.status === "stuck") {
+    maybeDumpWanderStall(agent, pose, nav, flags, tick, "install", grid, planned.points, pose.y, placeAt(graph, planned.goal.x, planned.goal.y, planned.goal.z).id);
   }
   if (agent.override && (stepped.status === "arrived" || stepped.status === "stuck")) agent.followEnd = stepped.status;
   clearWalk(agent);

@@ -297,24 +297,32 @@ export async function runBrain(session: BotSession, goal: Goal, opts: BrainOptio
     };
   };
 
-  const beginRide = (id: string, portalId: string, pose: Pose): Running | undefined => {
+  const beginRide = (id: string, arg: string, pose: Pose): Running | undefined => {
     const graph = session.world.sceneGraph();
     if (!graph) return undefined;
+    // `ride:<up|down>:<portalId>`, and live portal ids contain a colon themselves.
+    const cut = arg.indexOf(":");
+    const direction = cut >= 0 ? arg.slice(0, cut) : "up";
+    const portalId = cut >= 0 ? arg.slice(cut + 1) : arg;
+    const reverse = direction === "down";
     const portal = graph.portals.find((item) => item.kind === "elevator" && item.id === portalId);
     if (!portal) return undefined;
-    const from = stopOf(portal.a);
-    const to = stopOf(portal.b);
+    const from = stopOf(reverse ? portal.b : portal.a);
+    const to = stopOf(reverse ? portal.a : portal.b);
     if (!from || !to || from.shaft !== to.shaft) return undefined;
     const shaftPlace = graph.placeById.get(from.shaft);
     if (!shaftPlace) return undefined;
-    const landing = { x: portal.at.a[0], y: portal.at.a[1], z: portal.at.a[2] };
-    const destination = { x: portal.at.b[0], y: portal.at.b[1], z: portal.at.b[2] };
+    const landingAt = reverse ? portal.at.b : portal.at.a;
+    const destinationAt = reverse ? portal.at.a : portal.at.b;
+    const landing = { x: landingAt[0], y: landingAt[1], z: landingAt[2] };
+    const destination = { x: destinationAt[0], y: destinationAt[1], z: destinationAt[2] };
     let phase: "landing" | "summon" | "enter" | "exit" = "landing";
     let waitAt = Date.now();
     const firstWalk = walkToPoint(pose, landing, new Set());
     if (!firstWalk) return undefined;
     let follow = makeFollow(firstWalk);
     let exitFollow: ReturnType<typeof makeFollow> | undefined;
+    let exitDestination = destination;
     return {
       id,
       moving: true,
@@ -367,12 +375,14 @@ export async function runBrain(session: BotSession, goal: Goal, opts: BrainOptio
           return "running";
         }
         this.moving = true;
-        if (Math.hypot(self.x - destination.x, self.z - destination.z) <= RIDE_NEAR_M) return "done";
         if (!exitFollow) {
-          const outWalk = walkToPoint(current, destination, new Set());
+          const target = rideExitTarget(session, shaftPlace, from.shaft, landing, destination, cab.y);
+          const outWalk = walkToPoint(current, target, new Set());
           if (!outWalk) return "failed";
           exitFollow = makeFollow(outWalk);
+          exitDestination = target;
         }
+        if (Math.hypot(self.x - exitDestination.x, self.z - exitDestination.z) <= RIDE_NEAR_M) return "done";
         const step = exitFollow.step(current, otherPawns(session), nowTick);
         send(step.input);
         return step.status === "stuck" ? "stuck" : "running";
@@ -866,6 +876,36 @@ function outsideGridFor(
   });
   cache.set(key, grid);
   return grid;
+}
+
+function rideExitTarget(
+  session: BotSession,
+  shaftPlace: object,
+  shaft: string,
+  landing: { x: number; y: number; z: number },
+  destination: { x: number; y: number; z: number },
+  cabY: number,
+): { x: number; y: number; z: number } {
+  const room = (shaftPlace as { room?: string }).room;
+  if (room) {
+    for (const state of session.world.doors()) {
+      if (!state.id.startsWith(`${room}.`)) continue;
+      const body = session.world.doorBody(state.id);
+      if (!body) continue;
+      for (const side of ["out", "in"] as const) {
+        const stand = doorStand(body, side);
+        const point = { x: stand.x, y: cabY, z: stand.z };
+        const place = session.world.placeOf(point)?.id;
+        if (place && place !== shaft) return point;
+      }
+    }
+  }
+  // No usable room door: step past the in-cab landing, away from its centre.
+  const dx = destination.x - landing.x;
+  const dz = destination.z - landing.z;
+  const len = Math.hypot(dx, dz);
+  if (len > 1e-6) return { x: destination.x + (dx / len) * 2, y: cabY, z: destination.z + (dz / len) * 2 };
+  return { x: destination.x, y: cabY, z: destination.z };
 }
 
 function cabCentre(polygon: ReadonlyArray<readonly [number, number]>, y: number): { x: number; y: number; z: number } {

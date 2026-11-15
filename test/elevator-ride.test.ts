@@ -306,7 +306,7 @@ const goapTo = stopOf(goapPortal.b)!;
 
 test("ground_actions_and_a_goal_plan_include_a_ride_edge", () => {
   const actions = groundActions(goapGraph, loaded.view.pickups ?? []);
-  assert.ok(actions.some((action) => action.id === `ride:${goapPortal.id}`), "no ride action");
+  assert.ok(actions.some((action) => action.id === `ride:up:${goapPortal.id}`), "no ride action");
   const goal = reach(goapPortal.b);
   const ctx = createBotContext(goapGraph, loaded.view.pickups ?? []);
   const state = buildWorldState({

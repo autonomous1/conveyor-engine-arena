@@ -96,6 +96,9 @@ export function groundActions(
   stand?: Stand,
 ): Action<BotCtx>[] {
   const actions: Action<BotCtx>[] = [];
+  // The host's escape goal is on-foot; grounding 180 cab edges there makes a
+  // 10 ms plan miss. Rides are grounded for goals that actually name a stop.
+  const wantsRide = !goals || stand !== undefined || goals.some((goal) => typeof goal.want[AT] === "string" && stopOf(goal.want[AT] as string) !== undefined);
   // No goals: every place and every door, so fixture plans stay complete.
   // With goals: the goal room and the pickups that goal names. `goToDoor`
   // covers the stand, so door sides are not also `goTo` targets.
@@ -103,6 +106,16 @@ export function groundActions(
   const chosen = goals ? pickupsForGoals(pickups, goals, ranked) : undefined;
   const places = chosen ? relevantPlaces(graph, chosen, goals!) : graph.places.map((place) => place.id).sort(byText);
   if (stand && !places.includes(stand.place)) places.push(stand.place);
+  if (wantsRide) {
+    const seen = new Set(places);
+    for (const portal of elevatorPortals(graph)) {
+      for (const id of [portal.a, portal.b]) {
+        if (seen.has(id)) continue;
+        seen.add(id);
+        places.push(id);
+      }
+    }
+  }
   for (const place of places) actions.push(goTo(place));
 
   const doors = doorPortals(graph);
@@ -116,10 +129,12 @@ export function groundActions(
     actions.push(unlock(doorId(portal), portal.key));
   }
 
-  // The host's escape goal is on-foot; grounding 180 cab edges there makes a
-  // 10 ms plan miss. Rides are grounded for goals that actually name a stop.
-  const wantsRide = !goals || goals.some((goal) => typeof goal.want[AT] === "string" && stopOf(goal.want[AT] as string) !== undefined);
-  if (wantsRide) for (const portal of elevatorPortals(graph)) actions.push(ride(portal));
+  if (wantsRide) {
+    for (const portal of elevatorPortals(graph)) {
+      actions.push(ride(portal));
+      actions.push(ride(portal, true));
+    }
+  }
 
   for (const item of chosen ?? pickupsInOrder(pickups, ranked)) {
     actions.push(pickup(item, placeOfPickup(graph, item)));
@@ -195,12 +210,14 @@ export function elevatorPortals(graph: SceneGraph): ScenePortal[] {
  * One cab edge from the lower stop's place to the upper stop's place.
  * @post `at = portal.b`; the executor summons the cab and rides it.
  */
-export function ride(portal: ScenePortal): Action<BotCtx> {
+export function ride(portal: ScenePortal, reverse = false): Action<BotCtx> {
+  const from = reverse ? portal.b : portal.a;
+  const to = reverse ? portal.a : portal.b;
   return {
-    id: `ride:${portal.id}`,
-    pre: { [AT]: portal.a },
-    eff: { [AT]: portal.b },
-    usable: (s) => s[AT] === portal.a && portal.a !== portal.b,
+    id: `ride:${reverse ? "down" : "up"}:${portal.id}`,
+    pre: { [AT]: from },
+    eff: { [AT]: to },
+    usable: (s) => s[AT] === from && from !== to,
     cost: () => Math.max(ACT_S, portal.cost / WALK_MPS),
   };
 }
@@ -418,7 +435,7 @@ export function estimateSeconds(
     }
     mode = "none";
   };
-  return (s) => {
+  const onFoot = (s: WorldState): number => {
     if (!place) return 0;
     if (holding && s[holdingFact(holding)] === true) return 0;
     const at = String(s.at);
@@ -461,6 +478,26 @@ export function estimateSeconds(
     // Metres stay on the bound until the key is in hand and the pawn is at the leaf.
     if (!(here && hasKeys)) extra += altMetres / WALK_MPS;
     return extra;
+  };
+  const portals = elevatorPortals(ctx.graph);
+  const rideBound = (at: string, s: WorldState): number | undefined => {
+    if (!place) return undefined;
+    let best = Infinity;
+    for (const portal of portals) {
+      const to = ctx.routeCost(portal.b, place, s);
+      if (!(to >= 0 && Number.isFinite(to))) continue;
+      const from = ctx.routeCost(at, portal.a, s);
+      if (!(from >= 0 && Number.isFinite(from))) continue;
+      const metres = from + portal.cost + to;
+      if (metres < best) best = metres;
+    }
+    return Number.isFinite(best) ? best / WALK_MPS : undefined;
+  };
+  return (s) => {
+    const base = onFoot(s);
+    const ride = rideBound(String(s.at), s);
+    if (ride === undefined) return base;
+    return Math.min(base, ride);
   };
 }
 
