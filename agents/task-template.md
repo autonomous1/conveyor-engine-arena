@@ -18,6 +18,7 @@ Read `agents/AGENTS.md` first. Then this file. Then `agents/codemap.md` only for
 **Codemap delta:** <entries to add, move, or remove. "Remove" only for symbols that had entries in the prior codemap — verify with `rg` before writing. Line-number shifts are expected when comments are inserted; the rule is "no signature text changes, no reordering, no removed symbols," not "no `:line` changes.">
 
 **Test-must-fail-first:** <for a new invariant, the test that fails on current `HEAD`, with the expected failure to paste in the report. For extractions, the import-error fail-first (`ERR_MODULE_NOT_FOUND`) is honest and sufficient — state in the report that it is weaker than an assertion fail-first.>
+**Test scope:** <the `npm run test:scope <scopes>` and/or `npm run test:related -- <files>` command; which new/edited test files belong to which scope; the expected `selected N/<total>`. If a new test matches no `test/scopes.json` scope, add the pattern to the manifest as a step. The scoped run is the task loop; the full `npm test` is the merge gate (CI on push/PR and every two hours), not a per-task requirement.>
 
 ### Problem
 <What is wrong today, or what does not exist yet. Two to four paragraphs. Name the specific symbols and behaviors involved. If this is a refactor, say what the current shape is and why it does not support what is next.>
@@ -42,7 +43,7 @@ Read `agents/AGENTS.md` first. Then this file. Then `agents/codemap.md` only for
 
 ### Acceptance (hard gate)
 
-<- `npm run build && npm test && npm run typecheck` pass; **N tests, 0 fail**.>
+<- `npm run build && npm run typecheck` pass; the **scoped** run from Test scope passes; **N scoped tests, 0 fail**. The full `npm test` is the merge gate — CI on push/PR and every two hours — not the per-task loop.>
 <- Standalone scoped run of the new/edited test file passes; both test names appear in the report.>
 <- **Fail-first is demonstrated** — report includes the failing run before the fix and the passing run after, both verbatim.>
 <- `npm run codemap:check` passes.>

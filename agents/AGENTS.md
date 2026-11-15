@@ -79,4 +79,4 @@ Do not tag `@param` / `@returns` when the signature already says it. Do not rest
 - **Do not change the kernel** (`conveyor-engine-*` packages from conveyor-engine-packages). Work around it in the arena; if a kernel change seems needed, stop and describe it.
 - Server-authoritative: clients send inputs only; gameplay rules live on the host or in `src/shared/`.
 - Source is ESM, strict TS. Server/shared imports use `.js` extensions (Node16 resolution).
-- Add or update tests in `test/` for behavior changes; run `npm test` and `npm run typecheck` before finishing.
+- Add or update tests in `test/` for behavior changes; run the scoped command from the task's Test scope slot (`npm run test:scope …` or `test:related`) and `npm run typecheck`. The full `npm test` is the merge gate (push/PR and every two hours), not the per-task loop.
