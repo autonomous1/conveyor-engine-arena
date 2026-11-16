@@ -1,6 +1,6 @@
 // Scratch: cross doors the way the user described — centre on the doorway,
 // then walk straight along the door axis — for a chain of doors.
-// Run: node --import ./scripts/ts-ext-register.mjs plan/dsh-tasks/live/through-doors.ts \
+// Run: node --import ./scripts/ts-ext-register.mjs packages/bot-client/tests/through-doors.ts \
 //   --doors "id1;id2" [--final "x,y,z"] [--timeout-s 180]
 import { appendFileSync, mkdirSync, readFileSync } from "node:fs";
 import { connectBot } from "../../../packages/bot-client/src/connection.ts";
@@ -56,7 +56,7 @@ const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
 const t0 = Date.now();
 const secs = () => ((Date.now() - t0) / 1000).toFixed(2);
 const log = (line: string) => console.log(line);
-const dir = "plan/dsh-tasks/live/captures";
+const dir = "packages/bot-client/tests/captures";
 mkdirSync(dir, { recursive: true });
 const capture = `${dir}/through-${new Date().toISOString().replace(/[:.]/g, "-")}.jsonl`;
 appendFileSync(capture, JSON.stringify({ event: "start", doors: doorIds, final: finalPoint }) + "\n");

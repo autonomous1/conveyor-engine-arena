@@ -1,12 +1,12 @@
 // Scratch: one-shot bring-up probe. Seat the bot, print world/brain prerequisites, close.
-// Run: node --import ./scripts/ts-ext-register.mjs plan/dsh-tasks/live/probe-seat.ts
+// Run: node --import ./scripts/ts-ext-register.mjs packages/bot-client/tests/probe-seat.ts
 import { readFileSync } from "node:fs";
 import { connectBot } from "../../../packages/bot-client/src/connection.ts";
 import { openNodeSocket } from "../../../packages/bot-client/src/node-socket.ts";
 import { placeAt } from "../../../src/shared/scene-graph.ts";
 
 const url = "ws://127.0.0.1:4173";
-const token = readFileSync("plan/dsh-tasks/live/.ce-auth/bot-1.token", "utf8").trim();
+const token = readFileSync("packages/bot-client/tests/.ce-auth/bot-1.token", "utf8").trim();
 const sceneGraph = JSON.parse(readFileSync("web/game/scene-graph.json", "utf8")) as unknown;
 const regions = JSON.parse(readFileSync("web/game/regions.json", "utf8")) as unknown;
 

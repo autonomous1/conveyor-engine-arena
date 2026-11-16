@@ -1,6 +1,6 @@
 // Scratch: bring both bots back to the pads with the planner (not a straight line),
 // wait 10 s, then race to two distinct stand points beside the door.
-// Run: CE_TOKEN=<jwt> node --import ./scripts/ts-ext-register.mjs plan/dsh-tasks/live/race-claims2.ts
+// Run: CE_TOKEN=<jwt> node --import ./scripts/ts-ext-register.mjs packages/bot-client/tests/race-claims2.ts
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { connectBot, type BotSession } from "../../../packages/bot-client/src/connection.ts";
 import { openNodeSocket } from "../../../packages/bot-client/src/node-socket.ts";

@@ -10,7 +10,7 @@ import type { Fact, Goal, Plan, PlanOptions, WorldState } from "../../../src/sha
 import { chooseGoal } from "../../../src/shared/bots/goap.js";
 import { buildWorldState, STAND, type WorldSnapshot } from "../../../src/shared/bots/state.js";
 import { reach, standAt, type StandGoal } from "../../../src/shared/bots/goals.js";
-import { INPUT_HZ } from "../../../src/shared/look.js";
+import { INPUT_HZ, moveIntent } from "../../../src/shared/look.js";
 import type { FloorBox } from "../../../src/shared/movements.js";
 import { createFollower, doorStand, wishTo, type FollowInput, type FollowPawn, type Pose } from "../../../src/shared/nav/follow.js";
 import { buildGrid, findLocalPath, navBoxes, specForPlace, type Grid } from "../../../src/shared/nav/grid.js";
@@ -186,7 +186,7 @@ export async function runAttack(session: BotSession, targetId: number, opts: Bra
     const los = hasLineOfSight(eye, targetPoint, session.world.aabbs);
     if (range > 18 || !los) {
       const yaw = Math.atan2(dx, dz);
-      session.input.sendInput({ moveX: 0, moveZ: 1, yaw });
+      session.input.sendInput({ ...moveIntent(yaw, 1, 0), yaw });
       if (!approached) { approached = true; log("attack: approach"); }
     } else {
       const yaw = Math.atan2(dx, dz);

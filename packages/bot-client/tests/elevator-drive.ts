@@ -1,6 +1,6 @@
 // Scratch: drive the host elevator by hand. Enter, call 5, ride, step out, step in,
 // call 1, ride down, exit. No planner; uses the public call frame + cab frames.
-// Run: node --import ./scripts/ts-ext-register.mjs plan/dsh-tasks/live/elevator-drive.ts
+// Run: node --import ./scripts/ts-ext-register.mjs packages/bot-client/tests/elevator-drive.ts
 import { readFileSync } from "node:fs";
 import { connectBot } from "../../../packages/bot-client/src/connection.ts";
 import { openNodeSocket } from "../../../packages/bot-client/src/node-socket.ts";

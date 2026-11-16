@@ -1,6 +1,6 @@
 // Scratch: seat both bots, walk them to the pads, then WAIT for a go signal
-// (file plan/dsh-tasks/live/race-go) before starting the two-claim door race.
-// Run: CE_TOKEN=<jwt> node --import ./scripts/ts-ext-register.mjs plan/dsh-tasks/live/race-ready.ts
+// (file packages/bot-client/tests/race-go) before starting the two-claim door race.
+// Run: CE_TOKEN=<jwt> node --import ./scripts/ts-ext-register.mjs packages/bot-client/tests/race-ready.ts
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { connectBot, type BotSession } from "../../../packages/bot-client/src/connection.ts";
 import { openNodeSocket } from "../../../packages/bot-client/src/node-socket.ts";
@@ -9,7 +9,7 @@ import { parseMission } from "../../../packages/bot-client/src/missions.ts";
 
 const URL_ = "wss://arena.tszakacs.com";
 const TIMEOUT_MS = 90_000;
-const GO_FILE = "plan/dsh-tasks/live/race-go";
+const GO_FILE = "packages/bot-client/tests/race-go";
 const PADS: Record<string, string> = { "bot-1": "stand:-3.243,0,2.307", "bot-2": "stand:3.958,0,2.238" };
 const MISSIONS: Record<string, string> = {
   "bot-1": "stand:-38.250,0,-41.100",

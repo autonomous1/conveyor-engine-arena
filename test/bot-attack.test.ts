@@ -14,12 +14,13 @@ function session() {
     ],
   });
   const fired: Array<{ yaw: number; pitch: number }> = [];
+  const sent: Array<{ moveX: number; moveZ: number; yaw: number }> = [];
   const input = {
-    sendInput() {},
+    sendInput(command: { moveX: number; moveZ: number; yaw: number }) { sent.push(command); },
     fire(yaw: number, pitch: number) { fired.push({ yaw, pitch }); return true; },
     grenade() { return true; },
   };
-  return { world, input, fired, session: { world, input, claims: { acquire() {}, release() {} } } as never };
+  return { world, input, fired, sent, session: { world, input, claims: { acquire() {}, release() {} } } as never };
 }
 
 test("attack_mission_parses_positive_ids_only", () => {
@@ -59,4 +60,27 @@ test("attack_refuses_self_and_players_and_reports_lost_or_dead", async () => {
   const d = session();
   assert.equal(await runAttack(d.session, 7, { timeoutMs: 200, log: (line) => logs.push(line) }), 2);
   assert.ok(logs.some((line) => line.includes("no_ammo")));
+});
+
+test("attack_approach_uses_world_space_direction", async () => {
+  const east = session();
+  east.world.applyLoadout({ weapon: "alien-weapon-1", ammo: 30 });
+  east.world.applySnapshot({
+    spawns: [{ entity: 7, view: { position: { x: 25, y: 0, z: 0 }, rotation: { y: 0, w: 1 } } }],
+  });
+  await runAttack(east.session, 7, { timeoutMs: 120, log: () => {} });
+  assert.ok(east.sent.length > 0, "no approach command");
+  assert.ok(east.sent[0]!.moveX > 0.5, `east moveX ${east.sent[0]!.moveX}`);
+  assert.ok(Math.abs(east.sent[0]!.moveZ) < 0.2, `east moveZ ${east.sent[0]!.moveZ}`);
+  assert.ok(Math.abs(east.sent[0]!.yaw - Math.PI / 2) < 0.1, `east yaw ${east.sent[0]!.yaw}`);
+
+  const north = session();
+  north.world.applyLoadout({ weapon: "alien-weapon-1", ammo: 30 });
+  north.world.applySnapshot({
+    spawns: [{ entity: 7, view: { position: { x: 0, y: 0, z: 25 }, rotation: { y: 0, w: 1 } } }],
+  });
+  await runAttack(north.session, 7, { timeoutMs: 120, log: () => {} });
+  assert.ok(north.sent.length > 0);
+  assert.ok(north.sent[0]!.moveZ > 0.5, `north moveZ ${north.sent[0]!.moveZ}`);
+  assert.ok(Math.abs(north.sent[0]!.moveX) < 0.2, `north moveX ${north.sent[0]!.moveX}`);
 });

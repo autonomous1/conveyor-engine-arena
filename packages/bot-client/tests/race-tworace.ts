@@ -1,7 +1,7 @@
 // Scratch: the live two-pawn race. Two sessions (bot-1, bot-2) on the remote host,
 // shared wall-clock start T = second welcome + 5 s, same retrieve mission, 90 s.
 // Writes samples/logs under plan/dsh-tasks/logs/37-<stamp>/ and prints a summary.
-// Run: CE_TOKEN=<jwt> node --import ./scripts/ts-ext-register.mjs plan/dsh-tasks/live/race-tworace.ts
+// Run: CE_TOKEN=<jwt> node --import ./scripts/ts-ext-register.mjs packages/bot-client/tests/race-tworace.ts
 import { mkdirSync, readFileSync, writeFileSync, appendFileSync } from "node:fs";
 import { BotRejected, connectBot, type BotSession } from "../../../packages/bot-client/src/connection.ts";
 import { openNodeSocket } from "../../../packages/bot-client/src/node-socket.ts";

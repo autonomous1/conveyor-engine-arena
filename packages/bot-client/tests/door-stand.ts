@@ -1,6 +1,6 @@
 // Scratch controller: walk to one side of a door and stand in front of it.
 // Not a mission (no GOAP goal names a door side), so this drives nav directly.
-// Run: node --import ./scripts/ts-ext-register.mjs plan/dsh-tasks/live/door-stand.ts \
+// Run: node --import ./scripts/ts-ext-register.mjs packages/bot-client/tests/door-stand.ts \
 //        --door <doorId> [--side out|in|auto] [--timeout-s 90] [--stop-m 0.4]
 import { appendFileSync, mkdirSync, readFileSync } from "node:fs";
 import { connectBot } from "../../../packages/bot-client/src/connection.ts";
@@ -32,7 +32,7 @@ const timeoutMs = Number(args.get("timeout-s") ?? 90) * 1000;
 const stopM = Number(args.get("stop-m") ?? 0.4);
 
 const url = "ws://127.0.0.1:4173";
-const token = readFileSync("plan/dsh-tasks/live/.ce-auth/bot-1.token", "utf8").trim();
+const token = readFileSync("packages/bot-client/tests/.ce-auth/bot-1.token", "utf8").trim();
 const sceneGraph = JSON.parse(readFileSync("web/game/scene-graph.json", "utf8")) as unknown;
 const regions = JSON.parse(readFileSync("web/game/regions.json", "utf8")) as unknown;
 
@@ -85,7 +85,7 @@ const t0 = Date.now();
 const secs = () => ((Date.now() - t0) / 1000).toFixed(2);
 const log = (line: string) => console.log(line);
 
-const captureDir = "plan/dsh-tasks/live/captures";
+const captureDir = "packages/bot-client/tests/captures";
 mkdirSync(captureDir, { recursive: true });
 const slug = doorId.split(".").slice(-2).join(".");
 const capture = `${captureDir}/door-stand-${slug}-${new Date().toISOString().replace(/[:.]/g, "-")}.jsonl`;

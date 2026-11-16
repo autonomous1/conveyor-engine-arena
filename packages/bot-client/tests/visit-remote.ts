@@ -1,5 +1,5 @@
 // Scratch: join the remote arena, walk 10 m forward, exit.
-// Run: node --import ./scripts/ts-ext-register.mjs plan/dsh-tasks/live/visit-remote.ts
+// Run: node --import ./scripts/ts-ext-register.mjs packages/bot-client/tests/visit-remote.ts
 import { readFileSync } from "node:fs";
 import { connectBot } from "../../../packages/bot-client/src/connection.ts";
 import { openNodeSocket } from "../../../packages/bot-client/src/node-socket.ts";

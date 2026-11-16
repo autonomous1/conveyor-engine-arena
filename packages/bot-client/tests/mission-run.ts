@@ -1,6 +1,6 @@
 // Scratch: run a mission through the real runMission path, sampling pose every 0.5 s,
 // then hold the seat so the pawn stays where it stopped.
-// Run: node --import ./scripts/ts-ext-register.mjs plan/dsh-tasks/live/mission-run.ts \
+// Run: node --import ./scripts/ts-ext-register.mjs packages/bot-client/tests/mission-run.ts \
 //        --goal "stand:door:<doorId>" [--timeout-s 120] [--name dev-1]
 import { appendFileSync, mkdirSync, readFileSync } from "node:fs";
 import { connectBot } from "../../../packages/bot-client/src/connection.ts";
@@ -45,7 +45,7 @@ const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
 const t0 = Date.now();
 const secs = () => ((Date.now() - t0) / 1000).toFixed(2);
 const log = (line: string) => console.log(line);
-const dir = "plan/dsh-tasks/live/captures";
+const dir = "packages/bot-client/tests/captures";
 mkdirSync(dir, { recursive: true });
 const capture = `${dir}/mission-${new Date().toISOString().replace(/[:.]/g, "-")}.jsonl`;
 

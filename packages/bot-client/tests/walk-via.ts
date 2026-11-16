@@ -1,6 +1,6 @@
 // Scratch: straight waypoint walk (no grid), used when the grid's floor model
 // refuses a cell the host can walk (e.g. under a 6 m balcony).
-// Run: node --import ./scripts/ts-ext-register.mjs plan/dsh-tasks/live/walk-via.ts \
+// Run: node --import ./scripts/ts-ext-register.mjs packages/bot-client/tests/walk-via.ts \
 //   --via "x,z;x,z" --final "x,y,z" [--face "x,z"] [--timeout-s 120]
 import { readFileSync } from "node:fs";
 import { connectBot } from "../../../packages/bot-client/src/connection.ts";

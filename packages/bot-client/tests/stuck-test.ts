@@ -1,7 +1,7 @@
 // Scratch: the user's stuck test at door -1-1-9. From the door, walk 10 m in each of
 // N/S/E/W and come back after each leg. A leg that stops making progress is reported
 // with the exact pose, so a planner/trap issue shows up as data.
-// Run: node --import ./scripts/ts-ext-register.mjs plan/dsh-tasks/live/stuck-test.ts \
+// Run: node --import ./scripts/ts-ext-register.mjs packages/bot-client/tests/stuck-test.ts \
 //   [--leg 10] [--timeout-s 240]
 import { appendFileSync, mkdirSync, readFileSync } from "node:fs";
 import { BotRejected, connectBot } from "../../../packages/bot-client/src/connection.ts";
@@ -51,7 +51,7 @@ const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 const t0 = Date.now();
 const secs = () => ((Date.now() - t0) / 1000).toFixed(2);
 const log = (line: string) => console.log(line);
-const dir = "plan/dsh-tasks/live/captures";
+const dir = "packages/bot-client/tests/captures";
 mkdirSync(dir, { recursive: true });
 const capture = `${dir}/stuck-test-${new Date().toISOString().replace(/[:.]/g, "-")}.jsonl`;
 appendFileSync(capture, JSON.stringify({ event: "start", legM, dirs: DIRECTIONS.map((d) => d.name) }) + "\n");

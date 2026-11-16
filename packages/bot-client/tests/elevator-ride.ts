@@ -1,6 +1,6 @@
 // Scratch: get into the elevator room, ride up with the mission, then ride down with
 // the public call API (the planner has no downward ride edge).
-// Run: node --import ./scripts/ts-ext-register.mjs plan/dsh-tasks/live/elevator-ride.ts
+// Run: node --import ./scripts/ts-ext-register.mjs packages/bot-client/tests/elevator-ride.ts
 import { readFileSync } from "node:fs";
 import { connectBot } from "../../../packages/bot-client/src/connection.ts";
 import { openNodeSocket } from "../../../packages/bot-client/src/node-socket.ts";

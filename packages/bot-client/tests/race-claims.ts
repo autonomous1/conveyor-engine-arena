@@ -1,6 +1,6 @@
 // Scratch: two-pawn race with distinct claim keys (two stand points beside the door).
 // Join, return both to spawn pads, wait 10 s, then start both at the same instant.
-// Run: CE_TOKEN=<jwt> node --import ./scripts/ts-ext-register.mjs plan/dsh-tasks/live/race-claims.ts
+// Run: CE_TOKEN=<jwt> node --import ./scripts/ts-ext-register.mjs packages/bot-client/tests/race-claims.ts
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { connectBot, type BotSession } from "../../../packages/bot-client/src/connection.ts";
 import { openNodeSocket } from "../../../packages/bot-client/src/node-socket.ts";

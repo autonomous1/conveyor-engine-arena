@@ -1,5 +1,5 @@
 // Scratch: what the bot can plan from its spawn, using the real route module.
-// Run: node --import ./scripts/ts-ext-register.mjs plan/dsh-tasks/live/probe-graph.ts
+// Run: node --import ./scripts/ts-ext-register.mjs packages/bot-client/tests/probe-graph.ts
 import { readFileSync } from "node:fs";
 import { parseSceneGraph, placeAt } from "../../../src/shared/scene-graph.ts";
 import { createRoadCache, planRoute, routePlaceCosts, type Gate } from "../../../src/shared/nav/route.ts";

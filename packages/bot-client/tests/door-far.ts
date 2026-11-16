@@ -1,6 +1,6 @@
 // Scratch: by hand to a floor-3 door in building-1-cbake-0: hall out, plaza, building-0
 // door in, elevator to stop 2, walk to the door and face it.
-// Run: node --import ./scripts/ts-ext-register.mjs plan/dsh-tasks/live/door-far.ts
+// Run: node --import ./scripts/ts-ext-register.mjs packages/bot-client/tests/door-far.ts
 import { readFileSync } from "node:fs";
 import { connectBot } from "../../../packages/bot-client/src/connection.ts";
 import { openNodeSocket } from "../../../packages/bot-client/src/node-socket.ts";

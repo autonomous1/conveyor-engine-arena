@@ -2,7 +2,7 @@
 import { readFileSync } from "node:fs";
 import { connectBot } from "../../../packages/bot-client/src/connection.ts";
 import { openNodeSocket } from "../../../packages/bot-client/src/node-socket.ts";
-const token = readFileSync("plan/dsh-tasks/live/.ce-auth/bot-1.token", "utf8").trim();
+const token = readFileSync("packages/bot-client/tests/.ce-auth/bot-1.token", "utf8").trim();
 const sceneGraph = JSON.parse(readFileSync("web/game/scene-graph.json", "utf8")) as unknown;
 const session = await connectBot({ url: "ws://127.0.0.1:4173", token, name: "dev-1", role: "bot", sceneGraph, openSocket: openNodeSocket, onLog: (l) => console.error(l) });
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));

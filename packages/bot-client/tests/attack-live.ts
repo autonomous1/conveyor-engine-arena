@@ -1,6 +1,6 @@
 // Scratch: task 53 live run. One attack bot: arm up if needed, pick a wander-bot
 // target (non-player), run attack:<id>, record health frames + every controller line.
-// Run: CE_TOKEN=<jwt> node --import ./scripts/ts-ext-register.mjs plan/dsh-tasks/live/attack-live.ts [--target <id>]
+// Run: CE_TOKEN=<jwt> node --import ./scripts/ts-ext-register.mjs packages/bot-client/tests/attack-live.ts [--target <id>]
 import { appendFileSync, writeFileSync } from "node:fs";
 import { readFileSync } from "node:fs";
 import { connectBot } from "../../../packages/bot-client/src/connection.ts";

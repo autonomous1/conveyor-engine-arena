@@ -1,6 +1,6 @@
 // Scratch controller: walk a place route (doors already open) with waypoint steering,
 // then stand in front of one wall inside the room and face it.
-// Run: node --import ./scripts/ts-ext-register.mjs plan/dsh-tasks/live/room-stand.ts \
+// Run: node --import ./scripts/ts-ext-register.mjs packages/bot-client/tests/room-stand.ts \
 //        --wall <wall AABB source> --room <place id> [--offset 1.2] [--timeout-s 120]
 import { appendFileSync, mkdirSync, readFileSync } from "node:fs";
 import { connectBot } from "../../../packages/bot-client/src/connection.ts";
@@ -34,7 +34,7 @@ const via = (viaText ?? "").split(";").filter((part) => part.length > 0).map((pa
 });
 const timeoutMs = Number(args.get("timeout-s") ?? 120) * 1000;
 
-const token = readFileSync("plan/dsh-tasks/live/.ce-auth/bot-1.token", "utf8").trim();
+const token = readFileSync("packages/bot-client/tests/.ce-auth/bot-1.token", "utf8").trim();
 const sceneGraph = JSON.parse(readFileSync("web/game/scene-graph.json", "utf8")) as unknown;
 const regions = JSON.parse(readFileSync("web/game/regions.json", "utf8")) as unknown;
 
@@ -53,7 +53,7 @@ const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
 const t0 = Date.now();
 const secs = () => ((Date.now() - t0) / 1000).toFixed(2);
 const log = (line: string) => console.log(line);
-const captureDir = "plan/dsh-tasks/live/captures";
+const captureDir = "packages/bot-client/tests/captures";
 mkdirSync(captureDir, { recursive: true });
 const capture = `${captureDir}/room-stand-${new Date().toISOString().replace(/[:.]/g, "-")}.jsonl`;
 appendFileSync(capture, JSON.stringify({ t: 0, event: "start", wall: wallSource, room: roomId, offsetM }) + "\n");

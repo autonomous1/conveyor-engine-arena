@@ -1,6 +1,6 @@
 // Scratch: 5-minute attack run. Arm, reload as needed, return to the arena centre,
 // attack the nearest wander bot one at a time, clean close at the end.
-// Run: CE_TOKEN=<jwt> node --import ./scripts/ts-ext-register.mjs plan/dsh-tasks/live/attack-run.ts [--for-s 300]
+// Run: CE_TOKEN=<jwt> node --import ./scripts/ts-ext-register.mjs packages/bot-client/tests/attack-run.ts [--for-s 300]
 import { writeFileSync } from "node:fs";
 import { connectBot } from "../../../packages/bot-client/src/connection.ts";
 import { openNodeSocket } from "../../../packages/bot-client/src/node-socket.ts";

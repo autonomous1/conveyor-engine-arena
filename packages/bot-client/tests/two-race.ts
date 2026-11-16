@@ -1,5 +1,5 @@
 // Scratch: two clients join together, both walk 10 m forward, hold 60 s, exit.
-// Run: CE_TOKEN=<jwt> node --import ./scripts/ts-ext-register.mjs plan/dsh-tasks/live/two-race.ts
+// Run: CE_TOKEN=<jwt> node --import ./scripts/ts-ext-register.mjs packages/bot-client/tests/two-race.ts
 import { readFileSync } from "node:fs";
 import { BotRejected, connectBot, type BotSession } from "../../../packages/bot-client/src/connection.ts";
 import { openNodeSocket } from "../../../packages/bot-client/src/node-socket.ts";
