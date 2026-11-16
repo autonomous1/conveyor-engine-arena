@@ -9,9 +9,14 @@
 import { MAX_HP, type DamageNote } from "../health.js";
 import type { ScenePortal } from "../scene-graph.js";
 
-/** Host tick rate the default throttle is written against. */
+/**
+ * Host tick rate the default throttle is written against.
+ */
 export const SENSE_TICK_HZ = 20;
 
+/**
+ * Sense Tuning type.
+ */
 export type SenseTuning = {
   /** A bot is re-sensed every N update() calls. */
   everyTicks: number;
@@ -29,7 +34,9 @@ export type SenseTuning = {
   pickupRadius: number;
 };
 
-/** 4, 20, 2000, 30, 8, 20000, 1, 15. */
+/**
+ * 4, 20, 2000, 30, 8, 20000, 1, 15.
+ */
 export const DEFAULT_SENSE_TUNING: Readonly<SenseTuning> = Object.freeze({
   everyTicks: 4,
   worldEveryTicks: 20,
@@ -41,6 +48,9 @@ export const DEFAULT_SENSE_TUNING: Readonly<SenseTuning> = Object.freeze({
   pickupRadius: 15,
 });
 
+/**
+ * Sense Pawn type.
+ */
 export type SensePawn = {
   id: number;
   kind: "bot" | "player";
@@ -50,6 +60,9 @@ export type SensePawn = {
   alive: boolean;
 };
 
+/**
+ * Sense Pickup type.
+ */
 export type SensePickup = {
   id: string;
   kind: "health" | "ammo";
@@ -58,6 +71,9 @@ export type SensePickup = {
   z: number;
 };
 
+/**
+ * Sensed Pawn type.
+ */
 export type SensedPawn = {
   id: number;
   kind: "bot" | "player";
@@ -67,6 +83,9 @@ export type SensedPawn = {
   relYaw: number;
 };
 
+/**
+ * Sensed Pickup type.
+ */
 export type SensedPickup = {
   id: string;
   dist: number;
@@ -74,6 +93,9 @@ export type SensedPickup = {
   relYaw: number;
 };
 
+/**
+ * Sensed Damage type.
+ */
 export type SensedDamage = {
   attacker: number | undefined;
   ageMs: number;
@@ -86,8 +108,14 @@ export type SensedDamage = {
   relYaw?: number;
 };
 
+/**
+ * Sensed Exit type.
+ */
 export type SensedExit = { open: boolean; unlocked: boolean };
 
+/**
+ * Bot Sense type.
+ */
 export type BotSense = {
   id: number;
   tick: number;
@@ -104,7 +132,13 @@ export type BotSense = {
   pickups: { health?: SensedPickup; ammo?: SensedPickup };
 };
 
+/**
+ * Exit Portal type.
+ */
 export type ExitPortal = Pick<ScenePortal, "id" | "kind" | "a" | "b" | "door">;
+/**
+ * Exit Door type.
+ */
 export type ExitDoor = { open: boolean; locked: boolean };
 
 /**
@@ -123,6 +157,9 @@ export type ExitIndex = {
   readonly rebuilds: number;
 };
 
+/**
+ * Sense Deps type.
+ */
 export type SenseDeps = {
   now(): number;
   botIds(): readonly number[];
@@ -159,6 +196,9 @@ export type BotSensor = {
   readonly tick: number;
 };
 
+/**
+ * Bot Sense Reader type.
+ */
 export type BotSenseReader = Pick<BotSensor, "get" | "ids">;
 
 const TAU = Math.PI * 2;
@@ -317,6 +357,9 @@ function clearBearings(damage: SensedDamage): void {
   delete damage.relYaw;
 }
 
+/**
+ * Creates Bot Sensor.
+ */
 export function createBotSensor(deps: SenseDeps, partial?: Partial<SenseTuning>): BotSensor {
   const tuning: SenseTuning = { ...DEFAULT_SENSE_TUNING, ...partial };
   const senses = new Map<number, BotSense>();

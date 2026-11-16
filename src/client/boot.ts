@@ -59,6 +59,9 @@ import { formatFireLog, presentShot } from "./shot-view.js";
 /** A grenade's first pose is the thrower's eye. Within this of your own eye, it is yours. */
 const OWN_GRENADE_RADIUS = 2.5;
 
+/**
+ * boot.
+ */
 export async function boot(
   view: ArenaView,
   open: () => OpenSocket,

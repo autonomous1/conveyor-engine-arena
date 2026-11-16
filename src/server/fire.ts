@@ -23,7 +23,9 @@ import {
 import { deliverAuditFrame } from "./audit.js";
 import { clientSeesPawn, deliverHealthFrames } from "./health.js";
 
-/** Hitscan for owned pawns. Sends lasers and may wound. Counters sit on the shared audit. */
+/**
+ * Hitscan for owned pawns. Sends lasers and may wound. Counters sit on the shared audit.
+ */
 export interface ArenaFire {
   /** Shallow copy of the six audit numbers. Mutating it does not change the counters. */
   readonly counters: AuditCounters;

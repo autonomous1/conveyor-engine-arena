@@ -1,16 +1,23 @@
 /**
  * CLI mission text. Patrol is a loop of `reach` goals; there is no patrol goal in the planner.
  */
+// ARCHITECTURE: Mission text grammar: reach, retrieve, patrol, stand, and idle.
+// Wiring: runMission enters through parseMission; the CLI parses before connecting.
 import type { Goal } from "../../../src/shared/bots/goap.js";
 import { idle, reach, retrieve, standAt } from "../../../src/shared/bots/goals.js";
 import type { StandTarget } from "../../../src/shared/nav/stand.js";
 
+/**
+ * A parsed order: one goal, a patrol loop, or a stand target.
+ */
 export type Mission =
   | { kind: "goal"; goal: Goal }
   | { kind: "patrol"; places: string[] }
   | { kind: "stand"; target: StandTarget };
 
-/** `retrieve:<pickup>@<place>`, `reach:<place>`, `patrol:<place,place,…>`, `stand:…`, or `idle`. */
+/**
+ * `retrieve:<pickup>@<place>`, `reach:<place>`, `patrol:<place,place,…>`, `stand:…`, or `idle`.
+ */
 export function parseMission(text: string): Mission | undefined {
   if (text === "idle") return { kind: "goal", goal: idle() };
   if (text.startsWith("stand:door:")) {

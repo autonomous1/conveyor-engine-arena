@@ -22,7 +22,9 @@ type Point = { x: number; y: number; z: number };
 
 type Handle = { move(x: number, y: number, z: number): boolean };
 
-/** `elevatorStart` when a cab leaves a stop. The voice follows the cab until the doors open. */
+/**
+ * `elevatorStart` when a cab leaves a stop. The voice follows the cab until the doors open.
+ */
 export interface ElevatorSounds {
   /** Welcome. Records motion and does not play. Drops any follow handles. */
   onSet(rows: readonly ElevatorState[]): void;
@@ -37,6 +39,9 @@ export interface ElevatorSounds {
   readonly following: number;
 }
 
+/**
+ * Creates Elevator Sounds.
+ */
 export function createElevatorSounds(opts: {
   /** `x`, `z`: the cab centre. `y` of a frame is the cab floor; the sound sits `earHeight` above it. */
   cabs: ReadonlyArray<{ id: string; x: number; z: number }>;

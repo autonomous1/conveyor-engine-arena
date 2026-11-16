@@ -22,7 +22,9 @@ const COMPOSED = new THREE.Matrix4();
  * Show or hide one placement. Clones use `visible`. An instanced prop keeps
  * its slot and the matrix is scaled to zero, so the batch count does not change.
  */
-/** Show, hide, and shift placements. Clones use `visible`. Instances keep their slot and scale to zero. */
+/**
+ * Show, hide, and shift placements. Clones use `visible`. Instances keep their slot and scale to zero.
+ */
 export interface PlacementVisibility {
   /** Remember a clone and name it `id`. Does not parent it. */
   addClone(id: string, object: THREE.Object3D): void;
@@ -41,6 +43,9 @@ export interface PlacementVisibility {
   hidden(id: string): boolean;
 }
 
+/**
+ * Creates Placement Visibility.
+ */
 export function createPlacementVisibility(): PlacementVisibility {
   const clones = new Map<string, THREE.Object3D>();
   const cloneHomeY = new Map<string, number>();

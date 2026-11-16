@@ -20,12 +20,18 @@
 
 export type Point = { x: number; y: number; z: number };
 
+/**
+ * Character Fx Config type.
+ */
 export type CharacterFxConfig = {
   fadeMs: number;
   despawnDelayMs: number;
   despawnSoundDelayMs: number;
 };
 
+/**
+ * Character Fx Hooks type.
+ */
 export type CharacterFxHooks = {
   /** The spawn or despawn sound. `at` is the character's feet; a copy is not made. */
   sound(kind: "spawn" | "despawn", id: number, at: Point): void;
@@ -83,6 +89,9 @@ export interface CharacterFx {
   readonly active: number;
 }
 
+/**
+ * Creates Character Fx.
+ */
 export function createCharacterFx(config: CharacterFxConfig, hooks: CharacterFxHooks): CharacterFx {
   const states = new Map<number, State>();
   const fade = Math.max(1, config.fadeMs);

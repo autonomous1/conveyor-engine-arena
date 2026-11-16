@@ -18,6 +18,9 @@ const SNAP = 0.5;
 /** Vertical slack when a point is matched to a region's floor. */
 const Y_BAND = STEP_HEIGHT;
 
+/**
+ * Region type.
+ */
 export type Region = {
   id: string;
   minX: number;
@@ -27,6 +30,9 @@ export type Region = {
   y: number;
 };
 
+/**
+ * Region Portal type.
+ */
 export type RegionPortal = {
   from: string;
   to: string;
@@ -36,12 +42,18 @@ export type RegionPortal = {
   width: number;
 };
 
+/**
+ * Region Graph type.
+ */
 export type RegionGraph = {
   placeId: string;
   regions: Region[];
   portals: RegionPortal[];
 };
 
+/**
+ * Region Path type.
+ */
 export type RegionPath = {
   start: Vec3;
   goal: Vec3;
@@ -51,6 +63,9 @@ export type RegionPath = {
   portals: RegionPortal[];
 };
 
+/**
+ * Door Stand type.
+ */
 export type DoorStand = {
   doorId: string;
   side: "a" | "b";
@@ -58,6 +73,9 @@ export type DoorStand = {
   at: Vec3;
 };
 
+/**
+ * Baked Place Regions type.
+ */
 export type BakedPlaceRegions = {
   placeId: string;
   regions: Region[];
@@ -65,6 +83,9 @@ export type BakedPlaceRegions = {
   doorStands?: DoorStand[];
 };
 
+/**
+ * Baked Regions File type.
+ */
 export type BakedRegionsFile = {
   version: 1;
   radius: number;
@@ -72,11 +93,19 @@ export type BakedRegionsFile = {
   places: BakedPlaceRegions[];
 };
 
+/**
+ * Region Issue type.
+ */
 export type RegionIssue = { path: string; message: string };
 
+/**
+ * Region Door type.
+ */
 export type RegionDoor = Pick<DoorRuntime, "id" | "position" | "yaw" | "hinge" | "size">;
 
-/** Reused region graphs, keyed like the occupancy grids. */
+/**
+ * Reused region graphs, keyed like the occupancy grids.
+ */
 export type RegionCache = {
   /** Live graph, or undefined. Does not create a row. */
   get(key: string): RegionGraph | undefined;
@@ -88,6 +117,9 @@ export type RegionCache = {
 
 type Box = { minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number };
 
+/**
+ * Creates Region Cache.
+ */
 export function createRegionCache(): RegionCache {
   const graphs = new Map<string, RegionGraph>();
   const cache: RegionCache = {
@@ -103,12 +135,18 @@ export function createRegionCache(): RegionCache {
   return cache;
 }
 
+/**
+ * regions Of.
+ */
 export function regionsOf(file: BakedRegionsFile, placeId: string): RegionGraph | undefined {
   const place = file.places.find((item) => item.placeId === placeId);
   if (!place) return undefined;
   return { placeId: place.placeId, regions: place.regions, portals: place.portals };
 }
 
+/**
+ * index Regions.
+ */
 export function indexRegions(file: BakedRegionsFile): Map<string, RegionGraph> {
   const map = new Map<string, RegionGraph>();
   for (const place of file.places) {
@@ -351,6 +389,9 @@ function segmentHitsBox(a: Vec3, b: Vec3, box: Box): boolean {
 }
 
 
+/**
+ * find Region Path.
+ */
 export function findRegionPath(graph: RegionGraph, start: Vec3, goal: Vec3): RegionPath | undefined {
   const from = locate(graph, start);
   const to = locate(graph, goal);

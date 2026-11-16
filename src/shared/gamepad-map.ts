@@ -33,6 +33,9 @@ const STICK_OFF = 0.3;
 const REPEAT_DELAY_MS = 350;
 const REPEAT_INTERVAL_MS = 120;
 
+/**
+ * Pad Frame type.
+ */
 export type PadFrame = {
   connected: boolean;
   mapping: string;
@@ -40,8 +43,14 @@ export type PadFrame = {
   axes: number[];
 };
 
+/**
+ * Pad Edge type.
+ */
 export type PadEdge = { held: boolean; pressed: boolean };
 
+/**
+ * Pad Actions type.
+ */
 export type PadActions = {
   fire: PadEdge;
   grenade: PadEdge;
@@ -62,6 +71,9 @@ export type PadActions = {
 
 type Dir = -1 | 0 | 1;
 
+/**
+ * Trigger Latch.
+ */
 export class TriggerLatch {
   private down = false;
   private readonly on: number;
@@ -88,6 +100,9 @@ export class TriggerLatch {
   }
 }
 
+/**
+ * Button Edge.
+ */
 export class ButtonEdge {
   private down = false;
 
@@ -223,11 +238,17 @@ function shoulders(frame: PadFrame): Dir {
   return ascend ? 1 : -1;
 }
 
+/**
+ * Pad Reader type.
+ */
 export type PadReader = {
   step(frame: PadFrame, dtMs: number, profile: string, menu?: boolean): PadActions;
   reset(): void;
 };
 
+/**
+ * Creates Pad Reader.
+ */
 export function createPadReader(): PadReader {
   const fire = new TriggerLatch();
   const grenade = new TriggerLatch();

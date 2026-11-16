@@ -3,6 +3,8 @@
  * Reconnect uses welcome `reconnectToken` as `token`. No WebSocket subprotocol.
  * This file does not import `ws` or Node builtins. The CLI injects `openSocket`.
  */
+// ARCHITECTURE: The headless bot connection: hello/welcome, snapshot frames, reconnect, and the public BotSession.
+// Wiring: connectBot from the CLI and live tests; it composes BotWorld, BotInput, and the claim sender.
 import { EngineClient } from "conveyor-engine-client";
 import { parseArenaFrame, parseWelcomeExtras } from "../../../src/shared/bot-protocol.js";
 import { asSnapshot, revive } from "../../../src/shared/wire.js";
@@ -10,6 +12,9 @@ import { createBotInput, type BotInput } from "./input.js";
 import type { SocketLike } from "./socket.js";
 import { createBotWorld, type BotWorld, type WorldView } from "./world.js";
 
+/**
+ * Hello auth failed with 4401 (bad/missing token) or 4403 (scope/role refused).
+ */
 export class BotAuthRejected extends Error {
   readonly code: 4401 | 4403;
   readonly reason: string;
@@ -22,6 +27,9 @@ export class BotAuthRejected extends Error {
   }
 }
 
+/**
+ * The host refused the seat with a non-auth code (for example SERVER_FULL).
+ */
 export class BotRejected extends Error {
   readonly code: string;
 
@@ -32,6 +40,10 @@ export class BotRejected extends Error {
   }
 }
 
+/**
+ * How to open one bot session: URL, token, name, optional socket factory,
+ * preloaded scene graph/regions, and log hook.
+ */
 export type ConnectBotOptions = {
   url: string;
   /** Access JWT. Sent as hello `auth`. Empty omits the field (the host closes 4401). */
@@ -50,6 +62,9 @@ export type ConnectBotOptions = {
   onLog?: (line: string) => void;
 };
 
+/**
+ * A live bot seat: world view, input frames, claim sender, and close().
+ */
 export type BotSession = {
   world: BotWorld;
   input: BotInput;
@@ -72,6 +87,10 @@ const WELCOME_MS = 8_000;
 const BACKOFF_START_MS = 1_000;
 const BACKOFF_MAX_MS = 30_000;
 
+/**
+ * Open and welcome one bot session, reconnecting until the host closes it.
+ * @post The returned session owns a pawn; the caller must close it.
+ */
 export async function connectBot(o: ConnectBotOptions): Promise<BotSession> {
   const http = httpOf(o.url);
   const res = await fetch(new URL("/arena.json", http));
@@ -364,6 +383,9 @@ function reasonText(reason: unknown): string {
   return "";
 }
 
+/**
+ * HTTP URL for `/arena.json`, with the WebSocket scheme mapped to http(s).
+ */
 export function httpOf(url: string): URL {
   const parsed = new URL(url);
   if (parsed.protocol === "ws:") parsed.protocol = "http:";
@@ -372,6 +394,9 @@ export function httpOf(url: string): URL {
   return parsed;
 }
 
+/**
+ * WebSocket URL for hello, with http(s) mapped to ws(s).
+ */
 export function wsOf(url: string): string {
   const parsed = new URL(url);
   if (parsed.protocol === "http:") parsed.protocol = "ws:";

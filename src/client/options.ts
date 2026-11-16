@@ -14,24 +14,54 @@
 // Wiring: boot.ts creates it once and reads `open`/`fireDebug` each frame.
 import { emptyAudit, formatAudit, type AuditCounters } from "../shared/audit.ts";
 
+/**
+ * SHOW COLLISION STORAGE KEY.
+ */
 export const SHOW_COLLISION_STORAGE_KEY = "arena.showCollision.v1";
+/**
+ * FIRE DEBUG STORAGE KEY.
+ */
 export const FIRE_DEBUG_STORAGE_KEY = "arena.fireDebug.v1";
+/**
+ * SHOW SCENE MAP STORAGE KEY.
+ */
 export const SHOW_SCENE_MAP_STORAGE_KEY = "arena.showSceneMap.v1";
+/**
+ * NOCLIP STORAGE KEY.
+ */
 export const NOCLIP_STORAGE_KEY = "arena.noclip.v1";
+/**
+ * INVERT Y STORAGE KEY.
+ */
 export const INVERT_Y_STORAGE_KEY = "arena.invertY.v1";
+/**
+ * BOT LABELS STORAGE KEY.
+ */
 export const BOT_LABELS_STORAGE_KEY = "arena.botLabels.v1";
+/**
+ * MODEL CHOICE STORAGE KEY.
+ */
 export const MODEL_CHOICE_STORAGE_KEY = "arena.modelChoice.v1";
 
+/**
+ * Focus Row type.
+ */
 export type FocusRow = {
   activate(): void;
   adjust(delta: number): void;
 };
 
+/**
+ * Key Value Storage type.
+ */
 export type KeyValueStorage = {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
 };
 
+/**
+ * Options Model type.
+ */
 export type OptionsModel = {
   readonly open: boolean;
   readonly showCollision: boolean;
@@ -62,6 +92,9 @@ export type OptionsModel = {
   onKey(code: string): boolean;
 };
 
+/**
+ * Options Dialog type.
+ */
 export type OptionsDialog = OptionsModel & {
   setAudit(counters: AuditCounters): void;
   /** Selected character id. Empty when the dialog was built without model choices. */
@@ -69,6 +102,9 @@ export type OptionsDialog = OptionsModel & {
   repaint(): void;
 };
 
+/**
+ * Loads Show Collision.
+ */
 export function loadShowCollision(storage: KeyValueStorage | null | undefined): boolean {
   if (!storage) return false;
   try {
@@ -78,6 +114,9 @@ export function loadShowCollision(storage: KeyValueStorage | null | undefined): 
   }
 }
 
+/**
+ * Saves Show Collision.
+ */
 export function saveShowCollision(storage: KeyValueStorage | null | undefined, on: boolean): void {
   if (!storage) return;
   try {
@@ -87,6 +126,9 @@ export function saveShowCollision(storage: KeyValueStorage | null | undefined, o
   }
 }
 
+/**
+ * Loads Fire Debug.
+ */
 export function loadFireDebug(storage: KeyValueStorage | null | undefined): boolean {
   if (!storage) return false;
   try {
@@ -96,6 +138,9 @@ export function loadFireDebug(storage: KeyValueStorage | null | undefined): bool
   }
 }
 
+/**
+ * Saves Fire Debug.
+ */
 export function saveFireDebug(storage: KeyValueStorage | null | undefined, on: boolean): void {
   if (!storage) return;
   try {
@@ -105,6 +150,9 @@ export function saveFireDebug(storage: KeyValueStorage | null | undefined, on: b
   }
 }
 
+/**
+ * Loads Show Scene Map.
+ */
 export function loadShowSceneMap(storage: KeyValueStorage | null | undefined): boolean {
   if (!storage) return false;
   try {
@@ -114,6 +162,9 @@ export function loadShowSceneMap(storage: KeyValueStorage | null | undefined): b
   }
 }
 
+/**
+ * Saves Show Scene Map.
+ */
 export function saveShowSceneMap(storage: KeyValueStorage | null | undefined, on: boolean): void {
   if (!storage) return;
   try {
@@ -123,6 +174,9 @@ export function saveShowSceneMap(storage: KeyValueStorage | null | undefined, on
   }
 }
 
+/**
+ * Loads Noclip.
+ */
 export function loadNoclip(storage: KeyValueStorage | null | undefined): boolean {
   if (!storage) return false;
   try {
@@ -132,6 +186,9 @@ export function loadNoclip(storage: KeyValueStorage | null | undefined): boolean
   }
 }
 
+/**
+ * Saves Noclip.
+ */
 export function saveNoclip(storage: KeyValueStorage | null | undefined, on: boolean): void {
   if (!storage) return;
   try {
@@ -141,6 +198,9 @@ export function saveNoclip(storage: KeyValueStorage | null | undefined, on: bool
   }
 }
 
+/**
+ * Loads Invert Y.
+ */
 export function loadInvertY(storage: KeyValueStorage | null | undefined): boolean {
   if (!storage) return false;
   try {
@@ -150,6 +210,9 @@ export function loadInvertY(storage: KeyValueStorage | null | undefined): boolea
   }
 }
 
+/**
+ * Saves Invert Y.
+ */
 export function saveInvertY(storage: KeyValueStorage | null | undefined, on: boolean): void {
   if (!storage) return;
   try {
@@ -159,6 +222,9 @@ export function saveInvertY(storage: KeyValueStorage | null | undefined, on: boo
   }
 }
 
+/**
+ * Loads Bot Labels.
+ */
 export function loadBotLabels(storage: KeyValueStorage | null | undefined): boolean {
   if (!storage) return false;
   try {
@@ -168,6 +234,9 @@ export function loadBotLabels(storage: KeyValueStorage | null | undefined): bool
   }
 }
 
+/**
+ * Saves Bot Labels.
+ */
 export function saveBotLabels(storage: KeyValueStorage | null | undefined, on: boolean): void {
   if (!storage) return;
   try {
@@ -192,6 +261,9 @@ export function loadModelChoice(storage: KeyValueStorage | null | undefined, cho
   return first;
 }
 
+/**
+ * Saves Model Choice.
+ */
 export function saveModelChoice(storage: KeyValueStorage | null | undefined, id: string): void {
   if (!storage) return;
   try {
@@ -201,6 +273,9 @@ export function saveModelChoice(storage: KeyValueStorage | null | undefined, id:
   }
 }
 
+/**
+ * Creates Options Model.
+ */
 export function createOptionsModel(
   storage: KeyValueStorage | null | undefined,
   onShowCollision: (on: boolean) => void,

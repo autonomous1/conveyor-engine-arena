@@ -49,19 +49,33 @@ import type { DoorUseResult } from "./doors.js";
 import { TICK_MS, doorsOnRoute, planEscapeGoal, planWanderTarget, splitMix, type WanderNav } from "./game.js";
 import type { WanderAgent } from "./world-loader.js";
 
-/** An Escape claim is checked again this often (door changes, a lost route). */
+/**
+ * An Escape claim is checked again this often (door changes, a lost route).
+ */
 export const ESCAPE_REPLAN_MS = 5000;
-/** A door is pressed at most this often per bot, and only within {@link DOOR_NEAR_M} of it. */
+/**
+ * A door is pressed at most this often per bot, and only within {@link DOOR_NEAR_M} of it.
+ */
 export const DOOR_PRESS_MS = 250;
+/**
+ * DOOR NEAR M.
+ */
 export const DOOR_NEAR_M = 2.5;
-/** Near a shut door this long without it opening: give up on doors. */
+/**
+ * Near a shut door this long without it opening: give up on doors.
+ */
 export const DOOR_GIVE_UP_MS = 15_000;
-/** The door opened and was shut again this many times: give up on doors. */
+/**
+ * The door opened and was shut again this many times: give up on doors.
+ */
 export const DOOR_MAX_OPENS = 3;
 /** Arrival or stuck while still in the fight. The next one corners the bot. */
 const FLEE_REPICKS = 3;
 const MAX_LOGGED = 8;
 
+/**
+ * Host Bot Brain Options type.
+ */
 export type HostBotBrainOptions = {
   world: AuthoritativeWorld;
   agents: readonly WanderAgent[];
@@ -97,7 +111,9 @@ export type HostBotBrainOptions = {
   rng?: () => number;
 };
 
-/** Goal claims for unowned wander bots. In memory, lost on restart. */
+/**
+ * Goal claims for unowned wander bots. In memory, lost on restart.
+ */
 export type HostBotBrain = {
   /**
    * Once per host tick, after the sensor. A bot is replanned when its sense tick
@@ -173,6 +189,9 @@ type Threat = {
   hits: number;
 };
 
+/**
+ * Creates Host Bot Brain.
+ */
 export function createHostBotBrain(opts: HostBotBrainOptions): HostBotBrain {
   const now = opts.now ?? Date.now;
   const tuning: ArbiterTuning = { ...DEFAULT_ARBITER_TUNING, ...opts.tuning };

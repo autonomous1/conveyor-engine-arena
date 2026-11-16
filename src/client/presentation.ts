@@ -133,6 +133,9 @@ export interface PawnLayer {
   positionLine(): string;
 }
 
+/**
+ * Creates Pawn Layer.
+ */
 export function createPawnLayer(parent: THREE.Object3D, templates: CharacterTemplates, pawnHeight: number): PawnLayer {
   const pawns = new Map<number, Pawn>();
 

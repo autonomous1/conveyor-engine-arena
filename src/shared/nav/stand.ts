@@ -6,10 +6,16 @@ import { doorStand, type DoorSide } from "./follow.js";
 import { planRoute, type Vec3Like } from "./route.js";
 import { placeAt, type SceneGraph, type ScenePortal, type Vec3 } from "../scene-graph.js";
 
+/**
+ * Stand Target type.
+ */
 export type StandTarget =
   | { kind: "point"; x: number; y: number; z: number; yaw?: number }
   | { kind: "door"; doorId: string; side?: "in" | "out"; place?: string };
 
+/**
+ * Stand type.
+ */
 export type Stand = { place: string; key: string; x: number; y: number; z: number; yaw: number };
 
 /**

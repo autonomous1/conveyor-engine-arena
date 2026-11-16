@@ -54,6 +54,9 @@ if (MOVE_DT !== TICK_MS / 1000) {
  */
 export const ARENA_INTEREST_RADIUS = 192;
 
+/**
+ * Held Input type.
+ */
 export type HeldInput = {
   moveX: number;
   moveZ: number;
@@ -65,7 +68,9 @@ export type HeldInput = {
   ascend?: number;
 };
 
-/** Latest command per entity. In memory, lost on restart. */
+/**
+ * Latest command per entity. In memory, lost on restart.
+ */
 export interface HeldInputs {
   /** Stores `cmd` by reference, replacing any previous row for this entity. */
   admit(entity: number, cmd: HeldInput): void;
@@ -77,6 +82,9 @@ export interface HeldInputs {
   entities(): number[];
 }
 
+/**
+ * Creates Held Inputs.
+ */
 export function createHeldInputs(): HeldInputs {
   const latest = new Map<number, HeldInput>();
   return {
@@ -95,6 +103,9 @@ export function createHeldInputs(): HeldInputs {
   };
 }
 
+/**
+ * note Arena Interest.
+ */
 export function noteArenaInterest(server: EngineWsServer): void {
   for (const clientId of server.connected) {
     const session = server.replicator.get(clientId);
@@ -123,6 +134,9 @@ export function splitMix(seed: number): () => number {
   };
 }
 
+/**
+ * Prop Clip type.
+ */
 export type PropClip = { id: string; clip: string };
 
 /**
@@ -196,6 +210,9 @@ const WANDER_SAMPLE_TRIES = 8;
 const WANDER_GOAL_XZ = 0.25;
 const WANDER_GOAL_Y = 0.6;
 
+/**
+ * Wander Nav type.
+ */
 export type WanderNav = {
   sceneGraph?: SceneGraph;
   regions?: BakedRegionsFile;
@@ -951,6 +968,9 @@ function followOthers(world: AuthoritativeWorld, agents: readonly WanderAgent[],
   return out;
 }
 
+/**
+ * Starts Wander Loop.
+ */
 export function startWanderLoop(
   world: AuthoritativeWorld,
   agents: WanderAgent[],
@@ -1176,6 +1196,9 @@ export function claimClearSpawn(
   return picked;
 }
 
+/**
+ * place Pawn.
+ */
 export function placePawn(world: AuthoritativeWorld, id: number, spawn: SpawnPick): void {
   const view = world.store.view(id);
   if (!view) return;
@@ -1189,6 +1212,9 @@ export function placePawn(world: AuthoritativeWorld, id: number, spawn: SpawnPic
   });
 }
 
+/**
+ * Teleport Block type.
+ */
 export type TeleportBlock = "bounds" | "blocked";
 
 /**
@@ -1233,7 +1259,9 @@ export function teleportBlockReason(
   return undefined;
 }
 
-/** Replace the pawn mesh key. Ignored when `assetKey` is not one of `allowed`. */
+/**
+ * Replace the pawn mesh key. Ignored when `assetKey` is not one of `allowed`.
+ */
 export function applyPawnModel(world: AuthoritativeWorld, id: number, assetKey: string | undefined, allowed: readonly string[]): void {
   if (!assetKey || !allowed.includes(assetKey)) return;
   const view = world.store.view(id);

@@ -64,6 +64,9 @@ export type HostConn = {
   claims?: HostClaims;
 };
 
+/**
+ * Arena Host Options type.
+ */
 export type ArenaHostOptions = {
   holdNpcs?: boolean;
   /** `ARENA_BOT_DEBUG=1`, read once by `main`. Off does no per-tick label work. */
@@ -77,6 +80,9 @@ export type ArenaHostOptions = {
   grantSceneGraph?: boolean;
 };
 
+/**
+ * Arena Session type.
+ */
 export type ArenaSession = {
   arenaJson: string;
   /** Canonical scene-graph JSON. Absent when the manifest has no graph. */
@@ -606,6 +612,9 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
   };
 }
 
+/**
+ * socket From Conn.
+ */
 export function socketFromConn(
   conn: HostConn,
   refused: Set<number>,

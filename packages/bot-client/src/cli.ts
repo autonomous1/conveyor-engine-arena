@@ -118,7 +118,9 @@ function rejectLine(err: unknown): string {
   return String(err);
 }
 
-/** Parse argv and run. Returns the process exit code. Does not call `process.exit`. */
+/**
+ * Parse argv and run. Returns the process exit code. Does not call `process.exit`.
+ */
 export async function runCli(argv: readonly string[], io: Partial<Io> = {}): Promise<number> {
   const log = io.log ?? ((line: string) => console.log(line));
   const error = io.error ?? ((line: string) => console.error(line));

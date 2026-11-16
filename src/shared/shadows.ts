@@ -1,13 +1,24 @@
 // ARCHITECTURE: Shadow quality and algorithm settings for the renderer.
 // Wiring: client/arena-scene.ts applies; server/game-manifest.ts validates the
 //   manifest rows.
-/** Cheap hard maps, filtered maps, then variance maps at high resolution. */
+/**
+ * Cheap hard maps, filtered maps, then variance maps at high resolution.
+ */
 export const SHADOW_QUALITIES = ["off", "basic", "soft", "realistic"] as const;
 
+/**
+ * Shadow Quality type.
+ */
 export type ShadowQuality = (typeof SHADOW_QUALITIES)[number];
 
+/**
+ * Shadow Algorithm type.
+ */
 export type ShadowAlgorithm = "basic" | "pcf" | "vsm";
 
+/**
+ * Shadow Settings type.
+ */
 export type ShadowSettings = {
   enabled: boolean;
   algorithm: ShadowAlgorithm;
@@ -25,6 +36,9 @@ const SETTINGS: Record<ShadowQuality, ShadowSettings> = {
   realistic: { enabled: true, algorithm: "vsm", mapSize: 4096, radius: 12, bias: 0, normalBias: 0.05 },
 };
 
+/**
+ * shadow Settings.
+ */
 export function shadowSettings(quality: ShadowQuality): ShadowSettings {
   return SETTINGS[quality];
 }

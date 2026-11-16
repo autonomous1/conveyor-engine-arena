@@ -22,10 +22,25 @@ import * as THREE from "three";
  */
 
 export const EXPLOSION_COLUMNS = 6;
+/**
+ * EXPLOSION ROWS.
+ */
 export const EXPLOSION_ROWS = 5;
+/**
+ * EXPLOSION FRAMES.
+ */
 export const EXPLOSION_FRAMES = 30;
+/**
+ * EXPLOSION FPS.
+ */
 export const EXPLOSION_FPS = 30;
+/**
+ * EXPLOSION SIZE.
+ */
 export const EXPLOSION_SIZE = 4;
+/**
+ * EXPLOSION POOL CAP.
+ */
 export const EXPLOSION_POOL_CAP = 8;
 /**
  * Longest step one update takes, in seconds.
@@ -46,8 +61,14 @@ export const SURFACE_BLAST_STANDOFF = 0.02;
  */
 export const SURFACE_BLAST_DEGENERATE = 0.08;
 
+/**
+ * Explosion Blending type.
+ */
 export type ExplosionBlending = "normal" | "additive";
 
+/**
+ * Surface Blast Look type.
+ */
 export type SurfaceBlastLook = {
   position: { x: number; y: number; z: number };
   right: { x: number; y: number; z: number };
@@ -55,6 +76,9 @@ export type SurfaceBlastLook = {
   forward: { x: number; y: number; z: number };
 };
 
+/**
+ * Surface Blast Pose type.
+ */
 export type SurfaceBlastPose = {
   x: number;
   y: number;
@@ -65,6 +89,9 @@ export type SurfaceBlastPose = {
   degenerate: boolean;
 };
 
+/**
+ * Explosion Camera type.
+ */
 export type ExplosionCamera = {
   updateMatrixWorld?: () => void;
   matrixWorld: { elements: ArrayLike<number> };
@@ -76,7 +103,9 @@ function unit3(v: { x: number; y: number; z: number }): { x: number; y: number; 
   return { x: v.x / len, y: v.y / len, z: v.z / len };
 }
 
-/** Camera basis from `matrixWorld`: right, up, and look (-Z). */
+/**
+ * Camera basis from `matrixWorld`: right, up, and look (-Z).
+ */
 export function lookFromCamera(camera: ExplosionCamera): SurfaceBlastLook {
   camera.updateMatrixWorld?.();
   const m = camera.matrixWorld.elements;
@@ -139,7 +168,9 @@ export function surfaceBlastPose(
   };
 }
 
-/** Sheet layout and playback. Missing fields use the defaults above. */
+/**
+ * Sheet layout and playback. Missing fields use the defaults above.
+ */
 export type ExplosionSheet = {
   columns?: number;
   rows?: number;
@@ -357,6 +388,9 @@ export interface ExplosionFx {
   dispose(): void;
 }
 
+/**
+ * Creates Explosion Fx.
+ */
 export function createExplosionFx(
   parent: THREE.Object3D,
   opts: {
@@ -553,7 +587,9 @@ export function createExplosionFx(
   };
 }
 
-/** Default world size of a laser hit, in metres, when the sheet does not say otherwise. */
+/**
+ * Default world size of a laser hit, in metres, when the sheet does not say otherwise.
+ */
 export const LASER_IMPACT_SIZE = 0.8;
 /**
  * Playback rate used when laser hits fall back to the grenade-explosion sheet.
@@ -561,6 +597,9 @@ export const LASER_IMPACT_SIZE = 0.8;
  */
 export const LASER_IMPACT_FALLBACK_FPS = 60;
 
+/**
+ * Laser Impact Sheet type.
+ */
 export type LaserImpactSheet = ExplosionSheet & { texture: string; laserImpactSize?: number };
 
 /**
@@ -576,9 +615,14 @@ export function resolveLaserImpactSheet(
   return undefined;
 }
 
+/**
+ * Laser Impact Source type.
+ */
 export type LaserImpactSource = NonNullable<ReturnType<typeof resolveLaserImpactSheet>>;
 
-/** World size of a laser hit. Prefers `laserImpactSize`, then the dedicated sheet's `size`, then 0.8. */
+/**
+ * World size of a laser hit. Prefers `laserImpactSize`, then the dedicated sheet's `size`, then 0.8.
+ */
 export function laserImpactWorldSize(source: LaserImpactSource | undefined, fallback = LASER_IMPACT_SIZE): number {
   const impact = source?.sheet.laserImpactSize;
   if (typeof impact === "number" && Number.isFinite(impact) && impact > 0) return impact;
@@ -589,7 +633,9 @@ export function laserImpactWorldSize(source: LaserImpactSource | undefined, fall
   return fallback;
 }
 
-/** Playback fps. The dedicated sheet uses its own `fps`; a grenade-sheet fallback stays at 60. */
+/**
+ * Playback fps. The dedicated sheet uses its own `fps`; a grenade-sheet fallback stays at 60.
+ */
 export function laserImpactPlaybackFps(source: LaserImpactSource | undefined, fallback = LASER_IMPACT_FALLBACK_FPS): number {
   if (source && !source.fallback) {
     const fps = source.sheet.fps;
@@ -597,6 +643,9 @@ export function laserImpactPlaybackFps(source: LaserImpactSource | undefined, fa
   }
   return fallback;
 }
+/**
+ * Surface Explosion Sheet type.
+ */
 export type SurfaceExplosionSheet = ExplosionSheet & { texture: string };
 
 /**
@@ -612,16 +661,23 @@ export function resolveSurfaceExplosionSheet(
   return undefined;
 }
 
+/**
+ * Surface Explosion Source type.
+ */
 export type SurfaceExplosionSource = NonNullable<ReturnType<typeof resolveSurfaceExplosionSheet>>;
 
-/** World size of a surface blast. Uses the chosen sheet's `size`, else the grenade default. */
+/**
+ * World size of a surface blast. Uses the chosen sheet's `size`, else the grenade default.
+ */
 export function surfaceExplosionWorldSize(source: SurfaceExplosionSource | undefined, fallback = EXPLOSION_SIZE): number {
   const size = source?.sheet.size;
   if (typeof size === "number" && Number.isFinite(size) && size > 0) return size;
   return fallback;
 }
 
-/** Playback fps of a surface blast. The chosen sheet's `fps`, else the grenade default. */
+/**
+ * Playback fps of a surface blast. The chosen sheet's `fps`, else the grenade default.
+ */
 export function surfaceExplosionPlaybackFps(source: SurfaceExplosionSource | undefined, fallback = EXPLOSION_FPS): number {
   const fps = source?.sheet.fps;
   if (typeof fps === "number" && Number.isFinite(fps) && fps > 0) return fps;

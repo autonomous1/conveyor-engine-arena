@@ -56,4 +56,7 @@ export const BOT_TUNING = Object.freeze({
   chestM: 1,
 });
 
+/**
+ * Bot Tuning type.
+ */
 export type BotTuning = typeof BOT_TUNING;

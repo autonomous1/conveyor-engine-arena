@@ -15,11 +15,16 @@
 
 export type SvgMapBounds = { minX: number; maxX: number; minZ: number; maxZ: number };
 
-/** 2D affine [a, b, c, d, e, f]: x' = a x + c y + e, y' = b x + d y + f. */
+/**
+ * 2D affine [a, b, c, d, e, f]: x' = a x + c y + e, y' = b x + d y + f.
+ */
 export type Affine = [number, number, number, number, number, number];
 
 const IDENTITY: Affine = [1, 0, 0, 1, 0, 0];
 
+/**
+ * multiply.
+ */
 export function multiply(m: Affine, n: Affine): Affine {
   return [
     m[0] * n[0] + m[2] * n[1],
@@ -31,6 +36,9 @@ export function multiply(m: Affine, n: Affine): Affine {
   ];
 }
 
+/**
+ * Parses Transform.
+ */
 export function parseTransform(text: string | undefined): Affine {
   let out: Affine = [...IDENTITY];
   if (!text) return out;
@@ -93,7 +101,9 @@ function num(value: string | undefined, name: string): number {
   return n;
 }
 
-/** Bounds from the first `<rect>` in the layer labelled `label` (default `bounds`). */
+/**
+ * Bounds from the first `<rect>` in the layer labelled `label` (default `bounds`).
+ */
 export function svgMapBounds(svg: string, label = "bounds"): SvgMapBounds {
   const stack: Array<{ name: string; matrix: Affine; inLayer: boolean }> = [];
   let viewHeight: number | undefined;

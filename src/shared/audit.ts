@@ -20,12 +20,24 @@ export const AUDIT_FIELDS = [
   "kills",
 ] as const;
 
+/**
+ * Audit Field type.
+ */
 export type AuditField = (typeof AUDIT_FIELDS)[number];
 
+/**
+ * Audit Counters type.
+ */
 export type AuditCounters = Record<AuditField, number>;
 
+/**
+ * Audit Frame type.
+ */
 export type AuditFrame = { t: "audit" } & AuditCounters;
 
+/**
+ * empty Audit.
+ */
 export function emptyAudit(): AuditCounters {
   return {
     fired: 0,
@@ -37,6 +49,9 @@ export function emptyAudit(): AuditCounters {
   };
 }
 
+/**
+ * audit Frame.
+ */
 export function auditFrame(counters: AuditCounters): AuditFrame {
   return {
     t: "audit",
@@ -49,6 +64,9 @@ export function auditFrame(counters: AuditCounters): AuditFrame {
   };
 }
 
+/**
+ * Parses Audit.
+ */
 export function parseAudit(frame: unknown): AuditFrame | undefined {
   if (!frame || typeof frame !== "object") return undefined;
   const rec = frame as Record<string, unknown>;
@@ -70,7 +88,9 @@ export function formatAudit(counters: AuditCounters): string {
   return AUDIT_FIELDS.map((key) => `${key} ${counters[key]}`).join("\n");
 }
 
-/** Six host fire counters. In memory, lost on restart. */
+/**
+ * Six host fire counters. In memory, lost on restart.
+ */
 export interface Audit {
   /** Shallow copy of the six numbers. Mutating it does not change the counters. */
   readonly counts: AuditCounters;
@@ -85,6 +105,9 @@ export interface Audit {
   pawnHit(killed: boolean): void;
 }
 
+/**
+ * Creates Audit.
+ */
 export function createAudit(): Audit {
   const counts = emptyAudit();
 

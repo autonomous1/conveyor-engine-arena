@@ -39,6 +39,9 @@ export type HostBotSense = {
   readonly tick: number;
 };
 
+/**
+ * Host Bot Sense Options type.
+ */
 export type HostBotSenseOptions = {
   world: AuthoritativeWorld;
   agents: readonly WanderAgent[];
@@ -54,6 +57,9 @@ export type HostBotSenseOptions = {
   tuning?: Partial<SenseTuning>;
 };
 
+/**
+ * Creates Host Bot Sense.
+ */
 export function createHostBotSense(opts: HostBotSenseOptions): HostBotSense {
   const slots: number[] = [];
   const botSet = new Set<number>();

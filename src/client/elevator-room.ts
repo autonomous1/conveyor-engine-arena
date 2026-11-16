@@ -38,15 +38,24 @@ type Cab = {
   hallsHidden: boolean;
 };
 
+/**
+ * Elevator Room Visuals type.
+ */
 export type ElevatorRoomVisuals = {
   placements: Pick<PlacementVisibility, "setOffsetY" | "setVisible" | "flushBounds">;
   lights: ReadonlyMap<string, Object3D>;
 };
 
+/**
+ * Elevator Room Debug type.
+ */
 export type ElevatorRoomDebug = {
   offsetY(prefix: string, dy: number): void;
 };
 
+/**
+ * Render Pawn type.
+ */
 export type RenderPawn = { x: number; y: number; z: number };
 
 /**
@@ -63,6 +72,9 @@ export interface ElevatorRooms {
   tick(now: number, pawn: RenderPawn | undefined): void;
 }
 
+/**
+ * Creates Elevator Rooms.
+ */
 export function createElevatorRooms(
   view: ArenaView,
   visuals: ElevatorRoomVisuals,

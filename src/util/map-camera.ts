@@ -10,6 +10,8 @@
  * Check: world +X projects to +NDC x, and world −Z to +NDC y.
  */
 
+// ARCHITECTURE: Top-down camera fitting for the baked map utility.
+// Wiring: src/util/bake-scene.ts and the bake tooling call it.
 import * as THREE from "three";
 import { MAP_BAKE_PX, MAP_PAD, SCENE_MAP_SIZE, mapFrame, type MapBounds } from "../shared/map-frame.ts";
 
@@ -20,6 +22,9 @@ const EYE_Y = 200;
 const NEAR = 0.5;
 const FAR = 400;
 
+/**
+ * top Down Camera.
+ */
 export function topDownCamera(bounds: MapBounds, width: number, height: number): THREE.OrthographicCamera | undefined {
   const padX = MAP_PAD * (width / SCENE_MAP_SIZE);
   const padY = MAP_PAD * (height / SCENE_MAP_SIZE);

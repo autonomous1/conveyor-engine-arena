@@ -19,8 +19,14 @@ const NOSE = new THREE.Vector3(1, 0, 0);
 const SHOT_FORWARD = new THREE.Vector3(0, 0, 1);
 const NOSE_MOUNT = new THREE.Quaternion().setFromUnitVectors(NOSE, SHOT_FORWARD);
 
+/**
+ * GRENADE DRAW MS.
+ */
 export const GRENADE_DRAW_MS = 400;
 
+/**
+ * Grenade Draw type.
+ */
 export type GrenadeDraw = {
   id: number;
   x: number;
@@ -47,6 +53,9 @@ export interface GrenadeProps {
   drop(): void;
 }
 
+/**
+ * Creates Grenade Props.
+ */
 export function createGrenadeProps(
   parent: THREE.Object3D,
   loadTemplate: () => Promise<THREE.Object3D | undefined> = async () => undefined,

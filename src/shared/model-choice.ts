@@ -12,6 +12,9 @@ export function helloModel(hello: unknown): string | undefined {
   return model;
 }
 
+/**
+ * model Frame.
+ */
 export function modelFrame(model: string): { t: "model"; v: 1; model: string } {
   return { t: "model", v: 1, model };
 }

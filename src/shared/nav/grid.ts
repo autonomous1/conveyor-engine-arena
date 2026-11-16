@@ -27,8 +27,14 @@ import {
 } from "../scene-graph.js";
 import type { ArenaView } from "../arena-view.js";
 
+/**
+ * Grid Area type.
+ */
 export type GridArea = { minX: number; maxX: number; minZ: number; maxZ: number };
 
+/**
+ * Grid type.
+ */
 export type Grid = {
   minX: number;
   minZ: number;
@@ -39,6 +45,9 @@ export type Grid = {
   blocked: Uint8Array;
 };
 
+/**
+ * Grid Options type.
+ */
 export type GridOptions = {
   cell?: number;
   radius: number;
@@ -70,6 +79,9 @@ type BoxIndex = {
   bins: Array<number[] | undefined>;
 };
 
+/**
+ * place Grid Area.
+ */
 export function placeGridArea(graph: SceneGraph, placeId: string): GridArea | undefined {
   const place = graph.placeById.get(placeId);
   if (!place) return undefined;
@@ -87,6 +99,9 @@ export function placeGridArea(graph: SceneGraph, placeId: string): GridArea | un
   return boundsArea(place.bounds, []);
 }
 
+/**
+ * crossing Grid Area.
+ */
 export function crossingGridArea(graph: SceneGraph, fromId: string, toId: string): GridArea | undefined {
   const left = placeGridArea(graph, fromId);
   const right = placeGridArea(graph, toId);
@@ -124,12 +139,18 @@ export function shaftBlocks(
   return out;
 }
 
+/**
+ * Place Grid Spec type.
+ */
 export type PlaceGridSpec = {
   area: GridArea;
   baseY: number;
   block: Array<Array<[number, number]>>;
 };
 
+/**
+ * spec For Place.
+ */
 export function specForPlace(graph: SceneGraph, placeId: string): PlaceGridSpec | undefined {
   const place = graph.placeById.get(placeId);
   const area = placeGridArea(graph, placeId);
@@ -137,6 +158,9 @@ export function specForPlace(graph: SceneGraph, placeId: string): PlaceGridSpec 
   return { area, baseY: place.y, block: shaftBlocks(graph, area, [placeId]) };
 }
 
+/**
+ * spec For Crossing.
+ */
 export function specForCrossing(graph: SceneGraph, fromId: string, toId: string): PlaceGridSpec | undefined {
   const from = graph.placeById.get(fromId);
   const to = graph.placeById.get(toId);
@@ -184,6 +208,9 @@ export function navBoxes(
   return out;
 }
 
+/**
+ * Builds Grid.
+ */
 export function buildGrid(area: GridArea, boxes: readonly FloorBox[], opts: GridOptions): Grid {
   const cell = opts.cell && opts.cell > 0 ? opts.cell : 0.25;
   const radius = opts.radius > 0 ? opts.radius : 0;
@@ -228,6 +255,9 @@ export function buildGrid(area: GridArea, boxes: readonly FloorBox[], opts: Grid
   return { minX: area.minX, minZ: area.minZ, cell, w, h, floor, blocked };
 }
 
+/**
+ * find Local Path.
+ */
 export function findLocalPath(grid: Grid, start: PlanXZ | Vec3, goal: PlanXZ | Vec3): Vec3[] | undefined {
   if (grid.w <= 0 || grid.h <= 0) return undefined;
   const from = readXZ(start);

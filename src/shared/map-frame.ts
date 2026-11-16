@@ -26,7 +26,9 @@ export const SCENE_MAP_SIZE = 360;
  */
 export const MAP_BAKE_PX = 2048;
 
-/** URL the client loads. The file is `web/assets/map-bake.png`. */
+/**
+ * URL the client loads. The file is `web/assets/map-bake.png`.
+ */
 export const MAP_BAKE_URL = `${assetBase()}assets/map-bake.png`;
 
 /**
@@ -36,17 +38,33 @@ export const MAP_BAKE_URL = `${assetBase()}assets/map-bake.png`;
  */
 export const MAP_BAKE_BACKGROUND = 0x1b1f24;
 
-/** Bake metadata: the world XZ bounds the PNG was framed on (from the SVG `bounds` layer). */
+/**
+ * Bake metadata: the world XZ bounds the PNG was framed on (from the SVG `bounds` layer).
+ */
 export const MAP_BAKE_META_URL = `${assetBase()}assets/map-bake.json`;
+/**
+ * MAP BAKE META PATH.
+ */
 export const MAP_BAKE_META_PATH = "web/assets/map-bake.json";
 
-/** Design SVG whose `bounds` layer rect sets the bake extents. */
+/**
+ * Design SVG whose `bounds` layer rect sets the bake extents.
+ */
 export const MAP_DESIGN_SVG = "dev/scenes/arena-1/designs/arena-1.svg";
 
+/**
+ * MAP BAKE PATH.
+ */
 export const MAP_BAKE_PATH = "web/assets/map-bake.png";
 
+/**
+ * Map Bounds type.
+ */
 export type MapBounds = { minX: number; maxX: number; minZ: number; maxZ: number };
 
+/**
+ * Map Frame type.
+ */
 export type MapFrame = {
   width: number;
   height: number;
@@ -62,6 +80,9 @@ export type MapFrame = {
   toWorld(px: number, py: number): [number, number];
 };
 
+/**
+ * map Frame.
+ */
 export function mapFrame(
   bounds: MapBounds,
   width: number,

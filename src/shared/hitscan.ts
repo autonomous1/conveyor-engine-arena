@@ -16,9 +16,21 @@
 //   `sweepSegment` does not apply `MIN_HIT_DISTANCE`.
 import { FLOOR_INDEX_CELL, floorIndexFor, type FloorIndex } from "./movements.js";
 
+/**
+ * FIRE HZ.
+ */
 export const FIRE_HZ = 8;
+/**
+ * FIRE INTERVAL MS.
+ */
 export const FIRE_INTERVAL_MS = 1000 / FIRE_HZ;
+/**
+ * LASER MS.
+ */
 export const LASER_MS = 80;
+/**
+ * TRACE RANGE.
+ */
 export const TRACE_RANGE = 96;
 /**
  * @why The eye is inside the shooter capsule (radius 0.5), so a hit closer
@@ -29,8 +41,14 @@ export const MIN_HIT_DISTANCE = 0.5;
 
 const HIT_EPS = 1e-4;
 
+/**
+ * Vec3 type.
+ */
 export type Vec3 = { x: number; y: number; z: number };
 
+/**
+ * Trace Aabb type.
+ */
 export type TraceAabb = {
   id?: number;
   minX: number;
@@ -42,7 +60,9 @@ export type TraceAabb = {
   maxY?: number;
 };
 
-/** Feet at `y`. The shaft runs from `radius` to `height - radius`. */
+/**
+ * Feet at `y`. The shaft runs from `radius` to `height - radius`.
+ */
 export type TraceCapsule = {
   id?: number;
   x: number;
@@ -52,6 +72,9 @@ export type TraceCapsule = {
   height: number;
 };
 
+/**
+ * Fire Frame type.
+ */
 export type FireFrame = {
   t: "fire";
   v: 1;
@@ -60,6 +83,9 @@ export type FireFrame = {
   pitch: number;
 };
 
+/**
+ * fire Frame.
+ */
 export function fireFrame(seq: number, yaw: number, pitch: number): FireFrame {
   return { t: "fire", v: 1, seq, yaw, pitch };
 }
@@ -74,6 +100,9 @@ export function advanceFireClock(firing: boolean, now: number, nextAt: number): 
   return { due: true, nextAt: now + FIRE_INTERVAL_MS };
 }
 
+/**
+ * Laser Frame type.
+ */
 export type LaserFrame = {
   t: "laser";
   shooter: number;
@@ -106,11 +135,17 @@ export function parseLaser(frame: unknown): LaserFrame | undefined {
   return { t: "laser", shooter, from, to, until };
 }
 
+/**
+ * Fire Gate type.
+ */
 export type FireGate = {
   lastSeq: number;
   lastAt: number;
 };
 
+/**
+ * Shot type.
+ */
 export type Shot = {
   from: Vec3;
   to: Vec3;
@@ -119,10 +154,16 @@ export type Shot = {
   hitId?: number;
 };
 
+/**
+ * fresh Fire Gate.
+ */
 export function freshFireGate(): FireGate {
   return { lastSeq: 0, lastAt: Number.NEGATIVE_INFINITY };
 }
 
+/**
+ * Parses Fire.
+ */
 export function parseFire(frame: unknown): FireFrame | undefined {
   if (!frame || typeof frame !== "object") return undefined;
   const rec = frame as Record<string, unknown>;
@@ -149,6 +190,9 @@ export function admitFire(gate: FireGate, seq: number, now: number): "accept" | 
   return "accept";
 }
 
+/**
+ * trace Hitscan.
+ */
 export function traceHitscan(
   origin: Vec3,
   dir: Vec3,
@@ -554,6 +598,9 @@ function rayCapsule(origin: Vec3, dir: Vec3, cap: TraceCapsule, maxT: number): n
   return best;
 }
 
+/**
+ * Sweep Hit type.
+ */
 export type SweepHit = {
   /** Meters along the segment from `from` toward `to`. */
   distance: number;

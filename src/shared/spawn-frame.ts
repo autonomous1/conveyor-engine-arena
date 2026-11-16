@@ -9,10 +9,16 @@
  */
 export type SpawnFrame = { t: "spawn"; id: number; x: number; y: number; z: number };
 
+/**
+ * spawn Frame.
+ */
 export function spawnFrame(id: number, x: number, y: number, z: number): SpawnFrame {
   return { t: "spawn", id, x, y, z };
 }
 
+/**
+ * Parses Spawn.
+ */
 export function parseSpawn(frame: unknown): SpawnFrame | undefined {
   if (!frame || typeof frame !== "object") return undefined;
   const rec = frame as Record<string, unknown>;

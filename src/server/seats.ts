@@ -3,10 +3,16 @@
 // Wiring: arena-host.ts calls these on hello and close.
 import type { AuthoritativeWorld } from "conveyor-engine-world";
 
+/**
+ * set Seat Alive.
+ */
 export function setSeatAlive(world: AuthoritativeWorld, id: number, render: unknown): void {
   world.enqueue({ kind: "setLifecycle", entity: id, render } as never);
 }
 
+/**
+ * despawn Seat.
+ */
 export function despawnSeat(world: AuthoritativeWorld, id: number): void {
   world.enqueue({ kind: "setLifecycle", entity: id });
 }

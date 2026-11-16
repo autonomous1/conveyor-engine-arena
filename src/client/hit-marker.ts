@@ -10,10 +10,16 @@
 
 export const HIT_MARKER_MS = 150;
 
+/**
+ * Hit Marker Note type.
+ */
 export type HitMarkerNote =
   | { kind: "fire"; sent: boolean }
   | { kind: "laser"; shooter: number; ownedId: number | undefined };
 
+/**
+ * Hit Marker type.
+ */
 export type HitMarker = {
   /** Circle appended to document.body. Display none until a note shows it. */
   readonly element: HTMLDivElement;
@@ -28,6 +34,9 @@ export type HitMarker = {
   tick(now: number): void;
 };
 
+/**
+ * Creates Hit Marker.
+ */
 export function createHitMarker(doc: Document = document): HitMarker {
   const element = doc.createElement("div");
   element.id = "hit-marker";

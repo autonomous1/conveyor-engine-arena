@@ -10,15 +10,24 @@
 
 export const FIRE_DEBUG_PREFIX = "fire-debug";
 
+/**
+ * Fire Debug Sink type.
+ */
 export type FireDebugSink = {
   log(line: string): void;
   error(line: string): void;
 };
 
+/**
+ * fire Debug Line.
+ */
 export function fireDebugLine(step: string): string {
   return `${FIRE_DEBUG_PREFIX} ${step}`;
 }
 
+/**
+ * fire Debug Error Line.
+ */
 export function fireDebugErrorLine(where: string, err: unknown): string {
   const stack = err instanceof Error ? (err.stack ?? err.message) : String(err);
   return `${FIRE_DEBUG_PREFIX} error ${where}\n${stack}`;
@@ -57,6 +66,9 @@ export function fireShotFrame(seq: number, yaw: number, pitch: number, debug: bo
   return frame;
 }
 
+/**
+ * summarize Inbound.
+ */
 export function summarizeInbound(msg: Record<string, unknown>): string {
   if (msg.t === "laser") return `laser shooter=${String(msg.shooter)}`;
   if (typeof msg.t === "string") return String(msg.t);
@@ -85,6 +97,9 @@ function browserSink(): FireDebugSink {
   };
 }
 
+/**
+ * Creates Fire Debug Log.
+ */
 export function createFireDebugLog(enabled: () => boolean, sink: FireDebugSink = browserSink()) {
   const write = (step: string) => {
     if (!enabled()) return;

@@ -11,8 +11,14 @@ export const PLACEMENT_ID_START = 100;
 const ID_RE = /^[A-Za-z0-9][A-Za-z0-9_.-]*$/;
 const RESERVED_IDS = new Set([10, 11, 12, 13]);
 
+/**
+ * Placement Issue type.
+ */
 export type PlacementIssue = { path: string; message: string };
 
+/**
+ * Baked Building type.
+ */
 export type BakedBuilding = {
   id: string;
   model: string;
@@ -21,6 +27,9 @@ export type BakedBuilding = {
   scale: number;
 };
 
+/**
+ * Baked Box type.
+ */
 export type BakedBox = {
   id: number;
   sourceId: string;

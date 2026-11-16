@@ -32,6 +32,9 @@ export function reach(placeId: string): Goal {
   };
 }
 
+/**
+ * Stand Goal type.
+ */
 export type StandGoal = Goal & { stand: StandTarget };
 
 /**

@@ -17,6 +17,9 @@ function validKey(key: unknown): key is string {
   return typeof key === "string" && key.length > 0 && key.length <= 128 && !/[\u0000-\u001f\u007f]/.test(key);
 }
 
+/**
+ * Creates Arena Claims.
+ */
 export function createArenaClaims(opts: {
   sendAll(frame: ClaimsFrame): void;
   log?(line: string): void;

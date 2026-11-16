@@ -9,9 +9,14 @@ import { BOT_TUNING } from "./bot-tuning.js";
 const DEG = Math.PI / 180;
 const TAU = Math.PI * 2;
 
+/**
+ * Aim Point type.
+ */
 export type AimPoint = { readonly x: number; readonly y: number; readonly z: number };
 
-/** Standard deviation, in radians, of the yaw error and of the pitch error. */
+/**
+ * Standard deviation, in radians, of the yaw error and of the pitch error.
+ */
 export function aimSigma(range: number, targetSpeed: number): number {
   const metres = Number.isFinite(range) && range > 0 ? range : 0;
   const speed = Number.isFinite(targetSpeed) && targetSpeed > 0 ? targetSpeed : 0;

@@ -22,14 +22,18 @@ import type { PickupPlacement } from "../shared/pickups.js";
  * at once at the pickup's position; the taker is standing at it.
  */
 
-/** Used for any kind the manifest's sounds do not claim. */
+/**
+ * Used for any kind the manifest's sounds do not claim.
+ */
 export const DEFAULT_KIND_SOUND: Readonly<Record<string, ArenaSoundName>> = {
   ammo: "cratePickup",
   key: "keyPickup",
   health: "medkitPickup",
 };
 
-/** Kind to effect, from each sound's `pickupKinds`, else the defaults. */
+/**
+ * Kind to effect, from each sound's `pickupKinds`, else the defaults.
+ */
 export function kindSoundsOf(sounds: ArenaSounds | undefined): Record<string, ArenaSoundName> {
   const out: Record<string, ArenaSoundName> = {};
   let declared = false;
@@ -67,6 +71,9 @@ export interface PickupSounds {
   clear(): void;
 }
 
+/**
+ * Creates Pickup Sounds.
+ */
 export function createPickupSounds(opts: {
   pickups: readonly PickupPlacement[];
   /** `at` set: positional. Unset: your own. */

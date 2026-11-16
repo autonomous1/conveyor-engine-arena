@@ -26,7 +26,9 @@ import {
 import type { TraceCapsule } from "../shared/hitscan.js";
 import { clientSeesPawn, deliverHealthFrames } from "./health.js";
 
-/** In-flight grenades. Not world entities. Poses go to clients who can see the owner. */
+/**
+ * In-flight grenades. Not world entities. Poses go to clients who can see the owner.
+ */
 export interface ArenaGrenades {
   /**
    * One throw frame. A rejected, dead, or non-finite throw adds no body.

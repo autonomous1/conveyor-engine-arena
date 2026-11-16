@@ -5,6 +5,9 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { WanderDumpWriter, WanderStall } from "./wander-debug.js";
 
+/**
+ * install Wander Debug.
+ */
 export function installWanderDebug(): boolean {
   if (process.env.ARENA_WANDER_DEBUG !== "1") return false;
   (globalThis as { __wanderDebugEnabled?: boolean }).__wanderDebugEnabled = true;

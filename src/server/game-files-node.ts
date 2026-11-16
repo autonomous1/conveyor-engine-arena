@@ -11,6 +11,9 @@ import { GameManifestError } from "./game-manifest.js";
 
 const MANIFEST = join("web", "game", "arena.game.json");
 
+/**
+ * project Root.
+ */
 export function projectRoot(): string {
   let dir = dirname(fileURLToPath(import.meta.url));
   for (let i = 0; i < 6; i++) {
@@ -22,6 +25,9 @@ export function projectRoot(): string {
   throw new GameManifestError([{ path: "$", message: `missing ${MANIFEST}` }]);
 }
 
+/**
+ * node Host Env.
+ */
 export function nodeHostEnv(): Record<string, string | undefined> {
   return process.env;
 }
@@ -72,7 +78,9 @@ function isProfiles(ref: string): boolean {
   return trimmed === "web/game/building-profiles.json";
 }
 
-/** Disk `GameFiles` for one arena root. Omitted root walks up from this module to the manifest. */
+/**
+ * Disk `GameFiles` for one arena root. Omitted root walks up from this module to the manifest.
+ */
 export function nodeGameFiles(root = projectRoot()): GameFiles {
   return {
     text(ref: string): string | undefined {

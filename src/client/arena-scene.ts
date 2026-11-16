@@ -20,6 +20,9 @@ import { prepareCharacter } from "./pawn-feet.ts";
 import { createPlacementVisibility, type PlacementVisibility } from "./placements.ts";
 import { collectInstanceSamples, collectObjectSamples, type MapAnchor, type MapSample, type SampleMeta } from "./scene-map.ts";
 
+/**
+ * Arena Scene type.
+ */
 export type ArenaScene = {
   /** Canvas appended to document.body. The factory does not dispose it. */
   renderer: THREE.WebGLRenderer;
@@ -33,11 +36,17 @@ export type ArenaScene = {
   cameraLocked: boolean;
 };
 
+/**
+ * Arena Scene Options type.
+ */
 export type ArenaSceneOptions = {
   /** Fixed 1280×720 buffer at pixel ratio 1, kept so a PNG can be read back. */
   qa?: boolean;
 };
 
+/**
+ * Character Visual type.
+ */
 export type CharacterVisual = {
   object: THREE.Object3D;
   clips: THREE.AnimationClip[];
@@ -46,6 +55,9 @@ export type CharacterVisual = {
   scale?: number;
 };
 
+/**
+ * Character Templates type.
+ */
 export type CharacterTemplates = Map<string, CharacterVisual>;
 
 const BASIS_TRANSCODER = `${assetBase()}assets/basis/`;
@@ -200,6 +212,9 @@ function renderWithRoomLights(
   }
 }
 
+/**
+ * Creates Arena Scene.
+ */
 export function createArenaScene(quality: ShadowQuality, options?: ArenaSceneOptions): ArenaScene {
   const qa = options?.qa === true;
   const shadows = shadowSettings(quality);
@@ -342,7 +357,9 @@ async function texture(url: string): Promise<THREE.Texture | undefined> {
 type WallFace = ArenaView["walls"][number]["face"];
 type Bounds2 = { minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number };
 
-/** Inner-face anchor. Yaw turns a local +Z facade front into the room. */
+/**
+ * Inner-face anchor. Yaw turns a local +Z facade front into the room.
+ */
 export function wallAnchor(face: WallFace, wall: Pick<Bounds2, "minX" | "maxX" | "minZ" | "maxZ">, bounds: ArenaView["bounds"]): { x: number; z: number; yaw: number; span: number } {
   const span = face === "east" || face === "west" ? bounds.maxZ - bounds.minZ : bounds.maxX - bounds.minX;
   const midX = (bounds.minX + bounds.maxX) / 2;
@@ -372,6 +389,9 @@ export function doorSwingRadians(hinge: "left" | "right", open: boolean): number
   return hinge === "left" ? radians : -radians;
 }
 
+/**
+ * DOOR SWING SECONDS.
+ */
 export const DOOR_SWING_SECONDS = 0.4;
 
 /**
@@ -397,7 +417,9 @@ export function applyDoorSwing(
   node.userData.swing = { from: node.rotation.y, to, t: 0, seconds: seconds > 0 ? seconds : DOOR_SWING_SECONDS };
 }
 
-/** Advance an eased swing by `dt` seconds (smoothstep). */
+/**
+ * Advance an eased swing by `dt` seconds (smoothstep).
+ */
 export function tickDoorSwing(group: THREE.Object3D, dt: number): void {
   const node = group.getObjectByName("hinge");
   const swing = node?.userData.swing as { from: number; to: number; t: number; seconds?: number } | undefined;
@@ -408,6 +430,9 @@ export function tickDoorSwing(group: THREE.Object3D, dt: number): void {
   if (swing.t === 1) delete node.userData.swing;
 }
 
+/**
+ * Door Rig type.
+ */
 export type DoorRig = { hinge: "left" | "right"; group: THREE.Object3D };
 
 /**
@@ -772,7 +797,9 @@ function underNamed(object: THREE.Object3D, name: string): boolean {
  * Place the model at the manifest position, yaw, and scale. The origin stays
  * the GLB origin, so the mesh matches the baked AABBs. Scale defaults to 1.
  */
-/** Place a baked building at its manifest position, yaw, and scale. The origin stays the GLB origin. */
+/**
+ * Place a baked building at its manifest position, yaw, and scale. The origin stays the GLB origin.
+ */
 export function placeBuildingModel(template: THREE.Object3D, building: ArenaView["buildings"][number]): THREE.Group {
   const group = new THREE.Group();
   group.position.set(building.position[0], building.position[1], building.position[2]);
@@ -785,6 +812,9 @@ export function placeBuildingModel(template: THREE.Object3D, building: ArenaView
   return group;
 }
 
+/**
+ * place Wall Model.
+ */
 export function placeWallModel(template: THREE.Object3D, wall: ArenaView["walls"][number], bounds: ArenaView["bounds"]): THREE.Group {
   const anchor = wallAnchor(wall.face, wall, bounds);
   const scale = wall.scale ?? 1;
@@ -799,6 +829,9 @@ export function placeWallModel(template: THREE.Object3D, wall: ArenaView["walls"
   return group;
 }
 
+/**
+ * Loads Arena Visuals.
+ */
 export async function loadArenaVisuals(view: ArenaView, arena: ArenaScene): Promise<{ templates: CharacterTemplates; fallbacks: number; propMixers: THREE.AnimationMixer[]; placements: PlacementVisibility; mapSamples: MapSample[]; doors: Map<string, DoorRig>; lights: Map<string, THREE.Object3D> }> {
   let fallbacks = 0;
   const propMixers: THREE.AnimationMixer[] = [];

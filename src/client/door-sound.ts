@@ -45,6 +45,9 @@ export interface DoorSounds {
   clear(): void;
 }
 
+/**
+ * Creates Door Sounds.
+ */
 export function createDoorSounds(opts: {
   /** `at` is the leaf centre in world metres. */
   doors: ReadonlyArray<{ id: string; at: Point; open?: boolean; locked?: boolean }>;

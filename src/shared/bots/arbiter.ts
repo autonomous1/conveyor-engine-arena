@@ -11,6 +11,9 @@
 import { BOT_TUNING } from "./bot-tuning.js";
 import type { BotSense } from "./sense.js";
 
+/**
+ * Arbiter Tuning type.
+ */
 export type ArbiterTuning = {
   /** No route out of the place, or no net movement, for this long means trapped. */
   trappedMs: number;
@@ -23,31 +26,52 @@ export type ArbiterTuning = {
   outsideWedgedMs: number;
 };
 
-/** 60 s, 120 s, 180 s. */
+/**
+ * 60 s, 120 s, 180 s.
+ */
 export const DEFAULT_ARBITER_TUNING: Readonly<ArbiterTuning> = Object.freeze({
   trappedMs: 60_000,
   respawnMs: 120_000,
   outsideWedgedMs: 180_000,
 });
 
+/**
+ * Goal Id type.
+ */
 export type GoalId = "wander" | "escape" | "evade" | "fightback";
 
+/**
+ * WANDER PRIORITY.
+ */
 export const WANDER_PRIORITY = 1;
+/**
+ * ESCAPE PRIORITY.
+ */
 export const ESCAPE_PRIORITY = 6;
-/** Hurt, but not shot in the last {@link UNDER_FIRE_MS}. */
+/**
+ * Hurt, but not shot in the last {@link UNDER_FIRE_MS}.
+ */
 export const EVADE_HURT_PRIORITY = 8.5;
-/** Damaged within {@link UNDER_FIRE_MS}. */
+/**
+ * Damaged within {@link UNDER_FIRE_MS}.
+ */
 export const EVADE_UNDER_FIRE_PRIORITY = 9.5;
-/** The place a bot is trying to reach. Same id as the sensor's exit. */
+/**
+ * The place a bot is trying to reach. Same id as the sensor's exit.
+ */
 export const EXIT_PLACE = "outside";
 
-/** Recent damage still counts as hurt. */
+/**
+ * Recent damage still counts as hurt.
+ */
 export const HURT_MS = 10_000;
 /**
  * @why Recent damage counts as under fire, which raises Evade's priority.
  */
 export const UNDER_FIRE_MS = 2_000;
-/** No damage for this long is the quiet half of `safe`. */
+/**
+ * No damage for this long is the quiet half of `safe`.
+ */
 export const SAFE_QUIET_MS = 5_000;
 /**
  * @why `safe` must stay true this long, with no new damage, before Evade lets
@@ -74,7 +98,9 @@ export const SAFE_DISTANCE_M = 35;
  *      flees unless the bot is cornered.
  */
 export const FLEE_BELOW = BOT_TUNING.fleeBelow;
-/** FightBack, when the target is a live threat the bot can still shoot. */
+/**
+ * FightBack, when the target is a live threat the bot can still shoot.
+ */
 export const FIGHT_PRIORITY = 9;
 
 /**
@@ -155,6 +181,9 @@ export type Mind = {
   fightSince?: number;
 };
 
+/**
+ * Verdict type.
+ */
 export type Verdict = {
   goal: GoalId;
   priority: number;
@@ -166,10 +195,16 @@ export type Verdict = {
   respawn: boolean;
 };
 
+/**
+ * Creates Mind.
+ */
 export function createMind(): Mind {
   return {};
 }
 
+/**
+ * reset Mind.
+ */
 export function resetMind(mind: Mind): void {
   mind.noRouteSince = undefined;
   mind.noRoutePlace = undefined;

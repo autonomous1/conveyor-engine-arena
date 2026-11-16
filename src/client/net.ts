@@ -24,6 +24,9 @@ import { boundLabel, createClientDiag, type ClientDiag, type DiagFields } from "
 
 const TOKEN_KEY = "ce-arena-token";
 
+/**
+ * Live Status type.
+ */
 export type LiveStatus = {
   phase: "hello" | "welcome" | "snap" | "resync" | "reject" | "error";
   text: string;
@@ -33,6 +36,9 @@ export type LiveStatus = {
   resyncs: number;
 };
 
+/**
+ * Laser Notice type.
+ */
 export type LaserNotice = {
   shooter: number;
   from: { x: number; y: number; z: number };
@@ -40,6 +46,9 @@ export type LaserNotice = {
   until: number;
 };
 
+/**
+ * Health Notice type.
+ */
 export type HealthNotice = {
   entity: number;
   hp: number;
@@ -61,7 +70,9 @@ export type OpenSocket = {
   onerror: unknown;
 };
 
-/** Handler view used after `open()`. */
+/**
+ * Handler view used after `open()`.
+ */
 export type WebSocketLike = {
   readyState: number;
   readonly OPEN: number;
@@ -73,6 +84,9 @@ export type WebSocketLike = {
   onerror: ((ev: unknown) => void) | null;
 };
 
+/**
+ * Live Link type.
+ */
 export type LiveLink = {
   sendInput(moveX: number, moveZ: number, yaw: number, buttons?: number): void;
   /** Arena frame. Returns false when the socket has no owned pawn yet. */
@@ -119,6 +133,9 @@ function asHealth(msg: Record<string, unknown>): HealthNotice | undefined {
   return notice;
 }
 
+/**
+ * connect Live.
+ */
 export function connectLive(opts: {
   bundleId: string;
   authoritativeHash: string;

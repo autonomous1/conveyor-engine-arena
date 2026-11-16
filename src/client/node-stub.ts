@@ -11,11 +11,35 @@ const nodeOnly = (): never => {
 };
 
 export default {};
+/**
+ * Web Socket.
+ */
 export const WebSocket = nodeOnly;
+/**
+ * Web Socket Server.
+ */
 export const WebSocketServer = nodeOnly;
+/**
+ * read File.
+ */
 export const readFile = nodeOnly;
+/**
+ * True when is Absolute.
+ */
 export const isAbsolute = nodeOnly;
+/**
+ * normalize.
+ */
 export const normalize = nodeOnly;
+/**
+ * relative.
+ */
 export const relative = nodeOnly;
+/**
+ * resolve.
+ */
 export const resolve = nodeOnly;
+/**
+ * sep.
+ */
 export const sep = "/";

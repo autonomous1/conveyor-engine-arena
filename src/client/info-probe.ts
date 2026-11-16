@@ -25,6 +25,9 @@ export type { Aabb, Vec3 };
 type DoorDef = ArenaView["doors"][number];
 type Volume = ArenaView["aabbs"][number];
 
+/**
+ * Probe Pawn type.
+ */
 export type ProbePawn = {
   id: unknown;
   position: { x: number; y: number; z: number };
@@ -32,6 +35,9 @@ export type ProbePawn = {
   render?: { assetKey?: string };
 };
 
+/**
+ * Info Probe type.
+ */
 export type InfoProbe = {
   onDoors(rows: readonly { id: string; open: boolean; locked: boolean }[]): void;
   onDoor(row: { id: string; open: boolean; locked: boolean }): void;
@@ -55,6 +61,9 @@ export type InfoProbe = {
   refresh(now: number, own?: InfoOwn, cabs?: readonly CabState[]): void;
 };
 
+/**
+ * camera Aim.
+ */
 export function cameraAim(camera: THREE.Camera): { origin: Vec3; direction: Vec3 } {
   const origin = new THREE.Vector3();
   const direction = new THREE.Vector3();
@@ -79,6 +88,9 @@ export function leafAabb(group: THREE.Object3D): Aabb | undefined {
   return objectAabb(leaf);
 }
 
+/**
+ * object Aabb.
+ */
 export function objectAabb(object: THREE.Object3D): Aabb | undefined {
   object.updateWorldMatrix(true, true);
   const box = new THREE.Box3().setFromObject(object);
@@ -94,6 +106,9 @@ export function objectAabb(object: THREE.Object3D): Aabb | undefined {
   };
 }
 
+/**
+ * Creates Info Probe.
+ */
 export function createInfoProbe(opts: {
   doors: ArenaView["doors"];
   pickups: readonly { id: string; kind?: string; minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number }[];

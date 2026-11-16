@@ -8,12 +8,27 @@
 
 export type V3 = { x: number; y: number; z: number };
 
+/**
+ * Qa Door type.
+ */
 export type QaDoor = { id: string; open: boolean };
+/**
+ * Qa Pickup type.
+ */
 export type QaPickup = { id: string };
+/**
+ * Qa Pawn type.
+ */
 export type QaPawn = { id: number; x: number; y: number; z: number; yaw: number };
 
+/**
+ * Qa Follow type.
+ */
 export type QaFollow = { back: number; up: number };
 
+/**
+ * Qa Scene type.
+ */
 export type QaScene = {
   camera: {
     fov: number;
@@ -26,6 +41,9 @@ export type QaScene = {
   renderer: { domElement: { toDataURL(type?: string): string } };
 };
 
+/**
+ * Qa Api type.
+ */
 export type QaApi = {
   ready(): Promise<void>;
   lookFrom(eye: V3, target: V3, fovDeg?: number): void;
@@ -65,6 +83,9 @@ export function takeHashToken(
   return token;
 }
 
+/**
+ * install Qa Api.
+ */
 export function installQaApi(ctx: {
   scene: QaScene;
   net: { firstSnapshot: Promise<void> };

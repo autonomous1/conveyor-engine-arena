@@ -5,6 +5,9 @@
 import type { Grid } from "../shared/nav/grid.js";
 import type { Vec3 } from "../shared/scene-graph.js";
 
+/**
+ * Wander Stall type.
+ */
 export type WanderStall = {
   at: number;
   tick: number;
@@ -23,6 +26,9 @@ export type WanderStall = {
 
 type Box = { id: number; minX: number; maxX: number; minY?: number; maxY?: number; minZ: number; maxZ: number; source?: string };
 
+/**
+ * Builds Wander Stall Dump.
+ */
 export function buildWanderStallDump(input: {
   at: number;
   tick: number;
@@ -83,6 +89,9 @@ export function buildWanderStallDump(input: {
   };
 }
 
+/**
+ * Wander Dump Writer type.
+ */
 export type WanderDumpWriter = (dump: WanderStall, dir?: string) => string | undefined;
 
 /**

@@ -12,6 +12,9 @@ import { compileGame, GameManifestError, placementRefsOf, type CompiledGame, typ
 const MANIFEST_REF = "./web/game/arena.game.json";
 const PROFILES_REF = "./web/game/building-profiles.json";
 
+/**
+ * project Root.
+ */
 export function projectRoot(): string {
   return findProjectRoot();
 }
@@ -69,7 +72,13 @@ function readManifestText(files: GameFiles): string {
  * @post Absent placements is `undefined`. An empty placements list is `{ placementFiles: [] }`.
  */
 export function readManifestSources(root: string, doc: unknown): CompileSources | undefined;
+/**
+ * read Manifest Sources.
+ */
 export function readManifestSources(files: GameFiles, doc: unknown): CompileSources | undefined;
+/**
+ * read Manifest Sources.
+ */
 export function readManifestSources(rootOrFiles: string | GameFiles, doc: unknown): CompileSources | undefined {
   const files = typeof rootOrFiles === "string" ? nodeGameFiles(rootOrFiles) : rootOrFiles;
   return readSources(files, doc);

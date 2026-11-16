@@ -11,12 +11,21 @@
 //   and client/net.ts play frames; shared/doors.ts uses capsule overlap.
 
 export const HEALTH_PICKUP = 25;
+/**
+ * AMMO PICKUP.
+ */
 export const AMMO_PICKUP = 30;
 /** The resolver can sit a fraction of a millimeter off the expanded face. */
 const TOUCH_SLOP_M = 1e-3;
 
+/**
+ * Pickup Kind type.
+ */
 export type PickupKind = "ammo" | "health" | "weapon" | "key";
 
+/**
+ * Pickup Placement type.
+ */
 export type PickupPlacement = {
   id: string;
   kind: PickupKind;
@@ -33,18 +42,27 @@ export type PickupPlacement = {
   maxZ: number;
 };
 
+/**
+ * Pickup Frame type.
+ */
 export type PickupFrame = {
   t: "pickup";
   id: string;
   gone: true;
 };
 
+/**
+ * Loadout Frame type.
+ */
 export type LoadoutFrame = {
   t: "loadout";
   ammo: number;
   weapon?: string;
 };
 
+/**
+ * Pawn Body type.
+ */
 export type PawnBody = {
   id: number;
   x: number;
@@ -55,10 +73,16 @@ export type PawnBody = {
   alive: boolean;
 };
 
+/**
+ * Health Sink type.
+ */
 export type HealthSink = {
   heal(id: number, amount: number): unknown;
 };
 
+/**
+ * Pickup Grant type.
+ */
 export type PickupGrant = {
   id: string;
   pawnId: number;
@@ -68,7 +92,9 @@ export type PickupGrant = {
   loadout?: LoadoutFrame;
 };
 
-/** Placement obstacle id. The debug wire and the collision list use this name. */
+/**
+ * Placement obstacle id. The debug wire and the collision list use this name.
+ */
 export function pickupBoxSource(id: string): string {
   return `${id}-box`;
 }
@@ -85,15 +111,24 @@ export function dropPickupAabb<T extends { source?: string }>(boxes: T[], placem
   }
 }
 
+/**
+ * Parses Pickup Kind.
+ */
 export function parsePickupKind(value: unknown): PickupKind | undefined {
   if (value === "ammo" || value === "health" || value === "weapon" || value === "key" ) return value;
   return undefined;
 }
 
+/**
+ * pickup Frame.
+ */
 export function pickupFrame(id: string): PickupFrame {
   return { t: "pickup", id, gone: true };
 }
 
+/**
+ * Loads loadout Frame.
+ */
 export function loadoutFrame(ammo: number, weapon?: string): LoadoutFrame {
   const frame: LoadoutFrame = { t: "loadout", ammo };
   if (weapon) frame.weapon = weapon;
@@ -112,6 +147,9 @@ export function parsePickup(frame: unknown): PickupFrame | undefined {
   return pickupFrame(rec.id);
 }
 
+/**
+ * Parses Loadout.
+ */
 export function parseLoadout(frame: unknown): LoadoutFrame | undefined {
   if (!frame || typeof frame !== "object") return undefined;
   const rec = frame as Record<string, unknown>;
@@ -135,6 +173,9 @@ export function parsePickupSet(value: unknown): string[] | undefined {
   return ids;
 }
 
+/**
+ * capsule Overlaps Aabb.
+ */
 export function capsuleOverlapsAabb(
   x: number,
   y: number,
@@ -181,7 +222,9 @@ export function collectTouches(
   return taken;
 }
 
-/** Per-pawn ammo count and weapon id. In memory, lost on restart. */
+/**
+ * Per-pawn ammo count and weapon id. In memory, lost on restart.
+ */
 export interface PawnKit {
   /** Unknown id reads as 0. Does not create a row. */
   ammoOf(id: number): number;
@@ -195,6 +238,9 @@ export interface PawnKit {
   forget(id: number): void;
 }
 
+/**
+ * Creates Pawn Kit.
+ */
 export function createPawnKit(): PawnKit {
   const ammo = new Map<number, number>();
   const weapon = new Map<number, string>();
@@ -221,7 +267,9 @@ export function createPawnKit(): PawnKit {
   };
 }
 
-/** Remaining placements and the keys each pawn holds. In memory, lost on restart. */
+/**
+ * Remaining placements and the keys each pawn holds. In memory, lost on restart.
+ */
 export interface PickupHost {
   /** Sorted copy of ids not yet taken. */
   remainingIds(): string[];

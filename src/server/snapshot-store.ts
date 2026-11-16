@@ -26,6 +26,9 @@ export type SnapshotStore = {
   clearAll(): SnapJob[];
 };
 
+/**
+ * Creates Snapshot Store.
+ */
 export function createSnapshotStore(): SnapshotStore {
   const byRequester = new Map<number, SnapJob>();
   const byId = new Map<string, SnapJob>();

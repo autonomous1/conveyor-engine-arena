@@ -22,6 +22,9 @@ export interface LaserBeams {
   drop(): void;
 }
 
+/**
+ * Creates Laser Beams.
+ */
 export function createLaserBeams(parent: THREE.Object3D): LaserBeams {
   if ((parent as { isCamera?: boolean }).isCamera) {
     throw new Error("laser line must not be parented to the camera");

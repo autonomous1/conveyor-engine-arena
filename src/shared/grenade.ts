@@ -12,6 +12,9 @@
 import { MAX_HP } from "./health.js";
 import { sweepIndexed, type SweepHit, type TraceAabb, type TraceCapsule, type Vec3 } from "./hitscan.js";
 
+/**
+ * GRENADE INTERVAL MS.
+ */
 export const GRENADE_INTERVAL_MS = 1000;
 /**
  * Finite toss.
@@ -23,7 +26,9 @@ export const GRENADE_SPEED = 24;
  * @why Half of {@link MAX_HP}, because a grenade is harder to land than a laser.
  */
 export const GRENADE_DAMAGE = MAX_HP / 2;
-/** Meters per second squared, subtracted from velocity Y once per host tick. */
+/**
+ * Meters per second squared, subtracted from velocity Y once per host tick.
+ */
 export const GRENADE_GRAVITY = 9.81;
 /**
  * Scales the velocity into the surface.
@@ -44,16 +49,26 @@ export const GRENADE_IMPACT_STANDOFF = 0.08;
  *      shooter's body.
  */
 export const GRENADE_ARMING_S = 0.1;
-/** A miss that never meets a volume is removed after this many seconds. */
+/**
+ * A miss that never meets a volume is removed after this many seconds.
+ */
 export const GRENADE_LIFE_S = 4;
 
-/** `"explode"` detonates on first contact. `"bounce"` is the toss: one bounce, then a stop. */
+/**
+ * `"explode"` detonates on first contact. `"bounce"` is the toss: one bounce, then a stop.
+ */
 export type GrenadeImpact = "explode" | "bounce";
 
+/**
+ * Parses Grenade Impact.
+ */
 export function parseGrenadeImpact(value: unknown): GrenadeImpact | undefined {
   return value === "explode" || value === "bounce" ? value : undefined;
 }
 
+/**
+ * Grenade Frame type.
+ */
 export type GrenadeFrame = {
   t: "grenade";
   v: 1;
@@ -62,10 +77,16 @@ export type GrenadeFrame = {
   pitch: number;
 };
 
+/**
+ * grenade Frame.
+ */
 export function grenadeFrame(seq: number, yaw: number, pitch: number): GrenadeFrame {
   return { t: "grenade", v: 1, seq, yaw, pitch };
 }
 
+/**
+ * Parses Grenade.
+ */
 export function parseGrenade(frame: unknown): GrenadeFrame | undefined {
   if (!frame || typeof frame !== "object") return undefined;
   const rec = frame as Record<string, unknown>;
@@ -76,17 +97,25 @@ export function parseGrenade(frame: unknown): GrenadeFrame | undefined {
   return { t: "grenade", v: 1, seq: rec.seq, yaw: rec.yaw, pitch: rec.pitch };
 }
 
-/** Held throw. Due at most once per {@link GRENADE_INTERVAL_MS}. */
+/**
+ * Held throw. Due at most once per {@link GRENADE_INTERVAL_MS}.
+ */
 export function advanceGrenadeClock(armed: boolean, now: number, nextAt: number): { due: boolean; nextAt: number } {
   if (!armed || !(now >= nextAt)) return { due: false, nextAt };
   return { due: true, nextAt: now + GRENADE_INTERVAL_MS };
 }
 
+/**
+ * Grenade Gate type.
+ */
 export type GrenadeGate = {
   lastSeq: number;
   lastAt: number;
 };
 
+/**
+ * fresh Grenade Gate.
+ */
 export function freshGrenadeGate(): GrenadeGate {
   return { lastSeq: 0, lastAt: Number.NEGATIVE_INFINITY };
 }
@@ -106,7 +135,9 @@ export function admitGrenade(gate: GrenadeGate, seq: number, now: number): "acce
   return "accept";
 }
 
-/** Unit axis of a stop surface: one of ±X, ±Y, or ±Z. */
+/**
+ * Unit axis of a stop surface: one of ±X, ±Y, or ±Z.
+ */
 export type GrenadeSurfaceNormal = [number, number, number];
 
 /**
@@ -166,6 +197,9 @@ export function stopSurfaceNormal(hit: GrenadeHit): Vec3 | undefined {
   return snapSurfaceNormal(hit.normal);
 }
 
+/**
+ * grenade Pose.
+ */
 export function grenadePose(id: number, point: Vec3, yaw: number, stop = false, normal?: Vec3): GrenadePose {
   const pose: GrenadePose = { t: "grenade", id, x: point.x, y: point.y, z: point.z, yaw };
   if (stop) {
@@ -176,6 +210,9 @@ export function grenadePose(id: number, point: Vec3, yaw: number, stop = false, 
   return pose;
 }
 
+/**
+ * Parses Grenade Pose.
+ */
 export function parseGrenadePose(frame: unknown): GrenadePose | undefined {
   if (!frame || typeof frame !== "object") return undefined;
   const rec = frame as Record<string, unknown>;
@@ -193,6 +230,9 @@ export function parseGrenadePose(frame: unknown): GrenadePose | undefined {
   return pose;
 }
 
+/**
+ * Grenade Body type.
+ */
 export type GrenadeBody = {
   id: number;
   owner: number;
@@ -210,6 +250,9 @@ export type GrenadeBody = {
   impact: GrenadeImpact;
 };
 
+/**
+ * Grenade Hit type.
+ */
 export type GrenadeHit = {
   point: Vec3;
   normal: Vec3;
@@ -219,11 +262,17 @@ export type GrenadeHit = {
   surface?: true;
 };
 
+/**
+ * Grenade Step type.
+ */
 export type GrenadeStep =
   | { kind: "fly"; body: GrenadeBody }
   | { kind: "bounce"; body: GrenadeBody; hit: GrenadeHit }
   | { kind: "stop"; body: GrenadeBody; hit: GrenadeHit };
 
+/**
+ * launch Grenade.
+ */
 export function launchGrenade(
   id: number,
   owner: number,

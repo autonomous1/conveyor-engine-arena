@@ -1,5 +1,10 @@
+// ARCHITECTURE: The standalone benchmark runner and its report shape.
+// Wiring: Run from the CLI; it measures hot helpers without the live host.
 import { ExampleApp } from "./app.js";
 
+/**
+ * Bench Report type.
+ */
 export type BenchReport = {
   entities: number;
   ticks: number;
@@ -11,6 +16,9 @@ export type BenchReport = {
   lastHashPrefix: string;
 };
 
+/**
+ * run Bench.
+ */
 export function runBench(opts: { entities?: number; ticks?: number } = {}): BenchReport {
   const entityTarget = opts.entities ?? 1000;
   const ticks = opts.ticks ?? 120;

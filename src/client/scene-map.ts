@@ -43,10 +43,18 @@ export async function loadMapBakeBounds(url = MAP_BAKE_META_URL): Promise<SceneM
     return undefined;
   }
 }
+/**
+ * YAW MATCH DEGREES.
+ */
 export const YAW_MATCH_DEGREES = 5;
+/**
+ * YAW LARGE DEGREES.
+ */
 export const YAW_LARGE_DEGREES = 45;
 
-/** Fill colors for file-yaw error. Match is green, a small gap is yellow, 45° and over is red. */
+/**
+ * Fill colors for file-yaw error. Match is green, a small gap is yellow, 45° and over is red.
+ */
 export const YAW_COLOR = {
   match: "#3dff9a",
   small: "#e6c84a",
@@ -54,12 +62,23 @@ export const YAW_COLOR = {
   unknown: "#8aa0c8",
 } as const;
 
-/** Stroke for the outline turned by the SVG yaw, when it differs from the mesh. */
+/**
+ * Stroke for the outline turned by the SVG yaw, when it differs from the mesh.
+ */
 export const AUTHOR_PROFILE_COLOR = "#7ecbff";
 
+/**
+ * Yaw Mark type.
+ */
 export type YawMark = keyof typeof YAW_COLOR;
+/**
+ * Map Kind type.
+ */
 export type MapKind = "building" | "prop" | "door" | "wall" | "spawn";
 
+/**
+ * Map Anchor type.
+ */
 export type MapAnchor = {
   /** Placement origin. The model origin sits here, not the box center. */
   x: number;
@@ -68,6 +87,9 @@ export type MapAnchor = {
   scale: number;
 };
 
+/**
+ * Map Sample type.
+ */
 export type MapSample = {
   id: string;
   kind: Exclude<MapKind, "spawn">;
@@ -88,14 +110,23 @@ export type MapSample = {
   max: [number, number, number];
 };
 
+/**
+ * Map Spawn type.
+ */
 export type MapSpawn = { id: string; x: number; z: number; yaw: number };
 
+/**
+ * Scene Map World type.
+ */
 export type SceneMapWorld = {
   bounds: { minX: number; maxX: number; minZ: number; maxZ: number };
   samples: readonly MapSample[];
   spawns?: readonly MapSpawn[];
 };
 
+/**
+ * Map Entity type.
+ */
 export type MapEntity = {
   id: string;
   kind: MapKind;
@@ -119,6 +150,9 @@ export type MapEntity = {
   axisZ: [number, number];
 };
 
+/**
+ * Map Layout type.
+ */
 export type MapLayout = {
   width: number;
   height: number;
@@ -138,6 +172,9 @@ export type MapLayout = {
   }>;
 };
 
+/**
+ * Sample Meta type.
+ */
 export type SampleMeta = {
   id: string;
   kind: MapSample["kind"];
@@ -158,6 +195,9 @@ const KIND_RANK: Record<MapKind, number> = {
   spawn: 4,
 };
 
+/**
+ * yaw Mark.
+ */
 export function yawMark(actual: number, expected: number | undefined): YawMark {
   if (expected === undefined || !Number.isFinite(expected) || !Number.isFinite(actual)) return "unknown";
   const delta = Math.abs(Math.atan2(Math.sin(actual - expected), Math.cos(actual - expected)));
@@ -225,6 +265,9 @@ export function collectInstanceSamples(
   }
 }
 
+/**
+ * assemble Scene Map.
+ */
 export function assembleSceneMap(samples: readonly MapSample[], spawns: readonly MapSpawn[] = []): MapEntity[] {
   const groups = new Map<string, MapSample[]>();
   for (const sample of samples) {
@@ -261,6 +304,9 @@ export function assembleSceneMap(samples: readonly MapSample[], spawns: readonly
   return entities;
 }
 
+/**
+ * layout Scene Map.
+ */
 export function layoutSceneMap(world: SceneMapWorld, width = SCENE_MAP_SIZE, height = SCENE_MAP_SIZE): MapLayout | undefined {
   const { bounds } = world;
   const frame = mapFrame(bounds, width, height);
@@ -295,6 +341,9 @@ export function layoutSceneMap(world: SceneMapWorld, width = SCENE_MAP_SIZE, hei
   };
 }
 
+/**
+ * hit Scene Map.
+ */
 export function hitSceneMap(layout: MapLayout, px: number, py: number): MapLayout["entities"][number] | undefined {
   const [x, z] = layout.toWorld(px, py);
   for (let index = layout.entities.length - 1; index >= 0; index -= 1) {
@@ -309,6 +358,9 @@ export function hitSceneMap(layout: MapLayout, px: number, py: number): MapLayou
   return undefined;
 }
 
+/**
+ * Map Draw type.
+ */
 export type MapDraw = {
   clear(): void;
   polygon(points: Array<[number, number]>, fill: string, stroke: string): void;
@@ -319,6 +371,9 @@ export type MapDraw = {
   text(text: string, x: number, y: number, align: "center" | "left" | "right"): void;
 };
 
+/**
+ * paint Scene Map.
+ */
 export function paintSceneMap(layout: MapLayout, draw: MapDraw): void {
   draw.clear();
   draw.polygon(layout.floor, "", "rgba(255,255,255,0.45)");
@@ -354,6 +409,9 @@ export function paintSceneMap(layout: MapLayout, draw: MapDraw): void {
   draw.text("+X", layout.plusX[0], layout.plusX[1], "right");
 }
 
+/**
+ * Scene Map type.
+ */
 export type SceneMap = {
   /** False until setVisible(true). The panel stays in document.body. */
   readonly visible: boolean;
@@ -369,6 +427,9 @@ export type SceneMap = {
   setPlayers(players: readonly OtherPlayer[]): void;
 };
 
+/**
+ * Creates Scene Map.
+ */
 export function createSceneMap(): SceneMap {
   const root = document.createElement("div");
   root.id = "scene-map";

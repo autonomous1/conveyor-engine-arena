@@ -1,3 +1,5 @@
+// ARCHITECTURE: The example application loop that exercises the browser-side arena pieces.
+// Wiring: Entry/demo code; it composes the client pieces rather than the live host.
 import { EngineClient, type IncomingSnapshot } from "conveyor-engine-client";
 import type { ClientId, EntityId, Tick } from "conveyor-engine-core";
 import { InputGateway, Replicator, type SnapshotEnvelope } from "conveyor-engine-replication";
@@ -15,6 +17,9 @@ import { AuthoritativeWorld, applyStaticWorldDefinition } from "conveyor-engine-
 import { resolvePresentation, visualAssetFromManifest } from "conveyor-engine-assets";
 import { ARENA_PAWN_HEIGHT, arenaStaticWorld, arenaVisualGlb } from "./arena-assets.js";
 
+/**
+ * Example Client type.
+ */
 export type ExampleClient = {
   id: ClientId;
   pawn: EntityId;
@@ -25,6 +30,9 @@ export type ExampleClient = {
   presentation?: PresentationRuntime;
 };
 
+/**
+ * Example Diagnostics type.
+ */
 export type ExampleDiagnostics = {
   tick: Tick;
   entityCount: number;

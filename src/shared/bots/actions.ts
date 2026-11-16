@@ -34,6 +34,9 @@ const ACT_S = 0.5;
 /** Smallest positive route, in metres, when a stand point is already the anchor. */
 const MIN_M = 0.5;
 
+/**
+ * Bot Ctx type.
+ */
 export type BotCtx = {
   graph: SceneGraph;
   /** Metres. Infinite when no route exists under the simulated door state. */
@@ -55,6 +58,9 @@ type Point = { x: number; y: number; z: number };
 
 type DoorBit = { id: string; locked: boolean };
 
+/**
+ * Creates Bot Context.
+ */
 export function createBotContext(
   graph: SceneGraph,
   pickups: readonly PickupPlacement[] = [],

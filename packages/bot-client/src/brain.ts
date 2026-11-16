@@ -2,6 +2,8 @@
  * 20 Hz executor. A GOAP plan becomes a route, a grid path, and world-space inputs.
  * Node-free: the same loop can run in the browser. The CLI owns sockets and argv.
  */
+// ARCHITECTURE: The bot executor: goal claim, GOAP plan, route, walk, use, ride, and pickup state machine.
+// Wiring: runMission/runBrain from the CLI and live tests; it drives BotSession input/world.
 import type { BotCtx } from "../../../src/shared/bots/actions.js";
 import { createBotContext, estimateSeconds, groundActions } from "../../../src/shared/bots/actions.js";
 import type { Fact, Goal, Plan, PlanOptions, WorldState } from "../../../src/shared/bots/goap.js";
@@ -32,6 +34,10 @@ const USE_WAIT_MS = 1_000;
 const PICKUP_WAIT_MS = 2_000;
 const NO_GRAPH = "no scene graph (token lacks scene-graph scope?)";
 
+/**
+ * Mission tuning: timeout, local prediction, log sinks, planner expansion caps,
+ * and the per-plan budget.
+ */
 export type BrainOptions = {
   timeoutMs?: number;
   /** Integrate inputs locally. Default on. The browser client stays as it is. */
@@ -71,7 +77,9 @@ type UseState = {
   secondAt: number;
 };
 
-/** Run one goal, or loop a patrol until the timeout. Exit 0 met, 2 no plan, 3 timeout. */
+/**
+ * Run one goal, or loop a patrol until the timeout. Exit 0 met, 2 no plan, 3 timeout.
+ */
 export async function runMission(session: BotSession, mission: Mission, opts: BrainOptions = {}): Promise<number> {
   if (mission.kind === "goal") return runBrain(session, mission.goal, opts);
   if (mission.kind === "stand") return runBrain(session, standAt(mission.target), opts);
@@ -87,6 +95,10 @@ export async function runMission(session: BotSession, mission: Mission, opts: Br
   return 3;
 }
 
+/**
+ * Wait until this pawn owns `key` in the host claim table.
+ * @post True when owned (and renews every 10 s while owned); false at the deadline.
+ */
 export async function claimGoal(
   session: BotSession,
   key: string,
@@ -114,6 +126,11 @@ export async function claimGoal(
   }
 }
 
+/**
+ * Claim the goal id when the host supports claims, run the executor, and release
+ * the claim on every exit.
+ * @post 0 met, 2 no plan/target, 3 timeout or lost claim.
+ */
 export async function runBrain(session: BotSession, goal: Goal, opts: BrainOptions = {}): Promise<number> {
   const key = goal.id;
   const supported = session.world.claimsSupported?.() === true;

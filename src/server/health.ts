@@ -21,7 +21,9 @@ export function clientSeesPawn(server: EngineWsServer, clientId: number, entity:
 /** Last `hp|dead` sent per client session and pawn. A new session (welcome) starts empty. */
 const sentHealth = new WeakMap<EngineWsServer, Map<number, { sessionId: number; rows: Map<number, string> }>>();
 
-/** Sent-state for this client's current session. Drops clients that are gone. */
+/**
+ * Sent-state for this client's current session. Drops clients that are gone.
+ */
 export function sentFor<T>(
   cache: WeakMap<EngineWsServer, Map<number, { sessionId: number } & T>>,
   server: EngineWsServer,

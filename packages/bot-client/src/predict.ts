@@ -2,6 +2,8 @@
  * Bot pose. Inputs are world-space: `wishPlanar` integrates `moveX` / `moveZ`
  * directly, the same frame the host uses. The browser client is unchanged.
  */
+// ARCHITECTURE: The bot's own motion predictor using the host's movement functions.
+// Wiring: The brain advances it from world.self(); it is not the browser EngineClient.
 import {
   MOVE_DT,
   approachVelocity,
@@ -10,6 +12,9 @@ import {
   type FloorBox,
 } from "../../../src/shared/movements.js";
 
+/**
+ * Predicted feet plus planar velocity and yaw; the y is the floor under the move.
+ */
 export type PredictPose = {
   x: number;
   y: number;
@@ -19,11 +24,17 @@ export type PredictPose = {
   yaw: number;
 };
 
+/**
+ * The host snapshot pose the predictor pulls toward.
+ */
 export type AuthoritativePose = { x: number; y: number; z: number; yaw: number };
 
 const SNAP_M = 1;
 const BLEND = 0.2;
 
+/**
+ * The bot's motion model: snap above 1 m error, blend 20% otherwise.
+ */
 export type MotionPredictor = {
   readonly predictOwned: boolean;
   pose(): PredictPose | undefined;
@@ -40,6 +51,9 @@ export type MotionPredictor = {
   ): PredictPose | undefined;
 };
 
+/**
+ * Create a predictor; false makes advance() copy authority exactly.
+ */
 export function createMotionPredictor(predictOwned = true): MotionPredictor {
   let pose: PredictPose | undefined;
   return {

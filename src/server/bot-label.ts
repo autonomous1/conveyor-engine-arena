@@ -15,7 +15,9 @@ import { clientSeesPawn, sentFor } from "./health.js";
 
 const sentLabels = new WeakMap<EngineWsServer, Map<number, { sessionId: number; rows: Map<number, string> }>>();
 
-/** One label per bot this client can see, and only when that session has not seen the text. */
+/**
+ * One label per bot this client can see, and only when that session has not seen the text.
+ */
 export function deliverBotLabelFrames(
   server: EngineWsServer,
   clientIds: Iterable<number>,
@@ -37,11 +39,17 @@ export function deliverBotLabelFrames(
   }
 }
 
+/**
+ * Bot Label Host type.
+ */
 export type BotLabelHost = {
   /** Once per host tick, after the brain. Flag off returns before any string. */
   update(): void;
 };
 
+/**
+ * Bot Label Host Options type.
+ */
 export type BotLabelHostOptions = {
   /** False returns before any of the other fields are read. */
   enabled: boolean;
@@ -56,6 +64,9 @@ export type BotLabelHostOptions = {
 
 const IDLE: BotLabelHost = { update() {} };
 
+/**
+ * Creates Bot Label Host.
+ */
 export function createBotLabelHost(opts: BotLabelHostOptions): BotLabelHost {
   if (opts.enabled !== true) return IDLE;
   const seenTick = new Map<number, number>();

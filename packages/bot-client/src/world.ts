@@ -2,6 +2,8 @@
  * Arena world model for a connected bot. No Node builtins and no WebSocket.
  * Snapshots supply pawn poses. Arena frames supply doors, keys, and the scene graph.
  */
+// ARCHITECTURE: The bot's arena model: pawns, doors, elevators, pickups, claims, scene graph, and regions.
+// Wiring: connection.ts builds it from welcome/frames; the brain reads it.
 import type { ArenaView } from "../../../src/shared/arena-view.js";
 import type { ClaimRow } from "../../../src/shared/bot-protocol.js";
 import { yawFromQuat } from "../../../src/shared/look.js";
@@ -9,6 +11,9 @@ import type { PickupKind, PickupPlacement } from "../../../src/shared/pickups.js
 import { parseBakedRegions, type BakedRegionsFile } from "../../../src/shared/nav/regions.js";
 import { placeAt, parseSceneGraph, type CabState, type SceneGraph } from "../../../src/shared/scene-graph.js";
 
+/**
+ * One replicated pawn: feet, yaw, id, and the kernel entity kind.
+ */
 export type PawnPose = {
   id: number;
   x: number;
@@ -18,13 +23,24 @@ export type PawnPose = {
   kind: string;
 };
 
+/**
+ * Open/locked bits for one door id.
+ */
 export type DoorState = { id: string; open: boolean; locked: boolean };
 
+/**
+ * Last-arrived stop, floor y, and door state for one cab.
+ */
 export type ElevatorCab = { id: string; y: number; doorsOpen: boolean; stop: number };
 
+/**
+ * One static arena collision box from arena.json.
+ */
 export type WorldAabb = ArenaView["aabbs"][number];
 
-/** Leaf geometry from `arena.json`. Open and locked live on `door()`. */
+/**
+ * Leaf geometry from `arena.json`. Open and locked live on `door()`.
+ */
 export type DoorBody = {
   id: string;
   model: string;
@@ -35,6 +51,9 @@ export type DoorBody = {
   key?: string;
 };
 
+/**
+ * The subset of arena.json the bot world needs to initialize.
+ */
 export type WorldView = {
   aabbs?: readonly WorldAabb[];
   doors?: ArenaView["doors"];
@@ -58,6 +77,9 @@ type WorldPickup = {
   maxZ?: number;
 };
 
+/**
+ * Per-client welcome state: pickups, doors, keys, role, scope, elevators, claims.
+ */
 export type WelcomeState = {
   pickups: readonly string[];
   doors: readonly DoorState[];
@@ -70,12 +92,18 @@ export type WelcomeState = {
   scope?: readonly string[];
 };
 
+/**
+ * The spawn/update/despawn rows of one replicated snapshot.
+ */
 export type PoseSnapshot = {
   spawns?: readonly { entity: unknown; view?: unknown }[];
   updates?: readonly { entity: unknown; view?: unknown }[];
   despawns?: readonly { entity: unknown }[];
 };
 
+/**
+ * The bot's mutable arena model and the accessors the brain reads each tick.
+ */
 export type BotWorld = {
   readonly aabbs: readonly WorldAabb[];
   readonly playerSpawns: readonly { id: string; x: number; z: number; yaw: number }[];
@@ -124,6 +152,9 @@ export type BotWorld = {
   applySnapshot(snap: PoseSnapshot): void;
 };
 
+/**
+ * Create an empty world from arena.json; welcome and frames fill it.
+ */
 export function createBotWorld(view: WorldView): BotWorld {
   let regions: BakedRegionsFile | undefined;
   let regionsHash: string | undefined;

@@ -5,13 +5,21 @@
 // WebSocket hello gate. The access key arrives in `auth`. `token` stays the reconnect token.
 import { AuthError, isRole, verify, type Claims, type RevocationList } from "./tokens.js";
 
+/**
+ * Auth Mode type.
+ */
 export type AuthMode = "off" | "required";
 
-/** `"required"` only when ARENA_AUTH is exactly `required`. Anything else is off. */
+/**
+ * `"required"` only when ARENA_AUTH is exactly `required`. Anything else is off.
+ */
 export function authMode(env: NodeJS.ProcessEnv = process.env): AuthMode {
   return env.ARENA_AUTH === "required" ? "required" : "off";
 }
 
+/**
+ * Hello Auth type.
+ */
 export type HelloAuth =
   | { ok: true; claims?: Claims }
   | { ok: false; code: 4401 | 4403; reason: string };
@@ -41,6 +49,9 @@ export async function checkHelloAuth(
   }
 }
 
+/**
+ * Bearer Auth type.
+ */
 export type BearerAuth =
   | { ok: true; claims: Claims }
   | { ok: false; status: 401 | 403 };

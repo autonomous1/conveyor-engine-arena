@@ -9,8 +9,14 @@
 import { elevatorPolygonBounds } from "../shared/elevators.ts";
 import type { MapFrame } from "../shared/map-frame.ts";
 
+/**
+ * Self Pose type.
+ */
 export type SelfPose = { x: number; y: number; z: number; yaw: number };
 
+/**
+ * Self Marker type.
+ */
 export type SelfMarker = {
   /** Dot centre in panel pixels. */
   center: [number, number];
@@ -20,13 +26,34 @@ export type SelfMarker = {
   wedge: [[number, number], [number, number], [number, number]];
 };
 
+/**
+ * SELF DOT R.
+ */
 export const SELF_DOT_R = 5;
+/**
+ * SELF WEDGE LEN.
+ */
 export const SELF_WEDGE_LEN = 13;
+/**
+ * SELF COLOR.
+ */
 export const SELF_COLOR = "#ff4d4d";
+/**
+ * SELF LABEL COLOR.
+ */
 export const SELF_LABEL_COLOR = "#ff9c9c";
+/**
+ * OTHER PLAYER COLOR.
+ */
 export const OTHER_PLAYER_COLOR = "#ffd84d";
+/**
+ * OTHER DOT R.
+ */
 export const OTHER_DOT_R = 4;
 
+/**
+ * Other Player type.
+ */
 export type OtherPlayer = { id: number; x: number; z: number };
 
 /**
@@ -55,6 +82,9 @@ export function playersMoved(prev: readonly OtherPlayer[], next: readonly OtherP
   return false;
 }
 
+/**
+ * self Marker.
+ */
 export function selfMarker(frame: Pick<MapFrame, "toPixel">, pose: SelfPose): SelfMarker {
   const center = frame.toPixel(pose.x, pose.z);
   // World forward (sin, cos) on XZ; pixel y grows with world z.
@@ -76,9 +106,14 @@ export function selfMarker(frame: Pick<MapFrame, "toPixel">, pose: SelfPose): Se
   };
 }
 
+/**
+ * Floor Source type.
+ */
 export type FloorSource = { polygon: ReadonlyArray<readonly [number, number]>; stops: readonly number[] };
 
-/** Elevator cabs within this XZ distance count as the player's building. */
+/**
+ * Elevator cabs within this XZ distance count as the player's building.
+ */
 export const FLOOR_LIFT_REACH_M = 30;
 
 /**
@@ -108,7 +143,9 @@ export function floorLabel(pose: Pick<SelfPose, "x" | "y" | "z">, lifts: readonl
   return `y ${pose.y.toFixed(1)}m`;
 }
 
-/** True when the marker should be repainted. */
+/**
+ * True when the marker should be repainted.
+ */
 export function selfMoved(prev: SelfPose | undefined, next: SelfPose, label: string, prevLabel: string): boolean {
   if (!prev || label !== prevLabel) return true;
   const turn = Math.abs(Math.atan2(Math.sin(next.yaw - prev.yaw), Math.cos(next.yaw - prev.yaw)));

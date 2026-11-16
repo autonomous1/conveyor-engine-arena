@@ -27,8 +27,14 @@ import { AMMO_PICKUP, HEALTH_PICKUP, parsePickupKind, type PickupPlacement } fro
 import { interpretPlacements } from "./placements-file.js";
 import { SHADOW_QUALITIES, type ShadowQuality } from "../shared/shadows.js";
 
+/**
+ * Game Issue type.
+ */
 export type GameIssue = { path: string; message: string };
 
+/**
+ * Game Manifest Error.
+ */
 export class GameManifestError extends Error {
   readonly issues: GameIssue[];
   constructor(issues: GameIssue[]) {
@@ -38,6 +44,9 @@ export class GameManifestError extends Error {
   }
 }
 
+/**
+ * Compiled Game type.
+ */
 export type CompiledGame = {
   view: ArenaView;
   definition: StaticWorldDefinition;
@@ -830,14 +839,23 @@ function visualLayoutBytes(): Uint8Array {
   });
 }
 
+/**
+ * Placement Ref type.
+ */
 export type PlacementRef = { file: string; path: string };
 
+/**
+ * Placement File Source type.
+ */
 export type PlacementFileSource = {
   /** Path as written in `scene.placements`. */
   path: string;
   text: string;
 };
 
+/**
+ * Compile Sources type.
+ */
 export type CompileSources = {
   /** One entry per placements path, in manifest order. */
   placementFiles?: PlacementFileSource[];
@@ -1476,6 +1494,9 @@ function pushCollision(items: unknown[], pathFor: (index: number) => string, iss
   });
 }
 
+/**
+ * compile Game.
+ */
 export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | undefined, sources?: CompileSources): CompiledGame {
   const issues: GameIssue[] = [];
   if (!isObject(doc)) throw new GameManifestError([{ path: "$", message: "manifest must be an object" }]);

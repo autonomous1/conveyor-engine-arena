@@ -89,6 +89,9 @@ export type AudioContextLike = {
   suspend(): Promise<void>;
 };
 
+/**
+ * Sfx Options type.
+ */
 export type SfxOptions = {
   sounds?: ArenaSounds;
   /** Returns the file bytes. Default `fetch(uri)`. */
@@ -99,6 +102,9 @@ export type SfxOptions = {
   onError?: (err: unknown, effect: ArenaSoundName | "context") => void;
 };
 
+/**
+ * Point type.
+ */
 export type Point = { x: number; y: number; z: number };
 
 /**
@@ -141,7 +147,9 @@ function setParam(param: ParamLike | undefined, value: number): void {
   if (param && param.value !== value) param.value = value;
 }
 
-/** One Web Audio context. Files are fetched up front and decoded after unlock. */
+/**
+ * One Web Audio context. Files are fetched up front and decoded after unlock.
+ */
 export interface Sfx {
   /** Fetches each file. A bad file calls onError and turns that effect off. Never rejects. */
   load(): Promise<void>;
@@ -180,6 +188,9 @@ export interface Sfx {
   stopAll(): void;
 }
 
+/**
+ * Creates Sfx.
+ */
 export function createSfx(opts: SfxOptions = {}): Sfx {
   const fetchBytes = opts.fetchBytes ?? defaultFetch;
   const makeContext = opts.createContext ?? defaultContext;
@@ -524,6 +535,9 @@ export interface EchoDedupe {
   clear(): void;
 }
 
+/**
+ * Creates Echo Dedupe.
+ */
 export function createEchoDedupe(windowMs = 1000, capacity = 8): EchoDedupe {
   const at = new Float64Array(capacity);
   let head = 0;

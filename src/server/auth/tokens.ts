@@ -7,10 +7,22 @@ import { importPKCS8, importSPKI, jwtVerify, SignJWT } from "jose";
 import { randomUUID } from "node:crypto";
 import { readFileSync, statSync } from "node:fs";
 
+/**
+ * ROLES.
+ */
 export const ROLES = ["player", "bot", "qa", "admin"] as const;
+/**
+ * Role type.
+ */
 export type Role = (typeof ROLES)[number];
 
+/**
+ * SCOPES.
+ */
 export const SCOPES = ["play", "spectate", "scene-graph", "qa", "teleport", "chat", "voice", "admin"] as const;
+/**
+ * Scope type.
+ */
 export type Scope = (typeof SCOPES)[number];
 
 /**
@@ -24,6 +36,9 @@ export const DEFAULT_SCOPES: Record<Role, readonly Scope[]> = {
   admin: SCOPES,
 };
 
+/**
+ * Claims type.
+ */
 export type Claims = {
   sub: string;
   role: Role;
@@ -33,15 +48,23 @@ export type Claims = {
   exp: number;
 };
 
+/**
+ * Auth Error Code type.
+ */
 export type AuthErrorCode = "expired" | "bad-signature" | "revoked" | "bad-claims";
 
 const ISSUER = "ce-arena";
 const AUDIENCE = "ce-arena";
 const CLOCK_TOLERANCE_S = 30;
 
-/** Minimum time between revocation-file mtime checks. */
+/**
+ * Minimum time between revocation-file mtime checks.
+ */
 export const REVOCATION_RELOAD_MS = 5_000;
 
+/**
+ * Auth Error.
+ */
 export class AuthError extends Error {
   readonly code: AuthErrorCode;
 
@@ -52,10 +75,16 @@ export class AuthError extends Error {
   }
 }
 
+/**
+ * True when is Role.
+ */
 export function isRole(value: unknown): value is Role {
   return typeof value === "string" && (ROLES as readonly string[]).includes(value);
 }
 
+/**
+ * True when is Scope.
+ */
 export function isScope(value: unknown): value is Scope {
   return typeof value === "string" && (SCOPES as readonly string[]).includes(value);
 }
@@ -74,14 +103,23 @@ export function resolvedScopes(role: Role, extra?: readonly Scope[]): Scope[] {
   return merged;
 }
 
+/**
+ * Loads Signer.
+ */
 export async function loadSigner(privateKeyFile: string): Promise<CryptoKey> {
   return importPKCS8(readFileSync(privateKeyFile, "utf8"), "EdDSA");
 }
 
+/**
+ * Loads Verifier.
+ */
 export async function loadVerifier(publicKeyFile: string): Promise<CryptoKey> {
   return importSPKI(readFileSync(publicKeyFile, "utf8"), "EdDSA");
 }
 
+/**
+ * mint.
+ */
 export async function mint(
   key: CryptoKey,
   claims: { sub: string; role: Role; scope?: readonly Scope[]; ttlS: number },
@@ -105,6 +143,9 @@ export async function mint(
   return { token, jti, exp };
 }
 
+/**
+ * verify.
+ */
 export async function verify(
   pub: CryptoKey,
   token: string,
@@ -128,6 +169,9 @@ export async function verify(
   return toClaims(payload);
 }
 
+/**
+ * Revocation List type.
+ */
 export type RevocationList = { has(jti: string): boolean };
 
 /**

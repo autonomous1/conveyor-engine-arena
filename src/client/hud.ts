@@ -21,7 +21,9 @@ export function localHealthLabel(vital: { hp: number; dead: boolean } | undefine
   return `hp ${hp}`;
 }
 
-/** Status, crosshair, inspect line, and stats, appended to document.body. Hidden creation ignores F3. */
+/**
+ * Status, crosshair, inspect line, and stats, appended to document.body. Hidden creation ignores F3.
+ */
 export interface Hud {
   /** Status text. Still written when the bar is hidden. */
   setStatus(text: string): void;
@@ -44,6 +46,9 @@ export interface Hud {
   copyInfo(id: string): void;
 }
 
+/**
+ * Creates Hud.
+ */
 export function createHud(opts?: { hidden?: boolean }): Hud {
   const status = document.createElement("div");
   status.id = "status";

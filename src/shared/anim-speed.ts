@@ -7,8 +7,13 @@
 // Wiring: client/presentation.ts selects and plays the clips; nothing here runs
 //   on the host.
 
-/** Clamp used when an animation entry omits `minTimeScale` / `maxTimeScale`. */
+/**
+ * Clamp used when an animation entry omits `minTimeScale` / `maxTimeScale`.
+ */
 export const DEFAULT_MIN_TIME_SCALE = 0.25;
+/**
+ * DEFAULT MAX TIME SCALE.
+ */
 export const DEFAULT_MAX_TIME_SCALE = 2.5;
 
 /**
@@ -22,6 +27,9 @@ export const GROUND_SPEED_TAU = 0.15;
  */
 export const GROUND_SPEED_TELEPORT = 25;
 
+/**
+ * Clip Rate type.
+ */
 export type ClipRate = {
   /** Meters per second the feet travel at 1x, measured on the unscaled model (Blender). */
   referenceSpeed?: number;
@@ -45,8 +53,14 @@ export function clipTimeScale(groundSpeed: number, rate: ClipRate | undefined, m
   return Math.min(max, Math.max(min, raw));
 }
 
+/**
+ * Ground Speed type.
+ */
 export type GroundSpeed = { x: number; z: number; speed: number; seen: boolean };
 
+/**
+ * fresh Ground Speed.
+ */
 export function freshGroundSpeed(): GroundSpeed {
   return { x: 0, z: 0, speed: 0, seen: false };
 }
@@ -74,7 +88,9 @@ export function noteGroundSpeed(state: GroundSpeed, x: number, z: number, dt: nu
   return state.speed;
 }
 
-/** Fraction below the walk-to-run speed that a running pawn must drop to before walking again. */
+/**
+ * Fraction below the walk-to-run speed that a running pawn must drop to before walking again.
+ */
 export const GAIT_HYSTERESIS = 0.15;
 
 /**

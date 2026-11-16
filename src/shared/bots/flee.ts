@@ -9,7 +9,9 @@
  */
 export type FleeVec = { readonly x: number; readonly y: number; readonly z: number };
 
-/** One baked region centre. */
+/**
+ * One baked region centre.
+ */
 export type FleeCentre = {
   readonly placeId: string;
   readonly x: number;
@@ -17,6 +19,9 @@ export type FleeCentre = {
   readonly z: number;
 };
 
+/**
+ * Flee Tuning type.
+ */
 export type FleeTuning = {
   /** Drop a centre whose path cost from me is above this. */
   maxPathM: number;
@@ -81,6 +86,9 @@ export const FLEE_TUNING: Readonly<FleeTuning> = Object.freeze({
   wAmmo: 0,
 });
 
+/**
+ * Flee Input type.
+ */
 export type FleeInput = {
   me: FleeVec;
   myPlace: string;
@@ -104,6 +112,9 @@ export type FleeInput = {
   hasAmmo?: (centre: FleeCentre) => boolean;
 };
 
+/**
+ * Flee Choice type.
+ */
 export type FleeChoice = {
   placeId: string;
   x: number;

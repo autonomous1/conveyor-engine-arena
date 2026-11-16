@@ -16,29 +16,52 @@
  * Look reads LeftX and LeftY with no extra negate.
  */
 export const JUMPER_MOVE_X = 3;
+/**
+ * JUMPER MOVE Y.
+ */
 export const JUMPER_MOVE_Y = 2;
+/**
+ * JUMPER LOOK X.
+ */
 export const JUMPER_LOOK_X = 0;
+/**
+ * JUMPER LOOK Y.
+ */
 export const JUMPER_LOOK_Y = 1;
 
+/**
+ * jumper Stick.
+ */
 export function jumperStick(yAxis: number, sample: { x: number; y: number }): { x: number; y: number } {
   if (yAxis === JUMPER_MOVE_Y) return { x: -sample.x, y: -sample.y };
   return { x: sample.x, y: sample.y };
 }
 
+/**
+ * EYE HEIGHT.
+ */
 export const EYE_HEIGHT = 1.6;
+/**
+ * INPUT HZ.
+ */
 export const INPUT_HZ = 20;
 /**
  * @why Stay under ±90° so the look target does not cross the up axis.
  */
 export const PITCH_LIMIT = 1.35;
 
+/**
+ * clamp Pitch.
+ */
 export function clampPitch(pitch: number): number {
   if (pitch > PITCH_LIMIT) return PITCH_LIMIT;
   if (pitch < -PITCH_LIMIT) return -PITCH_LIMIT;
   return pitch;
 }
 
-/** Mouse right turns right. Mouse down looks down. */
+/**
+ * Mouse right turns right. Mouse down looks down.
+ */
 export function lookFromMouse(movementX: number, movementY: number, sensitivity = 0.0022): { yaw: number; pitch: number } {
   return { yaw: -movementX * sensitivity, pitch: -movementY * sensitivity };
 }
@@ -52,6 +75,9 @@ export function axesFromStick(stickX: number, stickY: number): { strafe: number;
   return { strafe: stickX, forward: -stickY };
 }
 
+/**
+ * look From Stick.
+ */
 export function lookFromStick(stickX: number, stickY: number, dt: number, yawRate: number, pitchRate: number): { yaw: number; pitch: number } {
   return { yaw: -stickX * yawRate * dt, pitch: -stickY * pitchRate * dt };
 }
@@ -75,16 +101,24 @@ export function moveIntent(yaw: number, forward: number, strafe: number): { move
   return { moveX: rx * s + fx * f, moveZ: rz * s + fz * f };
 }
 
+/**
+ * yaw From Quat.
+ */
 export function yawFromQuat(rotation: { y: number; w: number }): number {
   return 2 * Math.atan2(rotation.y, rotation.w);
 }
 
-/** Unit look direction. Yaw 0 pitch 0 is world +Z. Positive pitch looks up. */
+/**
+ * Unit look direction. Yaw 0 pitch 0 is world +Z. Positive pitch looks up.
+ */
 export function aimDirection(yaw: number, pitch: number): { x: number; y: number; z: number } {
   const cp = Math.cos(pitch);
   return { x: Math.sin(yaw) * cp, y: Math.sin(pitch), z: Math.cos(yaw) * cp };
 }
 
+/**
+ * eye Look.
+ */
 export function eyeLook(
   pawn: { x: number; y: number; z: number },
   yaw: number,
@@ -141,13 +175,25 @@ export function eyeLook(
  */
 export const GAMEPAD_PROFILE_STORAGE_KEY = "arena.gamepadProfile.v1";
 
+/**
+ * LOOK YAW RATE.
+ */
 export const LOOK_YAW_RATE = 2.4;
+/**
+ * LOOK PITCH RATE.
+ */
 export const LOOK_PITCH_RATE = 1.8;
 
 const MOVE_KEYS = ["KeyW", "KeyA", "KeyS", "KeyD", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"];
 
+/**
+ * Gamepad Profile Name type.
+ */
 export type GamepadProfileName = "standard" | "jumper-t";
 
+/**
+ * Gamepad Bindings type.
+ */
 export type GamepadBindings = {
   fire?: number;
   grenade?: number;
@@ -192,15 +238,24 @@ export function gamepadBindings(profile: GamepadProfileName): GamepadBindings {
   };
 }
 
+/**
+ * Profile Storage type.
+ */
 export type ProfileStorage = {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
 };
 
+/**
+ * True when is Move Key.
+ */
 export function isMoveKey(code: string): boolean {
   return MOVE_KEYS.includes(code);
 }
 
+/**
+ * keyboard Move.
+ */
 export function keyboardMove(held: { has(code: string): boolean }): { forward: number; strafe: number } {
   const forward = (held.has("KeyW") || held.has("ArrowUp") ? 1 : 0) - (held.has("KeyS") || held.has("ArrowDown") ? 1 : 0);
   const strafe = (held.has("KeyD") || held.has("ArrowRight") ? 1 : 0) - (held.has("KeyA") || held.has("ArrowLeft") ? 1 : 0);
@@ -215,6 +270,9 @@ export function gamepadProfileFromStored(value: string | null | undefined): Game
   return "standard";
 }
 
+/**
+ * Loads Gamepad Profile.
+ */
 export function loadGamepadProfile(storage: ProfileStorage | null | undefined): GamepadProfileName {
   if (!storage) return "standard";
   try {
@@ -224,6 +282,9 @@ export function loadGamepadProfile(storage: ProfileStorage | null | undefined): 
   }
 }
 
+/**
+ * Saves Gamepad Profile.
+ */
 export function saveGamepadProfile(storage: ProfileStorage | null | undefined, profile: GamepadProfileName): void {
   if (!storage) return;
   try {
@@ -233,6 +294,9 @@ export function saveGamepadProfile(storage: ProfileStorage | null | undefined, p
   }
 }
 
+/**
+ * next Gamepad Profile.
+ */
 export function nextGamepadProfile(profile: GamepadProfileName): GamepadProfileName {
   return profile === "standard" ? "jumper-t" : "standard";
 }
@@ -283,6 +347,9 @@ export function gamepadLook(
   return { yaw: look.yaw, pitch: -look.pitch };
 }
 
+/**
+ * sample Move.
+ */
 export function sampleMove(
   profile: GamepadProfileName,
   held: { has(code: string): boolean },

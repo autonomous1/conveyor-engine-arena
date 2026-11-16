@@ -11,18 +11,31 @@ import * as THREE from "three";
 import { parseBotLabel } from "../shared/bot-label.js";
 import type { ClientDiag } from "./diag.js";
 
-/** Canvas pixels. The sprite is this aspect in the world. */
+/**
+ * Canvas pixels. The sprite is this aspect in the world.
+ */
 export const LABEL_W = 128;
+/**
+ * LABEL H.
+ */
 export const LABEL_H = 32;
-/** Metres from the top of the pawn (its height) up to the label centre. */
+/**
+ * Metres from the top of the pawn (its height) up to the label centre.
+ */
 export const LABEL_ABOVE_M = 0.4;
 /**
  * World metres. Width matches the 128×32 canvas.
  * @why Height 0.4 reads at about 10–20 m with the play camera.
  */
 export const LABEL_SCALE_X = 1.6;
+/**
+ * LABEL SCALE Y.
+ */
 export const LABEL_SCALE_Y = 0.4;
 
+/**
+ * Bot Label Layer type.
+ */
 export type BotLabelLayer = {
   setEnabled(on: boolean): void;
   /** Ignored while the option is off. A bad frame is logged and dropped. */
@@ -66,6 +79,9 @@ function paint(canvas: LabelCanvas, text: string): void {
   ctx.fillText(text, LABEL_W / 2, LABEL_H / 2);
 }
 
+/**
+ * Creates Bot Label Layer.
+ */
 export function createBotLabelLayer(
   parent: THREE.Object3D,
   pawnHeight: number,

@@ -13,6 +13,9 @@ const MAX_KEYS = 32;
 const SUMMARY_EVERY = 32;
 const MAX_TEXT = 160;
 
+/**
+ * Diag Fields type.
+ */
 export type DiagFields = {
   source: string;
   messageType?: string;
@@ -38,6 +41,9 @@ export type DiagFields = {
   simTick?: number | bigint;
 };
 
+/**
+ * Diag Report type.
+ */
 export type DiagReport = {
   level: "error" | "warn";
   /** Thrown value when one exists. A parse fault is rewritten so the payload is not logged. */
@@ -45,13 +51,22 @@ export type DiagReport = {
   fields: DiagFields;
 };
 
+/**
+ * Diag Record type.
+ */
 export type DiagRecord = Record<string, string | number>;
 
+/**
+ * Diag Sink type.
+ */
 export type DiagSink = {
   error(error: unknown, fields: DiagRecord): void;
   warn(fields: DiagRecord): void;
 };
 
+/**
+ * Client Diag type.
+ */
 export type ClientDiag = {
   report(event: DiagReport): void;
 };
@@ -96,6 +111,9 @@ function label(value: string | number | undefined): string | number {
   return boundLabel(value) ?? UNKNOWN;
 }
 
+/**
+ * present Diag.
+ */
 export function presentDiag(fields: DiagFields): DiagRecord {
   const sim = fields.simTick;
   return {
@@ -148,6 +166,9 @@ function faultKey(level: string, fields: DiagRecord, error: unknown): string {
   ].join("\0");
 }
 
+/**
+ * Creates Client Diag.
+ */
 export function createClientDiag(opts?: {
   sink?: DiagSink;
   maxKeys?: number;
@@ -201,7 +222,9 @@ export function presentFaultHud(gameplay: string, hint: boolean): string {
   return `${gameplay} · ${CONSOLE_HINT}`;
 }
 
-/** One animation-frame failure. The Error object is logged when its message is safe to print. */
+/**
+ * One animation-frame failure. The Error object is logged when its message is safe to print.
+ */
 export function reportFrameFault(diag: ClientDiag, err: unknown, fields: DiagFields): void {
   diag.report({
     level: "error",

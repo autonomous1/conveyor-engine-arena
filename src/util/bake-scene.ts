@@ -22,6 +22,9 @@ import {
   type InstancePose,
 } from "../client/arena-scene.ts";
 
+/**
+ * Builds Map Scene.
+ */
 export async function buildMapScene(view: ArenaView, renderer?: THREE.WebGLRenderer): Promise<THREE.Scene> {
   const scene = new THREE.Scene();
   scene.add(new THREE.HemisphereLight(0xc8d8ff, 0x3a3228, 1.3));

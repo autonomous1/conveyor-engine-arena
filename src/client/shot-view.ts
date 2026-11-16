@@ -5,6 +5,9 @@ import type { PerspectiveCamera } from "three";
 import type { Vec3 } from "../shared/hitscan.js";
 import { eyeLook } from "../shared/look.ts";
 
+/**
+ * finite Vec.
+ */
 export function finiteVec(p: Vec3 | undefined | null): p is Vec3 {
   return !!p && Number.isFinite(p.x) && Number.isFinite(p.y) && Number.isFinite(p.z);
 }
@@ -37,6 +40,9 @@ export function presentShot(opts: {
   return { drew, camBefore, camAfter };
 }
 
+/**
+ * Formats Fire Log.
+ */
 export function formatFireLog(opts: {
   socketClosed: boolean;
   frameThrew: boolean;

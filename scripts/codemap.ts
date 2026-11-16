@@ -13,6 +13,8 @@
  *
  * Only dependency: `typescript` (parser only; no type checking, so broken types never block it).
  */
+// ARCHITECTURE: The codemap generator: files, symbols, signatures, tags, call edges, and the symbol index.
+// Wiring: npm run codemap/codemap:check and the codemap tests; it writes agents/codemap.md.
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join, relative, resolve, sep, posix } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -27,7 +29,9 @@ type Options = {
   maxSig: number;
 };
 
-/** One contract tag, normalized to a single logical line. */
+/**
+ * One contract tag, normalized to a single logical line.
+ */
 export type ExtractedTag = { name: string; text: string };
 
 type Entry = {
@@ -175,7 +179,9 @@ export function extractTags(node: ts.Node): ExtractedTag[] {
   return out;
 }
 
-/** The tag lines emitted under a symbol line: two-space indent, `@name` in backticks. */
+/**
+ * The tag lines emitted under a symbol line: two-space indent, `@name` in backticks.
+ */
 export function renderTagLines(tags: readonly ExtractedTag[], indent = ""): string[] {
   const out: string[] = [];
   for (const tag of tags) {
@@ -276,12 +282,17 @@ function resolveLocal(fromFile: string, spec: string, known: Set<string>): strin
   return rel(base);
 }
 
+/**
+ * Per-file declarations and local import aliases used to resolve call edges.
+ */
 export type CallsContext = {
   declares(file: string): ReadonlySet<string>;
   importsIn(file: string): ReadonlyMap<string, { file: string; name: string }>;
 };
 
-/** Top-level names per project-relative file, plus local import aliases. */
+/**
+ * Top-level names per project-relative file, plus local import aliases.
+ */
 export function createCallsContext(files: readonly string[], known: ReadonlySet<string>): CallsContext {
   const declared = new Map<string, Set<string>>();
   const imports = new Map<string, Map<string, { file: string; name: string }>>();
@@ -332,7 +343,9 @@ function shadowedNames(node: ts.Node): Set<string> {
   return out;
 }
 
-/** Local top-level symbols this declaration calls, sorted and deduped. */
+/**
+ * Local top-level symbols this declaration calls, sorted and deduped.
+ */
 export function extractCalls(node: ts.Node, owner: string, file: string, ctx: CallsContext): string[] {
   const shadow = shadowedNames(node);
   const local = ctx.declares(file);
@@ -356,9 +369,14 @@ export function extractCalls(node: ts.Node, owner: string, file: string, ctx: Ca
   return [...out].sort();
 }
 
+/**
+ * MAX CALLS.
+ */
 export const MAX_CALLS = 24;
 
-/** The `calls:` line(s) under a symbol: one line, capped, two-space indent. */
+/**
+ * The `calls:` line(s) under a symbol: one line, capped, two-space indent.
+ */
 export function renderCallLines(calls: readonly string[], indent = ""): string[] {
   if (calls.length === 0) return [];
   const shown = calls.slice(0, MAX_CALLS).map((name) => `\`${name}\``);

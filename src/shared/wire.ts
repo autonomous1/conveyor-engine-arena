@@ -7,6 +7,9 @@
 // Wiring: client/net.ts revives every inbound frame; no server consumer.
 import type { IncomingSnapshot } from "conveyor-engine-client";
 
+/**
+ * revive.
+ */
 export function revive(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(revive);
   if (value && typeof value === "object") {
@@ -19,6 +22,9 @@ export function revive(value: unknown): unknown {
   return value;
 }
 
+/**
+ * as Snapshot.
+ */
 export function asSnapshot(envelope: Record<string, unknown>): IncomingSnapshot {
   const tick = envelope.tick;
   return {

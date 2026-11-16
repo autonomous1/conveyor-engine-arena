@@ -33,11 +33,16 @@ import {
   type PlaceGridSpec,
 } from "./grid.js";
 
+/**
+ * Leg Plan type.
+ */
 export type LegPlan =
   | { ok: true; points: Vec3[] }
   | { ok: false; step: number };
 
-/** Reused occupancy grids and the region overlays beside them. */
+/**
+ * Reused occupancy grids and the region overlays beside them.
+ */
 export type NavCache = {
   /** Live grid, or undefined. Does not create a row. */
   get(key: string): Grid | undefined;
@@ -49,6 +54,9 @@ export type NavCache = {
   regions: RegionCache;
 };
 
+/**
+ * Plan Legs Options type.
+ */
 export type PlanLegsOptions = {
   doorsShut?: ReadonlySet<string>;
   cabs?: readonly CabState[];
@@ -60,6 +68,9 @@ export type PlanLegsOptions = {
 
 type NavView = Pick<ArenaView, "aabbs" | "doors" | "pawnRadius" | "pawnHeight">;
 
+/**
+ * Creates Nav Cache.
+ */
 export function createNavCache(): NavCache {
   const grids = new Map<string, Grid>();
   const cache: NavCache = {
@@ -76,6 +87,9 @@ export function createNavCache(): NavCache {
   return cache;
 }
 
+/**
+ * plan Legs.
+ */
 export function planLegs(
   graph: SceneGraph,
   view: NavView,

@@ -36,7 +36,9 @@ type FloorBox = { minX: number; maxX: number; minZ: number; maxZ: number; maxY?:
 
 type LiveBox = { id: number; minY?: number; maxY?: number };
 
-/** Door host surface a bound cab uses while it rides. */
+/**
+ * Door host surface a bound cab uses while it rides.
+ */
 export type ElevatorDoors = {
   /** Shift a door's runtime position to home y + dy and re-sync its blocker. */
   offset(id: string, dy: number): void;
@@ -58,7 +60,9 @@ type Cab = {
   roomDoors: string[];
 };
 
-/** Cab calls, motion, and the pawns carried with them. In memory, lost on restart. */
+/**
+ * Cab calls, motion, and the pawns carried with them. In memory, lost on restart.
+ */
 export interface ArenaElevators {
   /** Detached cab rows for the welcome. Empty when the manifest has no elevators. */
   snapshot(): ElevatorState[];
@@ -79,6 +83,9 @@ export interface ArenaElevators {
   step(dt: number): number[];
 }
 
+/**
+ * Creates Arena Elevators.
+ */
 export function createArenaElevators(opts: {
   elevators: readonly ArenaElevator[];
   aabbs: ArenaView["aabbs"];

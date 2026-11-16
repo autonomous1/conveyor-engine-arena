@@ -19,6 +19,9 @@ import type { Movement } from "./movements.js";
 import type { PickupKind, PickupPlacement } from "./pickups.js";
 import type { ShadowQuality } from "./shadows.js";
 
+/**
+ * Backdrop Shape type.
+ */
 export type BackdropShape = "cylinder" | "dome";
 
 /**
@@ -33,6 +36,9 @@ export type CharacterAnimation = {
   minTimeScale?: number;
   maxTimeScale?: number;
 };
+/**
+ * Prop type.
+ */
 export type Prop = {
   id: string;
   idNum: number;
@@ -89,7 +95,9 @@ export type ArenaElevator = {
   building?: string;
 };
 
-/** One room light. `color` is `#rrggbb`. A rect carries `yaw`, `width`, and `height`. */
+/**
+ * One room light. `color` is `#rrggbb`. A rect carries `yaw`, `width`, and `height`.
+ */
 export type ArenaLight = {
   id: string;
   type: "point" | "rect";
@@ -104,6 +112,9 @@ export type ArenaLight = {
   height?: number;
 };
 
+/**
+ * Arena View type.
+ */
 export type ArenaView = {
   bundleId: string;
   bundleVersion: string;
@@ -290,7 +301,9 @@ export type ArenaView = {
   authRequired?: boolean;
 };
 
-/** One animated sprite sheet: frames left to right, rows top to bottom. */
+/**
+ * One animated sprite sheet: frames left to right, rows top to bottom.
+ */
 export type ArenaExplosionSheet = {
   texture: string;
   columns: number;
@@ -336,7 +349,9 @@ export type ArenaCharacterBeam = {
   despawn?: ArenaExplosionSheet;
 };
 
-/** One decoded-once sound effect. `uri` is under `/assets/`, like every other asset. */
+/**
+ * One decoded-once sound effect. `uri` is under `/assets/`, like every other asset.
+ */
 export type ArenaSoundEffect = {
   uri: string;
   /** Effect gain under the master volume. 1 is unity; values above 1 boost, up to 2. */
@@ -351,6 +366,12 @@ export type ArenaSoundEffect = {
   pickupKinds?: string[];
 };
 
+/**
+ * Arena Sound Name type.
+ */
 export type ArenaSoundName = "laser" | "grenadeLaunch" | "grenadeBlast" | "cratePickup" | "keyPickup" | "medkitPickup" | "doorOpen" | "doorClose" | "elevatorStart" | "beamSpawn" | "beamDespawn";
 
+/**
+ * Arena Sounds type.
+ */
 export type ArenaSounds = Partial<Record<ArenaSoundName, ArenaSoundEffect>>;

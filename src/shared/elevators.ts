@@ -13,15 +13,30 @@ import type { ArenaElevator } from "./arena-view.js";
 
 export type { ArenaElevator };
 
+/**
+ * MIN DWELL S.
+ */
 export const MIN_DWELL_S = 1;
+/**
+ * RIDE Y TOL M.
+ */
 export const RIDE_Y_TOL_M = 0.5;
+/**
+ * LANDING HALF M.
+ */
 export const LANDING_HALF_M = 0.6;
 
 /** A few ulps. Keeps an exact metre boundary from slipping one tick or one edge. */
 const MEASURE_EPS = 1e-6;
 
+/**
+ * Elevator Phase type.
+ */
 export type ElevatorPhase = "idle" | "moving" | "dwell";
 
+/**
+ * Elevator Runtime type.
+ */
 export type ElevatorRuntime = {
   id: string;
   /** Stop index the cab last arrived at. */
@@ -36,12 +51,18 @@ export type ElevatorRuntime = {
   y: number;
 };
 
+/**
+ * Elevator Call type.
+ */
 export type ElevatorCall = {
   t: "elevator";
   id: string;
   stop: number;
 };
 
+/**
+ * Elevator State type.
+ */
 export type ElevatorState = {
   t: "elevator";
   id: string;
@@ -50,6 +71,9 @@ export type ElevatorState = {
   stop: number;
 };
 
+/**
+ * seed Elevator.
+ */
 export function seedElevator(def: ArenaElevator): ElevatorRuntime {
   return {
     id: def.id,
@@ -108,7 +132,9 @@ export function stepElevator(rt: ElevatorRuntime, def: ArenaElevator, dt: number
   rt.y += Math.sign(goal - rt.y) * step;
 }
 
-/** Landing XZ minus the polygon-bounds centre, snapped to the dominant axis. */
+/**
+ * Landing XZ minus the polygon-bounds centre, snapped to the dominant axis.
+ */
 export function elevatorDoorSide(def: ArenaElevator): [number, number] {
   const bounds = elevatorPolygonBounds(def.polygon);
   const landing = def.landings[0];
@@ -119,6 +145,9 @@ export function elevatorDoorSide(def: ArenaElevator): [number, number] {
   return [0, dz >= 0 ? 1 : -1];
 }
 
+/**
+ * elevator Polygon Bounds.
+ */
 export function elevatorPolygonBounds(polygon: ReadonlyArray<readonly [number, number]>): {
   minX: number;
   maxX: number;
@@ -138,13 +167,17 @@ export function elevatorPolygonBounds(polygon: ReadonlyArray<readonly [number, n
   return { minX, maxX, minZ, maxZ };
 }
 
-/** Pawn centre inside the cab polygon and within {@link RIDE_Y_TOL_M} of the cab floor. */
+/**
+ * Pawn centre inside the cab polygon and within {@link RIDE_Y_TOL_M} of the cab floor.
+ */
 export function inCab(def: ArenaElevator, rt: ElevatorRuntime, x: number, y: number, z: number): boolean {
   if (Math.abs(y - rt.y) >= RIDE_Y_TOL_M) return false;
   return pointInPolygon(def.polygon, x, z);
 }
 
-/** Stop index whose 1.2 m landing box holds the pawn, else undefined. */
+/**
+ * Stop index whose 1.2 m landing box holds the pawn, else undefined.
+ */
 export function landingAt(def: ArenaElevator, x: number, y: number, z: number): number | undefined {
   for (let index = 0; index < def.landings.length; index += 1) {
     const landing = def.landings[index];
@@ -170,7 +203,9 @@ export function stopForKey(code: string, stopCount: number): number | undefined 
   return stop;
 }
 
-/** Next stop above `at`, or the lowest stop when the cab is at the top. */
+/**
+ * Next stop above `at`, or the lowest stop when the cab is at the top.
+ */
 export function nextStopUp(rt: ElevatorRuntime, def: ArenaElevator): number {
   const next = rt.at + 1;
   return next < def.stops.length ? next : 0;
@@ -189,6 +224,9 @@ export function stepStop(current: number, delta: number, count: number): number 
   return next;
 }
 
+/**
+ * Parses Elevator Call.
+ */
 export function parseElevatorCall(frame: unknown): ElevatorCall | undefined {
   if (!frame || typeof frame !== "object") return undefined;
   const rec = frame as Record<string, unknown>;
@@ -198,10 +236,16 @@ export function parseElevatorCall(frame: unknown): ElevatorCall | undefined {
   return { t: "elevator", id: rec.id, stop: rec.stop };
 }
 
+/**
+ * elevator Frame.
+ */
 export function elevatorFrame(rt: ElevatorRuntime): ElevatorState {
   return { t: "elevator", id: rt.id, y: rt.y, doorsOpen: rt.phase !== "moving", stop: rt.at };
 }
 
+/**
+ * Parses Elevator State.
+ */
 export function parseElevatorState(frame: unknown): ElevatorState | undefined {
   if (!frame || typeof frame !== "object") return undefined;
   const rec = frame as Record<string, unknown>;
@@ -213,6 +257,9 @@ export function parseElevatorState(frame: unknown): ElevatorState | undefined {
   return { t: "elevator", id: rec.id, y: rec.y, doorsOpen: rec.doorsOpen, stop: rec.stop };
 }
 
+/**
+ * Parses Elevator Set.
+ */
 export function parseElevatorSet(value: unknown): ElevatorState[] | undefined {
   if (!Array.isArray(value)) return undefined;
   const out: ElevatorState[] = [];
@@ -223,6 +270,9 @@ export function parseElevatorSet(value: unknown): ElevatorState[] | undefined {
   return out;
 }
 
+/**
+ * point In Polygon.
+ */
 export function pointInPolygon(polygon: ReadonlyArray<readonly [number, number]>, x: number, z: number): boolean {
   if (polygon.length < 3) return false;
   let inside = false;

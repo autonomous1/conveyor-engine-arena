@@ -10,11 +10,19 @@
 import type { ArenaView } from "./arena-view.js";
 import { pointInPolygon, RIDE_Y_TOL_M, type ElevatorPhase } from "./elevators.js";
 
+/**
+ * Vec3 type.
+ */
 export type Vec3 = [number, number, number];
 
+/**
+ * Place Kind type.
+ */
 export type PlaceKind = "room" | "hall" | "platform" | "stairs" | "elevator" | "landing";
 
-/** One walkable region. Stairs and elevators add the fields on {@link StairsPlace} and {@link ElevatorPlace}. */
+/**
+ * One walkable region. Stairs and elevators add the fields on {@link StairsPlace} and {@link ElevatorPlace}.
+ */
 export type ScenePlace = {
   id: string;
   kind: PlaceKind;
@@ -27,7 +35,9 @@ export type ScenePlace = {
   bounds: { minX: number; maxX: number; minZ: number; maxZ: number };
 };
 
-/** A stair run. `top` and the landing `y` values are world metres. */
+/**
+ * A stair run. `top` and the landing `y` values are world metres.
+ */
 export type StairsPlace = ScenePlace & {
   kind: "stairs";
   /** World y of the top of the run. */
@@ -39,7 +49,9 @@ export type StairsPlace = ScenePlace & {
   joins: { from?: string; to?: string };
 };
 
-/** An elevator shaft. `stops` and landing `y` values are world metres. */
+/**
+ * An elevator shaft. `stops` and landing `y` values are world metres.
+ */
 export type ElevatorPlace = ScenePlace & {
   kind: "elevator";
   /** World y, ascending. */
@@ -54,10 +66,19 @@ export type ElevatorPlace = ScenePlace & {
   room?: string;
 };
 
+/**
+ * Any Place type.
+ */
 export type AnyPlace = ScenePlace | StairsPlace | ElevatorPlace;
 
+/**
+ * Portal Kind type.
+ */
 export type PortalKind = "door" | "landing" | "elevator" | "opening";
 
+/**
+ * Scene Portal type.
+ */
 export type ScenePortal = {
   id: string;
   kind: PortalKind;
@@ -75,6 +96,9 @@ export type ScenePortal = {
   cost: number;
 };
 
+/**
+ * Outside Place type.
+ */
 export type OutsidePlace = {
   id: "outside";
   kind: "outside";
@@ -83,6 +107,9 @@ export type OutsidePlace = {
   bounds: { minX: number; maxX: number; minZ: number; maxZ: number };
 };
 
+/**
+ * Scene Graph File type.
+ */
 export type SceneGraphFile = {
   formatVersion: 1;
   units: "meters";
@@ -103,6 +130,9 @@ export type CabState = {
   y: number;
 };
 
+/**
+ * Scene Graph type.
+ */
 export type SceneGraph = SceneGraphFile & {
   placeById: Map<string, AnyPlace | OutsidePlace>;
   /** Both ends of each portal, sorted by portal id. */
@@ -164,6 +194,9 @@ const PLACE_KINDS = new Set<string>(["room", "hall", "platform", "stairs", "elev
 const PORTAL_KINDS = new Set<string>(["door", "landing", "elevator", "opening"]);
 const NO_PORTALS: ScenePortal[] = [];
 
+/**
+ * True when is Elevator Shaft.
+ */
 export function isElevatorShaft(p: AnyPlace | OutsidePlace): p is ElevatorPlace {
   return p.kind === "elevator" && "stops" in p;
 }
@@ -184,6 +217,9 @@ export function stopOf(id: string): { shaft: string; index: number } | undefined
   return { shaft: id.slice(0, at), index: Number(rest) };
 }
 
+/**
+ * portals Of.
+ */
 export function portalsOf(graph: SceneGraph, placeId: string): ScenePortal[] {
   return graph.portalsOf.get(placeId) ?? NO_PORTALS;
 }

@@ -10,6 +10,9 @@ import type { Movement } from "../shared/movements.js";
 import type { SceneGraph } from "../shared/scene-graph.js";
 import type { BakedRegionsFile } from "../shared/nav/regions.js";
 
+/**
+ * Wander Agent type.
+ */
 export type WanderAgent = {
   id: number;
   heading: number;
@@ -37,6 +40,9 @@ export type WanderAgent = {
   followEnd?: "arrived" | "stuck";
 };
 
+/**
+ * Loaded Arena type.
+ */
 export type LoadedArena = {
   world: AuthoritativeWorld;
   agents: WanderAgent[];
@@ -49,6 +55,9 @@ export type LoadedArena = {
   regions?: BakedRegionsFile;
 };
 
+/**
+ * Loads Arena.
+ */
 export function loadArena(files?: GameFiles, env?: Record<string, string | undefined>): LoadedArena {
   const game = loadInstalledGame(files, env);
   const world = new AuthoritativeWorld({ worldVersion: game.view.world });

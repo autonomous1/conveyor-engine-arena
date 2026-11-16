@@ -100,7 +100,9 @@ export function createDoorBlockers(world: ObstacleWorld): DoorBlockers {
  */
 export type DoorUseResult = "none" | "open" | "lift" | "locked" | "opened" | "closed";
 
-/** Open, locked, and held doors, plus the use-seq gate. In memory, lost on restart. */
+/**
+ * Open, locked, and held doors, plus the use-seq gate. In memory, lost on restart.
+ */
 export interface ArenaDoors {
   /** Sorted by id. New array of detached rows. */
   snapshot(): Array<{ id: string; open: boolean; locked: boolean }>;
@@ -124,6 +126,9 @@ export interface ArenaDoors {
   hold(id: string, held: boolean): void;
 }
 
+/**
+ * Creates Arena Doors.
+ */
 export function createArenaDoors(opts: {
   doors: ReadonlyArray<ArenaView["doors"][number]>;
   pawnOf(pawnId: number): PawnBody | undefined;

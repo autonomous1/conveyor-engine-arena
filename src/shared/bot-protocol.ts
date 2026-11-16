@@ -18,12 +18,17 @@ import { parseLoadout, parsePickup, parsePickupSet, type LoadoutFrame, type Pick
 import type { SceneGraphFile } from "./scene-graph.js";
 import { parseBakedRegions, type BakedRegionsFile } from "./nav/regions.js";
 
+/**
+ * Inventory Frame type.
+ */
 export type InventoryFrame = {
   t: "inventory";
   keys: string[];
 };
 
-/** `graph` is the file shape (places and portals), not the runtime maps. */
+/**
+ * `graph` is the file shape (places and portals), not the runtime maps.
+ */
 export type SceneGraphFrame = {
   t: "sceneGraph";
   v: 1;
@@ -31,7 +36,9 @@ export type SceneGraphFrame = {
   graph: SceneGraphFile;
 };
 
-/** `regions` is the baked file (places and portals), not a runtime overlay. */
+/**
+ * `regions` is the baked file (places and portals), not a runtime overlay.
+ */
 export type RegionsFrame = {
   t: "regions";
   v: 1;
@@ -49,25 +56,37 @@ export type TeleportResultFrame = {
   reason?: string;
 };
 
+/**
+ * Snapshot Vec3 type.
+ */
 export type SnapshotVec3 = { x: number; y: number; z: number };
 
-/** Aimed shutter. `fovDeg` defaults to 55 on the QA page when omitted. */
+/**
+ * Aimed shutter. `fovDeg` defaults to 55 on the QA page when omitted.
+ */
 export type SnapshotLookFrom = {
   eye: SnapshotVec3;
   target: SnapshotVec3;
   fovDeg?: number;
 };
 
-/** Chase a pawn. `back` / `up` default to 3 / 1.6 on the QA page when omitted. */
+/**
+ * Chase a pawn. `back` / `up` default to 3 / 1.6 on the QA page when omitted.
+ */
 export type SnapshotFollow = {
   entityId: number;
   back?: number;
   up?: number;
 };
 
+/**
+ * Snapshot Result Reason type.
+ */
 export type SnapshotResultReason = "invalid" | "busy" | "noRenderer";
 
-/** Reply to the client that sent `qaSnapshot`. `png` is a PNG data URL. */
+/**
+ * Reply to the client that sent `qaSnapshot`. `png` is a PNG data URL.
+ */
 export type SnapshotResultFrame = {
   t: "snapshotResult";
   ok: boolean;
@@ -89,11 +108,22 @@ export type QaCaptureFrame = {
   waitFrames?: number;
 };
 
+/**
+ * Players Frame type.
+ */
 export type PlayersFrame = { t: "players"; ids: number[] };
+/**
+ * Claim Row type.
+ */
 export type ClaimRow = { key: string; owner: number; expires: number };
+/**
+ * Claims Frame type.
+ */
 export type ClaimsFrame = { t: "claims"; rows: ClaimRow[] };
 
-/** Host → client arena frames. Elevator is cab state. Grenade is the replicated pose. */
+/**
+ * Host → client arena frames. Elevator is cab state. Grenade is the replicated pose.
+ */
 export type ArenaFrame =
   | LoadoutFrame
   | PickupFrame
@@ -113,6 +143,9 @@ export type ArenaFrame =
   | SnapshotResultFrame
   | QaCaptureFrame;
 
+/**
+ * Welcome Extras type.
+ */
 export type WelcomeExtras = {
   pickups: string[];
   doors: DoorFrame[];
@@ -159,6 +192,9 @@ export function parseArenaFrame(text: string): ArenaFrame | undefined {
   return undefined;
 }
 
+/**
+ * Parses Claims.
+ */
 export function parseClaims(frame: unknown): ClaimsFrame | undefined {
   if (!frame || typeof frame !== "object" || Array.isArray(frame)) return undefined;
   const rec = frame as Record<string, unknown>;
@@ -176,6 +212,9 @@ export function parseClaims(frame: unknown): ClaimsFrame | undefined {
   return { t: "claims", rows };
 }
 
+/**
+ * Parses Players.
+ */
 export function parsePlayers(frame: unknown): PlayersFrame | undefined {
   if (!frame || typeof frame !== "object" || Array.isArray(frame)) return undefined;
   const rec = frame as Record<string, unknown>;
@@ -190,6 +229,9 @@ export function parsePlayers(frame: unknown): PlayersFrame | undefined {
 
 const SNAPSHOT_REASONS = new Set<string>(["invalid", "busy", "noRenderer"]);
 
+/**
+ * Parses Snapshot Result.
+ */
 export function parseSnapshotResult(frame: unknown): SnapshotResultFrame | undefined {
   if (!frame || typeof frame !== "object" || Array.isArray(frame)) return undefined;
   const rec = frame as Record<string, unknown>;
@@ -205,6 +247,9 @@ export function parseSnapshotResult(frame: unknown): SnapshotResultFrame | undef
   return { t: "snapshotResult", ok: false, id: rec.id, reason: rec.reason as SnapshotResultReason };
 }
 
+/**
+ * Parses Qa Capture.
+ */
 export function parseQaCapture(frame: unknown): QaCaptureFrame | undefined {
   if (!frame || typeof frame !== "object" || Array.isArray(frame)) return undefined;
   const rec = frame as Record<string, unknown>;
@@ -264,6 +309,9 @@ function parseSnapshotVec(value: unknown): SnapshotVec3 | undefined {
   return { x: rec.x, y: rec.y, z: rec.z };
 }
 
+/**
+ * Parses Teleport Result.
+ */
 export function parseTeleportResult(frame: unknown): TeleportResultFrame | undefined {
   if (!frame || typeof frame !== "object" || Array.isArray(frame)) return undefined;
   const rec = frame as Record<string, unknown>;
@@ -273,6 +321,9 @@ export function parseTeleportResult(frame: unknown): TeleportResultFrame | undef
   return { t: "teleportResult", ok: rec.ok, reason: rec.reason };
 }
 
+/**
+ * Parses Inventory.
+ */
 export function parseInventory(frame: unknown): InventoryFrame | undefined {
   if (!frame || typeof frame !== "object" || Array.isArray(frame)) return undefined;
   const rec = frame as Record<string, unknown>;
@@ -285,6 +336,9 @@ export function parseInventory(frame: unknown): InventoryFrame | undefined {
   return { t: "inventory", keys };
 }
 
+/**
+ * Parses Scene Graph Frame.
+ */
 export function parseSceneGraphFrame(frame: unknown): SceneGraphFrame | undefined {
   if (!frame || typeof frame !== "object" || Array.isArray(frame)) return undefined;
   const rec = frame as Record<string, unknown>;
@@ -298,6 +352,9 @@ export function parseSceneGraphFrame(frame: unknown): SceneGraphFrame | undefine
   return { t: "sceneGraph", v: 1, hash: rec.hash, graph: graph as SceneGraphFile };
 }
 
+/**
+ * Parses Regions Frame.
+ */
 export function parseRegionsFrame(frame: unknown): RegionsFrame | undefined {
   if (!frame || typeof frame !== "object" || Array.isArray(frame)) return undefined;
   const rec = frame as Record<string, unknown>;

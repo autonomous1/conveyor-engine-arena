@@ -5,6 +5,9 @@
  */
 declare const __ASSET_BASE__: string;
 
+/**
+ * asset Base.
+ */
 export function assetBase(): string {
   return typeof __ASSET_BASE__ === "string" ? __ASSET_BASE__ : "/";
 }

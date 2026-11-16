@@ -12,7 +12,9 @@ import { attachKtx2Loader } from "./arena-scene.ts";
 const LONG_AXIS_TO_FORWARD = Math.PI / 2;
 const VIEW_SCALE = 0.35;
 
-/** Mount a weapon mesh on the viewmodel root. No mixer. */
+/**
+ * Mount a weapon mesh on the viewmodel root. No mixer.
+ */
 export function mountWeaponMesh(root: THREE.Object3D, source: THREE.Object3D): THREE.Object3D {
   while (root.children.length > 0) {
     const child = root.children[0];
@@ -53,6 +55,9 @@ export interface ViewModel {
   show(weaponId: string, url: string): Promise<void>;
 }
 
+/**
+ * Creates View Model.
+ */
 export function createViewModel(camera: THREE.Camera, scene: THREE.Scene, renderer?: THREE.WebGLRenderer): ViewModel {
   if (camera.parent !== scene) scene.add(camera);
   const root = new THREE.Group();

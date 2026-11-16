@@ -14,27 +14,57 @@
 //   `avail:<id>` transitions true → false on pickup and never back.
 import type { Fact, WorldState } from "./goap.js";
 
+/**
+ * AT.
+ */
 export const AT = "at";
+/**
+ * HAS WEAPON.
+ */
 export const HAS_WEAPON = "hasWeapon";
+/**
+ * HAS AMMO.
+ */
 export const HAS_AMMO = "hasAmmo";
 // Derived pose fact: near the stand point and facing it. Only the bot brain sets it.
+/**
+ * STAND.
+ */
 export const STAND = "stand";
 
+/**
+ * DOOR AT PREFIX.
+ */
 export const DOOR_AT_PREFIX = "door:";
+/**
+ * PICKUP AT PREFIX.
+ */
 export const PICKUP_AT_PREFIX = "pickup:";
 
+/**
+ * True when has Key Fact.
+ */
 export function hasKeyFact(pickupId: string): string {
   return `hasKey:${pickupId}`;
 }
 
+/**
+ * avail Fact.
+ */
 export function availFact(pickupId: string): string {
   return `avail:${pickupId}`;
 }
 
+/**
+ * door Open Fact.
+ */
 export function doorOpenFact(doorId: string): string {
   return `doorOpen:${doorId}`;
 }
 
+/**
+ * door Locked Fact.
+ */
 export function doorLockedFact(doorId: string): string {
   return `doorLocked:${doorId}`;
 }
@@ -47,14 +77,23 @@ export function holdingFact(pickupId: string): string {
   return `holding:${pickupId}`;
 }
 
+/**
+ * at Door.
+ */
 export function atDoor(doorId: string): string {
   return `${DOOR_AT_PREFIX}${doorId}`;
 }
 
+/**
+ * at Pickup.
+ */
 export function atPickup(pickupId: string): string {
   return `${PICKUP_AT_PREFIX}${pickupId}`;
 }
 
+/**
+ * World Snapshot type.
+ */
 export type WorldSnapshot = {
   /** Place id, or `door:<id>` / `pickup:<id>` when an action ended on that spot. */
   at: string;

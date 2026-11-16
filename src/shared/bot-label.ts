@@ -13,6 +13,9 @@
  */
 export const BOT_LABEL_MAX = 24;
 
+/**
+ * Bot Label Frame type.
+ */
 export type BotLabelFrame = {
   t: "botLabel";
   id: number;
@@ -31,7 +34,9 @@ export function botLabelText(goal: string, hp: number, dead = false, seen = fals
   return seen && goal === "evade" ? `${line}·seen` : line;
 }
 
-/** Finite integer id and a string of at most {@link BOT_LABEL_MAX} characters. */
+/**
+ * Finite integer id and a string of at most {@link BOT_LABEL_MAX} characters.
+ */
 export function parseBotLabel(frame: unknown): BotLabelFrame | undefined {
   if (!frame || typeof frame !== "object" || Array.isArray(frame)) return undefined;
   const rec = frame as Record<string, unknown>;

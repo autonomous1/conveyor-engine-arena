@@ -9,12 +9,27 @@
 //   server/arena-host.ts sends; client/hud.ts and client/net.ts read.
 
 export const MAX_HP = 100;
+/**
+ * MIN HP.
+ */
 export const MIN_HP = 0;
+/**
+ * HIT DAMAGE.
+ */
 export const HIT_DAMAGE = 25;
+/**
+ * RESPAWN MS.
+ */
 export const RESPAWN_MS = 3000;
 
+/**
+ * Damage Cause type.
+ */
 export type DamageCause = "grenade" | "laser";
 
+/**
+ * Health Frame type.
+ */
 export type HealthFrame = {
   t: "health";
   entity: number;
@@ -24,6 +39,9 @@ export type HealthFrame = {
   cause?: DamageCause;
 };
 
+/**
+ * Pawn Health State type.
+ */
 export type PawnHealthState = {
   hp: number;
   dead: boolean;
@@ -35,10 +53,16 @@ export type PawnHealthState = {
  */
 export type DamageNote = { attacker: number | undefined; at: number; seq: number; cause?: DamageCause };
 
+/**
+ * True when is Damage Cause.
+ */
 export function isDamageCause(value: unknown): value is DamageCause {
   return value === "grenade" || value === "laser";
 }
 
+/**
+ * clamp Health.
+ */
 export function clampHealth(hp: number): number {
   if (!Number.isFinite(hp)) return MIN_HP;
   if (hp < MIN_HP) return MIN_HP;
@@ -46,12 +70,18 @@ export function clampHealth(hp: number): number {
   return hp;
 }
 
+/**
+ * health Frame.
+ */
 export function healthFrame(entity: number, hp: number, dead: boolean, cause?: DamageCause): HealthFrame {
   const frame: HealthFrame = { t: "health", entity, hp: clampHealth(hp), dead };
   if (dead && isDamageCause(cause)) frame.cause = cause;
   return frame;
 }
 
+/**
+ * Parses Health.
+ */
 export function parseHealth(frame: unknown): HealthFrame | undefined {
   if (!frame || typeof frame !== "object") return undefined;
   const rec = frame as Record<string, unknown>;
@@ -199,8 +229,14 @@ export function createPawnHealth(now: () => number = Date.now): PawnHealth {
   };
 }
 
+/**
+ * Spawn Pick type.
+ */
 export type SpawnPick = { x: number; y: number; z: number; yaw: number };
 
+/**
+ * Block Aabb type.
+ */
 export type BlockAabb = {
   minX: number;
   maxX: number;
@@ -210,8 +246,14 @@ export type BlockAabb = {
   maxY?: number;
 };
 
+/**
+ * Block Pawn type.
+ */
 export type BlockPawn = { id: number; x: number; y: number; z: number; radius: number };
 
+/**
+ * Spawn Blockers type.
+ */
 export type SpawnBlockers = {
   self: number;
   radius: number;

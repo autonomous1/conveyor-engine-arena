@@ -9,6 +9,9 @@
 
 const EM = "\u2014";
 
+/**
+ * Rate Sample type.
+ */
 export type RateSample = {
   fps: number | undefined;
   tickPerSec: number | undefined;
@@ -29,6 +32,9 @@ export interface RateWindow {
   push(nowMs: number, observedTick?: number): RateSample;
 }
 
+/**
+ * Creates Rate Window.
+ */
 export function createRateWindow(windowMs = 500): RateWindow {
   const sample: RateSample = { fps: undefined, tickPerSec: undefined };
   let origin = Number.NaN;
@@ -64,6 +70,9 @@ export function createRateWindow(windowMs = 500): RateWindow {
   };
 }
 
+/**
+ * Overlay Stats type.
+ */
 export type OverlayStats = {
   fps: number | undefined;
   tickPerSec: number | undefined;
@@ -102,6 +111,9 @@ function exposureText(value: number): string {
   return String(Math.round(value * 100) / 100);
 }
 
+/**
+ * Formats Overlay.
+ */
 export function formatOverlay(stats: OverlayStats): string {
   const lines = [
     `fps ${rateText(stats.fps)}  tick/s ${rateText(stats.tickPerSec)}  tick ${countText(stats.tick)}`,

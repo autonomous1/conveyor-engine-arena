@@ -11,7 +11,13 @@ import type { ArenaView } from "./arena-view.js";
 import type { SceneGraphFrame } from "./bot-protocol.js";
 import { parseSceneGraph, placeAt, type CabState, type SceneGraph } from "./scene-graph.js";
 
+/**
+ * INFO RANGE M.
+ */
 export const INFO_RANGE_M = 96;
+/**
+ * INFO SHOW MS.
+ */
 export const INFO_SHOW_MS = 4000;
 
 const AXIS_EPS = 1e-12;
@@ -20,17 +26,28 @@ const TIE_M = 1e-4;
 const UNBOUNDED_M = 8;
 const EYE_M = 1.6;
 
+/**
+ * Vec3 type.
+ */
 export type Vec3 = { x: number; y: number; z: number };
 
+/**
+ * Info Kind type.
+ */
 export type InfoKind = "door" | "pickup" | "pawn" | "prop" | "collision";
 
+/**
+ * Info Metadata type.
+ */
 export type InfoMetadata = {
   name?: string;
   model?: string;
   pickupKind?: string;
 };
 
-/** One pick volume. `min` / `max` are world-axis corners. */
+/**
+ * One pick volume. `min` / `max` are world-axis corners.
+ */
 export type InfoCandidate = {
   kind: InfoKind;
   id: string;
@@ -39,11 +56,17 @@ export type InfoCandidate = {
   metadata: InfoMetadata;
 };
 
+/**
+ * Info Hit type.
+ */
 export type InfoHit = InfoCandidate & {
   distance: number;
   point: Vec3;
 };
 
+/**
+ * Aabb type.
+ */
 export type Aabb = {
   minX: number;
   maxX: number;
@@ -61,8 +84,14 @@ const RANK: Record<InfoKind, number> = {
   collision: 3,
 };
 
+/**
+ * Door Live type.
+ */
 export type DoorLive = { open: boolean; locked: boolean; key?: string };
 
+/**
+ * Formats Door Line.
+ */
 export function formatDoorLine(id: string, live: DoorLive): string {
   const parts = [`door ${id}`, live.open ? "open" : "closed", live.locked ? "locked" : "unlocked"];
   const key = live.key;
@@ -74,11 +103,17 @@ export function formatDoorLine(id: string, live: DoorLive): string {
   return parts.join(" · ");
 }
 
+/**
+ * Formats Pickup Line.
+ */
 export function formatPickupLine(id: string, kind: string | undefined, available: boolean): string {
   const state = available ? "available" : "gone";
   return kind ? `pickup ${id} · ${kind} · ${state}` : `pickup ${id} · ${state}`;
 }
 
+/**
+ * Formats Pawn Line.
+ */
 export function formatPawnLine(id: string, name?: string, model?: string): string {
   const parts = [`pawn ${id}`];
   if (name) parts.push(name);
@@ -86,6 +121,9 @@ export function formatPawnLine(id: string, name?: string, model?: string): strin
   return parts.join(" · ");
 }
 
+/**
+ * Formats Meters.
+ */
 export function formatMeters(distance: number): string {
   if (!Number.isFinite(distance)) return "";
   const rounded = Math.round(distance * 10) / 10;
@@ -149,6 +187,9 @@ export function pickInfoTarget(
   return best;
 }
 
+/**
+ * Door Pick type.
+ */
 export type DoorPick = {
   id: string;
   /** Live open flag. A shut door with no leaf may use `closed`. */
@@ -159,6 +200,9 @@ export type DoorPick = {
   closed?: Aabb;
 };
 
+/**
+ * Pickup Pick type.
+ */
 export type PickupPick = {
   id: string;
   kind?: string;
@@ -167,6 +211,9 @@ export type PickupPick = {
   max: Vec3;
 };
 
+/**
+ * Pawn Pick type.
+ */
 export type PawnPick = {
   id: string;
   min: Vec3;
@@ -175,6 +222,9 @@ export type PawnPick = {
   model?: string;
 };
 
+/**
+ * Volume Pick type.
+ */
 export type VolumePick = {
   id?: number;
   source?: string;
@@ -247,8 +297,14 @@ export function collectInfoCandidates(args: {
   return out;
 }
 
+/**
+ * Info Own type.
+ */
 export type InfoOwn = { x: number; y: number; z: number };
 
+/**
+ * Info Session type.
+ */
 export type InfoSession = {
   onDoors(rows: readonly { id: string; open: boolean; locked: boolean }[]): void;
   onDoor(row: { id: string; open: boolean; locked: boolean }): void;
@@ -273,6 +329,9 @@ export type InfoSession = {
   refresh(now: number, own?: InfoOwn, cabs?: readonly CabState[]): string;
 };
 
+/**
+ * Creates Info Session.
+ */
 export function createInfoSession(opts: {
   doors: ArenaView["doors"];
   pickups: readonly { id: string; kind?: string }[];

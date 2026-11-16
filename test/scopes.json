@@ -1,7 +1,8 @@
 {
   "always": [
     "contract-grep.test.ts", "module-headers.test.ts",
-    "codemap-tags.test.ts", "codemap-calls.test.ts", "manifest-data.test.ts"
+    "codemap-tags.test.ts", "codemap-calls.test.ts", "manifest-data.test.ts",
+    "jsdoc-exports.test.ts"
   ],
   "scopes": {
     "nav": ["^nav-", "^bots-nav-", "^bot-brain", "^bot-arbiter", "^bot-aim", "^bot-escape", "^bot-evade", "^bot-fightback", "^wander-", "^elevator-", "^floor-grid-index", "^route\\.test", "^step\\.test", "^flee"],

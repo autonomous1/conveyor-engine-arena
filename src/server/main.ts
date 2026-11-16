@@ -271,17 +271,26 @@ function connFromWs(ws: WebSocket, gate: AuthGate, ip: string): HostConn {
   return conn;
 }
 
+/**
+ * Arena Host type.
+ */
 export type ArenaHost = {
   port: number;
   url: string;
   close: () => Promise<void>;
 };
 
+/**
+ * Arena Server Options type.
+ */
 export type ArenaServerOptions = {
   /** Disk arena root. `ARENA_GAME_ROOT` is the fallback. Omit both to load the installed game. */
   gameRoot?: string;
 };
 
+/**
+ * Starts Arena Server.
+ */
 export async function startArenaServer(
   port = Number(process.env.PORT ?? 4173),
   holdNpcs = false,

@@ -8,7 +8,9 @@ import type { WebSocketLike } from "./net.js";
 const OPEN = 1;
 const CLOSED = 3;
 
-/** In-tab host. The page loads `game/` and `assets/` relative to itself. */
+/**
+ * In-tab host. The page loads `game/` and `assets/` relative to itself.
+ */
 export async function startSolo(): Promise<{ view: ArenaView; open: () => WebSocketLike }> {
   const params = new URLSearchParams(location.search);
   const files = await preloadGameFiles("./");

@@ -2,6 +2,9 @@
 //   nearest-rank percentiles, and one formatted line per window.
 // Wiring: game.ts's startWanderLoop owns one instance and marks the eight
 //   phases; no other module imports it.
+/**
+ * Tick Phase type.
+ */
 export type TickPhase =
   | "timeouts"
   | "interest"
@@ -12,6 +15,9 @@ export type TickPhase =
   | "publish"
   | "frames";
 
+/**
+ * Budget Stats type.
+ */
 export type BudgetStats = {
   readonly samples: number;
   readonly p50Ms: number;
@@ -20,6 +26,9 @@ export type BudgetStats = {
   readonly maxMs: number;
 };
 
+/**
+ * Tick Report type.
+ */
 export type TickReport = {
   readonly ticks: number;
   readonly total: BudgetStats;
@@ -28,6 +37,9 @@ export type TickReport = {
   readonly phases: Readonly<Record<TickPhase, BudgetStats>>;
 };
 
+/**
+ * Tick Metrics type.
+ */
 export type TickMetrics = {
   beginTick(): void;
   endPhase(phase: TickPhase): void;
@@ -48,6 +60,9 @@ function stats(samples: readonly number[]): BudgetStats {
   return { samples: sorted.length, p50Ms: at(0.5), p95Ms: at(0.95), p99Ms: at(0.99), maxMs: sorted[sorted.length - 1]! };
 }
 
+/**
+ * Creates Tick Metrics.
+ */
 export function createTickMetrics(opts: { window?: number; tickMs?: number; now?: () => number } = {}): TickMetrics {
   const window = Math.max(1, opts.window ?? 200);
   const tickMs = opts.tickMs ?? 50;

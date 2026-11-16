@@ -11,7 +11,9 @@
 import type { RegionPath, RegionPortal } from "./regions.js";
 import type { Vec3 } from "../scene-graph.js";
 
-/** Opening's free axis: the aperture's long axis. The last step walks the other way. */
+/**
+ * Opening's free axis: the aperture's long axis. The last step walks the other way.
+ */
 export type DoorAxis = "x" | "z";
 
 const CLOSE = 0.01;
@@ -257,6 +259,9 @@ function alignDoor(path: RegionPath, points: Vec3[], axis: DoorAxis): Vec3[] {
   return next;
 }
 
+/**
+ * pull String.
+ */
 export function pullString(path: RegionPath, doorAxis?: DoorAxis): Vec3[] {
   const points = funnel(path);
   const axis = doorAxis ?? inferDoorAxis(path);

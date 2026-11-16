@@ -11,12 +11,18 @@ const WIRE_KIND: Record<string, string> = {
   snapshot: "snap",
 };
 
+/**
+ * Host Snap Frame type.
+ */
 export type HostSnapFrame = {
   type: "snap";
   clientId: ClientId;
   envelope: SnapshotEnvelope;
 };
 
+/**
+ * host Frame Kind.
+ */
 export function hostFrameKind(frame: unknown): string | undefined {
   if (!frame || typeof frame !== "object" || !("type" in frame)) return undefined;
   const type = (frame as { type?: unknown }).type;
@@ -35,6 +41,9 @@ export function isArenaFrame(frame: unknown): frame is { t: string } {
   return typeof rec.t === "string" && rec.t.length > 0 && rec.type === undefined;
 }
 
+/**
+ * host Snap Path.
+ */
 export function hostSnapPath(
   write: (clientId: ClientId, envelope: SnapshotEnvelope) => void,
 ): DirectNetPath<HostSnapFrame> {
@@ -44,12 +53,18 @@ export function hostSnapPath(
   });
 }
 
+/**
+ * dispatch Host Frame.
+ */
 export function dispatchHostFrame<Frame>(path: NetPath<Frame>, frame: Frame, options?: NetSendOptions): void {
   void path.send(frame, options).catch((err: unknown) => {
     console.error("[live] direct net path failed", err);
   });
 }
 
+/**
+ * Host Socket Paths type.
+ */
 export type HostSocketPaths = {
   sendEncoded(text: string): void;
   deliverEncoded(text: string): void;

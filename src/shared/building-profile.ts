@@ -14,8 +14,14 @@
 //   shared/arena-view.ts carries the rows.
 
 export type ProfilePoint = [number, number];
+/**
+ * Profile Ring type.
+ */
 export type ProfileRing = ProfilePoint[];
 
+/**
+ * Building Profile type.
+ */
 export type BuildingProfile = {
   id: string;
   /** Degrees about +Y, snapped to a quarter turn. The SVG group's yaw. */
@@ -23,6 +29,9 @@ export type BuildingProfile = {
   rings: ProfileRing[];
 };
 
+/**
+ * Profile Table type.
+ */
 export type ProfileTable = Map<string, { yaw?: number; rings: ProfileRing[] }>;
 
 const PATH_TOKEN = /[MmLlHhVvCcSsQqTtAaZz]|[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/g;
@@ -138,7 +147,9 @@ export function svgPathRings(d: string): Array<Array<[number, number]>> {
   return rings;
 }
 
-/** SVG user-space rings to model XZ. `+x` stays `+X`. `+y` (down) becomes `−Z`. */
+/**
+ * SVG user-space rings to model XZ. `+x` stays `+X`. `+y` (down) becomes `−Z`.
+ */
 export function svgRingsToModel(rings: ReadonlyArray<ReadonlyArray<readonly [number, number]>>): ProfileRing[] {
   return rings.map((ring) => ring.map(([x, y]) => [x, -y] as ProfilePoint));
 }
@@ -203,6 +214,9 @@ export function profilesFromPlanSvg(svg: string): BuildingProfile[] {
   return profiles;
 }
 
+/**
+ * profile File Text.
+ */
 export function profileFileText(profiles: readonly BuildingProfile[]): string {
   const body: Record<string, { yaw: number; rings: ProfileRing[] }> = {};
   for (const profile of [...profiles].sort((a, b) => a.id.localeCompare(b.id))) {
@@ -242,6 +256,9 @@ export function parseBuildingProfiles(text: string): ProfileTable {
   return table;
 }
 
+/**
+ * attach Building Profiles.
+ */
 export function attachBuildingProfiles<T extends { id: string; profile?: ProfileRing[]; authorYaw?: number }>(
   buildings: readonly T[],
   text: string | undefined,

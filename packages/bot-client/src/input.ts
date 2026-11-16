@@ -2,6 +2,8 @@
  * Player-equivalent frames. Throttled like the browser client.
  * No Node builtins and no WebSocket package.
  */
+// ARCHITECTURE: Player-equivalent input frames with the bot's sequence counters and 20 Hz throttle.
+// Wiring: createBotInput from connection.ts; the brain sends through BotSession.input.
 import { useFrame } from "../../../src/shared/doors.js";
 import { fireShotFrame } from "../../../src/shared/fire-debug.js";
 import { grenadeFrame } from "../../../src/shared/grenade.js";
@@ -9,6 +11,9 @@ import { INPUT_HZ } from "../../../src/shared/look.js";
 
 const INPUT_INTERVAL_MS = 1000 / INPUT_HZ;
 
+/**
+ * One world-space move/look command; buttons carry noclip and ascend bits.
+ */
 export type MoveCommand = {
   moveX: number;
   moveZ: number;
@@ -16,6 +21,9 @@ export type MoveCommand = {
   buttons?: number;
 };
 
+/**
+ * Player-equivalent frames: input, use, fire, grenade, elevator call, and reset.
+ */
 export type BotInput = {
   sendInput(cmd: MoveCommand): void;
   use(): boolean;
@@ -27,11 +35,18 @@ export type BotInput = {
   resetSeq(): void;
 };
 
+/**
+ * The socket slice input needs: send text and the current owned pawn id.
+ */
 export type InputLink = {
   send(text: string): boolean;
   ownedId(): number | undefined;
 };
 
+/**
+ * Create the throttled input sender for one session.
+ * @post Input sequence starts at 1; resetSeq() restarts it after a welcome.
+ */
 export function createBotInput(link: InputLink): BotInput {
   let inputSeq = 1;
   let fireSeq = 1;

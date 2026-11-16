@@ -73,7 +73,9 @@ export type PlaySample = {
   info: boolean;
 };
 
-/** Space up, Control down. Both held cancel. */
+/**
+ * Space up, Control down. Both held cancel.
+ */
 export function ascendFromKeys(held: { has(code: string): boolean }): -1 | 0 | 1 {
   const up = held.has("Space");
   const down = held.has("ControlLeft") || held.has("ControlRight");
@@ -81,10 +83,19 @@ export function ascendFromKeys(held: { has(code: string): boolean }): -1 | 0 | 1
   return up ? 1 : -1;
 }
 
+/**
+ * Pad Status type.
+ */
 export type PadStatus = { readonly id: string; readonly mapping: string };
 
+/**
+ * Pad Menu Event type.
+ */
 export type PadMenuEvent = "toggle" | "map" | "back" | "select" | "up" | "down" | "left" | "right";
 
+/**
+ * Play Input type.
+ */
 export type PlayInput = {
   update(dt: number): void;
   sample(): PlaySample;
@@ -142,6 +153,9 @@ function frameFromGamepad(gamepad: Gamepad | null): PadFrame {
   };
 }
 
+/**
+ * attach Play Input.
+ */
 export function attachPlayInput(
   dom: HTMLElement,
   storage: ProfileStorage | null = browserProfileStorage(),

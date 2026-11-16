@@ -9,19 +9,35 @@
  */
 export const AUTH_KEY = "ce-arena-auth";
 
-/** Set by the game client before it sends the player back to the landing page. */
+/**
+ * Set by the game client before it sends the player back to the landing page.
+ */
 export const AUTH_MSG = "ce-arena-auth-msg";
 
 const ROLES = ["player", "bot", "qa", "admin"] as const;
+/**
+ * Auth Role type.
+ */
 export type AuthRole = (typeof ROLES)[number];
 
+/**
+ * Decoded Claims type.
+ */
 export type DecodedClaims = { sub: string; role: AuthRole; exp: number };
+/**
+ * Decode Error type.
+ */
 export type DecodeError = "malformed" | "expired" | "no-sub" | "bad-role";
+/**
+ * Decode Result type.
+ */
 export type DecodeResult = DecodedClaims | { error: DecodeError };
 
 declare const __ARENA_SOLO__: boolean;
 
-/** True in the solo bundle. The web bundle defines this as false. Node leaves it unset. */
+/**
+ * True in the solo bundle. The web bundle defines this as false. Node leaves it unset.
+ */
 export function isArenaSolo(): boolean {
   return typeof __ARENA_SOLO__ !== "undefined" && __ARENA_SOLO__ === true;
 }
@@ -78,6 +94,9 @@ export function loadKey(nowMs = Date.now()): string | undefined {
   return undefined;
 }
 
+/**
+ * clear Key.
+ */
 export function clearKey(): void {
   sessionStore().removeItem(AUTH_KEY);
   localStore().removeItem(AUTH_KEY);

@@ -7,12 +7,19 @@
 //   the index rebuilds on array length, last element, or a new dynamic box.
 // Invariants: Y is never indexed, so a Y-only rewrite (a cab wall) needs no
 //   rebuild; a dynamic box is tested on every query, not from a cell.
-/** Locomotion and emote names the wander loop and the character clips share. */
+/**
+ * Locomotion and emote names the wander loop and the character clips share.
+ */
 export const MOVEMENTS = ["idle", "walk", "run", "fall", "angry"] as const;
 
+/**
+ * Movement type.
+ */
 export type Movement = (typeof MOVEMENTS)[number];
 
-/** Used when an animation entry omits speed. */
+/**
+ * Used when an animation entry omits speed.
+ */
 export const DEFAULT_MOVEMENT_SPEED: Record<Movement, number> = {
   idle: 0,
   walk: 1,
@@ -38,6 +45,9 @@ export function findClip<T extends { name: string }>(clips: readonly T[], wanted
   return clips.find((clip) => clip.name.toLowerCase().includes(needle));
 }
 
+/**
+ * movement Intent.
+ */
 export function movementIntent(speed: number, speeds: readonly number[]): number {
   let max = 0;
   for (const value of speeds) if (value > max) max = value;
@@ -52,7 +62,9 @@ export function movementIntent(speed: number, speeds: readonly number[]): number
  */
 export const MOVE_DT = 0.05;
 
-/** Meters per second at a unit wish. Input axes stay the client's yaw-space moveX / moveZ. */
+/**
+ * Meters per second at a unit wish. Input axes stay the client's yaw-space moveX / moveZ.
+ */
 export const MOVE_SPEED = 5;
 
 /**
@@ -61,7 +73,9 @@ export const MOVE_SPEED = 5;
  */
 export const MOVE_ACCEL = 1.25;
 
-/** Ticks from rest to `MOVE_SPEED`, and from that speed back to zero. */
+/**
+ * Ticks from rest to `MOVE_SPEED`, and from that speed back to zero.
+ */
 export const MOVE_TICKS = MOVE_SPEED / MOVE_ACCEL;
 
 /**
@@ -70,7 +84,9 @@ export const MOVE_TICKS = MOVE_SPEED / MOVE_ACCEL;
  */
 export const PAWN_YAW_STEP = (Math.PI * 2) / 10;
 
-/** At or under this planar speed the owned clip is idle. */
+/**
+ * At or under this planar speed the owned clip is idle.
+ */
 export const MOVE_IDLE = 0.05;
 
 /**
@@ -82,7 +98,9 @@ export const STEP_HEIGHT = 0.3;
 /** Float slack so a top of exactly `STEP_HEIGHT` still counts. */
 const STEP_SLOP = 1e-4;
 
-/** Yaw quaternion about +Y. Yaw 0 is identity and faces world +Z. */
+/**
+ * Yaw quaternion about +Y. Yaw 0 is identity and faces world +Z.
+ */
 export function yawQuaternion(yaw: number): { x: number; y: number; z: number; w: number } {
   const half = yaw * 0.5;
   return { x: 0, y: Math.sin(half), z: 0, w: Math.cos(half) };
@@ -107,6 +125,9 @@ export function approachYaw(from: number, to: number, maxStep = PAWN_YAW_STEP): 
   return from + Math.sign(delta) * limit;
 }
 
+/**
+ * Planar type.
+ */
 export type Planar = { x: number; z: number };
 
 /**
@@ -146,7 +167,9 @@ export function approachVelocity(velocity: Planar, wish: Planar, accel = MOVE_AC
  */
 export const RUN_SPEED_M_S = 2.69;
 
-/** Owned clip from planar speed. At or above `RUN_SPEED_M_S` the label is run. */
+/**
+ * Owned clip from planar speed. At or above `RUN_SPEED_M_S` the label is run.
+ */
 export function gaitForSpeed(speed: number): "idle" | "walk" | "run" {
   if (!(speed > MOVE_IDLE)) return "idle";
   if (speed >= RUN_SPEED_M_S) return "run";
@@ -206,7 +229,9 @@ type MoveCommand =
  * rewrite Y in place need no rebuild.
  */
 
-/** Cell edge in metres. */
+/**
+ * Cell edge in metres.
+ */
 export const FLOOR_INDEX_CELL = 2;
 /**
  * Largest query radius the cells cover.
@@ -218,6 +243,9 @@ const MAX_SPAN_CELLS = 256;
 /** Coordinates beyond this (parked door leaves sit at -1e6) are not gridded. */
 const FAR = 1e5;
 
+/**
+ * Floor Index type.
+ */
 export type FloorIndex = {
   readonly boxes: readonly FloorBox[];
   readonly length: number;
@@ -250,7 +278,9 @@ export function markDynamicObstacle(box: object): void {
   dynamicEpoch += 1;
 }
 
-/** Cached index for this live array, rebuilt only when stale. */
+/**
+ * Cached index for this live array, rebuilt only when stale.
+ */
 export function floorIndexFor(boxes: readonly FloorBox[]): FloorIndex {
   const hit = cache.get(boxes);
   if (hit && hit.length === boxes.length && hit.last === boxes[boxes.length - 1] && hit.epoch === dynamicEpoch) return hit;
@@ -270,6 +300,9 @@ function gridded(box: FloorBox): boolean {
     && Math.abs(minX) < FAR && Math.abs(maxX) < FAR && Math.abs(minZ) < FAR && Math.abs(maxZ) < FAR;
 }
 
+/**
+ * Builds Floor Index.
+ */
 export function buildFloorIndex(boxes: readonly FloorBox[]): FloorIndex {
   const t0 = performance.now();
   const cs = FLOOR_INDEX_CELL;
@@ -337,7 +370,9 @@ export function buildFloorIndex(boxes: readonly FloorBox[]): FloorIndex {
   };
 }
 
-/** Cell holding (x, z), or -1 when the point is off the grid or r is too big (full-scan fallback). */
+/**
+ * Cell holding (x, z), or -1 when the point is off the grid or r is too big (full-scan fallback).
+ */
 export function floorIndexCell(index: FloorIndex, x: number, z: number, r: number): number {
   if (!(r <= FLOOR_INDEX_PAD)) return -1;
   const c = Math.floor((x - index.originX) / FLOOR_INDEX_CELL);
@@ -481,6 +516,9 @@ export function floorAlongMoveIndexed(
   return y;
 }
 
+/**
+ * Planar Step type.
+ */
 export type PlanarStep = { vx: number; vz: number; speed: number };
 
 /**
@@ -554,6 +592,9 @@ const NOCLIP_BIT = 1;
 const ASCEND_UP_BIT = 2;
 const ASCEND_DOWN_BIT = 4;
 
+/**
+ * encode Move Buttons.
+ */
 export function encodeMoveButtons(noclip: boolean, ascend: number): number {
   let bits = 0;
   if (noclip) bits |= NOCLIP_BIT;
@@ -562,6 +603,9 @@ export function encodeMoveButtons(noclip: boolean, ascend: number): number {
   return bits;
 }
 
+/**
+ * decode Move Buttons.
+ */
 export function decodeMoveButtons(buttons: number | undefined): { noclip: boolean; ascend: -1 | 0 | 1 } {
   const bits = buttons === undefined || !Number.isFinite(buttons) ? 0 : buttons | 0;
   const up = (bits & ASCEND_UP_BIT) !== 0;
@@ -598,6 +642,9 @@ function radiusSlots(store: unknown): RadiusSlots {
   return record as RadiusSlots;
 }
 
+/**
+ * commit Shielded.
+ */
 export function commitShielded<S extends { entities: ReadonlyArray<{ id: number; radius: number }> }>(
   world: { store: unknown; commit(tick: bigint): S },
   tick: bigint,
@@ -630,6 +677,9 @@ export function commitShielded<S extends { entities: ReadonlyArray<{ id: number;
   }
 }
 
+/**
+ * Owned Move Options type.
+ */
 export type OwnedMoveOptions = {
   /** Skip obstacle and floor queries. The caller must `commitShielded` or the kernel push-out still stops the pawn. */
   noclip?: boolean;

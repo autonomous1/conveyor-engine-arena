@@ -49,22 +49,40 @@ const STUCK_PROGRESS = 0.25;
 /** Stand this far outside `doorUseVolume`, on the bot's side of the leaf. */
 const DOOR_STAND_M = 0.3;
 
+/**
+ * Pose type.
+ */
 export type Pose = { x: number; y: number; z: number; vx: number; vz: number; yaw: number };
 
+/**
+ * Follow Pawn type.
+ */
 export type FollowPawn = { x: number; z: number; radius: number };
 
+/**
+ * Follow Input type.
+ */
 export type FollowInput = { moveX: number; moveZ: number; yaw: number };
 
+/**
+ * Follow Step type.
+ */
 export type FollowStep = {
   input: FollowInput;
   status: "running" | "arrived" | "stuck";
 };
 
+/**
+ * Follow Options type.
+ */
 export type FollowOptions = {
   /** Own capsule radius. Default is the arena pawn, 0.5 m. */
   radius?: number;
 };
 
+/**
+ * Door Side type.
+ */
 export type DoorSide = "in" | "out";
 
 type Point = { x: number; y: number; z: number };
@@ -106,6 +124,9 @@ export function doorStand(
   return { x, y: door.position[1], z, yaw: Math.atan2(cx - x, cz - z) };
 }
 
+/**
+ * Creates Follower.
+ */
 export function createFollower(pathIn: readonly PathPoint[], grid: Grid, opts: FollowOptions = {}): {
   step(pose: Pose, others: readonly FollowPawn[], tick: number): FollowStep;
 } {

@@ -36,6 +36,9 @@ export const AABB_DEBUG_MESH_MARGIN = 0.02;
 const DEFAULT_MIN_Y = 0;
 const DEFAULT_MAX_Y = 3;
 
+/**
+ * World Aabb type.
+ */
 export type WorldAabb = {
   id?: string | number;
   kind?: string;
@@ -64,6 +67,9 @@ type Extents = {
   maxZ: number;
 };
 
+/**
+ * Aabb Debug type.
+ */
 export type AabbDebug = {
   /** Wireframe group. The caller parents it. There is no dispose. */
   group: THREE.Group;
@@ -77,6 +83,9 @@ export type AabbDebug = {
   offsetY(prefix: string, dy: number): void;
 };
 
+/**
+ * Creates Aabb Debug.
+ */
 export function createAabbDebug(obstacles: readonly WorldAabb[]): AabbDebug {
   const group = new THREE.Group();
   group.name = AABB_DEBUG_NAME;

@@ -20,7 +20,9 @@ const _origin = new THREE.Vector3();
 const _scale = new THREE.Vector3();
 const _up = new THREE.Vector3();
 
-/** Lowest skinned vertex, in meters above `root`'s world origin. */
+/**
+ * Lowest skinned vertex, in meters above `root`'s world origin.
+ */
 export function skinnedSoleGap(root: THREE.Object3D): number {
   root.updateMatrixWorld(true);
   root.getWorldPosition(_origin);

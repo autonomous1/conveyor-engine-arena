@@ -24,10 +24,19 @@ import {
   type Vec3,
 } from "../scene-graph.js";
 
+/**
+ * Gate type.
+ */
 export type Gate = "open" | "closed-unlocked" | "locked-have-key" | "locked" | "unusable";
 
+/**
+ * Vec3 Like type.
+ */
 export type Vec3Like = { x: number; y: number; z: number };
 
+/**
+ * Route Step type.
+ */
 export type RouteStep = {
   portal: ScenePortal;
   from: string;
@@ -36,12 +45,18 @@ export type RouteStep = {
   exit: Vec3;
 };
 
+/**
+ * Locked Alternative type.
+ */
 export type LockedAlternative = {
   steps: RouteStep[];
   cost: number;
   doors: Array<{ door: string; key?: string }>;
 };
 
+/**
+ * Route type.
+ */
 export type Route =
   | { ok: true; steps: RouteStep[]; places: string[]; cost: number; lockedAlternative?: LockedAlternative }
   | { ok: false; reason: "no-route" | "unknown-target"; lockedAlternative?: LockedAlternative };
@@ -73,10 +88,14 @@ type Dir = {
   loose: number;
 };
 
-/** Compiled portals for one graph and one gate snapshot. */
+/**
+ * Compiled portals for one graph and one gate snapshot.
+ */
 export type RoadNet = { readonly roads: Roads };
 
-/** Compiled portal nets for one graph. One net per gate signature. */
+/**
+ * Compiled portal nets for one graph. One net per gate signature.
+ */
 export type RoadCache = {
   /** New compiles. The same gate results and `elevators` flag do not increment. */
   compiles: number;
@@ -147,6 +166,9 @@ export function routePlaceCosts(
   return costsFrom(net.roads, origin);
 }
 
+/**
+ * plan Route.
+ */
 export function planRoute(
   graph: SceneGraph,
   from: Vec3Like,

@@ -22,7 +22,9 @@ import { capsuleOverlapsAabb, type PawnBody } from "./pickups.js";
  * @why The leaf does not fill this.
  */
 export const DOOR_GAP_DEPTH_M = 2;
-/** Meters outside the hinge plane where a pawn in front of the leaf can still use it. */
+/**
+ * Meters outside the hinge plane where a pawn in front of the leaf can still use it.
+ */
 export const DOOR_USE_OUTWARD_M = 0.75;
 /**
  * Thinnest closed-leaf blocker, in meters.
@@ -32,10 +34,19 @@ export const DOOR_USE_OUTWARD_M = 0.75;
  */
 export const DOOR_LEAF_MIN_THICKNESS_M = 0.2;
 
+/**
+ * Door Frame type.
+ */
 export type DoorFrame = { t: "door"; id: string; open: boolean; locked: boolean };
 
+/**
+ * Use Frame type.
+ */
 export type UseFrame = { t: "use"; v: 1; seq: number };
 
+/**
+ * Door Runtime type.
+ */
 export type DoorRuntime = {
   id: string;
   hinge: "left" | "right";
@@ -48,6 +59,9 @@ export type DoorRuntime = {
   yaw: number;
 };
 
+/**
+ * Door Use Volume type.
+ */
 export type DoorUseVolume = {
   minX: number;
   maxX: number;
@@ -57,10 +71,16 @@ export type DoorUseVolume = {
   maxZ: number;
 };
 
+/**
+ * door Frame.
+ */
 export function doorFrame(id: string, open: boolean, locked: boolean): DoorFrame {
   return { t: "door", id, open, locked };
 }
 
+/**
+ * use Frame.
+ */
 export function useFrame(seq: number): UseFrame {
   return { t: "use", v: 1, seq };
 }
@@ -189,6 +209,9 @@ export function pickDoorForUse(doors: readonly DoorRuntime[], pawn: PawnBody): D
   return best;
 }
 
+/**
+ * Key Ring type.
+ */
 export type KeyRing = {
   hasKey(pawnId: number, keyId: string): boolean;
   /** Single-use drop. Unlock does not call this. */
@@ -211,6 +234,9 @@ export function tryUseDoor(door: DoorRuntime, pawnId: number, keys: KeyRing): Do
   return doorFrame(door.id, door.open, door.locked);
 }
 
+/**
+ * Parses Use.
+ */
 export function parseUse(frame: unknown): UseFrame | undefined {
   if (!frame || typeof frame !== "object") return undefined;
   const rec = frame as Record<string, unknown>;
@@ -219,6 +245,9 @@ export function parseUse(frame: unknown): UseFrame | undefined {
   return useFrame(rec.seq);
 }
 
+/**
+ * Parses Door.
+ */
 export function parseDoor(frame: unknown): DoorFrame | undefined {
   if (!frame || typeof frame !== "object") return undefined;
   const rec = frame as Record<string, unknown>;
@@ -228,7 +257,9 @@ export function parseDoor(frame: unknown): DoorFrame | undefined {
   return doorFrame(rec.id, rec.open, rec.locked);
 }
 
-/** Welcome rows are `{ id, open, locked }` and may omit `t`. */
+/**
+ * Welcome rows are `{ id, open, locked }` and may omit `t`.
+ */
 export function parseDoorSet(value: unknown): DoorFrame[] | undefined {
   if (!Array.isArray(value)) return undefined;
   const out: DoorFrame[] = [];

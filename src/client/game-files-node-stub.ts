@@ -11,14 +11,23 @@ export function projectRoot(): string {
   throw new Error("node-only");
 }
 
+/**
+ * node Host Env.
+ */
 export function nodeHostEnv(): Record<string, string | undefined> {
   throw new Error("node-only");
 }
 
+/**
+ * node Game Files.
+ */
 export function nodeGameFiles(): GameFiles {
   throw new Error("node-only");
 }
 
+/**
+ * resolve Placements Path.
+ */
 export function resolvePlacementsPath(): string {
   throw new Error("node-only");
 }

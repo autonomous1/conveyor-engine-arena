@@ -18,6 +18,9 @@ export type RateLimitedLog = {
   clear(): void;
 };
 
+/**
+ * Creates Rate Limited Log.
+ */
 export function createRateLimitedLog(windowMs = 60_000): RateLimitedLog {
   const lastAt = new Map<number, number>();
   return {
