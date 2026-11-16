@@ -103,6 +103,8 @@ export interface PawnHealth {
   heal(id: number, amount: number): PawnHealthState | undefined;
   /** Restores due pawns to full health and returns their ids. Mutates. Clock is the injected `now`. New array. */
   takeRespawns(): number[];
+  /** Forgets every health row for this pawn. */
+  forget(id: number): void;
   /** Detached frames for every noted pawn. Unknown ids are absent. A cause is set only while that pawn is dead. */
   frames(): HealthFrame[];
 }
@@ -185,6 +187,9 @@ export function createPawnHealth(now: () => number = Date.now): PawnHealth {
         ids.push(id);
       }
       return ids;
+    },
+    forget(id: number): void {
+      rows.delete(id);
     },
     frames(): HealthFrame[] {
       const out: HealthFrame[] = [];

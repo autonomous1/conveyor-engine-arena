@@ -29,6 +29,7 @@ import { createArenaFire } from "./fire.js";
 import { applyPawnModel, claimClearSpawn, createHeldInputs, placePawn, startPropAnimation, startWanderLoop, teleportBlockReason } from "./game.js";
 import { playerRoster } from "./players.js";
 import { createArenaClaims } from "./claims.js";
+import { despawnSeat, setSeatAlive } from "./seats.js";
 import { createArenaGrenades } from "./grenade.js";
 import { createHostSocketPaths } from "./host-path.js";
 import { pawnBodies, releasePickupObstacle } from "./pickups.js";
@@ -124,6 +125,12 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
   const reservedPads = new Map<number, SpawnPick>();
   const health = createPawnHealth();
   const kit = createPawnKit();
+  const seatRender = new Map<number, unknown>();
+  for (const agent of loaded.agents) {
+    if (agent.role !== "player") continue;
+    const render = loaded.world.store.view(agent.id)?.render;
+    if (render !== undefined) seatRender.set(agent.id, render);
+  }
   const pickupHost = createPickupHost(loaded.view.pickups ?? []);
   const audit = createAudit();
   for (const agent of loaded.agents) health.note(agent.id);
@@ -216,6 +223,8 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
         refused.add(session.clientId);
         return undefined;
       }
+      const render = seatRender.get(owned);
+      if (render !== undefined) setSeatAlive(loaded.world, owned, render);
       if (reused === undefined) {
         const pad = claimClearSpawn(loaded.world, owned, loaded.playerSpawns, reservedPads);
         if (pad) {
@@ -572,8 +581,18 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
       socket.onClose(() => {
         const clientId = clientIdFor(engine, socket);
         if (clientId !== undefined) {
+          const pawnId = engine.replicator.get(clientId)?.ownedEntity ?? engine.gateway.get(clientId)?.ownedEntity;
+          if (pawnId !== undefined) {
+            despawnSeat(loaded.world, pawnId);
+            held.drop(pawnId);
+            fire.forgetBot(pawnId);
+            claimHost.drop(pawnId);
+            health.forget(pawnId);
+            kit.forget(pawnId);
+            grenades.drop(pawnId);
+            reservedPads.delete(pawnId);
+          }
           doorHost.drop(clientId);
-          claimHost.drop(engine.replicator.get(clientId)?.ownedEntity ?? -1);
         }
       });
       engine.attach(socket);

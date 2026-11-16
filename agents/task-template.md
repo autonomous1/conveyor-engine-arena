@@ -8,6 +8,7 @@ Read `agents/AGENTS.md` first. Then this file. Then `agents/codemap.md` only for
 
 **Repos:** all paths in `./conveyor-engine-arena`. Do not change the kernel. Do not read memory or skill bodies (see above).
 **Node:** start shell commands with `cd ~/dev/conveyor-engine-arena && export PATH=~/.nvm/versions/node/v24.0.2/bin:$PATH &&`.
+**Artifacts:** logs, fail-first output, scoped test output, and codemap diffs go under `plan/dsh-tasks/logs/` (name `<task>-<what>.log` / `<task>-codemap.diff`); the report goes under `plan/dsh-tasks/reports/`; live traces under `plan/dsh-tasks/live/`. Never write these to the repo root.
 
 > **Changed in vX.Y:** <one sentence: what this task assumes from prior tasks, what it closes, what it defers. Delete the whole line for a clean task with no dependency.>
 
@@ -16,9 +17,11 @@ Read `agents/AGENTS.md` first. Then this file. Then `agents/codemap.md` only for
 **Files to touch:** <paths with a one-line purpose each. This bounds the executor's codemap scope; nothing outside this list is in scope.>
 
 **Codemap delta:** <entries to add, move, or remove. "Remove" only for symbols that had entries in the prior codemap — verify with `rg` before writing. Line-number shifts are expected when comments are inserted; the rule is "no signature text changes, no reordering, no removed symbols," not "no `:line` changes.">
+**Headers and tags:** for every touched module that exports more than one symbol, update or create its four-slot header (`ARCHITECTURE` / `Wiring` / `Order` / `Invariants`); tag every new or changed export (`@invariant` with `(test: <name>)` or a deferred `(test lands …)`, plus `@pre` / `@post` / `@why` / `@when` / `@see` / `@internal`). See `agents/AGENTS.md` "Comment as contract".
 
 **Test-must-fail-first:** <for a new invariant, the test that fails on current `HEAD`, with the expected failure to paste in the report. For extractions, the import-error fail-first (`ERR_MODULE_NOT_FOUND`) is honest and sufficient — state in the report that it is weaker than an assertion fail-first.>
 **Test scope:** <the `npm run test:scope <scopes>` and/or `npm run test:related -- <files>` command; which new/edited test files belong to which scope; the expected `selected N/<total>`. If a new test matches no `test/scopes.json` scope, add the pattern to the manifest as a step. The scoped run is the task loop; the full `npm test` is the merge gate (CI on push/PR and every two hours), not a per-task requirement.>
+**Artifacts:** <exact paths under `plan/dsh-tasks/logs/`, e.g. `49-fail-first.log`, `49-tests.log`, `49-codemap.diff`; never the repo root. The report links them.>
 
 ### Problem
 <What is wrong today, or what does not exist yet. Two to four paragraphs. Name the specific symbols and behaviors involved. If this is a refactor, say what the current shape is and why it does not support what is next.>
@@ -47,7 +50,8 @@ Read `agents/AGENTS.md` first. Then this file. Then `agents/codemap.md` only for
 <- Standalone scoped run of the new/edited test file passes; both test names appear in the report.>
 <- **Fail-first is demonstrated** — report includes the failing run before the fix and the passing run after, both verbatim.>
 <- `npm run codemap:check` passes.>
-<- Codemap delta captured via `cp agents/codemap.md /tmp/codemap-prev.md && npm run codemap && git diff --no-index /tmp/codemap-prev.md agents/codemap.md` contains only the expected added lines (and their `:line` shifts). Pasted verbatim.>
+<- Codemap delta captured via `mkdir -p plan/dsh-tasks/logs && cp agents/codemap.md /tmp/codemap-prev.md && npm run codemap && git diff --no-index /tmp/codemap-prev.md agents/codemap.md > plan/dsh-tasks/logs/<task>-codemap.diff` contains only the expected added lines (and their `:line` shifts). Paste the summary and the log path; the full diff stays in `logs/`.>
+<- Every touched module that exports more than one symbol has its four-slot header (new or updated), and every new/changed export carries its JSDoc tags; `test/module-headers.test.ts` and `test/contract-grep.test.ts` pass in the scoped run; the codemap diff shows the header/tag lines and no unexplained comment churn.>
 <- `src/shared/bots/goap.ts` unchanged: `git diff src/shared/bots/goap.ts` empty.>
 <- No new `Math.random` / `Date.now` in the touched source; existing ones are noted but not removed.>
 <- <Any file whose behavior must not change — list specifically.>

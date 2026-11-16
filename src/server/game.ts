@@ -1138,7 +1138,7 @@ export function claimClearSpawn(
   const view = world.store.view(id);
   const radius = view && view.radius > 0 ? view.radius : 0.5;
   const height = Number.isFinite(world.pawnHeight) ? world.pawnHeight : 1.8;
-  const pawns: BlockPawn[] = world.query().filter((entity) => entity.radius > 0).map((entity) => ({
+  const pawns: BlockPawn[] = world.query().filter((entity) => entity.lifecycle === "alive" && entity.radius > 0).map((entity) => ({
     id: entity.id,
     x: entity.position.x,
     y: entity.position.y,

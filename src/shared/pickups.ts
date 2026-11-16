@@ -191,6 +191,8 @@ export interface PawnKit {
   addAmmo(id: number, amount: number): number;
   /** Creates or overwrites the row. */
   setWeapon(id: number, weaponId: string): string;
+  /** Forgets this pawn's ammo and weapon. */
+  forget(id: number): void;
 }
 
 export function createPawnKit(): PawnKit {
@@ -212,6 +214,10 @@ export function createPawnKit(): PawnKit {
       weapon.set(id, weaponId);
       return weaponId;
     },
+    forget(id: number): void {
+      ammo.delete(id);
+      weapon.delete(id);
+    },
   };
 }
 
@@ -226,6 +232,8 @@ export interface PickupHost {
   hasKey(pawnId: number, keyId?: string): boolean;
   /** Sorted copy of key ids. An unknown pawn is empty and does not create a row. */
   getHeldItems(pawnId: number): string[];
+  /** Forgets every key held by this pawn. */
+  forget(pawnId: number): void;
   /** Drops one key. False when this pawn does not hold it. Does not create a row. */
   consumeKey(pawnId: number, keyId: string): boolean;
   /**
@@ -269,6 +277,9 @@ export function createPickupHost(list: readonly PickupPlacement[]): PickupHost {
     /** Key placement ids this pawn is holding. */
     getHeldItems(pawnId: number): string[] {
       return [...(heldKeys.get(pawnId) ?? [])].sort();
+    },
+    forget(pawnId: number): void {
+      heldKeys.delete(pawnId);
     },
     /** Drop one key id from this pawn. False when that pawn does not hold it. */
     consumeKey(pawnId: number, keyId: string): boolean {

@@ -48,6 +48,8 @@ export interface ArenaGrenades {
    * `dead` means the throw was admitted and the pawn is dead, so nothing is spawned.
    */
   throwAsBot(entity: number, yaw: number, pitch: number): "accept" | "repeat" | "fast" | "dead";
+  /** Forgets bodies owned by this pawn. */
+  drop(pawnId: number): void;
 }
 
 /**
@@ -143,6 +145,9 @@ export function createArenaGrenades(opts: {
       throwAs(owned, thrown.yaw, thrown.pitch);
     },
     throwAs,
+    drop(pawnId) {
+      bodies = bodies.filter((body) => body.owner !== pawnId);
+    },
     throwAsBot,
     /** One host tick. Fixed {@link MOVE_DT}, matching the wander interval. */
     tick(dt = MOVE_DT) {
