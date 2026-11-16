@@ -1,0 +1,11 @@
+import { connectBot } from "../../../packages/bot-client/src/connection.ts";
+import { openNodeSocket } from "../../../packages/bot-client/src/node-socket.ts";
+const token = (process.env.CE_TOKEN ?? "").trim();
+const session = await connectBot({ url: "wss://arena.tszakacs.com", token, name: "dev-probe", role: "qa", openSocket: openNodeSocket, onLog: () => {} });
+const world = session.world;
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+const started = Date.now();
+while ((!world.self() || !world.sceneGraph()) && Date.now() - started < 8000) await sleep(50);
+const self = world.self()!;
+console.log("self", self.id, self.x.toFixed(2), self.y.toFixed(2), self.z.toFixed(2), "weapon", world.weapon() ?? "none", "ammo", world.ammo(), "pickups", world.pickups().length, "weaponOnMap", [...world.pickups()].includes("alien-weapon-1"));
+session.close();

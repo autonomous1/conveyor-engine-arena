@@ -1,0 +1,15 @@
+import { loadArena } from "../../../src/server/world-loader.ts";
+import { createBotContext, estimateSeconds } from "../../../src/shared/bots/actions.ts";
+import { buildWorldState } from "../../../src/shared/bots/state.ts";
+import { standAt } from "../../../src/shared/bots/goals.ts";
+import { resolveStand, type DoorView } from "../../../src/shared/nav/stand.ts";
+const loaded = loadArena();
+const graph = loaded.sceneGraph!;
+const doors = (loaded.view.doors ?? []) as DoorView[];
+const target = { kind: "door" as const, doorId: "brutalist-building-1-cbake.room-a-1-5-8-9-3.door-1-1-9-22-5", side: "out" as const };
+const stand = resolveStand(target, graph, doors, { from: { x: 0, y: 0, z: 0 } })!;
+console.log("stand", stand.place, stand.x.toFixed(2), stand.z.toFixed(2));
+const goal = standAt(target);
+const state = buildWorldState({ at: "outside", pickups: (loaded.view.pickups ?? []).map((p: any) => p.id), doors: doors.map((d: any) => ({ id: d.id, open: d.open === true, locked: d.locked === true })) });
+const ctx = createBotContext(graph, (loaded.view.pickups as any) ?? []);
+console.log("h(start) with stand", estimateSeconds(goal, ctx, (loaded.view.pickups as any) ?? [], stand)(state));

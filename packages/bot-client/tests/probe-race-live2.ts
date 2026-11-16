@@ -1,0 +1,14 @@
+import { connectBot } from "../../../packages/bot-client/src/connection.ts";
+import { openNodeSocket } from "../../../packages/bot-client/src/node-socket.ts";
+const token = (process.env.CE_TOKEN ?? "").trim();
+const session = await connectBot({ url: "wss://arena.tszakacs.com", token, name: "dev-probe", role: "qa", openSocket: openNodeSocket, onLog: () => {} });
+const world = session.world;
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+const started = Date.now();
+while ((!world.self() || !world.sceneGraph()) && Date.now() - started < 8000) await sleep(50);
+const ids = [...world.pickups()];
+console.log("self", world.self()!.x.toFixed(2), world.self()!.z.toFixed(2), "pickups", ids.length);
+console.log("target present", ids.includes("cover-crate-2-1-71-9"));
+const missing = (world.pickupPlacements() as any[]).map((p) => p.id).filter((id) => !ids.includes(id));
+console.log("missing count", missing.length, "sample", missing.slice(0, 6));
+session.close();
