@@ -6,7 +6,8 @@ Read `plan/dsh-tasks/prompt-bot-developer.txt` first. Then this file. Then the b
 **Artifacts:** every log, trace, capture, and diff goes under `plan/dsh-tasks/logs/` (`<NN>-<what>.log`, `<NN>-trace.json`); the analysis/report under `plan/dsh-tasks/reports/`. Never the repo root. The report links the exact paths.
 **Safety:** one long-lived session per trial; clean `close()`; wait before any retry; never more than one bot in the arena while the operator is playing; never target the operator's pawn. Leftover seats are the known cause of `SERVER_FULL` and the stale-pawn confusion (task 49).
 
-> **This is a run, not a code change.** The bot-developer measures, diagnoses, and recommends; the coder implements. A code change you discover goes in the report as a recommended task, with the evidence line that justifies it.
+> **This is a run/prototype, not a code change.** The bot-developer measures, diagnoses, and recommends; the coder implements.
+> You may write throwaway scripts under `plan/dsh-tasks/live/` to make the scenario happen; they are rough probes, not modules, and the coder refines the useful ones into `src/` with the tests. A code change you discover goes in the report as a recommended task, with the evidence line that justifies it.
 
 ## Question
 

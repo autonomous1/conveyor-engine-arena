@@ -7,6 +7,10 @@ import { openNodeSocket } from "../../../packages/bot-client/src/node-socket.ts"
 import { runMission } from "../../../packages/bot-client/src/brain.ts";
 import { parseMission } from "../../../packages/bot-client/src/missions.ts";
 import { hasLineOfSight } from "../../../src/shared/hitscan.ts";
+import { planPath } from "../../../src/shared/nav/path.ts";
+import { planRoute } from "../../../src/shared/nav/route.ts";
+import { doorStand } from "../../../src/shared/nav/follow.ts";
+import { createNavCache } from "../../../src/shared/nav/legs.ts";
 import { wishTo } from "../../../src/shared/nav/follow.ts";
 
 const URL_ = "wss://arena.tszakacs.com";
@@ -19,6 +23,8 @@ for (let i = 0; i < argv.length; i += 1) if (argv[i]!.startsWith("--")) args.set
 const RUN_MS = Number(args.get("for-s") ?? 300) * 1000;
 // The spawn point is a real pad the host placed us on, not an arbitrary centre point.
 let SPAWN = { x: -2.40, z: 3.00 };
+// This run refuses targets inside 35 m of the spawn and pursues outside it.
+const NO_FIRE_RING_M = 35;
 const t0 = Date.now();
 const secs = () => ((Date.now() - t0) / 1000).toFixed(2);
 const lines: string[] = [];
@@ -126,6 +132,178 @@ const standWalk = async (point: { x: number; z: number }, timeoutMs: number, lab
   return code === 0;
 };
 
+// Hitscan opportunity: a valid pawn inside the fire band with a clear line of sight.
+// This is the "computer vision sees a shot, take it" rule — checked every tick while
+// moving, so the bot fires as soon as a target presents a shot instead of running
+// past it to a stale plan point.
+const navCache = createNavCache();
+const gateNow = (portal: { kind?: string; door?: string; id?: string; locked?: boolean }): "open" | "locked" | "closed-unlocked" => {
+  if (portal.kind !== "door") return "open";
+  const d = world.door(portal.door ?? portal.id ?? "");
+  if (!d) return portal.locked === true ? "locked" : "closed-unlocked";
+  if (d.open) return "open";
+  if (d.locked) return "locked";
+  return "closed-unlocked";
+};
+// The nav view needs full door bodies (position/yaw/hinge/size), not just live state.
+const doorsNow = () => {
+  const out: Array<Record<string, unknown>> = [];
+  for (const state of world.doors()) {
+    const body = world.doorBody(state.id);
+    if (body) out.push({ ...(body as Record<string, unknown>), open: state.open, locked: state.locked });
+  }
+  return out;
+};
+const viewNow = () => ({ aabbs: world.aabbs, doors: doorsNow(), pawnRadius: world.pawnRadius, pawnHeight: world.pawnHeight });
+const poseNow = () => {
+  const s = world.self();
+  return s ? { x: s.x, y: s.y, z: s.z, vx: 0, vz: 0, yaw: s.yaw } : undefined;
+};
+// Outside the spawn ring is only excused for pawns inside a building; those are pursued
+// wherever they are.
+const allowedTarget = (p: { x: number; y: number; z: number }, ringM: number): boolean => {
+  const place = world.placeOf({ x: p.x, y: p.y, z: p.z })?.id ?? "outside";
+  if (place !== "outside") return true;
+  return ringM <= 0 || Math.hypot(p.x - SPAWN.x, p.z - SPAWN.z) > ringM;
+};
+const opportunity = (ringM: number): number | undefined => {
+  const me = world.self();
+  if (!me) return undefined;
+  const skip = players();
+  skip.add(me.id);
+  const eye = { x: me.x, y: me.y + world.pawnHeight * 0.8, z: me.z };
+  let best: { id: number; d: number } | undefined;
+  for (const p of world.others()) {
+    if (skip.has(p.id) || world.healthOf?.(p.id)?.dead === true) continue;
+    if (!allowedTarget(p, ringM)) continue;
+    const d = Math.hypot(p.x - me.x, p.z - me.z);
+    if (d > 18) continue;
+    if (!hasLineOfSight(eye, { x: p.x, y: p.y + world.pawnHeight * 0.75, z: p.z }, world.aabbs)) continue;
+    if (!best || d < best.d) best = { id: p.id, d };
+  }
+  return best?.id;
+};
+const followPlan = async (points: readonly (readonly number[])[], deadline: number): Promise<"done" | "stuck" | "timeout"> => {
+  for (const point of points) {
+    let last = Infinity;
+    let lastProgress = Date.now();
+    for (;;) {
+      if (Date.now() > deadline) return "timeout";
+      const me = poseNow();
+      if (!me) return "stuck";
+      const d = Math.hypot(me.x - point[0]!, me.z - point[2]!);
+      if (d <= 0.5) break;
+      if (d < last - 0.2) { last = d; lastProgress = Date.now(); }
+      if (Date.now() - lastProgress > 1200) return "stuck";
+      session.input.sendInput(wishTo(me, { x: point[0]!, z: point[2]! }, d < 1.2 ? 0.4 : 1));
+      await sleep(50);
+    }
+  }
+  return "done";
+};
+
+// Door entry, same technique as the elevator/through-doors test: centre on the near
+// stand, face the leaf, open it, then walk straight along the door axis to the far
+// stand. The 0.5 m capsule cannot use the grid across a 1.05 m doorway, so the
+// crossing must be the straight portal segment.
+const doorOnRoute = (toPlace: string): { id: string; locked: boolean } | undefined => {
+  const graph = world.sceneGraph();
+  const pose = poseNow();
+  if (!graph || !pose) return undefined;
+  const route = planRoute(graph, pose, toPlace, gateNow as never, {});
+  if (!route.ok) return undefined;
+  for (const step of route.steps) {
+    if (step.portal.kind !== "door") continue;
+    const id = step.portal.door ?? step.portal.id;
+    const door = world.door(id);
+    if (!door?.open) return { id, locked: door?.locked === true };
+  }
+  return undefined;
+};
+
+const enterDoor = async (doorId: string): Promise<boolean> => {
+  if (blacklisted(doorBlacklist, doorId)) return false;
+  const body = world.doorBody(doorId);
+  // An already-open door (e.g. the operator opened it with their key) needs no press.
+  // A locked, shut door needs the key, which the bot may not hold — report it and skip.
+  if (world.door(doorId)?.open !== true) {
+    const lockedRow = world.door(doorId);
+    if (lockedRow?.locked === true) {
+      const key = (body as { key?: string } | undefined)?.key ?? (lockedRow as { key?: string }).key ?? "?";
+      record(`door ${doorId} is LOCKED (key=${key}); the bot does not hold it, skipping`);
+      return false;
+    }
+  }
+  const graph = world.sceneGraph();
+  if (!body || !graph) return false;
+  const pose = poseNow();
+  if (!pose) return false;
+  const outStand = doorStand(body, "out");
+  const inStand = doorStand(body, "in");
+  const nowPlace = world.placeOf({ x: pose.x, y: pose.y, z: pose.z })?.id ?? "outside";
+  const outPlace = world.placeOf(outStand)?.id ?? "outside";
+  const nearIsOut = outPlace === nowPlace;
+  const near = nearIsOut ? outStand : inStand;
+  const far = nearIsOut ? inStand : outStand;
+  record(`door ${doorId}: approaching ${nearIsOut ? "out" : "in"} stand (${near.x.toFixed(2)},${near.z.toFixed(2)})`);
+  const plan = planPath(graph, pose, near, gateNow as never, { view: viewNow(), cache: navCache });
+  if (plan.ok) {
+    await followPlan(plan.points, Date.now() + 15_000);
+  } else {
+    record(`door ${doorId}: approach plan ${plan.reason}; straight fallback`);
+    const until = Date.now() + 15_000;
+    while (Date.now() < until) {
+      const me = poseNow();
+      if (!me) return false;
+      const d = Math.hypot(me.x - near.x, me.z - near.z);
+      if (d <= 0.4) break;
+      session.input.sendInput(wishTo(me, { x: near.x, z: near.z }, d < 1.2 ? 0.4 : 1));
+      await sleep(50);
+    }
+  }
+  for (let i = 0; i < 10; i += 1) {
+    const p = poseNow();
+    if (p) session.input.sendInput(wishTo(p, { x: body.position[0], z: body.position[2] }, 0));
+    await sleep(50);
+  }
+  // Press once and wait for the state to settle before pressing again — pressing while
+  // the local view still says "closed" toggles the leaf back shut (the open/close loop).
+  let presses = 0;
+  while (world.door(doorId)?.open !== true) {
+    if (world.door(doorId)?.locked === true) {
+      const b = world.doorBody(doorId) as { key?: string } | undefined;
+      record(`door ${doorId} is LOCKED (key=${b?.key ?? "?"}); a key is needed`);
+      return false;
+    }
+    if (presses >= 3) {
+      record(`door ${doorId} still closed after ${presses} presses`);
+      return false;
+    }
+    session.input.use();
+    presses += 1;
+    const wait = Date.now() + 1500;
+    while (Date.now() < wait && world.door(doorId)?.open !== true) await sleep(50);
+  }
+  record(`door ${doorId} open; crossing to (${far.x.toFixed(2)},${far.z.toFixed(2)})`);
+  const deadline = Date.now() + 10_000;
+  while (Date.now() < deadline) {
+    const me = poseNow();
+    if (!me) return false;
+    const d = Math.hypot(me.x - far.x, me.z - far.z);
+    if (d <= 0.4) {
+      record(`door ${doorId} crossed; place=${world.placeOf({ x: me.x, y: me.y, z: me.z })?.id}`);
+      return true;
+    }
+    if (world.door(doorId)?.open !== true) {
+      record(`door ${doorId} closed mid-crossing`);
+      return false;
+    }
+    session.input.sendInput(wishTo(me, { x: far.x, z: far.z }, d < 1.2 ? 0.4 : 1));
+    await sleep(50);
+  }
+  return false;
+};
+
 const armed = () => (world.weapon() ?? "") !== "" && world.ammo() > 0;
 
 const armUp = async (): Promise<boolean> => {
@@ -212,10 +390,83 @@ const pickTarget = (): number | undefined => {
   const skip = players();
   skip.add(me.id);
   const rows = world.others()
-    .filter((p) => !skip.has(p.id) && world.healthOf?.(p.id)?.dead !== true)
-    .map((p) => ({ id: p.id, d: Math.hypot(p.x - me.x, p.z - me.z), x: p.x, z: p.z }))
+    .filter((p) => {
+      if (skip.has(p.id) || targetBlocked(p.id) || world.healthOf?.(p.id)?.dead === true) return false;
+      return allowedTarget(p, NO_FIRE_RING_M);
+    })
+    .map((p) => ({ id: p.id, d: Math.hypot(p.x - me.x, p.z - me.z), x: p.x, z: p.z, s: Math.hypot(p.x - SPAWN.x, p.z - SPAWN.z) }))
     .sort((a, b) => a.d - b.d);
   return rows[0]?.id;
+};
+
+// Doors that would not open and targets behind them: skip briefly instead of retrying.
+const doorBlacklist = new Map<string, number>();
+const targetBlacklist = new Map<number, number>();
+const blacklisted = (map: Map<string, number>, key: string) => (map.get(key) ?? 0) > Date.now();
+const targetBlocked = (id: number) => (targetBlacklist.get(id) ?? 0) > Date.now();
+
+// Health recovery: below 50 hp, drop the attack goal and fetch health crates to 100.
+const heal = async (): Promise<boolean> => {
+  record(`heal: hp=${world.health()?.hp ?? "?"} -> seeking health crates`);
+  const deadline = Date.now() + 120_000;
+  const failed = new Map<string, number>();
+  let attempts = 0;
+  while (Date.now() < deadline) {
+    if ((world.health()?.hp ?? 0) >= 100) {
+      record("heal: restored to 100");
+      return true;
+    }
+    if (attempts >= 8) {
+      record(`heal: ${attempts} crates tried without reaching 100; giving up the heal loop`);
+      return false;
+    }
+    const me = world.self();
+    if (!me) return false;
+    const avail = new Set(world.pickups());
+    const crates = (world.pickupPlacements() as Array<{ id: string; kind?: string; minX: number; maxX: number; minZ: number; maxZ: number }>)
+      .filter((p) => p.kind === "health" && avail.has(p.id) && (failed.get(p.id) ?? 0) < Date.now())
+      .map((p) => {
+        const x = (p.minX + p.maxX) / 2;
+        const z = (p.minZ + p.maxZ) / 2;
+        return { id: p.id, d: Math.hypot(x - me.x, z - me.z) };
+      })
+      .sort((a, b) => a.d - b.d);
+    const crate = crates[0];
+    if (!crate) {
+      record("heal: no health crates available; waiting");
+      await sleep(1000);
+      continue;
+    }
+    record(`heal: retrieve:${crate.id} d=${crate.d.toFixed(0)}`);
+    const crateRow = (world.pickupPlacements() as Array<{ id: string; minX: number; maxX: number; minZ: number; maxZ: number }>).find((c) => c.id === crate.id);
+    if (crateRow) {
+      const cratePlace = world.placeOf({ x: (crateRow.minX + crateRow.maxX) / 2, y: 0.3, z: (crateRow.minZ + crateRow.maxZ) / 2 })?.id ?? "outside";
+      const here = world.self() ? (world.placeOf(world.self()!)?.id ?? "outside") : "outside";
+      if (cratePlace !== "outside" && cratePlace !== here) {
+        const door = doorOnRoute(cratePlace);
+        if (door) {
+          record(`heal: door ${door.id} on the route to ${cratePlace}`);
+          await enterDoor(door.id);
+        }
+      }
+    }
+    const mission = parseMission(`retrieve:${crate.id}@outside`);
+    const hpBefore = world.health()?.hp ?? 0;
+    if (mission) {
+      await runMission(session, mission, { timeoutMs: 60_000, log: (l) => record(`  heal ${l}`), error: (l) => record(`  heal ERROR ${l}`) });
+    }
+    const hpAfter = world.health()?.hp ?? 0;
+    if (hpAfter >= 100) return true;
+    if (hpAfter <= hpBefore) {
+      // Unreachable crate (a room behind a door, a taken crate, a stuck route):
+      // blacklist it for a minute and try the next one instead of looping forever.
+      attempts += 1;
+      failed.set(crate.id, Date.now() + 60_000);
+      record(`heal: ${crate.id} did not restore hp (${hpBefore} -> ${hpAfter}); blacklisted 60s`);
+    }
+    await sleep(400);
+  }
+  return (world.health()?.hp ?? 0) >= 100;
 };
 
 let kills = 0;
@@ -237,38 +488,106 @@ try {
   const end = t0 + RUN_MS;
   while (Date.now() < end) {
     await sleep(150);
+    if ((world.health()?.hp ?? 100) <= 50) {
+      await heal();
+      continue;
+    }
     if (!armed()) {
       if ((world.weapon() ?? "") === "") { record("no weapon (map pickup gone and the pawn is unarmed); stopping"); break; }
       if (!(await reload())) { record("no ammo available; stopping"); break; }
       await goCentre();
     }
-    const targetId = pickTarget();
-    if (targetId === undefined) { record("no target; patrolling centre"); await goCentre(); continue; }
+    let targetId = opportunity(NO_FIRE_RING_M) ?? pickTarget();
+    if (targetId === undefined) {
+      record("no target outside the 35 m spawn ring; scanning");
+      const angle = Math.random() * Math.PI * 2;
+      const scan = { x: SPAWN.x + Math.cos(angle) * (NO_FIRE_RING_M + 8), z: SPAWN.z + Math.sin(angle) * (NO_FIRE_RING_M + 8) };
+      await standWalk(scan, 20_000, "scan");
+      continue;
+    }
     const tg = world.others().find((p) => p.id === targetId);
     const me = world.self()!;
-    record(`target id=${targetId} d=${tg ? Math.hypot(tg.x - me.x, tg.z - me.z).toFixed(1) : "?"} hp=${JSON.stringify(world.healthOf?.(targetId))}`);
-    // Pre-position inside the band with LOS: plan to the target through the planner,
-    // and re-plan when it changes place or drifts more than ~3 m from the plan's point.
-    const preEnd = Date.now() + 25_000;
+    record(`target id=${targetId} d=${tg ? Math.hypot(tg.x - me.x, tg.z - me.z).toFixed(1) : "?"} spawnD=${tg ? Math.hypot(tg.x - SPAWN.x, tg.z - SPAWN.z).toFixed(1) : "?"} hp=${JSON.stringify(world.healthOf?.(targetId))}`);
+    // Pursue with a planned path, but every tick first look for a line-of-sight shot:
+    // if any valid pawn is inside the band with a clear lane, take the shot now.
+    const graphNow = world.sceneGraph();
+    const pursueEnd = Date.now() + 25_000;
     let planPoint: { x: number; z: number } | undefined;
     let planPlace: string | undefined;
-    while (Date.now() < preEnd && Date.now() < end) {
-      const p = world.self();
+    while (Date.now() < pursueEnd && Date.now() < end) {
+      if ((world.health()?.hp ?? 100) <= 50) { record("heal: hit during pursuit"); break; }
+      const shot = opportunity(NO_FIRE_RING_M);
+      if (shot !== undefined) {
+        if (shot !== targetId) record(`opportunity: id=${shot} (shot in view, engaging now)`);
+        targetId = shot;
+        break;
+      }
+      const p = poseNow();
       const t2 = world.others().find((q) => q.id === targetId);
-      if (!p || !t2) break;
+      if (!p || !t2 || !graphNow) break;
       const d = Math.hypot(t2.x - p.x, t2.z - p.z);
-      if (d <= 15 && losNow(targetId)) break;
+      if (d <= 18 && losNow(targetId)) break;
       const place = world.placeOf(t2)?.id ?? "";
       const drifted = planPoint === undefined ? Infinity : Math.hypot(t2.x - planPoint.x, t2.z - planPoint.z);
       if (planPoint === undefined || place !== planPlace || drifted > 3) {
         planPoint = { x: t2.x, z: t2.z };
         planPlace = place;
         record(`pursuit plan: id=${targetId} place=${place} d=${d.toFixed(1)}`);
-        const ok = await standWalk(planPoint, 8_000, "pursuit");
-        if (!ok) record(`pursuit: planner could not reach ${planPoint.x.toFixed(1)},${planPoint.z.toFixed(1)}`);
+        const plan = planPath(graphNow, p, { x: t2.x, y: t2.y, z: t2.z }, gateNow, { view: viewNow(), cache: navCache });
+        if (!plan.ok) {
+          record(`pursuit no plan: ${plan.reason}`);
+          const door = doorOnRoute(place);
+          if (door) {
+            record(`pursuit: door ${door.id} on the route to ${place}`);
+            const crossed = await enterDoor(door.id);
+            if (!crossed) {
+              doorBlacklist.set(door.id, Date.now() + 30_000);
+              targetBlacklist.set(targetId, Date.now() + 30_000);
+              record(`pursuit: door ${door.id} unusable; blacklisting it and target ${targetId} for 30s`);
+            }
+          } else {
+            targetBlacklist.set(targetId, Date.now() + 30_000);
+            record(`pursuit: no door found for ${place}; blacklisting target ${targetId} for 30s`);
+          }
+          await sleep(200);
+          continue;
+        }
+        const followed = await followPlan(plan.points, pursueEnd);
+        record(`pursuit follow: ${followed} self=${world.self()?.x.toFixed(1)},${world.self()?.z.toFixed(1)}`);
+        if (followed === "stuck") {
+          // Back off the wall and force a fresh plan from the new pose.
+          const me = poseNow();
+          const t3 = world.others().find((q) => q.id === targetId);
+          if (me && t3) {
+            const yaw = Math.atan2(t3.x - me.x, t3.z - me.z);
+            const side = Math.random() < 0.5 ? 1 : -1;
+            const aside = { x: me.x + Math.cos(yaw) * side * 1.1, z: me.z - Math.sin(yaw) * side * 1.1 };
+            const until = Date.now() + 600;
+            while (Date.now() < until) {
+              const p2 = poseNow();
+              if (!p2) break;
+              session.input.sendInput(wishTo(p2, aside, 1));
+              await sleep(50);
+            }
+          }
+          planPoint = undefined;
+        }
       } else {
-        await sleep(150);
+        await sleep(100);
       }
+    }
+    if ((world.health()?.hp ?? 100) <= 50) {
+      record("heal: hit during pursuit");
+      continue;
+    }
+    const bandCheck = (() => {
+      const p = world.self();
+      const t4 = world.others().find((q) => q.id === targetId);
+      return p && t4 ? Math.hypot(t4.x - p.x, t4.z - p.z) : Infinity;
+    })();
+    if (bandCheck > 18 || !losNow(targetId)) {
+      record(`target id=${targetId} not shootable (d=${bandCheck.toFixed(1)} los=${losNow(targetId)}); re-pursuing`);
+      continue;
     }
     const mission = parseMission(`attack:${targetId}`);
     // Face the target while firing (product fix #10; the controller does not rotate the body).
@@ -277,7 +596,7 @@ try {
       const t3 = world.others().find((q) => q.id === targetId);
       if (p && t3) session.input.sendInput({ moveX: 0, moveZ: 0, yaw: Math.atan2(t3.x - p.x, t3.z - p.z) });
     }, 100);
-    const code = mission ? await runMission(session, mission, { timeoutMs: Math.min(60_000, Math.max(5000, end - Date.now())), log: (l) => {
+    const code = mission ? await runMission(session, mission, { timeoutMs: Math.min(20_000, Math.max(5000, end - Date.now())), log: (l) => {
       if (l.includes("attack: fire")) shots += 1;
       record(`  atk ${l}`);
     }, error: (l) => record(`  atk ERROR ${l}`) }) : 1;
@@ -286,7 +605,7 @@ try {
     if (code === 0 && hp?.dead === true) kills += 1;
     attacks.push({ t: Number(secs()), targetId, code, hp, shots });
     record(`attack done id=${targetId} code=${code} hp=${JSON.stringify(hp)} kills=${kills} shots=${shots}`);
-    if (Date.now() < end) await goCentre();
+    // No spawn return in this mode: keep pursuing outside the ring.
   }
 } catch (err) {
   record(`ERROR ${err instanceof Error ? (err.stack ?? err.message) : String(err)}`);
