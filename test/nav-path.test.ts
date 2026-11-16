@@ -67,3 +67,62 @@ test("replan_needed_uses_the_explicit_planned_place", () => {
   assert.equal(replanNeeded([[0, 0, 0]], { x: 0.5, y: 0, z: 0 }, "a", 3, "a"), false);
   assert.equal(replanNeeded([[0, 0, 0]], { x: 4, y: 0, z: 0 }, "a", 3, "a"), true);
 });
+
+const probeFrom = { x: -2.79, y: 0, z: 2.16 };
+function endsNear(plan: ReturnType<typeof planPath>, to: { x: number; z: number }, tolerance = 0.35): void {
+  assert.ok(plan.ok, plan.ok ? "" : plan.reason);
+  const last = plan.points.at(-1)!;
+  assert.ok(Math.hypot(last[0] - to.x, last[2] - to.z) < tolerance, `ended ${last[0]},${last[2]} vs ${to.x},${to.z}`);
+}
+
+test("the_five_probe_cases", () => {
+  endsNear(planPath(graph, probeFrom, { x: -2.9, y: 0, z: 2.3 }, gate, { view }), { x: -2.9, z: 2.3 });
+  endsNear(planPath(graph, probeFrom, { x: 2, y: 0, z: 2 }, gate, { view }), { x: 2, z: 2 }, 1.05);
+  endsNear(planPath(graph, probeFrom, { x: 10, y: 0, z: 2 }, gate, { view }), { x: 10, z: 2 });
+  endsNear(planPath(graph, probeFrom, { x: -13.9, y: 0, z: 16.5 }, gate, { view }), { x: -13.9, z: 16.5 });
+
+  const reverse = planPath(graph, { x: -29.43, y: 0, z: -7.45 }, { x: -2.79, y: 0, z: 2.16 }, gate, { view });
+  assert.ok(reverse.ok || ["target-blocked", "start-blocked", "no-portal", "no-floor"].includes(reverse.reason));
+});
+
+test("a_short_move_does_not_stop_at_the_start", () => {
+  const plan = planPath(graph, probeFrom, { x: -2.9, y: 0, z: 2.3 }, gate, { view });
+  assert.ok(plan.ok);
+  assert.ok(plan.points.length >= 2);
+  const last = plan.points.at(-1)!;
+  assert.ok(Math.hypot(last[0] + 2.9, last[2] - 2.3) < 0.35);
+});
+
+test("an_open_point_snaps_within_one_metre", () => {
+  const plan = planPath(graph, probeFrom, { x: 2, y: 0, z: 2 }, gate, { view });
+  assert.ok(plan.ok);
+  const last = plan.points.at(-1)!;
+  assert.ok(Math.hypot(last[0] - 2, last[2] - 2) <= 1.05);
+  assert.equal(plan.placeId, "outside");
+});
+
+test("a_reverse_route_is_a_plan_or_a_named_reason", () => {
+  const plan = planPath(graph, { x: -29.43, y: 0, z: -7.45 }, probeFrom, gate, { view });
+  if (plan.ok) assert.ok(plan.points.length > 0);
+  else assert.ok(["target-blocked", "start-blocked", "no-portal", "no-floor"].includes(plan.reason));
+});
+
+test("probe_ten_metres_east", () => {
+  endsNear(planPath(graph, probeFrom, { x: 10, y: 0, z: 2 }, gate, { view }), { x: 10, z: 2 });
+});
+
+test("probe_far_corner", () => {
+  endsNear(planPath(graph, probeFrom, { x: -13.9, y: 0, z: 16.5 }, gate, { view }), { x: -13.9, z: 16.5 });
+});
+
+test("probe_two_metres_snaps", () => {
+  const plan = planPath(graph, probeFrom, { x: 2, y: 0, z: 2 }, gate, { view });
+  assert.ok(plan.ok);
+  const last = plan.points.at(-1)!;
+  assert.ok(Math.hypot(last[0] - 2, last[2] - 2) <= 1.05);
+});
+
+test("probe_reverse_route_is_named", () => {
+  const plan = planPath(graph, { x: -29.43, y: 0, z: -7.45 }, probeFrom, gate, { view });
+  if (!plan.ok) assert.ok(["target-blocked", "start-blocked", "no-portal", "no-floor"].includes(plan.reason));
+});

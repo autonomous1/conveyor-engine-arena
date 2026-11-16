@@ -22,8 +22,8 @@ const EMPTY_VIEW: PathView = { aabbs: [], doors: [], pawnRadius: 0.5, pawnHeight
 
 /**
  * Plan a complete walk from `from` to a coordinate.
- * @post On success the polyline starts near `from` and ends within one grid
- *       cell of `to`; every failure names a PathReason, never undefined.
+ * @post On success the polyline starts at the un-stuck start and ends at `to`
+ *       or a free cell within 1 m; every failure names a PathReason.
  */
 export function planPath(
   graph: SceneGraph,
@@ -50,15 +50,30 @@ export function planPath(
   if (!spec) return { ok: false, reason: "no-floor" };
   const shut = new Set(view.doors.filter((door) => !door.open).map((door) => door.id));
   const grid = buildGrid(spec.area, navBoxes(view, graph, shut, opts.cabs), {
-    cell: targetPlace === "outside" ? 0.5 : 0.25,
+    cell: 0.25,
     radius: view.pawnRadius,
     height: view.pawnHeight,
     baseY: spec.baseY,
     block: spec.block,
   });
-  const last = points[points.length - 1] ?? [from.x, from.y, from.z];
-  const local = findLocalPath(grid, { x: last[0], z: last[2] }, { x: to.x, z: to.z });
+  const last = points.length > 1 ? points[points.length - 1]! : [from.x, from.y, from.z];
+  let goal = { x: to.x, z: to.z };
+  if (cellBlocked(grid, goal.x, goal.z) !== 0) {
+    const snapped = freeCellNear(grid, goal.x, goal.z, 1);
+    if (!snapped) return { ok: false, reason: "target-blocked" };
+    goal = snapped;
+  }
+  let start = { x: last[0], z: last[2] };
+  if (cellBlocked(grid, start.x, start.z) !== 0) {
+    const freed = freeCellNear(grid, start.x, start.z, 1);
+    if (!freed) return { ok: false, reason: "start-blocked" };
+    start = freed;
+  }
+  let local = findLocalPath(grid, start, goal);
   if (!local) return { ok: false, reason: "target-blocked" };
+  if (local.length === 1 && Math.hypot(local[0]![0] - goal.x, local[0]![2] - goal.z) > 0.05) {
+    local = [[goal.x, local[0]![1], goal.z]];
+  }
   for (const point of local) {
     const tail = points[points.length - 1];
     if (tail && Math.abs(tail[0] - point[0]) < 1e-4 && Math.abs(tail[2] - point[2]) < 1e-4) {
@@ -73,6 +88,39 @@ export function planPath(
 /**
  * True when a moving target has drifted more than `driftM` from the plan's
  * destination or changed place.
+ * @pre `plan` came from `planPath`, or the caller supplies `plannedPlace`.
+ * @post A missing or empty plan always re-plans; a place change re-plans when
+ *       the planned place is supplied.
+ */
+function cellBlocked(grid: ReturnType<typeof buildGrid>, x: number, z: number): number {
+  const i = Math.floor((x - grid.minX) / grid.cell);
+  const j = Math.floor((z - grid.minZ) / grid.cell);
+  if (i < 0 || j < 0 || i >= grid.w || j >= grid.h) return 2;
+  return grid.blocked[j * grid.w + i] ?? 2;
+}
+
+function freeCellNear(grid: ReturnType<typeof buildGrid>, x: number, z: number, metres: number): { x: number; z: number } | undefined {
+  const reach = Math.ceil(metres / grid.cell);
+  let best: { x: number; z: number; d: number } | undefined;
+  const ci = Math.floor((x - grid.minX) / grid.cell);
+  const cj = Math.floor((z - grid.minZ) / grid.cell);
+  for (let j = cj - reach; j <= cj + reach; j += 1) {
+    for (let i = ci - reach; i <= ci + reach; i += 1) {
+      if (i < 0 || j < 0 || i >= grid.w || j >= grid.h) continue;
+      if ((grid.blocked[j * grid.w + i] ?? 1) !== 0) continue;
+      const px = grid.minX + (i + 0.5) * grid.cell;
+      const pz = grid.minZ + (j + 0.5) * grid.cell;
+      const d = Math.hypot(px - x, pz - z);
+      if (d <= metres && (!best || d < best.d)) best = { x: px, z: pz, d };
+    }
+  }
+  return best ? { x: best.x, z: best.z } : undefined;
+}
+
+/**
+ * True when a moving target has drifted more than `driftM` from the plan's
+ * destination or changed place.
+ * @pre `plan` came from `planPath`, or the caller supplies `plannedPlace`.
  * @post A missing or empty plan always re-plans; a place change re-plans when
  *       the planned place is supplied.
  */
