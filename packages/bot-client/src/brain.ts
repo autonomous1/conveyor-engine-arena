@@ -23,6 +23,7 @@ import { placeAt, stopOf, type SceneGraph, type ScenePortal } from "../../../src
 import type { BotSession } from "./connection.js";
 import type { Mission } from "./missions.js";
 import { createMotionPredictor } from "./predict.js";
+import { hasLineOfSight } from "../../../src/shared/hitscan.js";
 
 const STEP_MS = 1000 / INPUT_HZ;
 const RIDE_SUMMON_MS = 30_000;
@@ -83,6 +84,7 @@ type UseState = {
 export async function runMission(session: BotSession, mission: Mission, opts: BrainOptions = {}): Promise<number> {
   if (mission.kind === "goal") return runBrain(session, mission.goal, opts);
   if (mission.kind === "stand") return runBrain(session, standAt(mission.target), opts);
+  if (mission.kind === "attack") return runAttack(session, mission.target, opts);
   const timeoutMs = opts.timeoutMs ?? 300_000;
   const deadline = Date.now() + timeoutMs;
   let index = 0;
@@ -124,6 +126,82 @@ export async function claimGoal(
     if (Date.now() >= deadline) return false;
     await delay(100);
   }
+}
+
+/**
+ * Shoot a named pawn until its health frame says dead, it disappears, the bot
+ * runs out of ammo or dies, or the deadline passes.
+ * @post Returns 0 on dead, 2 on refused/lost/no_ammo/died, 3 on timeout.
+ */
+export async function runAttack(session: BotSession, targetId: number, opts: BrainOptions = {}): Promise<number> {
+  const log = opts.log ?? (() => {});
+  const self = session.world.self();
+  if (!self) return 2;
+  if (targetId === self.id || session.world.playerIds().has(targetId)) {
+    log("attack: refused");
+    return 2;
+  }
+  if (!session.world.others().some((pawn) => pawn.id === targetId)) {
+    log("attack: lost");
+    return 2;
+  }
+  const initial = session.world.healthOf(targetId);
+  if (initial?.dead === true) {
+    log("attack: dead");
+    return 0;
+  }
+  if (!session.world.weapon() || session.world.ammo() <= 0) {
+    log("attack: no_ammo");
+    return 2;
+  }
+  const deadline = Date.now() + (opts.timeoutMs ?? 60_000);
+  let approached = false;
+  let nextFire = 0;
+  log("attack: acquire");
+  while (Date.now() < deadline) {
+    const me = session.world.self();
+    if (!me) return 2;
+    const target = session.world.others().find((pawn) => pawn.id === targetId);
+    if (!target) {
+      log("attack: lost");
+      return 2;
+    }
+    if (session.world.healthOf(targetId)?.dead === true) {
+      log("attack: dead");
+      return 0;
+    }
+    if (session.world.health()?.dead === true) {
+      log("attack: died");
+      return 2;
+    }
+    if (session.world.ammo() <= 0) {
+      log("attack: no_ammo");
+      return 2;
+    }
+    const eye = { x: me.x, y: me.y + session.world.pawnHeight * 0.8, z: me.z };
+    const targetPoint = { x: target.x, y: target.y + session.world.pawnHeight * 0.75, z: target.z };
+    const dx = targetPoint.x - eye.x;
+    const dz = targetPoint.z - eye.z;
+    const range = Math.hypot(dx, dz);
+    const los = hasLineOfSight(eye, targetPoint, session.world.aabbs);
+    if (range > 18 || !los) {
+      const yaw = Math.atan2(dx, dz);
+      session.input.sendInput({ moveX: 0, moveZ: 1, yaw });
+      if (!approached) { approached = true; log("attack: approach"); }
+    } else {
+      const yaw = Math.atan2(dx, dz);
+      const pitch = Math.atan2(targetPoint.y - eye.y, range);
+      const now = Date.now();
+      if (now >= nextFire) {
+        nextFire = now + 250;
+        session.input.fire(yaw, pitch);
+        log(`attack: fire range=${range.toFixed(1)} los=${los ? "yes" : "no"}`);
+      }
+    }
+    await delay(50);
+  }
+  log("attack: timeout");
+  return 3;
 }
 
 /**

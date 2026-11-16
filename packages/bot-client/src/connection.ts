@@ -348,6 +348,7 @@ function applyArenaText(world: BotWorld, text: string, onLog?: (line: string) =>
   if (!frame) return;
   if (frame.t === "inventory") world.applyInventory(frame.keys);
   else if (frame.t === "claims") world.applyClaims(frame.rows);
+  else if (frame.t === "players") world.applyPlayers(frame.ids);
   else if (frame.t === "pickup") world.applyPickupGone(frame.id);
   else if (frame.t === "door") world.applyDoor(frame);
   else if (frame.t === "elevator") {

@@ -13,13 +13,20 @@ import type { StandTarget } from "../../../src/shared/nav/stand.js";
 export type Mission =
   | { kind: "goal"; goal: Goal }
   | { kind: "patrol"; places: string[] }
-  | { kind: "stand"; target: StandTarget };
+  | { kind: "stand"; target: StandTarget }
+  | { kind: "attack"; target: number };
 
 /**
  * `retrieve:<pickup>@<place>`, `reach:<place>`, `patrol:<place,place,…>`, `stand:…`, or `idle`.
  */
 export function parseMission(text: string): Mission | undefined {
   if (text === "idle") return { kind: "goal", goal: idle() };
+  if (text.startsWith("attack:")) {
+    const raw = text.slice("attack:".length);
+    if (!/^[1-9][0-9]*$/.test(raw)) return undefined;
+    const target = Number(raw);
+    return Number.isSafeInteger(target) ? { kind: "attack", target } : undefined;
+  }
   if (text.startsWith("stand:door:")) {
     const body = text.slice("stand:door:".length);
     let doorId = body;

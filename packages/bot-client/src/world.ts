@@ -85,6 +85,7 @@ export type WelcomeState = {
   doors: readonly DoorState[];
   elevators?: readonly ElevatorCab[];
   claims?: readonly ClaimRow[];
+  players?: readonly number[];
   weapon?: string;
   ammo: number;
   keys: readonly string[];
@@ -129,6 +130,10 @@ export type BotWorld = {
   weapon(): string | undefined;
   ammo(): number;
   health(): { entity: number; hp: number; dead: boolean } | undefined;
+  /** Health row for any entity the host has reported. */
+  healthOf(entity: number): { entity: number; hp: number; dead: boolean } | undefined;
+  playerIds(): ReadonlySet<number>;
+  applyPlayers(ids: readonly number[]): void;
   role(): string | undefined;
   scope(): readonly string[] | undefined;
   sceneGraph(): SceneGraph | undefined;
@@ -182,6 +187,7 @@ export function createBotWorld(view: WorldView): BotWorld {
   const claimRows = new Map<string, ClaimRow>();
   let sawClaims = false;
   const vitals = new Map<number, { entity: number; hp: number; dead: boolean }>();
+  const players = new Set<number>();
   let ownedId: number | undefined;
   let pickupIds: string[] = [];
   let heldKeys: string[] = [];
@@ -250,6 +256,17 @@ export function createBotWorld(view: WorldView): BotWorld {
     health() {
       return ownedId === undefined ? undefined : vitals.get(ownedId);
     },
+    healthOf(entity) {
+      const row = vitals.get(entity);
+      return row ? { ...row } : undefined;
+    },
+    playerIds() {
+      return players;
+    },
+    applyPlayers(ids) {
+      players.clear();
+      for (const id of ids) players.add(id);
+    },
     role() {
       return role;
     },
@@ -292,6 +309,7 @@ export function createBotWorld(view: WorldView): BotWorld {
         for (const cab of welcome.elevators) cabs.set(cab.id, { ...cab });
       }
       if (welcome.claims) this.applyClaims(welcome.claims);
+      if (welcome.players) this.applyPlayers(welcome.players);
       weapon = welcome.weapon;
       ammo = welcome.ammo;
       heldKeys = [...welcome.keys];

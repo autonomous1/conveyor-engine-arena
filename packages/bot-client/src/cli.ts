@@ -20,6 +20,7 @@ Goals:
   retrieve:<pickup>@<place>   Pick up <pickup>. The place is the goal name.
   reach:<place>               Stand in <place>.
   patrol:<place>,<place>,…   Loop reach until the timeout.
+  attack:<pawnId>            Fire at a named pawn until its health frame says dead.
   idle                        Succeed immediately.
 
 Options:

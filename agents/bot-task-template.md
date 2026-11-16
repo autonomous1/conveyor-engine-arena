@@ -1,0 +1,64 @@
+# Bot task NN — <the question this run answers, imperative>
+
+Read `plan/dsh-tasks/prompt-bot-developer.txt` first. Then this file. Then the bot session's code only for the symbols in Files.
+
+**Do not read memory or skills.** Do not open `SKILL.md` bodies or a memory plugin; the run's evidence is the live log + this file.
+**Artifacts:** every log, trace, capture, and diff goes under `plan/dsh-tasks/logs/` (`<NN>-<what>.log`, `<NN>-trace.json`); the analysis/report under `plan/dsh-tasks/reports/`. Never the repo root. The report links the exact paths.
+**Safety:** one long-lived session per trial; clean `close()`; wait before any retry; never more than one bot in the arena while the operator is playing; never target the operator's pawn. Leftover seats are the known cause of `SERVER_FULL` and the stale-pawn confusion (task 49).
+
+> **This is a run, not a code change.** The bot-developer measures, diagnoses, and recommends; the coder implements. A code change you discover goes in the report as a recommended task, with the evidence line that justifies it.
+
+## Question
+
+<The one hypothesis the run resolves, and the decision it informs. Make it falsifiable: “does X happen when Y”, “before A / after B”. If there is no decision, there is no task.>
+
+## Setup
+
+- **Host:** <the droplet `arena.tszakacs.com` / the local host; why>.
+- **Auth/token:** <the bot token/scope; the operator's role — spectator or the third seat; the seats in use>.
+- **Sessions:** <names, count, the same token; the clean-close rule>.
+- **Scenario / order:** <the exact mission(s), the place, the target id, the arm-up; the timeout>.
+- **Operator:** <watching as spectator/player; what they should look for; the map/3D>.
+
+## Instrumentation
+
+<The recorder and the log lines; the metrics (per shot/second, hp before/after, distance/LOS, seat/pawn state, plan ms, tick p99); the exact artifact paths; the format. If a metric is not logged, the conclusion cannot use it.>
+
+## Baseline / comparison
+
+<The previous result this run compares to (the 37 result: 73.5 m duplicate, 2.43 m separation; the 43 dump; the 49 seat probe); the change under test; the expected direction.>
+
+## Evidence
+
+<The observables that make the run a success or failure, stated before the run: the specific log line, the health frame, the seat count, the plan steps, the trace field. Also the “no run” outcome: if the scenario does not occur in the timebox, that is a result, not a failure.>
+
+## Report
+
+<The report must contain: the timeline (t, actor, event, detail); the metrics table; the findings (numbered, each with a log/trace line); the mechanism fit (which explanation the evidence supports and which it does not); the recommendation (the next coder task or “no change”); the open questions. The report is the deliverable, not the chat.>
+
+## Safety and abort
+
+<The stop conditions: the timebox; the dump not captured; the host down; the operator leaves; the bot dies/reconnects; the stale seat. The abort action: close cleanly, record the last log line, do not retry in a loop.>
+
+## Out of scope
+
+<The code changes (the coder's); the other scenarios; the kernel; the host restarts; the long-running soak.>
+
+## Files (read only these)
+
+| File | Repo | Use |
+|---|---|---|
+| `plan/dsh-tasks/prompt-bot-developer.txt` | conveyor-engine-arena | Read-only. The operator brief. |
+| <the bot session/CLI file> | conveyor-engine-arena | Read-only. The commands and the log fields. |
+| <the host/arena file> | conveyor-engine-arena | Read-only. The accept path, the seat rule. |
+| `plan/dsh-tasks/logs/<NN>-*` | conveyor-engine-arena | **New.** The raw evidence. |
+| `plan/dsh-tasks/reports/<NN>-<slug>.md` | conveyor-engine-arena | **New.** The report. |
+
+## Appendix: the exact commands and the log format
+
+```bash
+# the setup and the run; the token path; the operator's spectator state
+# the recorder; the metrics; the cleanup
+```
+
+The log lines the report quotes verbatim (one per metric family): `<format>`.
