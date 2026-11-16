@@ -53,6 +53,10 @@ export type ConnectBotOptions = {
 export type BotSession = {
   world: BotWorld;
   input: BotInput;
+  claims: {
+    acquire(key: string, ttlMs: number): void;
+    release(key: string): void;
+  };
   spectate: boolean;
   close(): void;
 };
@@ -97,6 +101,18 @@ export async function connectBot(o: ConnectBotOptions): Promise<BotSession> {
   let ready = false;
   let cancelSleep: (() => void) | undefined;
 
+  const claims = {
+    acquire(key: string, ttlMs: number): void {
+      const ws = current;
+      if (!ws || ws.readyState !== 1 || ownedId === undefined) return;
+      ws.send(JSON.stringify({ v: 1, t: "claim", key, ttlMs }));
+    },
+    release(key: string): void {
+      const ws = current;
+      if (!ws || ws.readyState !== 1 || ownedId === undefined) return;
+      ws.send(JSON.stringify({ v: 1, t: "release", key }));
+    },
+  };
   const input = createBotInput({
     send(text) {
       const ws = current;
@@ -275,6 +291,7 @@ export async function connectBot(o: ConnectBotOptions): Promise<BotSession> {
   return {
     world,
     input,
+    claims,
     spectate: o.spectate === true,
     close() {
       stopped = true;
@@ -311,6 +328,7 @@ function applyArenaText(world: BotWorld, text: string, onLog?: (line: string) =>
   const frame = parseArenaFrame(text);
   if (!frame) return;
   if (frame.t === "inventory") world.applyInventory(frame.keys);
+  else if (frame.t === "claims") world.applyClaims(frame.rows);
   else if (frame.t === "pickup") world.applyPickupGone(frame.id);
   else if (frame.t === "door") world.applyDoor(frame);
   else if (frame.t === "elevator") {

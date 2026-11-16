@@ -90,6 +90,8 @@ export type QaCaptureFrame = {
 };
 
 export type PlayersFrame = { t: "players"; ids: number[] };
+export type ClaimRow = { key: string; owner: number; expires: number };
+export type ClaimsFrame = { t: "claims"; rows: ClaimRow[] };
 
 /** Host → client arena frames. Elevator is cab state. Grenade is the replicated pose. */
 export type ArenaFrame =
@@ -104,6 +106,7 @@ export type ArenaFrame =
   | AuditFrame
   | InventoryFrame
   | PlayersFrame
+  | ClaimsFrame
   | SceneGraphFrame
   | RegionsFrame
   | TeleportResultFrame
@@ -120,6 +123,7 @@ export type WelcomeExtras = {
   role?: string;
   scope?: string[];
   players?: number[];
+  claims?: ClaimRow[];
 };
 
 /**
@@ -146,12 +150,30 @@ export function parseArenaFrame(text: string): ArenaFrame | undefined {
   if (t === "audit") return parseAudit(value);
   if (t === "inventory") return parseInventory(value);
   if (t === "players") return parsePlayers(value);
+  if (t === "claims") return parseClaims(value);
   if (t === "sceneGraph") return parseSceneGraphFrame(value);
   if (t === "regions") return parseRegionsFrame(value);
   if (t === "teleportResult") return parseTeleportResult(value);
   if (t === "snapshotResult") return parseSnapshotResult(value);
   if (t === "qaCapture") return parseQaCapture(value);
   return undefined;
+}
+
+export function parseClaims(frame: unknown): ClaimsFrame | undefined {
+  if (!frame || typeof frame !== "object" || Array.isArray(frame)) return undefined;
+  const rec = frame as Record<string, unknown>;
+  if (rec.t !== "claims" || !Array.isArray(rec.rows)) return undefined;
+  const rows: ClaimRow[] = [];
+  for (const value of rec.rows) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+    const row = value as Record<string, unknown>;
+    if (typeof row.key !== "string" || row.key.length === 0 || row.key.length > 128 || /[\u0000-\u001f\u007f]/.test(row.key)) return undefined;
+    if (typeof row.owner !== "number" || !Number.isInteger(row.owner)) return undefined;
+    if (typeof row.expires !== "number" || !Number.isFinite(row.expires)) return undefined;
+    rows.push({ key: row.key, owner: row.owner, expires: row.expires });
+  }
+  rows.sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
+  return { t: "claims", rows };
 }
 
 export function parsePlayers(frame: unknown): PlayersFrame | undefined {
@@ -301,6 +323,7 @@ export function parseWelcomeExtras(welcome: unknown): WelcomeExtras | undefined 
   const scope = stringList(rec.scope);
   const elevators = Array.isArray(rec.elevators) ? parseElevatorSet(rec.elevators) : undefined;
   const players = Array.isArray(rec.players) ? parsePlayers({ t: "players", ids: rec.players })?.ids : undefined;
+  const claims = Array.isArray(rec.claims) ? parseClaims({ t: "claims", rows: rec.claims })?.rows : undefined;
   return {
     pickups: parsePickupSet(rec.pickups) ?? [],
     doors: parseDoorSet(rec.doors) ?? [],
@@ -309,6 +332,7 @@ export function parseWelcomeExtras(welcome: unknown): WelcomeExtras | undefined 
     ammo,
     keys: parsePickupSet(rec.keys) ?? [],
     ...(players !== undefined ? { players } : {}),
+    ...(claims !== undefined ? { claims } : {}),
     ...(role ? { role } : {}),
     ...(scope ? { scope } : {}),
   };

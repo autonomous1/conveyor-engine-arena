@@ -305,8 +305,8 @@ const goapFrom = stopOf(goapPortal.a)!;
 const goapTo = stopOf(goapPortal.b)!;
 
 test("ground_actions_and_a_goal_plan_include_a_ride_edge", () => {
-  const actions = groundActions(goapGraph, loaded.view.pickups ?? []);
-  assert.ok(actions.some((action) => action.id === `ride:up:${goapPortal.id}`), "no ride action");
+  const actions = groundActions(goapGraph, loaded.view.pickups ?? [], [reach(goapPortal.b)]);
+  assert.ok(actions.some((action) => action.id === `rideTo:${stopOf(goapPortal.b)!.shaft}:${goapPortal.b}`), "no ride action");
   const goal = reach(goapPortal.b);
   const ctx = createBotContext(goapGraph, loaded.view.pickups ?? []);
   const state = buildWorldState({
@@ -316,6 +316,6 @@ test("ground_actions_and_a_goal_plan_include_a_ride_edge", () => {
   });
   const plan = chooseGoal(state, [goal], groundActions(goapGraph, loaded.view.pickups ?? [], [goal]), ctx, { maxExpand: 5000 });
   assert.ok(plan, "no plan");
-  assert.ok(plan.steps.some((id) => id.startsWith("ride:")), `plan ${plan.steps.join(" > ")}`);
+  assert.ok(plan.steps.some((id) => id.startsWith("rideTo:")), `plan ${plan.steps.join(" > ")}`);
   assert.equal(goapFrom.shaft, goapTo.shaft, "the fixture portal must stay in one shaft");
 });

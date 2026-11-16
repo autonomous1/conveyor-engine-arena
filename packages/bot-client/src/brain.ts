@@ -87,7 +87,50 @@ export async function runMission(session: BotSession, mission: Mission, opts: Br
   return 3;
 }
 
+export async function claimGoal(
+  session: BotSession,
+  key: string,
+  deadline: number,
+  log: (line: string) => void,
+): Promise<boolean> {
+  session.claims.acquire(key, 30_000);
+  let waited = false;
+  for (;;) {
+    const row = session.world.claims().get(key);
+    const self = session.world.self();
+    if (row && self && row.owner === self.id) {
+      const renew = setInterval(() => session.claims.acquire(key, 30_000), 10_000);
+      (renew as { unref?: () => void }).unref?.();
+      (session as { __claimRenew?: ReturnType<typeof setInterval> }).__claimRenew = renew;
+      return true;
+    }
+    if (!row) session.claims.acquire(key, 30_000);
+    else if (!waited) {
+      waited = true;
+      log(`claim wait ${key} owner=${row.owner}`);
+    }
+    if (Date.now() >= deadline) return false;
+    await delay(100);
+  }
+}
+
 export async function runBrain(session: BotSession, goal: Goal, opts: BrainOptions = {}): Promise<number> {
+  const key = goal.id;
+  const supported = session.world.claimsSupported?.() === true;
+  if (supported && session.world.self() !== undefined) {
+    const claimed = await claimGoal(session, key, Date.now() + (opts.timeoutMs ?? 300_000), opts.log ?? (() => {}));
+    if (!claimed) return 3;
+    try {
+      return await runBrainInner(session, goal, opts);
+    } finally {
+      clearInterval((session as { __claimRenew?: ReturnType<typeof setInterval> }).__claimRenew);
+      session.claims.release?.(key);
+    }
+  }
+  return runBrainInner(session, goal, opts);
+}
+
+async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions = {}): Promise<number> {
   const log = opts.log ?? (() => {});
   const error = opts.error ?? (() => {});
   const deadline = Date.now() + (opts.timeoutMs ?? 300_000);
@@ -221,6 +264,7 @@ export async function runBrain(session: BotSession, goal: Goal, opts: BrainOptio
     if (kind === "goTo") return beginGoTo(id, arg, pose);
     if (kind === "standAt") return beginStand(id, arg, pose);
     if (kind === "ride") return beginRide(id, arg, pose);
+    if (kind === "rideTo") return beginRide(id, arg, pose, true);
     if (kind === "goToDoor") return beginDoor(id, arg, pose);
     if (kind === "unlock") return beginUnlock(id, arg, pose);
     if (kind === "pickup") return beginPickup(id, arg, pose);
@@ -297,19 +341,50 @@ export async function runBrain(session: BotSession, goal: Goal, opts: BrainOptio
     };
   };
 
-  const beginRide = (id: string, arg: string, pose: Pose): Running | undefined => {
+  const beginRide = (id: string, arg: string, pose: Pose, byGoal = false): Running | undefined => {
     const graph = session.world.sceneGraph();
     if (!graph) return undefined;
-    // `ride:<up|down>:<portalId>`, and live portal ids contain a colon themselves.
-    const cut = arg.indexOf(":");
-    const direction = cut >= 0 ? arg.slice(0, cut) : "up";
-    const portalId = cut >= 0 ? arg.slice(cut + 1) : arg;
-    const reverse = direction === "down";
-    const portal = graph.portals.find((item) => item.kind === "elevator" && item.id === portalId);
-    if (!portal) return undefined;
-    const from = stopOf(reverse ? portal.b : portal.a);
-    const to = stopOf(reverse ? portal.a : portal.b);
-    if (!from || !to || from.shaft !== to.shaft) return undefined;
+    let portal: ScenePortal | undefined;
+    let reverse = false;
+    let from: { shaft: string; index: number } | undefined;
+    let to: { shaft: string; index: number } | undefined;
+    if (byGoal) {
+      const cut = arg.indexOf(":");
+      const shaft = cut >= 0 ? arg.slice(0, cut) : "";
+      const goalStop = cut >= 0 ? arg.slice(cut + 1) : arg;
+      const shaftPlace = graph.placeById.get(shaft) as { stops?: readonly number[] } | undefined;
+      if (!shaftPlace?.stops) return undefined;
+      const self = session.world.self();
+      const here = self ? session.world.placeOf(self)?.id : undefined;
+      const hereStop = here ? stopOf(here) : undefined;
+      let fromIndex = hereStop?.index;
+      if (fromIndex === undefined && self) {
+        let best = Infinity;
+        for (let i = 0; i < shaftPlace.stops.length; i += 1) {
+          const d = Math.abs(shaftPlace.stops[i]! - self.y);
+          if (d < best) { best = d; fromIndex = i; }
+        }
+      }
+      if (fromIndex === undefined) return undefined;
+      const fromId = `${shaft}@${fromIndex}`;
+      portal = graph.portals.find((item) => item.kind === "elevator"
+        && ((item.a === fromId && item.b === goalStop) || (item.b === fromId && item.a === goalStop)));
+      if (!portal) return undefined;
+      reverse = portal.b === fromId;
+      from = stopOf(reverse ? portal.b : portal.a);
+      to = stopOf(reverse ? portal.a : portal.b);
+    } else {
+      // `ride:<up|down>:<portalId>`, and live portal ids contain a colon themselves.
+      const cut = arg.indexOf(":");
+      const direction = cut >= 0 ? arg.slice(0, cut) : "up";
+      const portalId = cut >= 0 ? arg.slice(cut + 1) : arg;
+      reverse = direction === "down";
+      portal = graph.portals.find((item) => item.kind === "elevator" && item.id === portalId);
+      if (!portal) return undefined;
+      from = stopOf(reverse ? portal.b : portal.a);
+      to = stopOf(reverse ? portal.a : portal.b);
+    }
+    if (!portal || !from || !to || from.shaft !== to.shaft) return undefined;
     const shaftPlace = graph.placeById.get(from.shaft);
     if (!shaftPlace) return undefined;
     const landingAt = reverse ? portal.at.b : portal.at.a;

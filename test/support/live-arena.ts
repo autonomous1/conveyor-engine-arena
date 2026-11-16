@@ -29,7 +29,7 @@ export async function startLiveArena(): Promise<LiveArena> {
   writeFileSync(keyFile, priv, { mode: 0o600 });
   writeFileSync(pubFile, pub);
   const signer = await loadSigner(keyFile);
-  const bot = await mint(signer, { sub: "bot-live", role: "bot", scope: ["scene-graph"], ttlS: HOUR_S });
+  const bot = await mint(signer, { sub: "bot-live", role: "bot", scope: ["scene-graph", "chat"], ttlS: HOUR_S });
   const previous = new Map<string, string | undefined>();
   for (const key of AUTH_ENV) previous.set(key, process.env[key]);
   process.env.ARENA_AUTH = "required";

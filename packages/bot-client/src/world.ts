@@ -3,6 +3,7 @@
  * Snapshots supply pawn poses. Arena frames supply doors, keys, and the scene graph.
  */
 import type { ArenaView } from "../../../src/shared/arena-view.js";
+import type { ClaimRow } from "../../../src/shared/bot-protocol.js";
 import { yawFromQuat } from "../../../src/shared/look.js";
 import type { PickupKind, PickupPlacement } from "../../../src/shared/pickups.js";
 import { parseBakedRegions, type BakedRegionsFile } from "../../../src/shared/nav/regions.js";
@@ -61,6 +62,7 @@ export type WelcomeState = {
   pickups: readonly string[];
   doors: readonly DoorState[];
   elevators?: readonly ElevatorCab[];
+  claims?: readonly ClaimRow[];
   weapon?: string;
   ammo: number;
   keys: readonly string[];
@@ -85,6 +87,11 @@ export type BotWorld = {
   doors(): DoorState[];
   /** Current cabs, including door state and last arrival stop. */
   cabs(): readonly CabState[];
+  /** Host claim table, by key. */
+  claims(): ReadonlyMap<string, ClaimRow>;
+  applyClaims(rows: readonly ClaimRow[]): void;
+  /** True after a welcome/claims frame carried the field. */
+  claimsSupported(): boolean;
   /** Placement leaf. Open and locked stay on `door()`. */
   doorBody(id: string): DoorBody | undefined;
   pickups(): readonly string[];
@@ -141,6 +148,8 @@ export function createBotWorld(view: WorldView): BotWorld {
   const pawns = new Map<number, PawnPose>();
   const doorMap = new Map<string, DoorState>();
   const cabs = new Map<string, ElevatorCab>();
+  const claimRows = new Map<string, ClaimRow>();
+  let sawClaims = false;
   const vitals = new Map<number, { entity: number; hp: number; dead: boolean }>();
   let ownedId: number | undefined;
   let pickupIds: string[] = [];
@@ -177,6 +186,17 @@ export function createBotWorld(view: WorldView): BotWorld {
     },
     cabs() {
       return cabStates(cabs);
+    },
+    claims() {
+      return claimRows;
+    },
+    applyClaims(rows) {
+      claimRows.clear();
+      for (const row of rows) claimRows.set(row.key, { ...row });
+      sawClaims = true;
+    },
+    claimsSupported() {
+      return sawClaims;
     },
     doorBody(id: string) {
       return doorBodies.get(id);
@@ -240,6 +260,7 @@ export function createBotWorld(view: WorldView): BotWorld {
       if (welcome.elevators) {
         for (const cab of welcome.elevators) cabs.set(cab.id, { ...cab });
       }
+      if (welcome.claims) this.applyClaims(welcome.claims);
       weapon = welcome.weapon;
       ammo = welcome.ammo;
       heldKeys = [...welcome.keys];

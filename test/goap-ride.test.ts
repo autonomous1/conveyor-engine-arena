@@ -10,38 +10,39 @@ import { stopOf } from "../src/shared/scene-graph.ts";
 const loaded = loadArena();
 const graph = loaded.sceneGraph!;
 const portal = graph.portals.find((item) => item.kind === "elevator" && stopOf(item.a) && stopOf(item.b))!;
+const shaft = stopOf(portal.b)!.shaft;
+const upGoal = reach(portal.b);
+const downGoal = reach(portal.a);
+const doors = loaded.view.doors.map((door) => ({ id: door.id, open: door.open, locked: door.locked === true }));
+const ctx = createBotContext(graph, []);
 
-test("ride_grounds_both_landings_and_plans_both_directions", () => {
-  const doors = loaded.view.doors.map((door) => ({ id: door.id, open: door.open, locked: door.locked === true }));
-  const upGoal = reach(portal.b);
+test("a_stop_goal_grounds_one_ride_to_the_goal_shaft", () => {
   const actions = groundActions(graph, [], [upGoal]);
-  assert.ok(actions.some((action) => action.id === `goTo:${portal.a}`), "from landing not grounded");
-  assert.ok(actions.some((action) => action.id === `goTo:${portal.b}`), "to landing not grounded");
-
-  const ctx = createBotContext(graph, []);
-  const up = chooseGoal(buildWorldState({ at: portal.a, pickups: [], doors }), [upGoal], actions, ctx, { maxExpand: 5000 });
-  assert.ok(up, "no upward plan");
-  assert.equal(up.steps[0], `ride:up:${portal.id}`);
-
-  const downGoal = reach(portal.a);
-  const downActions = groundActions(graph, [], [downGoal]);
-  const down = chooseGoal(buildWorldState({ at: portal.b, pickups: [], doors }), [downGoal], downActions, ctx, { maxExpand: 5000 });
-  assert.ok(down, "no downward plan");
-  assert.equal(down.steps[0], `ride:down:${portal.id}`);
+  const rides = actions.filter((action) => action.id.startsWith("rideTo:"));
+  assert.equal(rides.length, 1);
+  assert.equal(rides[0]!.id, `rideTo:${shaft}:${portal.b}`);
+  assert.ok(actions.length < 100, `action set ${actions.length}`);
+  const plan = chooseGoal(buildWorldState({ at: portal.a, pickups: [], doors }), [upGoal], actions, ctx, { maxExpand: 5000 });
+  assert.ok(plan);
+  assert.deepEqual(plan.steps, [`rideTo:${shaft}:${portal.b}`]);
 });
 
-test("a_floor_stop_plans_from_outside_through_the_ride", () => {
-  const goal = reach(portal.b);
-  const ctx = createBotContext(graph, []);
-  const shaftPlace = graph.placeById.get(stopOf(portal.a)!.shaft) as { joins?: Array<string | undefined> } | undefined;
+test("a_floor_stop_plans_from_the_lower_hall_through_the_ride", () => {
+  const shaftPlace = graph.placeById.get(shaft) as { joins?: Array<string | undefined> } | undefined;
   const start = shaftPlace?.joins?.[stopOf(portal.a)!.index];
   assert.ok(start, "no lower hall for the ride test");
-  const state = buildWorldState({
-    at: start, pickups: [],
-    doors: loaded.view.doors.map((item) => ({ id: item.id, open: item.open, locked: item.locked === true })),
-  });
-  assert.ok(Number.isFinite(estimateSeconds(goal, ctx, [], undefined)(state)), "heuristic prunes the ride");
-  const plan = chooseGoal(state, [goal], groundActions(graph, [], [goal]), ctx, { maxExpand: 5000 });
+  const state = buildWorldState({ at: start, pickups: [], doors });
+  assert.ok(Number.isFinite(estimateSeconds(upGoal, ctx, [], undefined)(state)), "heuristic prunes the ride");
+  const plan = chooseGoal(state, [upGoal], groundActions(graph, [], [upGoal]), ctx, { maxExpand: 5000 });
   assert.ok(plan);
-  assert.ok(plan.steps.some((id) => id.startsWith("ride:")));
+  assert.ok(plan.steps.some((id) => id.startsWith("rideTo:")));
+});
+
+test("the_descent_uses_the_same_goal_ride", () => {
+  const actions = groundActions(graph, [], [downGoal]);
+  assert.ok(actions.some((action) => action.id === `goTo:${portal.a}`));
+  assert.ok(actions.some((action) => action.id === `goTo:${portal.b}`));
+  const plan = chooseGoal(buildWorldState({ at: portal.b, pickups: [], doors }), [downGoal], actions, ctx, { maxExpand: 5000 });
+  assert.ok(plan);
+  assert.deepEqual(plan.steps, [`rideTo:${shaft}:${portal.a}`]);
 });

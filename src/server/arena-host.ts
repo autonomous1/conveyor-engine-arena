@@ -28,6 +28,7 @@ import { createArenaElevators } from "./elevators.js";
 import { createArenaFire } from "./fire.js";
 import { applyPawnModel, claimClearSpawn, createHeldInputs, placePawn, startPropAnimation, startWanderLoop, teleportBlockReason } from "./game.js";
 import { playerRoster } from "./players.js";
+import { createArenaClaims } from "./claims.js";
 import { createArenaGrenades } from "./grenade.js";
 import { createHostSocketPaths } from "./host-path.js";
 import { pawnBodies, releasePickupObstacle } from "./pickups.js";
@@ -145,6 +146,7 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
     const elevators = elevatorHost.snapshot();
     if (elevators.length > 0) welcome.elevators = elevators;
     welcome.players = roster();
+    welcome.claims = claimHost.snapshot();
     const owned = welcome.ownedEntityId;
     if (typeof owned === "number") {
       const weapon = kit.weaponOf(owned);
@@ -267,6 +269,13 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
     blockers: createDoorBlockers(loaded.world),
     log: (line) => console.log(line),
   });
+  const claimHost = createArenaClaims({
+    sendAll(frame) {
+      const text = encodeFrame(frame);
+      for (const clientId of engine.connected) engine.session(clientId)?.socket.send(text);
+    },
+    log: (line) => console.error(line),
+  });
   const elevatorHost = createArenaElevators({
     elevators: loaded.view.elevators ?? [],
     aabbs: loaded.view.aabbs,
@@ -384,6 +393,7 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
       const frame = encodeFrame({ t: "players", ids: rosterIds });
       for (const clientId of engine.connected) engine.session(clientId)?.socket.send(frame);
     }
+    claimHost.tick(Date.now());
     reservedPads.clear();
     const bodies = pawnBodies(loaded.world, health);
     const grants = pickupHost.take(bodies, health, kit);
@@ -544,6 +554,7 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
         } catch (err) {
           console.error("grenade threw", err);
         }
+        claimHost.onFrame(clientId, frame, conn.claims?.scope, engine.replicator.get(clientId)?.ownedEntity);
         try {
           elevatorHost.onFrame(clientId, frame);
         } catch (err) {
@@ -560,7 +571,10 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
       }, (text) => attachPickupWelcome(text, conn.claims), () => pushPrivileged(conn));
       socket.onClose(() => {
         const clientId = clientIdFor(engine, socket);
-        if (clientId !== undefined) doorHost.drop(clientId);
+        if (clientId !== undefined) {
+          doorHost.drop(clientId);
+          claimHost.drop(engine.replicator.get(clientId)?.ownedEntity ?? -1);
+        }
       });
       engine.attach(socket);
     },

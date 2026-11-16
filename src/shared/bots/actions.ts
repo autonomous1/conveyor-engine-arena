@@ -96,9 +96,8 @@ export function groundActions(
   stand?: Stand,
 ): Action<BotCtx>[] {
   const actions: Action<BotCtx>[] = [];
-  // The host's escape goal is on-foot; grounding 180 cab edges there makes a
-  // 10 ms plan miss. Rides are grounded for goals that actually name a stop.
-  const wantsRide = !goals || stand !== undefined || goals.some((goal) => typeof goal.want[AT] === "string" && stopOf(goal.want[AT] as string) !== undefined);
+  const rideGoals = rideTargets(graph, goals, stand);
+  const wantsRide = rideGoals.length > 0;
   // No goals: every place and every door, so fixture plans stay complete.
   // With goals: the goal room and the pickups that goal names. `goToDoor`
   // covers the stand, so door sides are not also `goTo` targets.
@@ -108,8 +107,11 @@ export function groundActions(
   if (stand && !places.includes(stand.place)) places.push(stand.place);
   if (wantsRide) {
     const seen = new Set(places);
-    for (const portal of elevatorPortals(graph)) {
-      for (const id of [portal.a, portal.b]) {
+    for (const goal of rideGoals) {
+      const shaft = graph.placeById.get(goal.shaft) as { stops?: readonly number[] } | undefined;
+      if (!shaft?.stops) continue;
+      for (let i = 0; i < shaft.stops.length; i += 1) {
+        const id = `${goal.shaft}@${i}`;
         if (seen.has(id)) continue;
         seen.add(id);
         places.push(id);
@@ -129,12 +131,7 @@ export function groundActions(
     actions.push(unlock(doorId(portal), portal.key));
   }
 
-  if (wantsRide) {
-    for (const portal of elevatorPortals(graph)) {
-      actions.push(ride(portal));
-      actions.push(ride(portal, true));
-    }
-  }
+  for (const goal of rideGoals) actions.push(rideTo(graph, goal.shaft, goal.stop));
 
   for (const item of chosen ?? pickupsInOrder(pickups, ranked)) {
     actions.push(pickup(item, placeOfPickup(graph, item)));
@@ -195,6 +192,55 @@ export function goToDoor(door: string, place: string, stand: Point): Action<BotC
     eff: { at: atDoor(door), [doorSideFact(door)]: place },
     usable: (s, ctx) => Number.isFinite(metres(s, ctx)),
     cost: (s, ctx) => metres(s, ctx) / WALK_MPS,
+  };
+}
+
+type RideTarget = { shaft: string; stop: string };
+
+function rideTargets(
+  graph: SceneGraph,
+  goals: readonly { want: WorldState }[] | undefined,
+  stand?: Stand,
+): RideTarget[] {
+  const out = new Map<string, RideTarget>();
+  for (const goal of goals ?? []) {
+    const at = goal.want[AT];
+    if (typeof at !== "string") continue;
+    const stop = stopOf(at);
+    if (stop) out.set(`${stop.shaft}|${at}`, { shaft: stop.shaft, stop: at });
+  }
+  const place = stand ? graph.placeById.get(stand.place) : undefined;
+  if (place) {
+    for (const shaft of graph.shafts) {
+      for (let i = 0; i < shaft.stops.length; i += 1) {
+        if (Math.abs(shaft.stops[i]! - place.y) > 0.1) continue;
+        const id = `${shaft.id}@${i}`;
+        out.set(`${shaft.id}|${id}`, { shaft: shaft.id, stop: id });
+      }
+    }
+  }
+  return [...out.values()];
+}
+
+/**
+ * One cab edge to `stop` in `shaft`. The from stop is the state's `at`.
+ * @post `at = stop`; cost is Infinity when no portal connects the two stops.
+ */
+export function rideTo(graph: SceneGraph, shaft: string, stop: string): Action<BotCtx> {
+  const portals = elevatorPortals(graph);
+  return {
+    id: `rideTo:${shaft}:${stop}`,
+    pre: {},
+    eff: { [AT]: stop },
+    usable: (s) => {
+      const from = stopOf(String(s.at));
+      return from?.shaft === shaft && s.at !== stop;
+    },
+    cost: (s) => {
+      const from = String(s.at);
+      const portal = portals.find((item) => (item.a === from && item.b === stop) || (item.b === from && item.a === stop));
+      return portal ? Math.max(ACT_S, portal.cost / WALK_MPS) : Infinity;
+    },
   };
 }
 

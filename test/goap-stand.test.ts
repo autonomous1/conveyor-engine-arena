@@ -50,7 +50,7 @@ test("a_stand_goal_on_an_upper_floor_grounds_the_ride", () => {
   assert.ok(upperStand);
   const goal = standAt(target);
   const actions = groundActions(graph, [], [goal], upperStand);
-  assert.ok(actions.some((action) => action.id.startsWith("ride:")), "stand goal has no ride");
+  assert.ok(actions.some((action) => action.id.startsWith("rideTo:")), "stand goal has no ride");
   assert.ok(actions.some((action) => action.id.startsWith(`goTo:${upperStand.place}`)));
   const ctx = createBotContext(graph, []);
   const state = buildWorldState({
