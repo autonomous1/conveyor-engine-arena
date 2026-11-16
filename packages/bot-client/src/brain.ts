@@ -15,6 +15,7 @@ import type { FloorBox } from "../../../src/shared/movements.js";
 import { createFollower, doorStand, wishTo, type FollowInput, type FollowPawn, type Pose } from "../../../src/shared/nav/follow.js";
 import { buildGrid, findLocalPath, navBoxes, specForPlace, type Grid } from "../../../src/shared/nav/grid.js";
 import { createNavCache, planLegs, type PlanLegsOptions } from "../../../src/shared/nav/legs.js";
+import { planPath } from "../../../src/shared/nav/path.js";
 import { resolveStand, type DoorView, type Stand } from "../../../src/shared/nav/stand.js";
 import type { BakedRegionsFile } from "../../../src/shared/nav/regions.js";
 import { planRoute, type Gate } from "../../../src/shared/nav/route.js";
@@ -692,32 +693,16 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
   ): Walk | undefined => {
     const graph = session.world.sceneGraph();
     if (!graph) return undefined;
-    const place = placeAt(graph, target.x, target.y, target.z).id;
-    const fromPlace = placeAt(graph, pose.x, pose.y, pose.z).id;
-    let points: Triple[] = [[pose.x, pose.y, pose.z]];
-    if (fromPlace !== place) {
-      const route = planRoute(graph, pose, place, gate);
-      if (!route.ok) return undefined;
-      if (route.steps.length > 0 && route.steps.every((step) => step.portal.kind === "elevator")) return undefined;
-      if (route.steps.some((step) => step.portal.kind === "door" && gate(step.portal) !== "open")) return undefined;
-      const legs = planLegs(graph, navView(session, omit), route, pose, legOpts(session, cache));
-      if (!legs.ok) return undefined;
-      points = legs.points.map(triple);
-    } else if (place === "outside") {
-      const grid = outsideGridFor(session, graph, omit, cache);
-      if (!grid) return undefined;
-      const local = findLocalPath(grid, { x: pose.x, z: pose.z }, { x: target.x, z: target.z });
-      if (!local) return undefined;
-      for (const point of local) pushPoint(points, point);
-      return { points, grid };
+    const plan = planPath(graph, pose, target, gate, {
+      view: navView(session, omit),
+      cache,
+      regions: bakedRegions(session),
+    });
+    if (!plan.ok) {
+      log(`no plan: ${plan.reason}`);
+      return undefined;
     }
-    const end = points[points.length - 1] ?? [pose.x, pose.y, pose.z];
-    if (Math.hypot(end[0] - target.x, end[2] - target.z) > 0.25) {
-      const probe = gridFor(session, graph, [...points, [target.x, target.y, target.z]], omit, placeY(graph, pose));
-      const local = findLocalPath(probe, { x: end[0], z: end[2] }, { x: target.x, z: target.z });
-      if (!local) return undefined;
-      for (const point of local) pushPoint(points, point);
-    }
+    const points = plan.points.map(triple);
     return { points, grid: gridFor(session, graph, points, omit, placeY(graph, pose)) };
   };
 

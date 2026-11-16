@@ -57,6 +57,17 @@ const walkToPoint = async (target: { x: number; z: number }, ms: number, label: 
   return false;
 };
 
+const standWalk = async (point: { x: number; z: number }, timeoutMs: number, label: string): Promise<boolean> => {
+  const mission = parseMission(`stand:${point.x.toFixed(2)},0,${point.z.toFixed(2)}`);
+  if (!mission) return false;
+  const code = await runMission(session, mission, {
+    timeoutMs,
+    log: (l) => record(`  ${label} ${l}`),
+    error: (l) => record(`  ${label} ERROR ${l}`),
+  });
+  return code === 0;
+};
+
 const losNow = (targetId: number): boolean => {
   const me = world.self();
   const tg = world.others().find((p) => p.id === targetId);
@@ -78,7 +89,8 @@ try {
   const self = world.self();
   if (!self) throw new Error("no owned pawn");
   const players = [...(world.playerIds?.() ?? [])];
-  record(`joined self=${self.id} at ${self.x.toFixed(2)},${self.y.toFixed(2)},${self.z.toFixed(2)} place=${world.placeOf(self)?.id}`);
+  const SPAWN = { x: self.x, z: self.z };
+  record(`joined self=${self.id} at ${SPAWN.x.toFixed(2)},${self.y.toFixed(2)},${SPAWN.z.toFixed(2)} place=${world.placeOf(self)?.id} (spawn point)`);
   record(`seat: others=${world.others().length} players=[${players.join(",")}] weapon=${world.weapon() ?? "none"} ammo=${world.ammo()} hp=${world.health()?.hp ?? "?"}`);
   record(`graph hash=${(world.sceneGraphHash() ?? "none").slice(0, 12)}`);
   const weaponPresent = [...world.pickups()].includes("alien-weapon-1");
@@ -114,9 +126,13 @@ try {
       record(`arm-up ${label}: timeout`);
       return false;
     };
-    record("arm-up: east approach to 10 m east of the weapon");
+    record("arm-up: east approach to 10 m east of the weapon (planner)");
     const east = { x: -13.90, z: 16.50 };
-    await walkTo(east, 60_000, "east");
+    const eastOk = await standWalk(east, 45_000, "east");
+    if (!eastOk) {
+      record("east: LAST RESORT straight walk");
+      await walkTo(east, 30_000, "east");
+    }
     record(`at east point self=${world.self()?.x.toFixed(2)},${world.self()?.y.toFixed(2)},${world.self()?.z.toFixed(2)} weapon=${world.weapon() ?? "none"} ammo=${world.ammo()}`);
     if (!world.weapon() || world.ammo() <= 0) {
       record("arm-up: climbing the steps west toward the weapon");
@@ -158,7 +174,7 @@ try {
       .map((p) => {
         const x = (p.minX + p.maxX) / 2;
         const z = (p.minZ + p.maxZ) / 2;
-        return { id: p.id, d: Math.hypot(x - me.x, z - me.z), x, z };
+        return { id: p.id, d: Math.hypot(x - SPAWN.x, z - SPAWN.z), x, z };
       })
       .sort((a, b) => a.d - b.d);
     record(`ammo candidates: ${crates.slice(0, 5).map((c) => `${c.id}(${c.d.toFixed(0)}m)`).join(" ") || "none"}`);
@@ -170,10 +186,11 @@ try {
     }
   }
 
-  // 1c. Back to the centre of the arena.
-  const center = { x: -2.40, z: 3.00 };
-  const atCenter = await walkToPoint(center, 60_000, "center");
-  record(`back at the centre: ${atCenter} self=${world.self()?.x.toFixed(2)},${world.self()?.z.toFixed(2)}`);
+  // 1c. Back to the spawn point, through the planner (no straight-line fallback).
+  let atCenter = await standWalk(SPAWN, 45_000, "spawn");
+  if (!atCenter) atCenter = await standWalk(SPAWN, 20_000, "spawn-retry");
+  if (!atCenter) record("NO ROUTE to the spawn point (not sliding)");
+  record(`back at the spawn point: ${atCenter} self=${world.self()?.x.toFixed(2)},${world.self()?.z.toFixed(2)}`);
 
   // 2. Target: explicit id, else the nearest non-player pawn.
   const selfNow = world.self()!;
@@ -191,16 +208,27 @@ try {
   } else {
     const t = world.others().find((p) => p.id === targetId);
     record(`target id=${targetId} at ${t?.x.toFixed(2)},${t?.y.toFixed(2)},${t?.z.toFixed(2)} d=${t ? Math.hypot(t.x - selfNow.x, t.z - selfNow.z).toFixed(1) : "?"} hp=${JSON.stringify(world.healthOf?.(targetId))}`);
-    // Pre-position with the world-space walker so runAttack's approach is not needed.
-    const preDeadline = Date.now() + 20_000;
+    // Pre-position through the planner; re-plan when the target changes place or drifts >3 m.
+    const preDeadline = Date.now() + 25_000;
+    let planPoint: { x: number; z: number } | undefined;
+    let planPlace: string | undefined;
     while (targetId !== undefined && Date.now() < preDeadline) {
       const me = world.self();
       const tg = world.others().find((p) => p.id === targetId);
       if (!me || !tg) break;
       const d = Math.hypot(tg.x - me.x, tg.z - me.z);
       if (d <= 15 && losNow(targetId)) break;
-      session.input.sendInput(wishTo({ x: me.x, y: me.y, z: me.z, vx: 0, vz: 0, yaw: me.yaw }, { x: tg.x, z: tg.z }, 1));
-      await sleep(50);
+      const place = world.placeOf(tg)?.id ?? "";
+      const drifted = planPoint === undefined ? Infinity : Math.hypot(tg.x - planPoint.x, tg.z - planPoint.z);
+      if (planPoint === undefined || place !== planPlace || drifted > 3) {
+        planPoint = { x: tg.x, z: tg.z };
+        planPlace = place;
+        record(`pursuit plan: id=${targetId} place=${place} d=${d.toFixed(1)}`);
+        const ok = await standWalk(planPoint, 8_000, "pursuit");
+        if (!ok) record(`pursuit: planner could not reach ${planPoint.x.toFixed(1)},${planPoint.z.toFixed(1)}`);
+      } else {
+        await sleep(150);
+      }
     }
     const me2 = world.self();
     const tg2 = targetId === undefined ? undefined : world.others().find((p) => p.id === targetId);

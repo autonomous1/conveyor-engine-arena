@@ -17,7 +17,8 @@ const args = new Map<string, string>();
 const argv = process.argv.slice(2);
 for (let i = 0; i < argv.length; i += 1) if (argv[i]!.startsWith("--")) args.set(argv[i]!.slice(2), argv[i + 1] ?? "");
 const RUN_MS = Number(args.get("for-s") ?? 300) * 1000;
-const CENTRE = { x: -2.40, z: 6.00 };
+// The spawn point is a real pad the host placed us on, not an arbitrary centre point.
+let SPAWN = { x: -2.40, z: 3.00 };
 const t0 = Date.now();
 const secs = () => ((Date.now() - t0) / 1000).toFixed(2);
 const lines: string[] = [];
@@ -112,6 +113,19 @@ const walkWithRecovery = async (target: { x: number; z: number }, ms: number, la
   return false;
 };
 
+// A -> B through the route planner: the brain's `stand:` walker (planRoute/planLegs
+// or the whole-place outside grid). The straight walker is only a logged last resort.
+const standWalk = async (point: { x: number; z: number }, timeoutMs: number, label: string): Promise<boolean> => {
+  const mission = parseMission(`stand:${point.x.toFixed(2)},0,${point.z.toFixed(2)}`);
+  if (!mission) return false;
+  const code = await runMission(session, mission, {
+    timeoutMs,
+    log: (l) => record(`  ${label} ${l}`),
+    error: (l) => record(`  ${label} ERROR ${l}`),
+  });
+  return code === 0;
+};
+
 const armed = () => (world.weapon() ?? "") !== "" && world.ammo() > 0;
 
 const armUp = async (): Promise<boolean> => {
@@ -143,7 +157,7 @@ const reload = async (): Promise<boolean> => {
     .map((p) => {
       const x = (p.minX + p.maxX) / 2;
       const z = (p.minZ + p.maxZ) / 2;
-      return { id: p.id, d: Math.hypot(x - me.x, z - me.z) };
+      return { id: p.id, d: Math.hypot(x - SPAWN.x, z - SPAWN.z) };
     })
     .sort((a, b) => a.d - b.d);
   const crate = crates[0];
@@ -179,18 +193,17 @@ const monitorMission = (label: string): (() => void) => {
 };
 
 const goCentre = async (): Promise<void> => {
-  const mission = parseMission(`stand:${CENTRE.x},0,${CENTRE.z}`);
   const stop = monitorMission("centre");
-  const code = mission ? await runMission(session, mission, { timeoutMs: 25_000, log: (l) => record(`  centre ${l}`), error: (l) => record(`  centre ERROR ${l}`) }) : 1;
-  stop();
-  let me = world.self();
-  record(`centre mission code=${code} self=${me?.x.toFixed(2)},${me?.y.toFixed(2)},${me?.z.toFixed(2)}`);
-  if (code !== 0 && me) {
-    record("centre: recovery walk");
-    await walkWithRecovery({ x: CENTRE.x, z: CENTRE.z }, 40_000, "centre-recover");
+  let ok = await standWalk(SPAWN, 30_000, "spawn");
+  if (!ok) {
+    record("spawn: planner retry");
+    ok = await standWalk(SPAWN, 20_000, "spawn-retry");
   }
-  me = world.self();
-  record(`centre done self=${me?.x.toFixed(2)},${me?.y.toFixed(2)},${me?.z.toFixed(2)} stalls=${missionStalls}`);
+  stop();
+  const me = world.self();
+  record(`spawn planner ok=${ok} self=${me?.x.toFixed(2)},${me?.y.toFixed(2)},${me?.z.toFixed(2)}`);
+  if (!ok) record("NO ROUTE to the spawn point (not sliding; the loop will try the next step)");
+  record(`spawn done self=${me?.x.toFixed(2)},${me?.y.toFixed(2)},${me?.z.toFixed(2)} stalls=${missionStalls}`);
 };
 
 const pickTarget = (): number | undefined => {
@@ -213,7 +226,8 @@ try {
   while (!world.self() && Date.now() - started < 10_000) await sleep(20);
   while (!world.sceneGraph() && Date.now() - started < 10_000) await sleep(20);
   const me0 = world.self();
-  record(`joined self=${me0?.id} at ${me0?.x.toFixed(2)},${me0?.z.toFixed(2)} pickups=${world.pickups().length} weapon=${world.weapon() ?? "none"} ammo=${world.ammo()}`);
+  if (me0) SPAWN = { x: me0.x, z: me0.z };
+  record(`joined self=${me0?.id} at ${SPAWN.x.toFixed(2)},${SPAWN.z.toFixed(2)} (spawn point) pickups=${world.pickups().length} weapon=${world.weapon() ?? "none"} ammo=${world.ammo()}`);
 
   if (!armed()) await armUp();
   if (world.weapon() && world.ammo() <= 0) await reload();
@@ -233,16 +247,28 @@ try {
     const tg = world.others().find((p) => p.id === targetId);
     const me = world.self()!;
     record(`target id=${targetId} d=${tg ? Math.hypot(tg.x - me.x, tg.z - me.z).toFixed(1) : "?"} hp=${JSON.stringify(world.healthOf?.(targetId))}`);
-    // Pre-position inside the band with LOS.
-    const preEnd = Date.now() + 20_000;
+    // Pre-position inside the band with LOS: plan to the target through the planner,
+    // and re-plan when it changes place or drifts more than ~3 m from the plan's point.
+    const preEnd = Date.now() + 25_000;
+    let planPoint: { x: number; z: number } | undefined;
+    let planPlace: string | undefined;
     while (Date.now() < preEnd && Date.now() < end) {
       const p = world.self();
       const t2 = world.others().find((q) => q.id === targetId);
       if (!p || !t2) break;
       const d = Math.hypot(t2.x - p.x, t2.z - p.z);
       if (d <= 15 && losNow(targetId)) break;
-      session.input.sendInput(wishTo({ x: p.x, y: p.y, z: p.z, vx: 0, vz: 0, yaw: p.yaw }, { x: t2.x, z: t2.z }, 1));
-      await sleep(50);
+      const place = world.placeOf(t2)?.id ?? "";
+      const drifted = planPoint === undefined ? Infinity : Math.hypot(t2.x - planPoint.x, t2.z - planPoint.z);
+      if (planPoint === undefined || place !== planPlace || drifted > 3) {
+        planPoint = { x: t2.x, z: t2.z };
+        planPlace = place;
+        record(`pursuit plan: id=${targetId} place=${place} d=${d.toFixed(1)}`);
+        const ok = await standWalk(planPoint, 8_000, "pursuit");
+        if (!ok) record(`pursuit: planner could not reach ${planPoint.x.toFixed(1)},${planPoint.z.toFixed(1)}`);
+      } else {
+        await sleep(150);
+      }
     }
     const mission = parseMission(`attack:${targetId}`);
     // Face the target while firing (product fix #10; the controller does not rotate the body).
