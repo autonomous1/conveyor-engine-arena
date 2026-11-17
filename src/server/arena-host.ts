@@ -232,20 +232,27 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
       }
       const render = seatRender.get(owned);
       if (render !== undefined) setSeatAlive(loaded.world, owned, render);
-      if (reused === undefined) {
-        const live = new Map(doorHost.snapshot().map((door) => [door.id, door.open]));
-        const shut = shutDoorBoxes(loaded.view.doors.map((door) => ({ ...door, open: live.get(door.id) ?? door.open })));
-        const pad = claimClearSpawn(loaded.world, owned, loaded.playerSpawns, reservedPads, loaded.spatialDag, shut);
-        if (pad) {
-          placePawn(loaded.world, owned, pad);
-          const agent = loaded.agents.find((item) => item.id === owned);
-          if (agent) agent.heading = pad.yaw;
-          reservedPads.set(owned, pad);
-          // One frame to everyone: this pawn just appeared on the pad (a client beams it in).
-          const joined = encodeFrame(spawnFrame(owned, pad.x, pad.y, pad.z));
-          for (const clientId of engine.connected) engine.session(clientId)?.socket.send(joined);
-        }
+      if (reused !== undefined) {
+        held.drop(owned);
+        kit.forget(owned);
+        pickupHost.forget(owned);
+        fire.forgetBot(owned);
       }
+      const live = new Map(doorHost.snapshot().map((door) => [door.id, door.open]));
+      const shut = shutDoorBoxes(loaded.view.doors.map((door) => ({ ...door, open: live.get(door.id) ?? door.open })));
+      const claimed = claimClearSpawn(loaded.world, owned, loaded.playerSpawns, reservedPads, loaded.spatialDag, shut);
+      const pad = claimed ?? loaded.playerSpawns[0];
+      if (pad) {
+        placePawn(loaded.world, owned, pad);
+        const agent = loaded.agents.find((item) => item.id === owned);
+        if (agent) agent.heading = pad.yaw;
+        reservedPads.set(owned, pad);
+        // One frame to everyone: this pawn just appeared on the pad (a client beams it in).
+        const joined = encodeFrame(spawnFrame(owned, pad.x, pad.y, pad.z));
+        for (const clientId of engine.connected) engine.session(clientId)?.socket.send(joined);
+      }
+      const pose = loaded.world.store.view(owned)?.position;
+      console.log(`hello client=${session.clientId} reused=${reused ?? "no"} owned=${owned} pad=${pad ? `${pad.x.toFixed(2)},${pad.z.toFixed(2)}` : "no"} pose=${pose ? `${pose.x.toFixed(2)},${pose.y.toFixed(2)},${pose.z.toFixed(2)}` : "none"}`);
       applyPawnModel(loaded.world, owned, helloModel(hello), loaded.view.modelChoices);
       return owned;
     },

@@ -93,3 +93,25 @@ test("attack_reports_a_missing_dag", async () => {
   assert.equal(await runAttack(fake, 7, { timeoutMs: 200, log: (line) => logs.push(line) }), 2);
   assert.ok(logs.some((line) => line.includes("no_dag")));
 });
+
+test("attack_does_not_fire_through_a_player", async () => {
+  const blocked = session();
+  blocked.world.applyLoadout({ weapon: "alien-weapon-1", ammo: 30 });
+  blocked.world.applyPlayers([8]);
+  blocked.world.applySnapshot({
+    spawns: [{ entity: 8, view: { position: { x: 5, y: 0, z: 0 }, rotation: { y: 0, w: 1 } } }],
+  });
+  const blockedLogs: string[] = [];
+  await runAttack(blocked.session, 7, { timeoutMs: 180, log: (line) => blockedLogs.push(line) });
+  assert.equal(blocked.fired.length, 0);
+  assert.ok(blockedLogs.some((line) => line.includes("friendly_blocked")));
+
+  const clear = session();
+  clear.world.applyLoadout({ weapon: "alien-weapon-1", ammo: 30 });
+  clear.world.applyPlayers([8]);
+  clear.world.applySnapshot({
+    spawns: [{ entity: 8, view: { position: { x: 5, y: 0, z: 4 }, rotation: { y: 0, w: 1 } } }],
+  });
+  await runAttack(clear.session, 7, { timeoutMs: 180, log: () => {} });
+  assert.ok(clear.fired.length > 0);
+});

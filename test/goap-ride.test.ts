@@ -46,3 +46,40 @@ test("the_descent_uses_the_same_goal_ride", () => {
   assert.ok(plan);
   assert.deepEqual(plan.steps, [`rideTo:${shaft}:${portal.a}`]);
 });
+
+const upperHall = [...graph.placeById.values()].find((place) => place.kind === "hall" && place.y > 1);
+const lowerHall = [...graph.placeById.values()].find((place) => place.kind === "hall" && place.y === 0);
+const outside = graph.placeById.get("outside")!;
+
+test("a_place_goal_on_an_upper_floor_grounds_a_ride", () => {
+  assert.ok(upperHall);
+  const goal = reach(upperHall.id);
+  const actions = groundActions(graph, [], [goal]);
+  const ride = actions.find((action) => action.id.startsWith("rideTo:"));
+  assert.ok(ride, "no ride action");
+  const shaftPlace = graph.placeById.get(ride.id.split(":")[1]!) as { joins?: Array<string | undefined> } | undefined;
+  const lower = shaftPlace?.joins?.[0];
+  assert.ok(lower, "no lower landing");
+  const state = buildWorldState({ at: lower, pickups: [], doors });
+  assert.ok(Number.isFinite(estimateSeconds(goal, ctx, [], undefined)(state)));
+});;
+
+test("a_ground_floor_place_goal_does_not_ground_a_ride", () => {
+  assert.ok(lowerHall);
+  const actions = groundActions(graph, [], [reach(lowerHall.id)]);
+  assert.equal(actions.some((action) => action.id.startsWith("rideTo:")), false);
+});
+
+test("the_live_floor_1_hall_reaches_floor_3", () => {
+  const from = graph.placeById.get("brutalist-building-1-cbake.floor-1.hall");
+  const to = graph.placeById.get("brutalist-building-1-cbake.floor-3.hall");
+  assert.ok(from && to);
+  const goal = reach(to.id);
+  const actions = groundActions(graph, [], [goal]);
+  const state = buildWorldState({ at: from.id, pickups: [], doors });
+  assert.ok(Number.isFinite(estimateSeconds(goal, ctx, [], undefined)(state)), "h(start) is Infinity");
+  const plan = chooseGoal(state, [goal], actions, ctx, { maxExpand: 8000 });
+  assert.ok(plan, "no plan");
+  assert.ok(plan.steps.some((id) => id.startsWith("rideTo:")), JSON.stringify(plan.steps));
+  assert.ok(plan.steps.includes(`goTo:${to.id}`), JSON.stringify(plan.steps));
+});

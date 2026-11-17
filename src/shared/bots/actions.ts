@@ -203,6 +203,11 @@ export function goToDoor(door: string, place: string, stand: Point): Action<BotC
 
 type RideTarget = { shaft: string; stop: string };
 
+/**
+ * Ride targets for stop goals, a stand, and place goals above the ground floor.
+ * @post A ground-floor place adds no ride; upper place goals add the stop on
+ *       their floor.
+ */
 function rideTargets(
   graph: SceneGraph,
   goals: readonly { want: WorldState }[] | undefined,
@@ -213,7 +218,19 @@ function rideTargets(
     const at = goal.want[AT];
     if (typeof at !== "string") continue;
     const stop = stopOf(at);
-    if (stop) out.set(`${stop.shaft}|${at}`, { shaft: stop.shaft, stop: at });
+    if (stop) {
+      out.set(`${stop.shaft}|${at}`, { shaft: stop.shaft, stop: at });
+      continue;
+    }
+    const place = graph.placeById.get(at);
+    if (!place || place.y <= 0.1) continue;
+    for (const shaft of graph.shafts) {
+      for (let i = 0; i < shaft.stops.length; i += 1) {
+        if (Math.abs(shaft.stops[i]! - place.y) > 0.1) continue;
+        const id = `${shaft.id}@${i}`;
+        out.set(`${shaft.id}|${id}`, { shaft: shaft.id, stop: id });
+      }
+    }
   }
   const place = stand ? graph.placeById.get(stand.place) : undefined;
   if (place) {

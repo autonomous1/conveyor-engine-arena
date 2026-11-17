@@ -130,6 +130,26 @@ export async function claimGoal(
   }
 }
 
+function playerOnSegment(
+  from: { x: number; y: number; z: number },
+  to: { x: number; y: number; z: number },
+  player: { x: number; y: number; z: number },
+  radius: number,
+  height: number,
+): boolean {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const dz = to.z - from.z;
+  const len = dx * dx + dy * dy + dz * dz;
+  if (!(len > 0)) return false;
+  const t = Math.max(0, Math.min(1, ((player.x - from.x) * dx + (player.y - from.y) * dy + (player.z - from.z) * dz) / len));
+  const x = from.x + dx * t;
+  const y = from.y + dy * t;
+  const z = from.z + dz * t;
+  if (y < player.y - 0.05 || y > player.y + height + 0.05) return false;
+  return Math.hypot(x - player.x, z - player.z) <= radius + 0.05;
+}
+
 function shutDoorBoxes(session: BotSession): Array<{ minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number }> {
   const boxes = [];
   for (const door of session.world.doors()) {
@@ -146,7 +166,8 @@ function shutDoorBoxes(session: BotSession): Array<{ minX: number; maxX: number;
 /**
  * Shoot a named pawn until its health frame says dead, it disappears, the bot
  * runs out of ammo or dies, or the deadline passes.
- * @post Returns 0 on dead, 2 on refused/lost/no_ammo/died, 3 on timeout.
+ * @post Returns 0 on dead, 2 on refused/lost/no_ammo/died/no_dag, 3 on
+ *       timeout; no shot whose eye-to-target corridor contains a player.
  */
 export async function runAttack(session: BotSession, targetId: number, opts: BrainOptions = {}): Promise<number> {
   const log = opts.log ?? (() => {});
@@ -224,9 +245,15 @@ export async function runAttack(session: BotSession, targetId: number, opts: Bra
       const pitch = Math.atan2(targetPoint.y - eye.y, range);
       const now = Date.now();
       if (now >= nextFire) {
-        nextFire = now + 250;
-        session.input.fire(yaw, pitch);
-        log(`attack: fire range=${range.toFixed(1)} los=${los ? "yes" : "no"}`);
+        const player = session.world.others().find((pawn) => session.world.playerIds().has(pawn.id)
+          && playerOnSegment(eye, targetPoint, pawn, session.world.pawnRadius, session.world.pawnHeight));
+        if (player) {
+          log(`attack: friendly_blocked id=${player.id}`);
+        } else {
+          nextFire = now + 250;
+          session.input.fire(yaw, pitch);
+          log(`attack: fire range=${range.toFixed(1)} los=${los ? "yes" : "no"}`);
+        }
       }
     }
     await delay(50);
