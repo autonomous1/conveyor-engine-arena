@@ -16,12 +16,15 @@ import {
   LASER_MS,
   parseFire,
   traceIndexed,
+  traceHitscanDag,
+  type TraceAabb,
   type FireGate,
   type LaserFrame,
   type TraceCapsule,
 } from "../shared/hitscan.js";
 import { deliverAuditFrame } from "./audit.js";
 import { clientSeesPawn, deliverHealthFrames } from "./health.js";
+import type { SpatialDAG } from "../shared/spatial-dag.js";
 
 /**
  * Hitscan for owned pawns. Sends lasers and may wound. Counters sit on the shared audit.
@@ -64,6 +67,10 @@ export function createArenaFire(opts: {
   health?: PawnHealth;
   /** Shared with the wander tick so a later client still receives the totals. */
   audit?: Audit;
+  /** Static DAG. Absent keeps the flat trace for tests. */
+  dag?: SpatialDAG;
+  /** Dynamic shut-door boxes for the DAG path. */
+  dynamic?: () => readonly TraceAabb[];
 }): ArenaFire {
   const now = opts.now ?? Date.now;
   const gates = new Map<number, { sessionId: number; gate: FireGate }>();
@@ -85,7 +92,10 @@ export function createArenaFire(opts: {
     }
     const origin = { x: pawn.position.x, y: pawn.position.y + EYE_HEIGHT, z: pawn.position.z };
     const capsules = pawnCapsules(opts.world, entity);
-    const traced = traceIndexed(origin, aimDirection(yaw, clampPitch(pitch)), opts.world.listObstacles(), capsules);
+    const direction = aimDirection(yaw, clampPitch(pitch));
+    const traced = opts.dag
+      ? traceHitscanDag(origin, direction, opts.dag, opts.dynamic?.() ?? [], capsules)
+      : traceIndexed(origin, direction, opts.world.listObstacles(), capsules);
     const hit = traced.hitId === undefined ? "none" : String(traced.hitId);
     log.trace(`hit=${hit} dist=${traced.distance.toFixed(3)}`);
     console.log(`shot shooter=${entity} eye=${origin.x.toFixed(3)},${origin.y.toFixed(3)},${origin.z.toFixed(3)} hit=${hit} dist=${traced.distance.toFixed(3)}`);

@@ -15,7 +15,7 @@ import { createAudit } from "../shared/audit.js";
 import type { BotSenseReader } from "../shared/bots/sense.js";
 import { createPawnHealth, type SpawnPick } from "../shared/health.js";
 import { helloModel, parseModelFrame } from "../shared/model-choice.js";
-import { hasLineOfSight } from "../shared/hitscan.js";
+import { hasLineOfSight, hasLineOfSightDag } from "../shared/hitscan.js";
 import { createPawnKit, createPickupHost } from "../shared/pickups.js";
 import { decodeMoveButtons } from "../shared/movements.js";
 import { canonicalJson, sceneGraphPayload, sha256Hex } from "../shared/scene-graph.js";
@@ -29,6 +29,7 @@ import { createArenaFire } from "./fire.js";
 import { applyPawnModel, claimClearSpawn, createHeldInputs, placePawn, startPropAnimation, startWanderLoop, teleportBlockReason } from "./game.js";
 import { playerRoster } from "./players.js";
 import { createArenaClaims } from "./claims.js";
+import { shutDoorBoxes } from "../shared/bots/cover.js";
 import { despawnSeat, setSeatAlive } from "./seats.js";
 import { createArenaGrenades } from "./grenade.js";
 import { createHostSocketPaths } from "./host-path.js";
@@ -334,6 +335,11 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
     pickups: loaded.view.pickups ?? [],
     remainingPickups: () => pickupHost.remainingIds(),
     log: (line) => console.error(line),
+    coverDag: loaded.spatialDag,
+    coverDynamic: () => {
+      const live = new Map(doorHost.snapshot().map((door) => [door.id, door.open]));
+      return shutDoorBoxes(loaded.view.doors.map((door) => ({ ...door, open: live.get(door.id) ?? door.open })));
+    },
     ownedEntities() {
       const owned: number[] = [];
       for (const clientId of engine.connected) {
@@ -370,10 +376,19 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
       health,
       sense: botSense,
       nav: { ...wanderNav, sceneGraph: wanderNav.sceneGraph, regions: wanderNav.regions },
+      coverDag: loaded.spatialDag,
+      coverDynamic: () => {
+        const live = new Map(doorHost.snapshot().map((door) => [door.id, door.open]));
+        return shutDoorBoxes(loaded.view.doors.map((door) => ({ ...door, open: live.get(door.id) ?? door.open })));
+      },
       pickups: loaded.view.pickups ?? [],
       log: (line) => console.error(line),
       useDoor: (pawnId, door) => doorHost.useDoorAs(pawnId, { door }),
-      lineOfSight: (from, to) => hasLineOfSight(from, to, loaded.world.listObstacles()),
+      lineOfSight: (from, to) => {
+        if (!loaded.spatialDag) return hasLineOfSight(from, to, loaded.world.listObstacles());
+        const live = new Map(doorHost.snapshot().map((door) => [door.id, door.open]));
+        return hasLineOfSightDag(loaded.spatialDag, from, to, shutDoorBoxes(loaded.view.doors.map((door) => ({ ...door, open: live.get(door.id) ?? door.open }))));
+      },
       fireAsBot: (id, yaw, pitch) => fire.fireAsBot(id, yaw, pitch),
       forgetBot: (id) => fire.forgetBot(id),
     })

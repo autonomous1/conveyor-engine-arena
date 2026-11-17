@@ -63,19 +63,28 @@ test("dag_los_agrees_with_the_flat_boxes_and_keeps_dynamic", () => {
   const loaded = loadArena();
   const dag = loaded.spatialDag;
   assert.ok(dag);
-  const p = (raw as { chunks: Array<{ positions: number[] }> }).chunks[0]!.positions;
-  const xs = [p[0]!, p[3]!, p[6]!, p[9]!];
-  const zs = [p[2]!, p[5]!, p[8]!, p[11]!];
-  const box = { minX: Math.min(...xs), maxX: Math.max(...xs), minY: 0, maxY: 2, minZ: Math.min(...zs), maxZ: Math.max(...zs) };
-  const from = { x: box.minX - 1, y: 1, z: (box.minZ + box.maxZ) / 2 };
-  const to = { x: box.maxX + 1, y: 1, z: from.z };
-  assert.equal(hasLineOfSight(from, to, loaded.view.aabbs), false);
-  assert.equal(hasLineOfSightDag(dag, from, to), false);
-
+  const boxes = loaded.view.aabbs.filter((item) => item.maxX - item.minX > 1).slice(0, 5);
+  assert.ok(boxes.length > 0);
+  for (const box of boxes) {
+    const from = { x: box.minX - 1, y: 1, z: (box.minZ + box.maxZ) / 2 };
+    const to = { x: box.maxX + 1, y: 1, z: from.z };
+    assert.equal(hasLineOfSight(from, to, loaded.view.aabbs), false);
+    assert.equal(hasLineOfSightDag(dag, from, to), false);
+  }
+  const box = boxes[0]!;
   const openFrom = { x: box.maxX + 2, y: 5, z: box.maxZ + 2 };
   const openTo = { x: openFrom.x + 1, y: 5, z: openFrom.z };
   assert.equal(hasLineOfSightDag(dag, openFrom, openTo), true);
   const dynamic = [{ minX: openFrom.x + 0.6, maxX: openFrom.x + 0.8, minY: 4, maxY: 6, minZ: openFrom.z - 1, maxZ: openFrom.z + 1 }];
   assert.equal(hasLineOfSightDag(dag, openFrom, openTo, dynamic), false);
   assert.equal(hasLineOfSight(openFrom, openTo, dynamic), false);
+});;
+
+test("runtime_hash_covers_the_merged_geometry", () => {
+  const loaded = loadArena();
+  assert.ok(loaded.spatialDag);
+  assert.equal(loaded.spatialDag.hash, loaded.view.spatialDagHash);
+  assert.notEqual(loaded.spatialDag.hash, raw.hash);
+  const bot = createBotWorld({ aabbs: [], spatialDag: loaded.view.spatialDag, spatialDagHash: loaded.view.spatialDagHash });
+  assert.equal(bot.spatialDagHash(), loaded.spatialDag.hash);
 });

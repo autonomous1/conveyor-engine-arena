@@ -116,6 +116,8 @@ export type MindSense = Pick<BotSense, "alive" | "place" | "msNoProgress" | "rou
   threatDist?: number;
   /** Place of the threat. The place the bot was standing when the attacker is unknown. */
   threatPlace?: string;
+  /** Nearest cover candidate; a blocked point raises the evade priority. */
+  cover?: { block: boolean; score: number };
   /**
    * Timestamp of the current damage note (`sense.at - ageMs`).
    * The same note keeps this value. Absent: `now - damage.ageMs`.
@@ -371,5 +373,6 @@ function evadeVerdict(mind: Mind, sense: MindSense, now: number): number | undef
     mind.safeSince = undefined;
   }
   if (mind.evadeSince === undefined) return undefined;
-  return underFire ? EVADE_UNDER_FIRE_PRIORITY : EVADE_HURT_PRIORITY;
+  const priority = underFire ? EVADE_UNDER_FIRE_PRIORITY : EVADE_HURT_PRIORITY;
+  return sense.cover?.block ? priority + 1 : priority;
 }

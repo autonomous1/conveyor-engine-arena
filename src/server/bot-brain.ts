@@ -38,6 +38,8 @@ import { reach } from "../shared/bots/goals.js";
 import type { BotSenseReader } from "../shared/bots/sense.js";
 import { buildWorldState } from "../shared/bots/state.js";
 import { hasLineOfSight, losGate } from "../shared/hitscan.js";
+import { nearestCover, shutDoorBoxes } from "../shared/bots/cover.js";
+import type { SpatialDAG } from "../shared/spatial-dag.js";
 import { MAX_HP, type PawnHealth } from "../shared/health.js";
 import { EYE_HEIGHT } from "../shared/look.js";
 import { createNavCache } from "../shared/nav/legs.js";
@@ -95,6 +97,10 @@ export type HostBotBrainOptions = {
    * Evade calls it through `losGate(5)`, once per bot.
    */
   lineOfSight?: (from: FleeVec, to: FleeVec) => boolean;
+  /** Static DAG for the cover/evade query. Absent keeps the old flee picker. */
+  coverDag?: SpatialDAG;
+  /** Shut-door boxes for the cover query. */
+  coverDynamic?: () => readonly import("../shared/hitscan.js").TraceAabb[];
   /**
    * Press use for a pawn on one door (`useDoorAs`). Absent: Escape never uses a
    * door and plans only through open ones.
@@ -422,6 +428,13 @@ export function createHostBotBrain(opts: HostBotBrainOptions): HostBotBrain {
 
   function chooseFlee(me: FleeVec, threat: FleeVec): { x: number; y: number; z: number } | undefined {
     const graph = opts.nav.sceneGraph;
+    if (opts.coverDag) {
+      const cover = nearestCover(opts.coverDag, graph, me, threat, { dynamic: opts.coverDynamic?.() ?? [] });
+      if (cover?.block) {
+        opts.log?.(`[live] cover ${cover.source} block score=${cover.score.toFixed(2)}`);
+        return { x: cover.x, y: cover.y, z: cover.z };
+      }
+    }
     const myPlace = placeAt(graph, me.x, me.y, me.z).id;
     const threatPlace = placeAt(graph, threat.x, threat.y, threat.z).id;
     const net = roads.net((portal) => {
@@ -806,6 +819,12 @@ export function createHostBotBrain(opts: HostBotBrainOptions): HostBotBrain {
       damageSeq: sense.damage?.seq,
       threatSeen: threat ? slot.threatSeen : undefined,
       hpFrac: vital.hp / MAX_HP,
+      ...(opts.coverDag && threat && vital.hp < MAX_HP * 0.5
+        ? { cover: (() => {
+          const cover = nearestCover(opts.coverDag!, opts.nav.sceneGraph, me ?? { x: 0, y: 0, z: 0 }, threat ?? me ?? { x: 0, y: 0, z: 0 }, { dynamic: opts.coverDynamic?.() ?? [] });
+          return cover ? { block: cover.block, score: cover.score } : undefined;
+        })() }
+        : {}),
     };
     if (fightOn) {
       const latchedDead = slot.goal === "fightback" && slot.targetId !== undefined && opts.health.isDead(slot.targetId);

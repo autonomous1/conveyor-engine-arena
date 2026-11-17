@@ -6,7 +6,7 @@
 // Invariants: `block` is exactly the raycast result; a shut door must be a
 //   dynamic box or it does not block. (test: cover_evaluation_matches_the_raycast)
 import { placeAt, type SceneGraph } from "../scene-graph.js";
-import type { SpatialDAG } from "../spatial-dag.js";
+import { nodeAt, type SpatialDAG } from "../spatial-dag.js";
 import { hasLineOfSightDag, type TraceAabb } from "../hitscan.js";
 
 /**
@@ -22,6 +22,7 @@ export type CoverPoint = {
   los: boolean;
   dist: number;
   angle: number;
+  source: "ring" | "polygon" | "node";
 };
 
 /**
@@ -32,6 +33,21 @@ export type CoverOptions = {
   dynamic?: readonly TraceAabb[];
   limit?: number;
 };
+
+/**
+ * AABB for every shut leaf. The DAG is static; these boxes are the dynamic
+ * blockers the caller adds to `CoverOptions.dynamic`.
+ */
+export function shutDoorBoxes(doors: readonly { open: boolean; position: [number, number, number]; size: [number, number, number] }[]): TraceAabb[] {
+  const boxes: TraceAabb[] = [];
+  for (const door of doors) {
+    if (door.open) continue;
+    const [x, , z] = door.position;
+    const [sx, sy, sz] = door.size;
+    boxes.push({ minX: x - sx / 2, maxX: x + sx / 2, minY: 0, maxY: sy, minZ: z - sz / 2, maxZ: z + sz / 2 });
+  }
+  return boxes;
+}
 
 const EYE = 1.6;
 const CHEST = 1.2;
@@ -63,7 +79,7 @@ export function evaluateCover(
   const ideal = opts.idealDistance ?? 5;
   const angle = angleOf(point, target);
   const score = (clear ? -2 : 3) + Math.max(0, 2 - Math.abs(dist - ideal) * 0.2) + (1 - angle / Math.PI) * 0.5;
-  return { x: point.x, y: point.y, z: point.z, score, block: !clear, los: clear, dist, angle };
+  return { x: point.x, y: point.y, z: point.z, score, block: !clear, los: clear, dist, angle, source: opts.idealDistance === undefined ? "ring" : "ring" };
 }
 
 /**
@@ -83,23 +99,35 @@ export function findCoverPoints(
   } catch {
     polygon = [];
   }
-  const candidates = new Map<string, { x: number; y: number; z: number }>();
-  const add = (x: number, y: number, z: number): void => {
+  const candidates = new Map<string, { x: number; y: number; z: number; source: CoverPoint["source"] }>();
+  const add = (x: number, y: number, z: number, source: CoverPoint["source"]): void => {
     if (![x, y, z].every(Number.isFinite)) return;
     const key = `${x.toFixed(2)}:${y.toFixed(2)}:${z.toFixed(2)}`;
-    candidates.set(key, { x, y, z });
+    candidates.set(key, { x, y, z, source });
   };
   for (const radius of [3, 5, 7]) {
     for (let i = 0; i < 12; i += 1) {
       const a = (i / 12) * Math.PI * 2;
-      add(target.x + Math.cos(a) * radius, target.y, target.z + Math.sin(a) * radius);
+      add(target.x + Math.cos(a) * radius, target.y, target.z + Math.sin(a) * radius, "ring");
     }
   }
-  for (const point of polygon) add(point[0], target.y, point[1]);
+  for (const point of polygon) add(point[0], target.y, point[1], "polygon");
+  const node = nodeAt(dag, target);
+  if (node) {
+    const min = node.bounds.min;
+    const max = node.bounds.max;
+    for (const [x, z] of [
+      [min.x, min.z], [min.x, max.z], [max.x, min.z], [max.x, max.z],
+      [(min.x + max.x) / 2, min.z], [(min.x + max.x) / 2, max.z],
+      [min.x, (min.z + max.z) / 2], [max.x, (min.z + max.z) / 2],
+    ] as const) add(x, target.y, z, "node");
+  }
   const points: CoverPoint[] = [];
   for (const candidate of candidates.values()) {
     if (Math.hypot(candidate.x - eye.x, candidate.z - eye.z) < 0.6) continue;
-    points.push(evaluateCover(dag, candidate, target, opts));
+    const point = evaluateCover(dag, candidate, target, opts);
+    point.source = candidate.source;
+    points.push(point);
   }
   points.sort((a, b) => b.score - a.score || a.dist - b.dist);
   return (opts.limit ?? 24) > 0 ? points.slice(0, opts.limit ?? 24) : points;
@@ -111,13 +139,12 @@ export function findCoverPoints(
  */
 export function nearestCover(
   dag: SpatialDAG,
+  graph: SceneGraph | undefined,
   from: { x: number; y: number; z: number },
   target: { x: number; y: number; z: number },
   opts: CoverOptions = {},
 ): CoverPoint | undefined {
-  const graph = undefined as SceneGraph | undefined;
-  void graph;
-  const points = findCoverPoints(dag, { places: [], portals: [] } as unknown as SceneGraph, from, target, opts);
+  const points = findCoverPoints(dag, graph ?? ({ places: [], portals: [] } as unknown as SceneGraph), from, target, opts);
   const blocked = points.filter((point) => point.block);
   const pool = blocked.length > 0 ? blocked : points;
   let best: CoverPoint | undefined;

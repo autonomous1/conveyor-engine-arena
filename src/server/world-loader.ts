@@ -6,7 +6,7 @@ import { AuthoritativeWorld, applyStaticWorldDefinition } from "conveyor-engine-
 import type { GameFiles } from "./game-files.js";
 import { loadInstalledGame } from "./load-game.js";
 import { nodeGameFiles } from "./game-files-node.js";
-import { loadSpatialDAG, type SpatialDAG } from "../shared/spatial-dag.js";
+import { loadSpatialDAG, withDagAabbs, type SpatialDAG } from "../shared/spatial-dag.js";
 import type { ArenaView } from "../shared/arena-view.js";
 import type { Movement } from "../shared/movements.js";
 import type { SceneGraph } from "../shared/scene-graph.js";
@@ -94,11 +94,12 @@ export function loadArena(files?: GameFiles, env?: Record<string, string | undef
     const text = files?.text("./web/game/spatial-dag.json") ?? nodeGameFiles().text("./web/game/spatial-dag.json");
     if (text) {
       const raw = JSON.parse(text) as { hash?: unknown };
-      const dag = loadSpatialDAG(raw);
+      const full = withDagAabbs(raw, game.view.aabbs);
+      const dag = loadSpatialDAG(full);
       if (dag && typeof raw.hash === "string") {
         spatialDag = dag;
-        game.view.spatialDag = raw;
-        game.view.spatialDagHash = raw.hash;
+        game.view.spatialDag = full;
+        game.view.spatialDagHash = (full as { hash?: string }).hash ?? raw.hash;
       }
     }
   } catch {

@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { loadArena } from "../src/server/world-loader.ts";
-import { evaluateCover, findCoverPoints, nearestCover } from "../src/shared/bots/cover.ts";
+import { evaluateCover, findCoverPoints, nearestCover, shutDoorBoxes } from "../src/shared/bots/cover.ts";
+import { createHostBotSense } from "../src/server/bot-sense.ts";
+import { createPawnHealth } from "../src/shared/health.ts";
+import { createMind, judge } from "../src/shared/bots/arbiter.ts";
 
 const loaded = loadArena();
 const dag = loaded.spatialDag!;
@@ -35,7 +38,73 @@ test("findCoverPoints_scores_and_nearest_cover", () => {
   assert.ok(points.length > 0);
   assert.ok(points.every((point) => Number.isFinite(point.score)));
   for (let i = 1; i < points.length; i += 1) assert.ok(points[i - 1]!.score >= points[i]!.score);
-  const nearest = nearestCover(dag, { x: target.x, y: 1, z: target.z }, target, { limit: 8 });
+  const nearest = nearestCover(dag, graph, { x: target.x, y: 1, z: target.z }, target, { limit: 8 });
   assert.ok(nearest);
   assert.ok(Number.isFinite(nearest.score));
+  assert.ok(["ring", "polygon", "node"].includes(nearest.source));
+});
+
+test("nearestCover_uses_polygon_and_node_candidates", () => {
+  const place = [...graph.placeById.values()].find((item) => {
+    if (item.polygon.length < 4 || item.kind === "outside") return false;
+    const b = item.bounds;
+    return item.polygon.some(([x, z]) => Math.abs(x - b.minX) > 0.2 && Math.abs(x - b.maxX) > 0.2 && Math.abs(z - b.minZ) > 0.2 && Math.abs(z - b.maxZ) > 0.2);
+  });
+  assert.ok(place);
+  const center = {
+    x: place.polygon.reduce((sum, point) => sum + point[0], 0) / place.polygon.length,
+    y: place.y + 0.2,
+    z: place.polygon.reduce((sum, point) => sum + point[1], 0) / place.polygon.length,
+  };
+  const points = findCoverPoints(dag, graph, { x: center.x, y: center.y + 1.6, z: center.z }, center, { limit: 500 });
+  const sources = [...new Set(points.map((point) => point.source))];
+  assert.ok(sources.includes("polygon"), JSON.stringify(sources));
+  assert.ok(sources.includes("node"), JSON.stringify(sources));
+});
+
+test("shutDoorBoxes_only_includes_closed_leaves", () => {
+  const boxes = shutDoorBoxes([
+    { open: false, position: [1, 0, 2], size: [1, 2, 0.2] },
+    { open: true, position: [5, 0, 6], size: [1, 2, 0.2] },
+  ]);
+  assert.equal(boxes.length, 1);
+  assert.equal(boxes[0]!.minX, 0.5);
+  assert.equal(boxes[0]!.maxX, 1.5);
+});
+
+test("host_sense_exposes_a_cover_candidate", () => {
+  const sense = createHostBotSense({
+    world: loaded.world,
+    agents: loaded.agents,
+    health: createPawnHealth(),
+    sceneGraph: graph,
+    doors: () => loaded.view.doors,
+    pickups: loaded.view.pickups ?? [],
+    remainingPickups: () => [],
+    ownedEntities: () => [],
+    coverDag: dag,
+  });
+  const bot = loaded.agents[0]!;
+  const point = sense.coverOf(bot.id, target);
+  assert.ok(point);
+  assert.ok(["ring", "polygon", "node"].includes(point.source));
+  assert.ok(Number.isFinite(point.score));
+  assert.equal(point.block, !point.los);
+});
+
+test("arbiter_raises_evade_priority_for_a_blocked_cover", () => {
+  const base = {
+    alive: true,
+    place: "p",
+    msNoProgress: 0,
+    damage: { attacker: 9, ageMs: 100 },
+    hpFrac: 0.2,
+    threatSeen: true,
+    armed: true,
+  };
+  const plain = judge(createMind(), base, 1_000);
+  const covered = judge(createMind(), { ...base, cover: { block: true, score: 5 } }, 1_000);
+  assert.equal(plain.goal, "evade");
+  assert.equal(covered.goal, "evade");
+  assert.ok(covered.priority > plain.priority);
 });

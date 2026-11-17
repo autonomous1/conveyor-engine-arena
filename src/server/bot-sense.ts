@@ -21,6 +21,9 @@ import {
   type SenseTuning,
 } from "../shared/bots/sense.js";
 import type { WanderAgent } from "./world-loader.js";
+import { nearestCover, type CoverPoint } from "../shared/bots/cover.js";
+import type { SpatialDAG } from "../shared/spatial-dag.js";
+import type { TraceAabb } from "../shared/hitscan.js";
 
 const EMPTY_BODIES: readonly PawnBody[] = [];
 
@@ -35,6 +38,8 @@ export type HostBotSense = {
   get(id: number): BotSense | undefined;
   /** Sorted copy of ids sensed at least once. */
   ids(): number[];
+  /** Nearest cover candidate, or undefined without a DAG/target. */
+  coverOf(id: number, target: { x: number; y: number; z: number }): CoverPoint | undefined;
   /** How many sensor `update` calls have started. */
   readonly tick: number;
 };
@@ -54,6 +59,8 @@ export type HostBotSenseOptions = {
   /** Same clock `health` was built with. Defaults to `Date.now`. */
   now?: () => number;
   log?: (line: string) => void;
+  coverDag?: SpatialDAG;
+  coverDynamic?: () => readonly TraceAabb[];
   tuning?: Partial<SenseTuning>;
 };
 
@@ -174,6 +181,14 @@ export function createHostBotSense(opts: HostBotSenseOptions): HostBotSense {
     },
     get: (id) => sensor.get(id),
     ids: () => sensor.ids(),
+    coverOf(id, target) {
+      if (!opts.coverDag) return undefined;
+      const view = opts.world.store.view(id);
+      if (!view) return undefined;
+      return nearestCover(opts.coverDag, opts.sceneGraph, view.position, target, {
+        dynamic: opts.coverDynamic?.() ?? [],
+      });
+    },
     get tick() {
       return sensor.tick;
     },

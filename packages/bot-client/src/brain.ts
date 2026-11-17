@@ -130,6 +130,19 @@ export async function claimGoal(
   }
 }
 
+function shutDoorBoxes(session: BotSession): Array<{ minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number }> {
+  const boxes = [];
+  for (const door of session.world.doors()) {
+    if (door.open) continue;
+    const body = session.world.doorBody(door.id);
+    if (!body) continue;
+    const [x, , z] = body.position;
+    const [sx, sy, sz] = body.size;
+    boxes.push({ minX: x - sx / 2, maxX: x + sx / 2, minY: 0, maxY: sy, minZ: z - sz / 2, maxZ: z + sz / 2 });
+  }
+  return boxes;
+}
+
 /**
  * Shoot a named pawn until its health frame says dead, it disappears, the bot
  * runs out of ammo or dies, or the deadline passes.
@@ -179,7 +192,7 @@ export async function runAttack(session: BotSession, targetId: number, opts: Bra
     const health = session.world.health();
     const coverDag = health && health.hp < 50 ? session.world.spatialDag() : undefined;
     if (health && health.hp < 50 && coverDag) {
-      const cover = nearestCover(coverDag, me, target, { dynamic: [] });
+      const cover = nearestCover(coverDag, session.world.sceneGraph(), me, target, { dynamic: shutDoorBoxes(session) });
       if (cover) {
         session.input.sendInput({ moveX: cover.x - me.x, moveZ: cover.z - me.z, yaw: Math.atan2(cover.x - me.x, cover.z - me.z) });
         log(`attack: cover hp=${health.hp} score=${cover.score.toFixed(2)}`);

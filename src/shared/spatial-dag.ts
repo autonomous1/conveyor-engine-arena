@@ -28,7 +28,10 @@ export type StaticChunk = {
   bounds: Box3;
 };
 
-/** The loaded static DAG: hierarchy plus queryable chunks. */
+/**
+ * The loaded static DAG: hierarchy plus queryable chunks.
+ * @post `hash` covers the chunk geometry actually loaded, not the bake file.
+ */
 export type SpatialDAG = {
   hash: string;
   nodes: SpatialNode[];
@@ -110,6 +113,41 @@ export function loadSpatialDAG(file: unknown): SpatialDAG | undefined {
     }
   }
   return { hash: rec.hash, nodes, chunks, byId: new Map(nodes.map((node) => [node.id, node])) };
+}
+
+/**
+ * Replace the serialized chunk geometry with the full static AABB set.
+ * @post The hash is kept from the bake; the returned file is still static-only.
+ */
+export function withDagAabbs(file: unknown, aabbs: readonly { minX: number; maxX: number; minZ: number; maxZ: number; minY?: number; maxY?: number }[]): unknown {
+  if (!file || typeof file !== "object" || Array.isArray(file)) return file;
+  const rec = file as Record<string, unknown>;
+  if (!Array.isArray(rec.chunks)) return file;
+  const positions: number[] = [];
+  const indices: number[] = [];
+  const faces = [[0,1,2],[0,2,3],[4,6,5],[4,7,6],[0,4,5],[0,5,1],[1,5,6],[1,6,2],[2,6,7],[2,7,3],[3,7,4],[3,4,0]];
+  for (const b of aabbs) {
+    const y0 = b.minY ?? 0;
+    const y1 = b.maxY ?? 10;
+    const corners = [
+      [b.minX, y0, b.minZ], [b.maxX, y0, b.minZ], [b.maxX, y0, b.maxZ], [b.minX, y0, b.maxZ],
+      [b.minX, y1, b.minZ], [b.maxX, y1, b.minZ], [b.maxX, y1, b.maxZ], [b.minX, y1, b.maxZ],
+    ];
+    const base = positions.length / 3;
+    for (const c of corners) positions.push(...c);
+    for (const f of faces) indices.push(base + f[0]!, base + f[1]!, base + f[2]!);
+  }
+  const chunks = [{
+    ...(rec.chunks[0] as Record<string, unknown>),
+    positions,
+    indices,
+  }];
+  let hash = 2166136261;
+  for (const value of [...positions, ...indices]) {
+    hash ^= Math.round(value * 1000) | 0;
+    hash = Math.imul(hash, 16777619);
+  }
+  return { ...rec, chunks, hash: `aabb-${(hash >>> 0).toString(16).padStart(8, "0")}` };
 }
 
 /**
