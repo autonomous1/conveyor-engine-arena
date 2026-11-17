@@ -88,3 +88,37 @@ test("runtime_hash_covers_the_merged_geometry", () => {
   const bot = createBotWorld({ aabbs: [], spatialDag: loaded.view.spatialDag, spatialDagHash: loaded.view.spatialDagHash });
   assert.equal(bot.spatialDagHash(), loaded.spatialDag.hash);
 });
+
+import { createArenaDoors } from "../src/server/doors.ts";
+import { shutDoorBoxes } from "../src/shared/bots/cover.ts";
+import { doorYawRadians } from "../src/shared/doors.ts";
+
+test("host_live_door_blocks_then_opens", () => {
+  const loaded = loadArena();
+  const dag = loaded.spatialDag;
+  assert.ok(dag);
+  const door = loaded.view.doors[0]!;
+  const host = createArenaDoors({
+    doors: loaded.view.doors,
+    pawnOf: () => undefined,
+    keys: { hasKey: () => false, consumeKey: () => false },
+    sendAll: () => {},
+    ownedPawn: () => undefined,
+    sessionId: () => undefined,
+  });
+  const boxes = () => shutDoorBoxes(loaded.view.doors.map((item) => {
+    const live = host.snapshot().find((row) => row.id === item.id);
+    return { ...item, open: live?.open ?? item.open };
+  }));
+  host.force(door.id, false);
+  const yaw = doorYawRadians(door.yaw);
+  const nx = Math.sin(yaw);
+  const nz = Math.cos(yaw);
+  const cx = door.position[0] + (door.size[0] / 2) * Math.cos(yaw);
+  const cz = door.position[2] - (door.size[0] / 2) * Math.sin(yaw);
+  const from = { x: cx - nx * 2, y: 1, z: cz - nz * 2 };
+  const to = { x: cx + nx * 2, y: 1, z: cz + nz * 2 };
+  assert.equal(hasLineOfSightDag(dag, from, to, boxes()), false);
+  host.force(door.id, true);
+  assert.equal(hasLineOfSightDag(dag, from, to, boxes()), true);
+});

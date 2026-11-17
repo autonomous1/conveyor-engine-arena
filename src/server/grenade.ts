@@ -8,6 +8,7 @@ import type { AuthoritativeWorld } from "conveyor-engine-world";
 import { aimDirection, clampPitch, EYE_HEIGHT } from "../shared/look.js";
 import { healthFrame, type PawnHealth } from "../shared/health.js";
 import { MOVE_DT } from "../shared/movements.js";
+import type { SpatialDAG } from "../shared/spatial-dag.js";
 import {
   admitGrenade,
   freshGrenadeGate,
@@ -74,6 +75,10 @@ export function createArenaGrenades(opts: {
   impact?: GrenadeImpact;
   /** Direct pawn hit. Default {@link GRENADE_DAMAGE}. */
   damage?: number;
+  /** Static DAG. Absent keeps the flat sweep for tests. */
+  dag?: SpatialDAG;
+  /** Dynamic shut-door boxes for the DAG sweep. */
+  dynamic?: () => readonly import("../shared/hitscan.js").TraceAabb[];
 }): ArenaGrenades {
   const now = opts.now ?? Date.now;
   const gates = new Map<number, { sessionId: number; gate: GrenadeGate }>();
@@ -158,7 +163,7 @@ export function createArenaGrenades(opts: {
       const capsules = pawnCapsules(opts.world);
       const kept: GrenadeBody[] = [];
       for (const body of bodies) {
-        const step = stepGrenade(body, dt, boxes, capsules, opts.floorY);
+        const step = stepGrenade(body, dt, boxes, capsules, opts.floorY, opts.dag, opts.dynamic?.() ?? []);
         const point = step.kind === "fly"
           ? { x: step.body.x, y: step.body.y, z: step.body.z }
           : step.kind === "bounce"

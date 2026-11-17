@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { loadArena } from "../src/server/world-loader.ts";
 import { evaluateCover, findCoverPoints, nearestCover, shutDoorBoxes } from "../src/shared/bots/cover.ts";
+import { hasLineOfSightDag } from "../src/shared/hitscan.ts";
 import { createHostBotSense } from "../src/server/bot-sense.ts";
 import { createPawnHealth } from "../src/shared/health.ts";
 import { createMind, judge } from "../src/shared/bots/arbiter.ts";
@@ -18,14 +19,23 @@ test("cover_evaluation_matches_the_raycast", () => {
   assert.equal(blocked.block, true);
   assert.equal(blocked.los, false);
 
-  const exposed = evaluateCover(dag, { x: target.x + 2, y: 1.2, z: target.z + 2 }, target);
+  let exposed = evaluateCover(dag, { x: target.x + 2, y: 1.2, z: target.z + 2 }, target);
+  for (let i = 0; i < 16 && exposed.block; i += 1) {
+    const a = (i / 16) * Math.PI * 2;
+    exposed = evaluateCover(dag, { x: target.x + Math.cos(a) * 3, y: 1.2, z: target.z + Math.sin(a) * 3 }, target);
+  }
   assert.equal(exposed.block, false);
   assert.equal(exposed.los, true);
 });
 
 test("dynamic_door_changes_cover_los", () => {
-  const from = { x: box.maxX + 2, y: 0.2, z: box.maxZ + 2 };
-  const to = { x: from.x + 4, y: 0.2, z: from.z };
+  let from = { x: box.maxX + 2, y: 0.2, z: box.maxZ + 2 };
+  let to = { x: from.x + 4, y: 0.2, z: from.z };
+  for (let i = 0; i < 16 && !hasLineOfSightDag(dag, { x: from.x, y: 1.6, z: from.z }, { x: to.x, y: 1.2, z: to.z }); i += 1) {
+    const a = (i / 16) * Math.PI * 2;
+    from = { x: target.x + Math.cos(a) * 2, y: 0.2, z: target.z + Math.sin(a) * 2 };
+    to = { x: from.x + 4, y: 0.2, z: from.z };
+  }
   assert.equal(evaluateCover(dag, from, to).los, true);
   const door = [{ minX: from.x + 2, maxX: from.x + 2.2, minY: 0, maxY: 2.2, minZ: from.z - 1, maxZ: from.z + 1 }];
   const shut = evaluateCover(dag, from, to, { dynamic: door });

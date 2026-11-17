@@ -20,6 +20,7 @@ function session() {
     fire(yaw: number, pitch: number) { fired.push({ yaw, pitch }); return true; },
     grenade() { return true; },
   };
+  (world as { spatialDag?: () => unknown }).spatialDag = () => ({ hash: "test", nodes: [], chunks: [], byId: new Map() });
   return { world, input, fired, sent, session: { world, input, claims: { acquire() {}, release() {} } } as never };
 }
 
@@ -83,4 +84,12 @@ test("attack_approach_uses_world_space_direction", async () => {
   assert.ok(north.sent.length > 0);
   assert.ok(north.sent[0]!.moveZ > 0.5, `north moveZ ${north.sent[0]!.moveZ}`);
   assert.ok(Math.abs(north.sent[0]!.moveX) < 0.2, `north moveX ${north.sent[0]!.moveX}`);
+});
+
+test("attack_reports_a_missing_dag", async () => {
+  const { world, session: fake } = session();
+  (world as { spatialDag?: () => unknown }).spatialDag = () => undefined;
+  const logs: string[] = [];
+  assert.equal(await runAttack(fake, 7, { timeoutMs: 200, log: (line) => logs.push(line) }), 2);
+  assert.ok(logs.some((line) => line.includes("no_dag")));
 });

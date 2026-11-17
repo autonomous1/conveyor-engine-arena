@@ -328,6 +328,38 @@ export function traceHitscanDag(
 }
 
 /**
+ * Sweep a sphere-sized point from `from` to `to` over the static DAG plus the
+ * dynamic boxes; the nearest surface hit wins.
+ * @post The returned point is on the nearest static/dynamic surface; no pawn is
+ *       included unless it is in `dynamic`.
+ */
+export function sweepDag(
+  from: Vec3,
+  to: Vec3,
+  dag: SpatialDAG,
+  dynamic: readonly TraceAabb[] = [],
+): SweepHit | undefined {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const dz = to.z - from.z;
+  const span = Math.hypot(dx, dy, dz);
+  if (!(span > 0)) return undefined;
+  const aim = unit({ x: dx, y: dy, z: dz });
+  const staticHit = raycastFirst(dag, from, aim, span);
+  const dyn = traceHitscan(from, aim, dynamic, [], span);
+  if (dyn.distance < span && (!staticHit || dyn.distance < staticHit.distance)) {
+    return { point: dyn.to, normal: { x: 0, y: 1, z: 0 }, pawn: false, distance: dyn.distance };
+  }
+  if (!staticHit) return undefined;
+  return {
+    point: { x: staticHit.point.x, y: staticHit.point.y, z: staticHit.point.z },
+    normal: { x: staticHit.normal.x, y: staticHit.normal.y, z: staticHit.normal.z },
+    pawn: false,
+    distance: staticHit.distance,
+  };
+}
+
+/**
  * True when neither the static DAG nor the dynamic boxes block the segment.
  * @invariant The DAG holds no door or pawn triangles; a shut door must be in
  *            `dynamic` to block. (test: dag_los_agrees_with_the_flat_boxes_and_keeps_dynamic)

@@ -45,6 +45,7 @@ export type SpatialHit = {
   nodeId: string;
   distance: number;
   point: Vector3;
+  normal: Vector3;
 };
 
 type Encoded = { __type: string; data: number[] };
@@ -160,7 +161,9 @@ export function raycastFirst(dag: SpatialDAG, from: { x: number; y: number; z: n
   for (const chunk of dag.chunks) {
     const hit = chunk.bvh.raycastFirst(ray, DoubleSide, 0, Number.isFinite(maxDist) ? maxDist : undefined);
     if (!hit) continue;
-    if (!best || hit.distance < best.distance) best = { chunkId: chunk.id, nodeId: chunk.nodeId, distance: hit.distance, point: hit.point.clone() };
+    if (!best || hit.distance < best.distance) {
+      best = { chunkId: chunk.id, nodeId: chunk.nodeId, distance: hit.distance, point: hit.point.clone(), normal: hit.face?.normal.clone() ?? new Vector3(0, 1, 0) };
+    }
   }
   return best;
 }

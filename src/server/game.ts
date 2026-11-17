@@ -8,12 +8,16 @@
 // Invariants: One branch per agent per tick — a rider, a timed-out pawn, a dead
 //   pawn, an owned pawn, an unowned bot are mutually exclusive.
 import type { AuthoritativeWorld } from "conveyor-engine-world";
+import { Vector3 } from "three";
 import type { EngineWsServer } from "conveyor-engine-transport-ws";
 import type { Audit } from "../shared/audit.js";
 import type { ArenaView } from "../shared/arena-view.js";
 import { propClipName, type Prop } from "../shared/arena-view.js";
 import { doorLeafBox } from "../shared/doors.js";
 import { pawnHitsBox, pickRespawnSpawn, type BlockPawn, type PawnHealth, type SpawnPick } from "../shared/health.js";
+import { shapecast } from "../shared/spatial-dag.js";
+import type { SpatialDAG } from "../shared/spatial-dag.js";
+import type { TraceAabb } from "../shared/hitscan.js";
 import { capsuleOverlapsAabb } from "../shared/pickups.js";
 import { moveIntent, yawFromQuat } from "../shared/look.js";
 import { approachYaw, commitShielded, enqueueOwnedMove, MOVE_DT, MOVEMENTS, movementIntent, yawQuaternion } from "../shared/movements.js";
@@ -1154,6 +1158,8 @@ export function claimClearSpawn(
   id: number,
   spawns: readonly SpawnPick[],
   pending: ReadonlyMap<number, SpawnPick> = new Map(),
+  dag?: SpatialDAG,
+  dynamic: readonly TraceAabb[] = [],
 ): SpawnPick | undefined {
   const view = world.store.view(id);
   const radius = view && view.radius > 0 ? view.radius : 0.5;
@@ -1184,7 +1190,11 @@ export function claimClearSpawn(
   };
   const picked = pickRespawnSpawn(spawns, blockers);
   if (!picked) return undefined;
-  if (blockers.aabbs.some((box) => pawnHitsBox(picked.x, picked.z, radius, picked.y, height, box))) return undefined;
+  const dynamicHit = dynamic.some((box) => pawnHitsBox(picked.x, picked.z, radius, picked.y, height, box));
+  if (dynamicHit) return undefined;
+  if (dag) {
+    if (shapecast(dag, new Vector3(picked.x, picked.y + height / 2, picked.z), radius).length > 0) return undefined;
+  } else if (blockers.aabbs.some((box) => pawnHitsBox(picked.x, picked.z, radius, picked.y, height, box))) return undefined;
   for (const pawn of pawns) {
     if (pawn.id === id) continue;
     const dx = picked.x - pawn.x;

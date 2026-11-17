@@ -233,7 +233,9 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
       const render = seatRender.get(owned);
       if (render !== undefined) setSeatAlive(loaded.world, owned, render);
       if (reused === undefined) {
-        const pad = claimClearSpawn(loaded.world, owned, loaded.playerSpawns, reservedPads);
+        const live = new Map(doorHost.snapshot().map((door) => [door.id, door.open]));
+        const shut = shutDoorBoxes(loaded.view.doors.map((door) => ({ ...door, open: live.get(door.id) ?? door.open })));
+        const pad = claimClearSpawn(loaded.world, owned, loaded.playerSpawns, reservedPads, loaded.spatialDag, shut);
         if (pad) {
           placePawn(loaded.world, owned, pad);
           const agent = loaded.agents.find((item) => item.id === owned);
@@ -324,6 +326,11 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
     damage: loaded.view.grenadeDamage,
     send(clientId, frame) {
       engine.session(clientId)?.socket.send(encodeFrame(frame));
+    },
+    dag: loaded.spatialDag,
+    dynamic: () => {
+      const live = new Map(doorHost.snapshot().map((door) => [door.id, door.open]));
+      return shutDoorBoxes(loaded.view.doors.map((door) => ({ ...door, open: live.get(door.id) ?? door.open })));
     },
   });
   const botSense = createHostBotSense({

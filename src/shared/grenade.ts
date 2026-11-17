@@ -10,7 +10,8 @@
 // Wiring: server/grenade.ts owns bodies; client/boot.ts and client/net.ts apply
 //   poses; shared/bot-protocol.ts parses the frame.
 import { MAX_HP } from "./health.js";
-import { sweepIndexed, type SweepHit, type TraceAabb, type TraceCapsule, type Vec3 } from "./hitscan.js";
+import { sweepDag, sweepIndexed, type SweepHit, type TraceAabb, type TraceCapsule, type Vec3 } from "./hitscan.js";
+import type { SpatialDAG } from "./spatial-dag.js";
 
 /**
  * GRENADE INTERVAL MS.
@@ -318,6 +319,8 @@ export function stepGrenade(
   aabbs: readonly TraceAabb[],
   capsules: readonly TraceCapsule[],
   floorY?: number,
+  dag?: SpatialDAG,
+  dynamic: readonly TraceAabb[] = [],
 ): GrenadeStep {
   const next: GrenadeBody = { ...body, age: body.age + dt };
   if (!(dt > 0)) return { kind: "fly", body: next };
@@ -328,7 +331,10 @@ export function stepGrenade(
     y: body.y + next.vy * dt,
     z: body.z + next.vz * dt,
   };
-  const hit = closerFloorHit(from, to, sweepIndexed(from, to, aabbs, capsulesFor(body, next.age, capsules)), floorY);
+  const swept = dag
+    ? sweepDag(from, to, dag, dynamic)
+    : sweepIndexed(from, to, aabbs, capsulesFor(body, next.age, capsules));
+  const hit = closerFloorHit(from, to, swept, floorY);
   if (!hit) {
     next.x = to.x;
     next.y = to.y;
