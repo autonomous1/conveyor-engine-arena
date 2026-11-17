@@ -794,7 +794,8 @@ test("one client takes alien-weapon-1 and the other sees it gone", { timeout: 40
     assert.equal(re.pickups.includes("cover-crate-2-1"), true);
     assert.equal(re.pickups.includes("cover-crate-2-6-1"), true);
     assert.equal(re.pickups.includes("cover-crate-2-9"), true);
-    assert.equal(re.weapon, "alien-weapon-enh");
+    assert.equal(re.weapon, undefined);
+    assert.deepEqual(re.keys ?? [], []);
   } finally {
     for (const ws of open) {
       if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) ws.close();

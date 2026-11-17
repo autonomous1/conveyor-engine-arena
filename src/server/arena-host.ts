@@ -228,6 +228,7 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
       const owned = reused ?? seats.find((agent) => !used.has(agent.id))?.id;
       if (owned === undefined) {
         refused.add(session.clientId);
+        console.log(`hello full client=${session.clientId} reason=SERVER_FULL`);
         return undefined;
       }
       const render = seatRender.get(owned);
@@ -616,6 +617,7 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
       socket.onClose(() => {
         const clientId = clientIdFor(engine, socket);
         if (clientId !== undefined) {
+          const record = engine.gateway.get(clientId);
           const pawnId = engine.replicator.get(clientId)?.ownedEntity ?? engine.gateway.get(clientId)?.ownedEntity;
           if (pawnId !== undefined) {
             despawnSeat(loaded.world, pawnId);
@@ -627,6 +629,7 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
             grenades.drop(pawnId);
             reservedPads.delete(pawnId);
           }
+          console.log(`close client=${clientId} owned=${pawnId ?? "no"} gateway=${record?.connected === true ? "connected" : "closed"}`);
           doorHost.drop(clientId);
         }
       });

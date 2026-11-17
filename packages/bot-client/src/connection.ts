@@ -55,6 +55,8 @@ export type ConnectBotOptions = {
   /** Recorded for the caller. Admission stays the JWT scope. */
   spectate?: boolean;
   openSocket?: (url: string) => SocketLike;
+  /** `auto` keeps the old retry loop; the default `abort` stops after a close. */
+  reconnect?: "auto" | "abort";
   /** Parsed scene-graph file. A later `sceneGraph` frame replaces it. */
   sceneGraph?: unknown;
   /** Parsed regions file. A later `regions` frame replaces it. */
@@ -88,8 +90,9 @@ const BACKOFF_START_MS = 1_000;
 const BACKOFF_MAX_MS = 30_000;
 
 /**
- * Open and welcome one bot session, reconnecting until the host closes it.
- * @post The returned session owns a pawn; the caller must close it.
+ * Open and welcome one bot session.
+ * @post The returned session owns a pawn; the caller must close it. By default a
+ *       close aborts the session (`reconnect: "abort"`); `"auto"` keeps retrying.
  */
 export async function connectBot(o: ConnectBotOptions): Promise<BotSession> {
   const http = httpOf(o.url);
@@ -288,6 +291,11 @@ export async function connectBot(o: ConnectBotOptions): Promise<BotSession> {
         o.onLog?.(`connection lost: ${err instanceof Error ? err.message : String(err)}`);
       }
       if (stopped) return;
+      if ((o.reconnect ?? "abort") !== "auto") {
+        o.onLog?.("session abort");
+        stopped = true;
+        return;
+      }
       o.onLog?.(`reconnect in ${backoff / 1000}s`);
       await sleep(backoff);
       backoff = Math.min(BACKOFF_MAX_MS, backoff * 2);
