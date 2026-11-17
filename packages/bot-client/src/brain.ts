@@ -25,6 +25,7 @@ import type { BotSession } from "./connection.js";
 import type { Mission } from "./missions.js";
 import { createMotionPredictor } from "./predict.js";
 import { hasLineOfSight, hasLineOfSightDag } from "../../../src/shared/hitscan.js";
+import { nearestCover } from "../../../src/shared/bots/cover.js";
 
 const STEP_MS = 1000 / INPUT_HZ;
 const RIDE_SUMMON_MS = 30_000;
@@ -174,6 +175,17 @@ export async function runAttack(session: BotSession, targetId: number, opts: Bra
     if (session.world.health()?.dead === true) {
       log("attack: died");
       return 2;
+    }
+    const health = session.world.health();
+    const coverDag = health && health.hp < 50 ? session.world.spatialDag() : undefined;
+    if (health && health.hp < 50 && coverDag) {
+      const cover = nearestCover(coverDag, me, target, { dynamic: [] });
+      if (cover) {
+        session.input.sendInput({ moveX: cover.x - me.x, moveZ: cover.z - me.z, yaw: Math.atan2(cover.x - me.x, cover.z - me.z) });
+        log(`attack: cover hp=${health.hp} score=${cover.score.toFixed(2)}`);
+        await delay(100);
+        continue;
+      }
     }
     if (session.world.ammo() <= 0) {
       log("attack: no_ammo");
