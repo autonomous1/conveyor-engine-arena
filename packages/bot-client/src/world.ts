@@ -10,6 +10,7 @@ import { yawFromQuat } from "../../../src/shared/look.js";
 import type { PickupKind, PickupPlacement } from "../../../src/shared/pickups.js";
 import { parseBakedRegions, type BakedRegionsFile } from "../../../src/shared/nav/regions.js";
 import { placeAt, parseSceneGraph, type CabState, type SceneGraph } from "../../../src/shared/scene-graph.js";
+import { loadSpatialDAG, type SpatialDAG } from "../../../src/shared/spatial-dag.js";
 
 /**
  * One replicated pawn: feet, yaw, id, and the kernel entity kind.
@@ -61,6 +62,8 @@ export type WorldView = {
   playerSpawns?: readonly { id: string; x: number; z: number; yaw: number }[];
   pawnRadius?: number;
   pawnHeight?: number;
+  spatialDag?: unknown;
+  spatialDagHash?: string;
 };
 
 type WorldPickup = {
@@ -140,6 +143,9 @@ export type BotWorld = {
   sceneGraphHash(): string | undefined;
   regions(): BakedRegionsFile | undefined;
   regionsHash(): string | undefined;
+  /** Raw static spatial DAG from arena.json, if the host baked one. */
+  spatialDag(): SpatialDAG | undefined;
+  spatialDagHash(): string | undefined;
   placeOf(pos: { x: number; y: number; z: number }): { id: string; kind: string } | undefined;
   summary(): string;
   noteOwned(id: number | undefined): void;
@@ -198,6 +204,8 @@ export function createBotWorld(view: WorldView): BotWorld {
   let scope: string[] | undefined;
   let graph: SceneGraph | undefined;
   let graphHash: string | undefined;
+  let spatialDag: SpatialDAG | undefined;
+  let spatialDagLoaded = false;
 
   const self = (): PawnPose | undefined => (ownedId === undefined ? undefined : pawns.get(ownedId));
 
@@ -281,6 +289,16 @@ export function createBotWorld(view: WorldView): BotWorld {
     },
     regions() {
       return regions;
+    },
+    spatialDag() {
+      if (!spatialDagLoaded) {
+        spatialDagLoaded = true;
+        spatialDag = view.spatialDag === undefined ? undefined : loadSpatialDAG(view.spatialDag);
+      }
+      return spatialDag;
+    },
+    spatialDagHash() {
+      return view.spatialDagHash;
     },
     regionsHash() {
       return regionsHash;

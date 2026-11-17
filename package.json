@@ -66,6 +66,7 @@
     "jose": "^6.2.15",
     "three": "~0.186.0",
     "three-gamepad-controls": "^0.24.0",
+    "three-mesh-bvh": "^0.9.18",
     "ws": "^8.18.0"
   },
   "devDependencies": {

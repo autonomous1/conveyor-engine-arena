@@ -24,7 +24,7 @@ import { placeAt, stopOf, type SceneGraph, type ScenePortal } from "../../../src
 import type { BotSession } from "./connection.js";
 import type { Mission } from "./missions.js";
 import { createMotionPredictor } from "./predict.js";
-import { hasLineOfSight } from "../../../src/shared/hitscan.js";
+import { hasLineOfSight, hasLineOfSightDag } from "../../../src/shared/hitscan.js";
 
 const STEP_MS = 1000 / INPUT_HZ;
 const RIDE_SUMMON_MS = 30_000;
@@ -184,7 +184,8 @@ export async function runAttack(session: BotSession, targetId: number, opts: Bra
     const dx = targetPoint.x - eye.x;
     const dz = targetPoint.z - eye.z;
     const range = Math.hypot(dx, dz);
-    const los = hasLineOfSight(eye, targetPoint, session.world.aabbs);
+    const dag = session.world.spatialDag();
+    const los = dag ? hasLineOfSightDag(dag, eye, targetPoint) : hasLineOfSight(eye, targetPoint, session.world.aabbs);
     if (range > 18 || !los) {
       const yaw = Math.atan2(dx, dz);
       session.input.sendInput({ ...moveIntent(yaw, 1, 0), yaw });

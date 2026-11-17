@@ -5,6 +5,8 @@
 import { AuthoritativeWorld, applyStaticWorldDefinition } from "conveyor-engine-world";
 import type { GameFiles } from "./game-files.js";
 import { loadInstalledGame } from "./load-game.js";
+import { nodeGameFiles } from "./game-files-node.js";
+import { loadSpatialDAG, type SpatialDAG } from "../shared/spatial-dag.js";
 import type { ArenaView } from "../shared/arena-view.js";
 import type { Movement } from "../shared/movements.js";
 import type { SceneGraph } from "../shared/scene-graph.js";
@@ -53,6 +55,8 @@ export type LoadedArena = {
   sceneGraph?: SceneGraph;
   /** Privileged baked regions. Absent when the manifest has no `scene.regions`. */
   regions?: BakedRegionsFile;
+  /** Static spatial DAG from `web/game/spatial-dag.json`. */
+  spatialDag?: SpatialDAG;
 };
 
 /**
@@ -85,6 +89,21 @@ export function loadArena(files?: GameFiles, env?: Record<string, string | undef
     )),
   ];
   world.commit(0n);
+  let spatialDag: SpatialDAG | undefined;
+  try {
+    const text = files?.text("./web/game/spatial-dag.json") ?? nodeGameFiles().text("./web/game/spatial-dag.json");
+    if (text) {
+      const raw = JSON.parse(text) as { hash?: unknown };
+      const dag = loadSpatialDAG(raw);
+      if (dag && typeof raw.hash === "string") {
+        spatialDag = dag;
+        game.view.spatialDag = raw;
+        game.view.spatialDagHash = raw.hash;
+      }
+    }
+  } catch {
+    // The flat collision world remains the fallback in this slice.
+  }
   return {
     world,
     agents,
@@ -92,6 +111,7 @@ export function loadArena(files?: GameFiles, env?: Record<string, string | undef
     playerSpawns,
     ...(game.sceneGraph ? { sceneGraph: game.sceneGraph } : {}),
     ...(game.regions ? { regions: game.regions } : {}),
+    ...(spatialDag ? { spatialDag } : {}),
   };
 }
 

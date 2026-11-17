@@ -7,7 +7,9 @@ import type { ArenaView } from "../arena-view.js";
 import { buildGrid, findLocalPath, navBoxes, specForPlace } from "./grid.js";
 import { createNavCache, planLegs, type NavCache } from "./legs.js";
 import { planRoute, type Gate, type Vec3Like } from "./route.js";
+import { Vector3 } from "three";
 import { placeAt, type CabState, type SceneGraph, type Vec3 } from "../scene-graph.js";
+import { nodeAt, type SpatialDAG } from "../spatial-dag.js";
 import type { BakedRegionsFile } from "./regions.js";
 
 /** Why a point-to-point plan failed. */
@@ -36,8 +38,10 @@ export function planPath(
     regions?: BakedRegionsFile;
     cache?: NavCache;
     elevators?: boolean;
+    dag?: SpatialDAG;
   } = {},
 ): PathPlan {
+  if (opts.dag) return planDagPath(opts.dag, from, to, placeAt(graph, to.x, to.y, to.z, opts.cabs).id);
   const view = opts.view ?? EMPTY_VIEW;
   const cache = opts.cache ?? createNavCache();
   const targetPlace = placeAt(graph, to.x, to.y, to.z, opts.cabs).id;
@@ -92,6 +96,54 @@ export function planPath(
  * @post A missing or empty plan always re-plans; a place change re-plans when
  *       the planned place is supplied.
  */
+function macroPath(dag: SpatialDAG, start: string, goal: string): string[] | undefined {
+  if (start === goal) return [start];
+  const open = new Set([start]);
+  const cameFrom = new Map<string, string>();
+  const cost = new Map<string, number>([[start, 0]]);
+  while (open.size > 0) {
+    let current: string | undefined;
+    let best = Infinity;
+    for (const id of open) {
+      const c = cost.get(id) ?? Infinity;
+      if (c < best) { best = c; current = id; }
+    }
+    if (current === undefined) break;
+    if (current === goal) {
+      const out = [goal];
+      let at = goal;
+      while (at !== start) { const prev = cameFrom.get(at); if (!prev) return undefined; out.unshift(prev); at = prev; }
+      return out;
+    }
+    open.delete(current);
+    for (const next of dag.byId.get(current)?.adjacency ?? []) {
+      if (!dag.byId.has(next)) continue;
+      const nextCost = (cost.get(current) ?? Infinity) + 1;
+      if (nextCost >= (cost.get(next) ?? Infinity)) continue;
+      cost.set(next, nextCost);
+      cameFrom.set(next, current);
+      open.add(next);
+    }
+  }
+  return undefined;
+}
+
+function planDagPath(dag: SpatialDAG, from: Vec3Like, to: Vec3Like, targetPlace: string): PathPlan {
+  const start = nodeAt(dag, from);
+  const goal = dag.byId.get(targetPlace) ?? nodeAt(dag, to);
+  if (!start || !goal) return { ok: false, reason: "no-cell" };
+  const sequence = macroPath(dag, start.id, goal.id);
+  if (!sequence) return { ok: false, reason: "no-portal" };
+  const points: Vec3[] = [[from.x, from.y, from.z]];
+  for (const id of sequence.slice(1, -1)) {
+    const node = dag.byId.get(id)!;
+    const center = node.bounds.getCenter(new Vector3());
+    points.push([center.x, center.y, center.z]);
+  }
+  points.push([to.x, to.y, to.z]);
+  return { ok: true, points, placeId: goal.id };
+}
+
 function cellBlocked(grid: ReturnType<typeof buildGrid>, x: number, z: number): number {
   const i = Math.floor((x - grid.minX) / grid.cell);
   const j = Math.floor((z - grid.minZ) / grid.cell);

@@ -13,13 +13,14 @@ import { doorStand } from "../../../src/shared/nav/follow.ts";
 import { createNavCache } from "../../../src/shared/nav/legs.ts";
 import { wishTo } from "../../../src/shared/nav/follow.ts";
 
-const URL_ = "wss://arena.tszakacs.com";
+const DEFAULT_URL = "wss://arena.tszakacs.com";
 const LOG = "plan/dsh-tasks/logs/53-attack-run.log";
 const TRACE = "plan/dsh-tasks/logs/53-attack-run.json";
 const token = (process.env.CE_TOKEN ?? "").trim();
 const args = new Map<string, string>();
 const argv = process.argv.slice(2);
 for (let i = 0; i < argv.length; i += 1) if (argv[i]!.startsWith("--")) args.set(argv[i]!.slice(2), argv[i + 1] ?? "");
+const URL_ = args.get("url") ?? process.env.CE_URL ?? DEFAULT_URL;
 const RUN_MS = Number(args.get("for-s") ?? 300) * 1000;
 // The spawn point is a real pad the host placed us on, not an arbitrary centre point.
 let SPAWN = { x: -2.40, z: 3.00 };
@@ -216,7 +217,10 @@ const doorOnRoute = (toPlace: string): { id: string; locked: boolean } | undefin
     if (step.portal.kind !== "door") continue;
     const id = step.portal.door ?? step.portal.id;
     const door = world.door(id);
-    if (!door?.open) return { id, locked: door?.locked === true };
+    if (!door?.open) {
+      if (blacklisted(doorBlacklist, id)) continue;
+      return { id, locked: door?.locked === true };
+    }
   }
   return undefined;
 };
@@ -304,6 +308,26 @@ const enterDoor = async (doorId: string): Promise<boolean> => {
   return false;
 };
 
+// Leave a building the same way we enter: plan to outside, open the door on the route,
+// cross it, and carry on. Used when a mission is stuck indoors.
+const exitBuilding = async (): Promise<boolean> => {
+  const me = poseNow();
+  if (!me) return false;
+  const here = world.placeOf({ x: me.x, y: me.y, z: me.z })?.id ?? "outside";
+  if (here === "outside") return true;
+  const door = doorOnRoute("outside");
+  if (!door) {
+    record(`exit: no door found on the route from ${here} to outside`);
+    return false;
+  }
+  record(`exit: leaving ${here} through ${door.id}`);
+  const crossed = await enterDoor(door.id);
+  if (!crossed) doorBlacklist.set(door.id, Date.now() + 30_000);
+  const after = poseNow();
+  record(`exit: crossed=${crossed} self=${after?.x.toFixed(2)},${after?.z.toFixed(2)} place=${after ? world.placeOf(after)?.id : "?"}`);
+  return crossed;
+};
+
 const armed = () => (world.weapon() ?? "") !== "" && world.ammo() > 0;
 
 const armUp = async (): Promise<boolean> => {
@@ -316,7 +340,7 @@ const armUp = async (): Promise<boolean> => {
   record("arm-up: climb");
   const climbed = await walkWithRecovery({ x: -23.90, z: 16.50 }, 60_000, "climb");
   record(`arm-up climb=${climbed} weapon=${world.weapon() ?? "none"} ammo=${world.ammo()}`);
-  if (world.self() && world.self()!.y > 0.6) await walkWithRecovery({ x: -20.30, z: 16.50 }, 30_000, "step-off");
+  if (world.self() && world.self()!.y > 0.6) await walkWithRecovery({ x: -14.00, z: 16.50 }, 30_000, "step-off");
   return armed();
 };
 
@@ -428,13 +452,19 @@ const heal = async (): Promise<boolean> => {
       .map((p) => {
         const x = (p.minX + p.maxX) / 2;
         const z = (p.minZ + p.maxZ) / 2;
-        return { id: p.id, d: Math.hypot(x - me.x, z - me.z) };
+        const place = world.placeOf({ x, y: 0.3, z })?.id ?? "outside";
+        return { id: p.id, d: Math.hypot(x - me.x, z - me.z), outside: place === "outside" };
       })
-      .sort((a, b) => a.d - b.d);
+      .sort((a, b) => (a.outside === b.outside ? a.d - b.d : a.outside ? -1 : 1));
     const crate = crates[0];
     if (!crate) {
       record("heal: no health crates available; waiting");
       await sleep(1000);
+      continue;
+    }
+    if (!avail.has(crate.id)) {
+      // Taken by someone else between the scan and the attempt: find another, no penalty.
+      record(`heal: ${crate.id} is gone; finding another`);
       continue;
     }
     record(`heal: retrieve:${crate.id} d=${crate.d.toFixed(0)}`);
@@ -466,6 +496,10 @@ const heal = async (): Promise<boolean> => {
     }
     await sleep(400);
   }
+  // Give up healing but do not stay trapped indoors: leave the building and carry on.
+  const me2 = poseNow();
+  const here2 = me2 ? (world.placeOf({ x: me2.x, y: me2.y, z: me2.z })?.id ?? "outside") : "outside";
+  if (here2 !== "outside") await exitBuilding();
   return (world.health()?.hp ?? 0) >= 100;
 };
 
@@ -548,6 +582,11 @@ try {
           } else {
             targetBlacklist.set(targetId, Date.now() + 30_000);
             record(`pursuit: no door found for ${place}; blacklisting target ${targetId} for 30s`);
+          }
+          {
+            const meNow = poseNow();
+            const hereNow = meNow ? (world.placeOf({ x: meNow.x, y: meNow.y, z: meNow.z })?.id ?? "outside") : "outside";
+            if (hereNow !== "outside") await exitBuilding();
           }
           await sleep(200);
           continue;

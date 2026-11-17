@@ -72,3 +72,11 @@ test("scene_graph_locks_match_doors", () => {
   }
   assert.deepEqual(problems, []);
 });
+
+test("spatial_dag_is_loaded_and_hashed", () => {
+  const loaded = loadArena();
+  assert.ok(loaded.spatialDag, "server did not load the DAG");
+  assert.ok(loaded.view.spatialDagHash, "view has no spatialDagHash");
+  assert.equal(loaded.spatialDag.hash, loaded.view.spatialDagHash);
+  assert.ok(loaded.view.spatialDag, "arena.json view has no DAG");
+});

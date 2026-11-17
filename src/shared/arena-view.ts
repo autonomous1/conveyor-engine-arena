@@ -222,6 +222,10 @@ export type ArenaView = {
    * It is not part of the collision hash. A taken pickup removes its box.
    */
   aabbs: Array<{ id: number; minX: number; maxX: number; minZ: number; maxZ: number; minY?: number; maxY?: number; mesh?: boolean; source?: string }>;
+  /** Raw baked spatial DAG. The flat `aabbs` stay until tasks 60/61. */
+  spatialDag?: unknown;
+  /** Hash of `spatialDag`. Not part of `authoritativeHash` in this slice. */
+  spatialDagHash?: string;
   pawnRadius: number;
   pawnHeight: number;
   /**

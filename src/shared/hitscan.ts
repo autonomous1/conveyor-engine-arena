@@ -15,6 +15,7 @@
 // Invariants: `traceIndexed` and `traceHitscan` return the same closest hit;
 //   `sweepSegment` does not apply `MIN_HIT_DISTANCE`.
 import { FLOOR_INDEX_CELL, floorIndexFor, type FloorIndex } from "./movements.js";
+import { raycastFirst, type SpatialDAG } from "./spatial-dag.js";
 
 /**
  * FIRE HZ.
@@ -294,6 +295,55 @@ export function hasLineOfSight(
   const span = Math.hypot(dx, dy, dz);
   if (!(span > 0)) return true;
   const shot = traceIndexed(from, { x: dx, y: dy, z: dz }, boxes, [], span);
+  return !(shot.distance < span);
+}
+
+/**
+ * Trace the static DAG plus the dynamic boxes/capsules; the nearest hit wins.
+ * @post Static geometry is never duplicated in `aabbs`; dynamic boxes remain
+ *       doors/props only.
+ */
+export function traceHitscanDag(
+  origin: Vec3,
+  dir: Vec3,
+  dag: SpatialDAG,
+  aabbs: readonly TraceAabb[] = [],
+  capsules: readonly TraceCapsule[] = [],
+  range = TRACE_RANGE,
+): Shot {
+  const aim = unit(dir);
+  let best = range;
+  let hitId: number | undefined;
+  const staticHit = raycastFirst(dag, origin, aim, range);
+  if (staticHit && staticHit.distance < best) {
+    best = staticHit.distance;
+    hitId = undefined;
+  }
+  const dynamic = traceHitscan(origin, aim, aabbs, capsules, range);
+  if (dynamic.distance < best) {
+    best = dynamic.distance;
+    hitId = dynamic.hitId;
+  }
+  return finishShot(origin, aim, best, hitId);
+}
+
+/**
+ * True when neither the static DAG nor the dynamic boxes block the segment.
+ * @invariant The DAG holds no door or pawn triangles; a shut door must be in
+ *            `dynamic` to block. (test: dag_los_agrees_with_the_flat_boxes_and_keeps_dynamic)
+ */
+export function hasLineOfSightDag(
+  dag: SpatialDAG,
+  from: Vec3,
+  to: Vec3,
+  dynamic: readonly TraceAabb[] = [],
+): boolean {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const dz = to.z - from.z;
+  const span = Math.hypot(dx, dy, dz);
+  if (!(span > 0)) return true;
+  const shot = traceHitscanDag(from, { x: dx, y: dy, z: dz }, dag, dynamic, [], span);
   return !(shot.distance < span);
 }
 

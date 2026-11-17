@@ -126,3 +126,19 @@ test("probe_reverse_route_is_named", () => {
   const plan = planPath(graph, { x: -29.43, y: 0, z: -7.45 }, probeFrom, gate, { view });
   if (!plan.ok) assert.ok(["target-blocked", "start-blocked", "no-portal", "no-floor"].includes(plan.reason));
 });
+
+test("dag_macro_path_reaches_a_building_node", () => {
+  const dag = loaded.spatialDag;
+  assert.ok(dag);
+  const place = [...graph.placeById.values()].find((item) => item.kind === "hall" && item.building);
+  assert.ok(place);
+  const center = {
+    x: place.polygon.reduce((sum, point) => sum + point[0], 0) / place.polygon.length,
+    y: place.y + 0.1,
+    z: place.polygon.reduce((sum, point) => sum + point[1], 0) / place.polygon.length,
+  };
+  const plan = planPath(graph, probeFrom, center, gate, { view, dag });
+  assert.ok(plan.ok, plan.ok ? "" : plan.reason);
+  assert.equal(plan.placeId, place.id);
+  assert.ok(plan.points.length >= 2);
+});
