@@ -44,3 +44,26 @@ The standard flow is Designer → Coder → Bot-Developer. However, there is a s
 - **The Action:** The Designer may skip the Coder and write a **Spike Task** directly for the Bot-Developer.
 - **Spike Task Requirements:** The Designer must specify the Goal, the exact hypothesis to test, the required telemetry (e.g., `PathReason`, 10Hz pose trace), and the boundaries (e.g., "Do not edit `src/`. Prototype in `plan/dsh-tasks/live/` only").
 - **The Return:** The Bot-Developer returns the exact log evidence and a working prototype. The Designer then incorporates this into the Code Map / Decisions and writes the final implementation task for the Coder.
+
+## Entry 11-18-2026 3:47 pm
+
+## Environment — the prop guard (live arena)
+
+## bot-developer environment needs to disable random wander bot effects on live arena
+Wander bots pick up props, including the alien weapon and the key. A host that
+has been up for a while has usually lost them, so a bot that joins late cannot
+arm (`alien-weapon-1 present=false` → the attack mission exits `no_ammo`). The
+operator therefore restarts the host to protect the weapon/key long enough for
+the bot to arm.
+
+**What the bot sees:** a restart closes its socket after welcome and the client
+logs `[conn] session abort` (reconnect policy is `abort`, no retry). That is a
+deliberate restart, not host instability — the bot stops, waits for "ready",
+and takes a fresh session. Never retry into a restarting host.
+
+**Run shape:** operator restarts → bot joins and arms immediately → the actual
+test. If the bot joins and `alien-weapon-1` is already gone, do not chase it;
+ask for a fresh map.
+
+**Requested fix:** a "wander bots pick up props" option in the options
+interface disables wander bots from changing the test environment (host/game side, covering both the weapon and the key).
