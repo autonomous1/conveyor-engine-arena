@@ -1384,7 +1384,7 @@
     }
   ],
   "player": {
-    "radius": 0.5,
+    "radius": 0.45,
     "height": 1.8,
     "modelChoices": [
       "grok-bot",
