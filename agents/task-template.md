@@ -10,6 +10,8 @@ Read `agents/AGENTS.md` first. Then this file. Then `agents/codemap.md` only for
 **Node:** start shell commands with `cd ~/dev/conveyor-engine-arena && export PATH=~/.nvm/versions/node/v24.0.2/bin:$PATH &&`.
 **Artifacts:** logs, fail-first output, scoped test output, and codemap diffs go under `plan/dsh-tasks/logs/` (name `<task>-<what>.log` / `<task>-codemap.diff`); the report goes under `plan/dsh-tasks/reports/`; live traces under `plan/dsh-tasks/live/`. Never write these to the repo root.
 
+**Context to Inject:** <the exact files the user pastes into the coder's fresh context window, together with this task file. One path per line, each with a one-line reason; repo-relative, or absolute for `~/dev/blueprint-scene`. List only the files the coder must read in full: the source under edit, its test file, and the specific report/log/evidence. Do not list `agents/codemap.md` (symbol lookup only, regenerated), generated files (`dist/`, codemap), or the kernel; `agents/AGENTS.md` is injected by the runner, do not list it. Every source/test path here must also appear in the Files table. If the task reproduces an existing failure, list the reproduction script and its log here too.>
+
 > **Changed in vX.Y:** <one sentence: what this task assumes from prior tasks, what it closes, what it defers. Delete the whole line for a clean task with no dependency.>
 
 **Architecture note:** <cite the specific `ARCHITECTURE` paragraph, `@invariant`, or decision entry this task implements. If it can't cite one, the task is speculative — stop and reconsider.>

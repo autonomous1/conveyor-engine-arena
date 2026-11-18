@@ -6,6 +6,8 @@ Browser arena client + authoritative Node host for Conveyor Engine. The host tic
 
 **Node version:** use `~/.nvm/versions/node/v24.0.2/bin/node`. PATH `node` is nvm v4.4.2, which can't run this repo. Start shell commands with `cd ~/dev/conveyor-engine-arena && export PATH=~/.nvm/versions/node/v24.0.2/bin:$PATH &&` so `node`, `npm` and `npx` are Node 24. Don't try other Node versions.
 
+**Roles:** the role briefs are `agents/coder-role.md` (coder method and Pre-Flight/HALT contract), `agents/designer-role.md`, and the bot-developer brief; this file is the repo-wide rule set common to them. `src/shared/bots/goap.ts` is frozen unless the task explicitly requires a change.
+
 **Read order for every task (hard stop)**
 1. The task file the user named — only once.
 2. This `agents/AGENTS.md` — only once.
@@ -30,8 +32,8 @@ Do **not** open `../conveyor-engine-packages` or `../blueprint-scene` unless the
 If the task sketches collision / movement / lights / input, implement **exactly** that sketch in the listed files. Do not rediscover behaviour by searching the kernel or sibling repos.
 
 ## Find code fast
-- **Before searching, read `agents/codemap.md`.** Look up symbols in its **Symbol index**: each line is the name in backticks, then `file:line kind`, so `grep -n 'createDoorBlockers' agents/codemap.md` finds it in one step. Each module section lists `imports`, `used by`, and exported signatures.
-- Grep the source only when the codemap doesn't answer the question (for example, local helpers or call sites inside a function).
+- **Look up an exact symbol in `agents/codemap.md`.** Use the Symbol index only for a symbol or filename named by the task's Files table; open the named source file and verify it there. Do not read the codemap first or use it for design.
+- Grep the source for the exact symbol when it is not listed (local helpers, call sites inside a function), or to verify the entry.
 - Regenerate with `npm run codemap` after adding, moving or renaming exports. `npm run codemap:check` exits 1 if it is stale.
 
 ## Comment as contract
@@ -56,7 +58,7 @@ Do not tag `@param` / `@returns` when the signature already says it. Do not rest
 
 **Editorial rule: why and when, not how.** "How it works" duplicates the body and rots fastest. If the *how* is non-obvious, the fix is a named type, a helper, or a test — not a comment. The exception is *how to use it* (calling convention), which is `@pre` / `@when`.
 
-**Tag on touch.** When a task edits a file, bring that file's comments up to this standard as part of the task. No bulk pass — the touched surface becomes excellent, the rest stays honestly bare, and the codemap still lists signatures and reverse deps for it. Acceptance gate for every task that edits code: *codemap diff is reviewable and includes no unexplained comment churn*.
+**Tag on touch.** When a task edits a module, update that module's four-slot header (if it exports at least two symbols) and the tags on every new or changed export. Do not sweep untouched code or adjacent modules. Acceptance gate for every task that edits code: *codemap diff is reviewable and includes no unexplained comment churn*.
 
 ## Layout
 - `src/server/` host: `main.ts` (HTTP + WS entry, serves `dist/web`), `game.ts` (wander loop, held inputs), `world-loader.ts`/`load-game.ts`/`game-manifest.ts` (manifest → world), `doors.ts`, `fire.ts`, `grenade.ts`, `pickups.ts`, `health.ts`, `host-path.ts`, `placements-file.ts`.
