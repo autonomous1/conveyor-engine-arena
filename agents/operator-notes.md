@@ -35,4 +35,12 @@ The pipeline is not strictly linear. There are two distinct workflows depending 
 
 **Resolution Rule:** When there is disagreement about where a fix belongs, the spike belongs to the Bot-Developer, the production build belongs to the Coder, and the Operator has final judgment. The prototype is the executable spec; the Coder makes it production.
 
+## Entry 11-18-2026 1:40 pm:
 
+## The "Designer-Initiated Spike" (The Direct-to-Probe Flow)
+The standard flow is Designer → Coder → Bot-Developer. However, there is a sanctioned exception:
+
+- **When to use it:** The Designer encounters a problem that cannot be modeled statically (e.g., moving portals, ephemeral desyncs, nested spatial hierarchies) and lacks the empirical data to write a safe, narrow task for the Coder.
+- **The Action:** The Designer may skip the Coder and write a **Spike Task** directly for the Bot-Developer.
+- **Spike Task Requirements:** The Designer must specify the Goal, the exact hypothesis to test, the required telemetry (e.g., `PathReason`, 10Hz pose trace), and the boundaries (e.g., "Do not edit `src/`. Prototype in `plan/dsh-tasks/live/` only").
+- **The Return:** The Bot-Developer returns the exact log evidence and a working prototype. The Designer then incorporates this into the Code Map / Decisions and writes the final implementation task for the Coder.

@@ -1,6 +1,6 @@
 # Bot task NN — <the question this run answers, imperative>
 
-Read `plan/dsh-tasks/prompt-bot-developer.txt` first. Then this file. Then the bot session's code only for the symbols in Files.
+Read `~/dev/conveyor-engine-arena/agents/bot-developer-role.md` first. Then this file. Then the bot session's code only for the symbols in Files.
 
 **Do not read memory or skills.** Do not open `SKILL.md` bodies or a memory plugin; the run's evidence is the live log + this file.
 **Artifacts:** every log, trace, capture, and diff goes under `plan/dsh-tasks/logs/` (`<NN>-<what>.log`, `<NN>-trace.json`); the analysis/report under `plan/dsh-tasks/reports/`. Never the repo root. The report links the exact paths.
@@ -49,7 +49,7 @@ Read `plan/dsh-tasks/prompt-bot-developer.txt` first. Then this file. Then the b
 
 | File | Repo | Use |
 |---|---|---|
-| `plan/dsh-tasks/prompt-bot-developer.txt` | conveyor-engine-arena | Read-only. The operator brief. |
+| `~/dev/conveyor-engine-arena/agents/bot-developer-role.md` | conveyor-engine-arena | Read-only. The operator brief. |
 | <the bot session/CLI file> | conveyor-engine-arena | Read-only. The commands and the log fields. |
 | <the host/arena file> | conveyor-engine-arena | Read-only. The accept path, the seat rule. |
 | `plan/dsh-tasks/logs/<NN>-*` | conveyor-engine-arena | **New.** The raw evidence. |
