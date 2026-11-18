@@ -26,6 +26,17 @@ test("manifest_loads_without_warnings", () => {
   assert.deepEqual(warnings, []);
 });
 
+test("baked_regions_match_the_manifest_player_capsule", () => {
+  const game = loadInstalledGame(nodeGameFiles());
+  const regions = JSON.parse(readFileSync("web/game/regions.json", "utf8")) as {
+    radius?: number;
+    height?: number;
+    places?: unknown[];
+  };
+  assert.equal(regions.radius, game.view.pawnRadius);
+  assert.equal(regions.height, game.view.pawnHeight);
+});
+
 test("sprite_frame_geometry_matches_png", () => {
   const doc = JSON.parse(readFileSync("web/game/arena.game.json", "utf8")) as {
     assets?: Array<{
