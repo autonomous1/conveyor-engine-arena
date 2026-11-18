@@ -42,8 +42,17 @@ test("the_descent_uses_the_same_goal_ride", () => {
   const actions = groundActions(graph, [], [downGoal]);
   assert.ok(actions.some((action) => action.id === `goTo:${portal.a}`));
   assert.ok(actions.some((action) => action.id === `goTo:${portal.b}`));
-  const plan = chooseGoal(buildWorldState({ at: portal.b, pickups: [], doors }), [downGoal], actions, ctx, { maxExpand: 5000 });
-  assert.ok(plan);
+  const state = buildWorldState({ at: portal.b, pickups: [], doors });
+  const heuristic = estimateSeconds(downGoal, ctx, [], undefined);
+  assert.ok(Number.isFinite(heuristic(state)), "h(start) is Infinity");
+  // The brain's call: heuristic and a 250 ms budget (`brain.ts` `planMs`).
+  const plan = chooseGoal(state, [downGoal], actions, ctx, {
+    minCost: ctx.minActionS,
+    heuristic,
+    deadlineMs: Date.now() + 250,
+    now: () => Date.now(),
+  });
+  assert.ok(plan, "no plan");
   assert.deepEqual(plan.steps, [`rideTo:${shaft}:${portal.a}`]);
 });
 
@@ -77,9 +86,18 @@ test("the_live_floor_1_hall_reaches_floor_3", () => {
   const goal = reach(to.id);
   const actions = groundActions(graph, [], [goal]);
   const state = buildWorldState({ at: from.id, pickups: [], doors });
-  assert.ok(Number.isFinite(estimateSeconds(goal, ctx, [], undefined)(state)), "h(start) is Infinity");
-  const plan = chooseGoal(state, [goal], actions, ctx, { maxExpand: 8000 });
+  const heuristic = estimateSeconds(goal, ctx, [], undefined);
+  assert.ok(Number.isFinite(heuristic(state)), "h(start) is Infinity");
+  // The brain's call: heuristic and a 250 ms budget (`brain.ts` `planMs`).
+  const plan = chooseGoal(state, [goal], actions, ctx, {
+    minCost: ctx.minActionS,
+    heuristic,
+    deadlineMs: Date.now() + 250,
+    now: () => Date.now(),
+  });
   assert.ok(plan, "no plan");
-  assert.ok(plan.steps.some((id) => id.startsWith("rideTo:")), JSON.stringify(plan.steps));
-  assert.ok(plan.steps.includes(`goTo:${to.id}`), JSON.stringify(plan.steps));
+  assert.equal(plan.steps.length, 3, JSON.stringify(plan.steps));
+  assert.ok(plan.steps[0]!.startsWith("goTo:") && plan.steps[0]!.endsWith(".e1@0"), plan.steps[0]);
+  assert.ok(plan.steps[1]!.startsWith("rideTo:"), plan.steps[1]);
+  assert.equal(plan.steps[2], `goTo:${to.id}`);
 });

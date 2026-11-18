@@ -446,10 +446,12 @@ function walkToStand(graph: SceneGraph, place: string, stand: Point): number {
 
 /**
  * Seconds still to pay.
- * An open walk is one strict route, reused so the direct `goTo` is popped
- * next. A locked walk names the alternative doors once; any other door is
- * unreachable and `plan` drops that state.
- * @post No finite bound (elevator-only, missing id) stops the search.
+ * An open walk pays the current place's own strict route, so the direct
+ * `goTo` is popped next. A locked walk names the alternative doors once; any
+ * other door is unreachable and `plan` drops that state.
+ * @post Finite at every state on a ride path — the start, either stop, the
+ *       goal place — in both directions; Infinity only when neither a walk
+ *       nor a ride can reach the goal.
  */
 export function estimateSeconds(
   goal: { want: WorldState },
@@ -509,6 +511,12 @@ export function estimateSeconds(
     if (holding && s[holdingFact(holding)] === true) return 0;
     const at = String(s.at);
     if (at === place) return pickupS;
+    // Per state, not per closure: a place pays its own strict route. The
+    // post-ride stop is a place, and `directS` came from the start place.
+    if (ctx.graph.placeById.has(at)) {
+      const metres = ctx.routeCost(at, place, s);
+      if (metres > 0 && Number.isFinite(metres)) return metres / WALK_MPS;
+    }
     if (mode === undefined) {
       // `at` may be `pickup:<id>` or `door:<id>` after that step finishes.
       const spots = spotsOf(at, s);
@@ -553,12 +561,19 @@ export function estimateSeconds(
     if (!place) return undefined;
     let best = Infinity;
     for (const portal of portals) {
-      const to = ctx.routeCost(portal.b, place, s);
-      if (!(to >= 0 && Number.isFinite(to))) continue;
-      const from = ctx.routeCost(at, portal.a, s);
-      if (!(from >= 0 && Number.isFinite(from))) continue;
-      const metres = from + portal.cost + to;
-      if (metres < best) best = metres;
+      // `rideTo` grounds each elevator portal in either direction; the bound
+      // must too, or a descent state has no ride leg.
+      for (const [board, alight] of [
+        [portal.a, portal.b],
+        [portal.b, portal.a],
+      ] as const) {
+        const to = ctx.routeCost(alight, place, s);
+        if (!(to >= 0 && Number.isFinite(to))) continue;
+        const from = at === board ? 0 : ctx.routeCost(at, board, s);
+        if (!(from >= 0 && Number.isFinite(from))) continue;
+        const metres = from + portal.cost + to;
+        if (metres < best) best = metres;
+      }
     }
     return Number.isFinite(best) ? best / WALK_MPS : undefined;
   };
