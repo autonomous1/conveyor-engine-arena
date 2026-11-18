@@ -10,13 +10,16 @@ import { parseMission } from "../../../packages/bot-client/src/missions.ts";
 import { hasLineOfSight } from "../../../src/shared/hitscan.ts";
 import { wishTo } from "../../../src/shared/nav/follow.ts";
 
-const URL_ = "wss://arena.tszakacs.com";
-const LOG = "plan/dsh-tasks/logs/53-attack.log";
-const TRACE = "plan/dsh-tasks/logs/53-trace.json";
 const token = (process.env.CE_TOKEN ?? "").trim() || readFileSync("/home/tim/.config/ce-arena/qa-token.pem", "utf8").trim();
 const args = new Map<string, string>();
 const argv = process.argv.slice(2);
 for (let i = 0; i < argv.length; i += 1) if (argv[i]!.startsWith("--")) args.set(argv[i]!.slice(2), argv[i + 1] ?? "");
+// The live arena is the operator's local host by default (role: environment).
+const URL_ = args.get("url") ?? process.env.CE_URL ?? "ws://127.0.0.1:4173";
+// One file set per run so a new run never overwrites the previous evidence.
+const STAMP = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+const LOG = `plan/dsh-tasks/logs/53-attack-live-${STAMP}.log`;
+const TRACE = `plan/dsh-tasks/logs/53-attack-live-${STAMP}.json`;
 const fixedTarget = args.get("target") ? Number(args.get("target")) : undefined;
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 const t0 = Date.now();

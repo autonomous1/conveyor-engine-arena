@@ -7,6 +7,7 @@ import { openNodeSocket } from "../../../packages/bot-client/src/node-socket.ts"
 import { runMission } from "../../../packages/bot-client/src/brain.ts";
 import { parseMission } from "../../../packages/bot-client/src/missions.ts";
 import { hasLineOfSight } from "../../../src/shared/hitscan.ts";
+import { pickDoorForUse, type DoorRuntime } from "../../../src/shared/doors.ts";
 import { planPath } from "../../../src/shared/nav/path.ts";
 import { planRoute } from "../../../src/shared/nav/route.ts";
 import { doorStand } from "../../../src/shared/nav/follow.ts";
@@ -14,8 +15,9 @@ import { createNavCache } from "../../../src/shared/nav/legs.ts";
 import { wishTo } from "../../../src/shared/nav/follow.ts";
 
 const DEFAULT_URL = "wss://arena.tszakacs.com";
-const LOG = "plan/dsh-tasks/logs/53-attack-run.log";
-const TRACE = "plan/dsh-tasks/logs/53-attack-run.json";
+const STAMP = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+const LOG = `plan/dsh-tasks/logs/53-attack-run-${STAMP}.log`;
+const TRACE = `plan/dsh-tasks/logs/53-attack-run-${STAMP}.json`;
 const token = (process.env.CE_TOKEN ?? "").trim();
 const args = new Map<string, string>();
 const argv = process.argv.slice(2);
@@ -156,6 +158,21 @@ const doorsNow = () => {
   return out;
 };
 const viewNow = () => ({ aabbs: world.aabbs, doors: doorsNow(), pawnRadius: world.pawnRadius, pawnHeight: world.pawnHeight });
+// Door bodies in the shape pickDoorForUse reads (task 86: the press needs the pawn in the volume).
+const liveDoors = (): DoorRuntime[] => {
+  const out: DoorRuntime[] = [];
+  for (const state of world.doors()) {
+    const body = world.doorBody(state.id);
+    if (body) out.push({ ...body, open: state.open, locked: state.locked });
+  }
+  return out;
+};
+const inDoorVolume = (doorId: string): boolean => {
+  const me = world.self();
+  if (!me) return false;
+  const picked = pickDoorForUse(liveDoors(), { id: me.id, alive: true, x: me.x, y: me.y, z: me.z, radius: world.pawnRadius, height: world.pawnHeight });
+  return picked?.id === doorId;
+};
 const poseNow = () => {
   const s = world.self();
   return s ? { x: s.x, y: s.y, z: s.z, vx: 0, vz: 0, yaw: s.yaw } : undefined;
@@ -184,7 +201,7 @@ const opportunity = (ringM: number): number | undefined => {
   }
   return best?.id;
 };
-const followPlan = async (points: readonly (readonly number[])[], deadline: number): Promise<"done" | "stuck" | "timeout"> => {
+const followPlan = async (points: readonly (readonly number[])[], deadline: number, tolerance = 0.5): Promise<"done" | "stuck" | "timeout"> => {
   for (const point of points) {
     let last = Infinity;
     let lastProgress = Date.now();
@@ -193,7 +210,7 @@ const followPlan = async (points: readonly (readonly number[])[], deadline: numb
       const me = poseNow();
       if (!me) return "stuck";
       const d = Math.hypot(me.x - point[0]!, me.z - point[2]!);
-      if (d <= 0.5) break;
+      if (d <= tolerance) break;
       if (d < last - 0.2) { last = d; lastProgress = Date.now(); }
       if (Date.now() - lastProgress > 1200) return "stuck";
       session.input.sendInput(wishTo(me, { x: point[0]!, z: point[2]! }, d < 1.2 ? 0.4 : 1));
@@ -252,7 +269,7 @@ const enterDoor = async (doorId: string): Promise<boolean> => {
   record(`door ${doorId}: approaching ${nearIsOut ? "out" : "in"} stand (${near.x.toFixed(2)},${near.z.toFixed(2)})`);
   const plan = planPath(graph, pose, near, gateNow as never, { view: viewNow(), cache: navCache });
   if (plan.ok) {
-    await followPlan(plan.points, Date.now() + 15_000);
+    await followPlan(plan.points, Date.now() + 15_000, 0.2);
   } else {
     record(`door ${doorId}: approach plan ${plan.reason}; straight fallback`);
     const until = Date.now() + 15_000;
@@ -260,11 +277,22 @@ const enterDoor = async (doorId: string): Promise<boolean> => {
       const me = poseNow();
       if (!me) return false;
       const d = Math.hypot(me.x - near.x, me.z - near.z);
-      if (d <= 0.4) break;
+      if (d <= 0.2) break;
       session.input.sendInput(wishTo(me, { x: near.x, z: near.z }, d < 1.2 ? 0.4 : 1));
       await sleep(50);
     }
   }
+  // Task 86: the press only lands with the capsule inside useVolume. The stand is
+  // already ~0.3 m outside it, so a short stop leaves `use` hitting nothing. Nudge
+  // until pickDoorForUse names this door before the first press.
+  for (let i = 0; i < 8 && !inDoorVolume(doorId); i += 1) {
+    const p = poseNow();
+    if (!p) break;
+    record(`door ${doorId}: not in the use volume yet; nudging`);
+    session.input.sendInput(wishTo(p, { x: body.position[0], z: body.position[2] }, 0.7));
+    await sleep(80);
+  }
+  record(`door ${doorId}: in volume=${inDoorVolume(doorId)}`);
   for (let i = 0; i < 10; i += 1) {
     const p = poseNow();
     if (p) session.input.sendInput(wishTo(p, { x: body.position[0], z: body.position[2] }, 0));
