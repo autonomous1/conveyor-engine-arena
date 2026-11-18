@@ -221,7 +221,8 @@ test("arena outside walks around buildings to a door, then lines up on the openi
   const scene = loaded.sceneGraph;
   assert.ok(scene);
   const view = loaded.view;
-  assert.equal(view.pawnRadius, RADIUS);
+  const manifest = JSON.parse(readFileSync("web/game/arena.game.json", "utf8")) as { player: { radius: number } };
+  assert.equal(view.pawnRadius, manifest.player.radius);
   assert.equal(view.pawnHeight, HEIGHT);
 
   const gate = scene.portals.find((item) => item.id === "brutalist-building-1-cbake-9.door-1-1-9-22-0");
@@ -231,7 +232,7 @@ test("arena outside walks around buildings to a door, then lines up on the openi
   const open = new Set<string>();
   const baked = loaded.regions;
   assert.ok(baked);
-  assert.equal(baked.radius, RADIUS);
+  assert.equal(baked.radius, view.pawnRadius);
   assert.equal(baked.height, HEIGHT);
   const regions = regionsOf(baked, "outside");
   assert.ok(regions);
@@ -247,14 +248,17 @@ test("arena outside walks around buildings to a door, then lines up on the openi
     const blocks = box.minY === undefined || box.maxY === undefined
       || !(Math.max(box.minY, box.maxY) <= STEP_HEIGHT || Math.min(box.minY, box.maxY) >= HEIGHT);
     if (!blocks) return [];
-    return [inflate(box, RADIUS)];
+    // The baked partition clears the capsule it was built for, not the old literal.
+    return [inflate(box, view.pawnRadius)];
   });
   assert.equal(hitsAny(points, blockers), false, "pulled segment enters a blocker");
 
   let blockedX: number | undefined;
   for (const block of blockers) {
     if (-6.2 <= block.minZ || -6.2 >= block.maxZ) continue;
-    const lo = Math.max(33.6, block.minX);
+    // The window must include the building face the west line crosses; the old
+    // 33.6 start was the 0.5 m capsule edge (face 33.115 + 0.5).
+    const lo = Math.max(32, block.minX);
     const hi = Math.min(72.1, block.maxX);
     if (!(hi - lo > 1e-3)) continue;
     blockedX = (lo + hi) * 0.5;

@@ -433,7 +433,6 @@ test("optional scene blocks and a placements list", () => {
 
 test("a prop AABB is not inflated, so a spawn 0.6 m from the face is accepted", () => {
   const doc = document() as { scene: Record<string, unknown>; player: { radius: number } };
-  assert.equal(doc.player.radius, 0.5);
   const scene = structuredClone(doc) as { scene: Record<string, unknown> };
   scene.scene.placements = ["./crate.json"];
   scene.scene.bounds = { minX: -24, maxX: 24, minY: -2, maxY: 12, minZ: -24, maxZ: 24 };
@@ -448,6 +447,8 @@ test("a prop AABB is not inflated, so a spawn 0.6 m from the face is accepted", 
   const read = (uri: string) => files.get(uri);
   const sources = { placementFiles: [{ path: "./crate.json", text: JSON.stringify(file) }] };
   const game = compile(scene, read, sources);
+  // The authored radius is the single source; the compiled view must carry it.
+  assert.equal(doc.player.radius, game.view.pawnRadius);
   const box = game.view.aabbs.find((item) => item.minX === -0.6 && item.maxX === 0.6);
   assert.ok(box);
   assert.equal(box.mesh, true);
@@ -681,7 +682,7 @@ test("scene.sceneGraph is optional, a missing file is an issue, and invalid json
   assert.equal("portals" in loaded.view, false);
   assert.ok(loaded.regions);
   assert.equal(loaded.regions.version, 1);
-  assert.equal(loaded.regions.radius, 0.5);
+  assert.equal(loaded.regions.radius, loaded.view.pawnRadius);
   assert.equal(loaded.regions.height, 1.8);
   assert.ok(loaded.regions.places.length > 0);
   assert.equal("regions" in loaded.view, false);

@@ -151,9 +151,10 @@ test("arena loads the baked regions file and does not rebuild it", { timeout: 12
   assert.ok(file);
   assert.equal("regions" in loaded.view, false);
   assert.equal(file.version, 1);
-  assert.equal(file.radius, RADIUS);
+  const manifest = JSON.parse(readFileSync("web/game/arena.game.json", "utf8")) as { player: { radius: number } };
+  assert.equal(file.radius, loaded.view.pawnRadius);
   assert.equal(file.height, HEIGHT);
-  assert.equal(loaded.view.pawnRadius, RADIUS);
+  assert.equal(loaded.view.pawnRadius, manifest.player.radius);
   assert.equal(loaded.view.pawnHeight, HEIGHT);
 
   const disk = JSON.parse(readFileSync(join(here, "../web/game/regions.json"), "utf8")) as {
@@ -190,7 +191,8 @@ test("arena loads the baked regions file and does not rebuild it", { timeout: 12
     const blocks = box.minY === undefined || box.maxY === undefined
       || !(Math.max(box.minY, box.maxY) <= STEP_HEIGHT || Math.min(box.minY, box.maxY) >= HEIGHT);
     if (!blocks) return [];
-    return [inflate(box, RADIUS)];
+    // The baked partition clears the capsule it was built for, not the old literal.
+    return [inflate(box, loaded.view.pawnRadius)];
   });
   for (const id of path.regions) {
     const region = regionById(outside, id);
@@ -200,7 +202,9 @@ test("arena loads the baked regions file and does not rebuild it", { timeout: 12
   let blockedX: number | undefined;
   for (const block of blockers) {
     if (-6.2 <= block.minZ || -6.2 >= block.maxZ) continue;
-    const lo = Math.max(33.6, block.minX);
+    // The window must include the building face the west line crosses; the old
+    // 33.6 start was the 0.5 m capsule edge (face 33.115 + 0.5).
+    const lo = Math.max(32, block.minX);
     const hi = Math.min(72.1, block.maxX);
     if (!(hi - lo > 1e-3)) continue;
     blockedX = (lo + hi) * 0.5;
