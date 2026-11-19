@@ -443,11 +443,14 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
     }
     claimHost.tick(Date.now());
     reservedPads.clear();
-    const bodies = pickupCandidates(pawnBodies(loaded.world, health), npcIds, padIds, {
+    // The pickup gate is not the sense gate: grants filter by the manifest, the
+    // bot sense must still see every pawn.
+    const bodies = pawnBodies(loaded.world, health);
+    const pickupBodies = pickupCandidates(bodies, npcIds, padIds, {
       npc: loaded.view.npcPickupProps !== false,
       client: loaded.view.clientPickupProps !== false,
     });
-    const grants = pickupHost.take(bodies, health, kit);
+    const grants = pickupHost.take(pickupBodies, health, kit);
     for (const grant of grants) {
       releasePickupObstacle(loaded.world, loaded.view.aabbs, grant.id);
       const gone = encodeFrame(grant.gone);

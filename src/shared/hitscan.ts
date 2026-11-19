@@ -329,15 +329,18 @@ export function traceHitscanDag(
 
 /**
  * Sweep a sphere-sized point from `from` to `to` over the static DAG plus the
- * dynamic boxes; the nearest surface hit wins.
- * @post The returned point is on the nearest static/dynamic surface; no pawn is
- *       included unless it is in `dynamic`.
+ * dynamic boxes and pawn capsules; the nearest surface hit wins.
+ * @post The returned point is on the nearest static/dynamic volume. The dynamic
+ *       half uses the segment rule (`sweepIndexed`), not the shooter ray, so a
+ *       hit nearer than `MIN_HIT_DISTANCE` is kept; the dynamic normal stays
+ *       `{0,1,0}` so door bounces are unchanged.
  */
 export function sweepDag(
   from: Vec3,
   to: Vec3,
   dag: SpatialDAG,
   dynamic: readonly TraceAabb[] = [],
+  capsules: readonly TraceCapsule[] = [],
 ): SweepHit | undefined {
   const dx = to.x - from.x;
   const dy = to.y - from.y;
@@ -346,9 +349,9 @@ export function sweepDag(
   if (!(span > 0)) return undefined;
   const aim = unit({ x: dx, y: dy, z: dz });
   const staticHit = raycastFirst(dag, from, aim, span);
-  const dyn = traceHitscan(from, aim, dynamic, [], span);
-  if (dyn.distance < span && (!staticHit || dyn.distance < staticHit.distance)) {
-    return { point: dyn.to, normal: { x: 0, y: 1, z: 0 }, pawn: false, distance: dyn.distance };
+  const dyn = sweepIndexed(from, to, dynamic, capsules);
+  if (dyn && dyn.distance < span && (!staticHit || dyn.distance < staticHit.distance)) {
+    return { ...dyn, normal: { x: 0, y: 1, z: 0 } };
   }
   if (!staticHit) return undefined;
   return {

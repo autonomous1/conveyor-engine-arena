@@ -10,6 +10,7 @@ import { createGrenadeProps, GRENADE_DRAW_MS } from "../src/client/grenade.ts";
 import { aimDirection, EYE_HEIGHT } from "../src/shared/look.ts";
 import { createPawnHealth, MAX_HP } from "../src/shared/health.ts";
 import { sweepSegment, traceHitscan, type TraceAabb, type TraceCapsule } from "../src/shared/hitscan.ts";
+import { loadSpatialDAG } from "../src/shared/spatial-dag.ts";
 import { startArenaServer } from "../dist/server/main.js";
 import { loadArena } from "../dist/server/world-loader.js";
 
@@ -1145,4 +1146,94 @@ test("a grenade kill's health frame carries cause grenade", () => {
   assert.equal(health.lastDamage(2)?.cause, "grenade");
   assert.ok(healthFrames.some((frame) => frame.entity === 2 && frame.dead === true && frame.hp === 0 && frame.cause === "grenade"));
   assert.equal(healthFrames.some((frame) => frame.cause !== undefined && frame.dead !== true), false);
+});
+
+test("a DAG grenade hits a pawn capsule, and a nearer door box still wins", () => {
+  // Valid but empty static geometry: the only volumes are the dynamic ones.
+  const dag = loadSpatialDAG({ formatVersion: 1, hash: "x", nodes: [], chunks: [] });
+  assert.ok(dag);
+  const body: grenade.GrenadeBody = {
+    id: 1,
+    owner: 99,
+    x: 0,
+    y: 1,
+    z: 0,
+    vx: 10,
+    vy: 0,
+    vz: 0,
+    yaw: 0,
+    bounced: false,
+    age: 0,
+    impact: "explode",
+  };
+  const capsule: TraceCapsule = { id: 7, x: 1, y: 0, z: 0, radius: 0.45, height: 1.8 };
+  const step = grenade.stepGrenade(body, 0.1, [], [capsule], undefined, dag);
+  assert.equal(step.kind, "stop", "the DAG sweep passes through the pawn");
+  if (step.kind !== "fly") {
+    assert.equal(step.hit.pawn, true);
+    assert.equal(step.hit.id, capsule.id);
+  }
+
+  // A door/prop box nearer than the capsule keeps the hit a box.
+  const door: TraceAabb = { id: 3, minX: 0.5, maxX: 0.55, minY: 0, maxY: 2, minZ: -1, maxZ: 1 };
+  const blocked = grenade.stepGrenade(body, 0.1, [], [capsule], undefined, dag, [door]);
+  assert.ok(blocked.kind !== "fly");
+  if (blocked.kind !== "fly") {
+    assert.equal(blocked.hit.pawn, false);
+    assert.equal(blocked.hit.id, door.id);
+  }
+});
+
+test("a DAG grenade keeps a near pawn hit inside the shooter-ray blind spot", () => {
+  const dag = loadSpatialDAG({ formatVersion: 1, hash: "x", nodes: [], chunks: [] });
+  assert.ok(dag);
+  // The live step: 24 m/s over one 0.05 s tick is 1.2 m; the capsule's top cap
+  // entry is ~0.19 m along the segment, inside traceHitscan's MIN_HIT_DISTANCE.
+  const body: grenade.GrenadeBody = {
+    id: 2,
+    owner: 99,
+    x: 0,
+    y: 1.6,
+    z: 2.4,
+    vx: 0,
+    vy: 0,
+    vz: 24,
+    yaw: 0,
+    bounced: false,
+    age: 0,
+    impact: "explode",
+  };
+  const capsule: TraceCapsule = { id: 7, x: 0, y: 0, z: 3, radius: 0.5, height: 1.8 };
+  const step = grenade.stepGrenade(body, 0.05, [], [capsule], undefined, dag);
+  assert.ok(step.kind !== "fly", "the near hit was dropped");
+  if (step.kind !== "fly") {
+    assert.equal(step.hit.pawn, true);
+    assert.equal(step.hit.id, capsule.id);
+  }
+});
+
+test("a DAG grenade that starts inside a capsule still hits it", () => {
+  const dag = loadSpatialDAG({ formatVersion: 1, hash: "x", nodes: [], chunks: [] });
+  assert.ok(dag);
+  const body: grenade.GrenadeBody = {
+    id: 3,
+    owner: 99,
+    x: 0,
+    y: 1.6,
+    z: 3.0,
+    vx: 0,
+    vy: 0,
+    vz: 24,
+    yaw: 0,
+    bounced: false,
+    age: 0,
+    impact: "explode",
+  };
+  const capsule: TraceCapsule = { id: 7, x: 0, y: 0, z: 3, radius: 0.5, height: 1.8 };
+  const step = grenade.stepGrenade(body, 0.05, [], [capsule], undefined, dag);
+  assert.ok(step.kind !== "fly", "a grenade inside the pawn passed through");
+  if (step.kind !== "fly") {
+    assert.equal(step.hit.pawn, true);
+    assert.equal(step.hit.id, capsule.id);
+  }
 });

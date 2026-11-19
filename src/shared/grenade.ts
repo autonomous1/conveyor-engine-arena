@@ -332,7 +332,7 @@ export function stepGrenade(
     z: body.z + next.vz * dt,
   };
   const swept = dag
-    ? sweepDag(from, to, dag, dynamic)
+    ? sweepDag(from, to, dag, dynamic, capsulesFor(body, next.age, capsules))
     : sweepIndexed(from, to, aabbs, capsulesFor(body, next.age, capsules));
   const hit = closerFloorHit(from, to, swept, floorY);
   if (!hit) {
