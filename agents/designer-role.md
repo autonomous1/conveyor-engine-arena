@@ -21,6 +21,7 @@ Before drafting any task, read:
 
 - `agents/decisions.md` (D1–D10; the rationale for the pipeline)
 - `agents/README-dsh.md` (template, state table, open loops, common failures)
+- `agents/operator-notes.md` — the **Standing rules** (`[designer]`/`[all]`): the two flows, the designer-initiated spike, the timebox, and the 11-90 rule that every bot-developer prompt goes through the bot-task-template.
 
 The `agents/` and `plan/dsh-tasks/` copies of both files are identical today; use the `agents/` copies. (The README's "docs/decisions.md" line is stale.)
 
@@ -38,10 +39,13 @@ The `agents/` and `plan/dsh-tasks/` copies of both files are identical today; us
 
 1. Verify every symbol and line number against current source with `rg` before writing it into a task. Tasks written without source access carry line drift and wrong-symbol bugs.
 2. Cite the specific `ARCHITECTURE` paragraph, `@invariant`, or decision entry the task implements. If you can't, the task is speculative — stop.
-3. Fill **every** slot in `agents/task-template.md`: Architecture note, Files to touch, Codemap delta, Headers and tags, Test-must-fail-first, Test scope, Artifacts, **Context to Inject**, plus the preamble. The Context to Inject slot lists the exact files the user pastes into the coder's fresh context window — one path per line, a subset of the Files table plus the task file; never the whole repo, the codemap, or generated files.
+3. Fill **every** slot in `agents/task-template.md`: Architecture note, **Knowledge base**, Files to touch, Codemap delta, Headers and tags, Test-must-fail-first, Test scope, Artifacts, **Context to Inject**, plus the preamble. The Context to Inject slot lists the exact files the user pastes into the coder's fresh context window — one path per line, a subset of the Files table plus the task file, including the KB file(s) named in **Knowledge base**; never the whole repo, the codemap, or generated files.
+
+**Bot-developer prompts go through the template.** Every bot-developer prompt goes through `agents/bot-task-template.md`. A direct prompt is how 11-90 happened: the bot edited source outside the requested script. Draft the task, fill the Knowledge base and Files slots, and hand the file over.
+
 4. The Test scope slot names the `npm run test:scope <scopes>` and/or `npm run test:related -- <files>` command the coder runs, not the full suite. Use the implemented scopes (nav, doors, bot, server, client, shared, meta); a new test file must match one, or the task adds the pattern to `test/scopes.json`. Full `npm test` is the merge gate and the 2-hour CI run.
 5. Do not edit `src/`, `test/`, or `packages/`. Do not change the kernel (`conveyor-engine-*`) without an explicit user decision; if a kernel change seems needed, stop and describe it.
-6. Do not read `~/.dsh/AGENTS.md`, `~/.dsh/skills/`, or any memory plugin's state. `AGENTS.md` is already injected. Stay on the task at hand.
+6. Prohibitions: `agents/AGENTS.md` (memory/skills); stay on the task at hand.
 
 ## Writing discipline
 

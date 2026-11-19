@@ -6,13 +6,15 @@ Browser arena client + authoritative Node host for Conveyor Engine. The host tic
 
 **Node version:** use `~/.nvm/versions/node/v24.0.2/bin/node`. PATH `node` is nvm v4.4.2, which can't run this repo. Start shell commands with `cd ~/dev/conveyor-engine-arena && export PATH=~/.nvm/versions/node/v24.0.2/bin:$PATH &&` so `node`, `npm` and `npx` are Node 24. Don't try other Node versions.
 
-**Roles:** the role briefs are `agents/coder-role.md` (coder method and Pre-Flight/HALT contract), `agents/designer-role.md`, and the bot-developer brief; this file is the repo-wide rule set common to them. `src/shared/bots/goap.ts` is frozen unless the task explicitly requires a change.
+**Roles:** the role briefs are `agents/coder-role.md` (coder method and Pre-Flight/HALT contract), `agents/designer-role.md`, and `agents/bot-developer-role.md`; this file is the repo-wide rule set common to them. `src/shared/bots/goap.ts` is frozen unless the task explicitly requires a change.
 
 **Read order for every task (hard stop)**
 1. The task file the user named — only once.
-2. This `agents/AGENTS.md` — only once.
-3. The task’s **Files table** paths (and only the line ranges / symbols it names).
-4. `agents/codemap.md` — **symbol lookup only** (see below). Never open it first. Never re-read it for “context”.
+2. This `agents/AGENTS.md` — already injected; do not re-read.
+3. `agents/operator-notes.md` — the **Standing rules** at the top (the dated entries are history); apply the rules tagged for your role.
+4. The KB sections named in the task's **Knowledge base** slot (only those sections; the KB is the map, not a field dump). If the slot is missing or names no section, stop.
+5. The task’s **Files table** paths (and only the line ranges / symbols it names).
+6. `agents/codemap.md` — **symbol lookup only** (see below). Never open it first. Never re-read it for “context”.
 
 **Codemap is an index, not a document**
 - Allowed: one `rg`/search for an **exact** symbol or filename from the Files table (e.g. `compileGame`, `loadArenaVisuals`, `readManifestSources`). Jump to that line; read that symbol’s entry and the file path it names; open **that source file**.
@@ -56,6 +58,12 @@ Comments carry what types cannot: *why*, *when*, and cross-call invariants. They
 
 Do not tag `@param` / `@returns` when the signature already says it. Do not restate the types.
 
+**KB row classifications.** The state-model tables (`host-kb`/`client-kb`/`shared-kb` §13) tag each row:
+- `S` structural — a container or shape checkable from the declaration.
+- `B` behavioral — a lifetime rule: one-shot, per-tick/snapshot/frame clear, monotonic, TTL.
+- `X` cross-boundary — the state or reference crosses the host↔client↔shared boundary; the contract lives in `agents/shared-kb.md`.
+A candidate invariant is not an `@invariant` until a test or tag confirms it; then it moves to that layer's §12/§11 and the tag is added.
+
 **Editorial rule: why and when, not how.** "How it works" duplicates the body and rots fastest. If the *how* is non-obvious, the fix is a named type, a helper, or a test — not a comment. The exception is *how to use it* (calling convention), which is `@pre` / `@when`.
 
 **Tag on touch.** When a task edits a module, update that module's four-slot header (if it exports at least two symbols) and the tags on every new or changed export. Do not sweep untouched code or adjacent modules. Acceptance gate for every task that edits code: *codemap diff is reviewable and includes no unexplained comment churn*.
@@ -68,6 +76,7 @@ Do not tag `@param` / `@returns` when the signature already says it. Do not rest
 - `src/app.ts`, `src/run.ts`, `src/bench*.ts`: headless example app, scenarios and bench.
 - `web/` static: `index.html`, `game/arena.game.json` (hand-edited manifest) + baked `*.placements.json`, `bounds.json`, `spawn-points.json`; `assets/models` GLBs.
 - `dev/scenes/arena-1/` Inkscape designs and source models for the scene bake (`npm run bake:scene` → blueprint-scene).
+- `packages/bot-client/` the bot lane: `connection.ts`, `world.ts`, `input.ts`, `cli.ts`, `brain.ts`, and the tracked drivers under `tests/`.
 - `test/*.test.ts` node:test suites. `scripts/` build-client, bake and helper scripts.
 
 ## Commands

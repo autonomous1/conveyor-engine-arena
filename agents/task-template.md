@@ -1,20 +1,21 @@
 # Task NN — <one-line title, imperative: "Extract X", "Add Y", "Fix Z">
 
-Read `agents/AGENTS.md` first. Then this file. Then `agents/codemap.md` only for symbols in the Files table.
+Read `agents/AGENTS.md` first. Then this file. Then the KB sections named in **Knowledge base** (the map; do not edit it). Then `agents/codemap.md` only for symbols in the Files table.
 
-**Do not read memory or skills.** `AGENTS.md` is already injected. Do not re-read `~/.dsh/AGENTS.md` or the project `AGENTS.md`. Do not open `SKILL.md` bodies under `~/.dsh/skills/` or `<repo>/.dsh/skills/` unless this task names the skill. If a memory plugin is installed, do not call `mem_search` / `mem_pack` / `memory_*` and do not read `~/.dsh/memory*`.
-**Do not open** `~/dev/conveyor-engine-packages` or `../blueprint-scene` unless the Files table names a path there.
+**Prohibitions:** `agents/AGENTS.md` (memory/skills, sibling repos).
 **Codemap:** at most one exact-symbol search from the Files table, then open that source file. Do not scroll or re-open `codemap.md`.
 
 **Repos:** all paths in `./conveyor-engine-arena`. Do not change the kernel. Do not read memory or skill bodies (see above).
 **Node:** start shell commands with `cd ~/dev/conveyor-engine-arena && export PATH=~/.nvm/versions/node/v24.0.2/bin:$PATH &&`.
 **Artifacts:** logs, fail-first output, scoped test output, and codemap diffs go under `plan/dsh-tasks/logs/` (name `<task>-<what>.log` / `<task>-codemap.diff`); the report goes under `plan/dsh-tasks/reports/`; live traces under `plan/dsh-tasks/live/`. Never write these to the repo root.
 
-**Context to Inject:** <the exact files the user pastes into the coder's fresh context window, together with this task file. One path per line, each with a one-line reason; repo-relative, or absolute for `~/dev/blueprint-scene`. List only the files the coder must read in full: the source under edit, its test file, and the specific report/log/evidence. Do not list `agents/codemap.md` (symbol lookup only, regenerated), generated files (`dist/`, codemap), or the kernel; `agents/AGENTS.md` is injected by the runner, do not list it. Every source/test path here must also appear in the Files table. If the task reproduces an existing failure, list the reproduction script and its log here too.>
+**Context to Inject:** <the exact files the user pastes into the coder's fresh context window, together with this task file. One path per line, each with a one-line reason; repo-relative, or absolute for `~/dev/blueprint-scene`. List only the files the coder must read in full: the source under edit, its test file, and the specific report/log/evidence. Do not list `agents/codemap.md` (symbol lookup only, regenerated), generated files (`dist/`, codemap), or the kernel; `agents/AGENTS.md` is injected by the runner, do not list it. Every source/test path here must also appear in the Files table. If the task reproduces an existing failure, list the reproduction script and its log here too. Also list the KB file(s) named in **Knowledge base** — read the named sections, not necessarily the whole file.>
 
 > **Changed in vX.Y:** <one sentence: what this task assumes from prior tasks, what it closes, what it defers. Delete the whole line for a clean task with no dependency.>
 
 **Architecture note:** <cite the specific `ARCHITECTURE` paragraph, `@invariant`, or decision entry this task implements. If it can't cite one, the task is speculative — stop and reconsider.>
+
+**Knowledge base:** <the KB file(s) and section(s) this task touches, with the reason. E.g. `agents/host-kb.md` §13 (the host state model) and §5 (doors); `agents/client-kb.md` §13 (the client state model); `agents/shared-kb.md` §2–§3 (wire/protocol, data model) and §11 (invariants). Read the named sections before the source. The KB is the map, not a field dump; a stale claim is a report note, not an edit. If this slot is missing or names no section, stop.>
 
 **Files to touch:** <paths with a one-line purpose each. This bounds the executor's codemap scope; nothing outside this list is in scope.>
 
@@ -74,6 +75,7 @@ Read `agents/AGENTS.md` first. Then this file. Then `agents/codemap.md` only for
 |---|---|---|
 | <path> | conveyor-engine-arena | Edit / Read-only reference / New |
 | `agents/codemap.md` | conveyor-engine-arena | Regenerate; symbol lookup only. Do not edit by hand. |
+| `agents/<layer>-kb.md` | conveyor-engine-arena | Read-only. The §… named in Knowledge base (one row per layer the task touches). |
 | `src/shared/bots/goap.ts` | conveyor-engine-arena | Read-only reference to confirm it is **not** edited. |
 
 ### Appendix: <pre-flight cross-check | fixture | exact diffs>

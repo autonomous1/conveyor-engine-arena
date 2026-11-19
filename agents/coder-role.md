@@ -10,18 +10,18 @@ read order, memory/skill prohibitions, sibling-repo boundaries, the kernel
 boundary, and comment-as-contract. If it is absent, stop with
 `HALT: MISSING_CONTEXT` before reading or editing source.
 
-Read the task file **once**, then `agents/AGENTS.md` once, then only the task's
-Files table paths. Do not re-read the task or `AGENTS.md` for “context”.
+Read the task file **once**, then `agents/AGENTS.md` once, then
+`agents/operator-notes.md` (the Standing rules; the `[coder]`/`[all]` entries),
+then the task's **Knowledge base** sections, then only the task's Files table
+paths. Do not re-read the task or `AGENTS.md` for “context”.
 
 Write only the files named in the task's **Files to touch** table. Do not edit
 the kernel (`conveyor-engine-*`), `src/shared/bots/goap.ts`, memory, skill
 bodies, or generated artifacts by hand. If the task explicitly names a sibling
 repo, read/edit only the paths it names there.
 
-Do not read `~/.dsh/AGENTS.md`, `~/.dsh/skills/`, `<repo>/.dsh/skills/`, memory
-plugins, or `../conveyor-engine-packages` / `../blueprint-scene` unless the task
-names a path there. The catalog line for a skill is not permission to load its
-body.
+Prohibitions: `agents/AGENTS.md` (memory/skills, sibling repos, the kernel
+boundary).
 
 The per-task loop is:
 
@@ -119,6 +119,8 @@ codemap cannot express. The KBs are curated, not generated:
 
 Method:
 
+Read the KB for each layer the task touches before the source; update it after the edit (Pass 7).
+
 1. Cluster modules by runtime role using headers and imports.
 2. Record entry points, construction order, and data flow.
 3. Record trust boundaries: host authoritative, client predicted, shared
@@ -209,17 +211,21 @@ invent a file.
 
 Read the task once. Extract: goal, Files table, symbols, invariants, test
 command, acceptance, artifacts, context list. Stop if the citation is missing or
-the task is contradictory. Test-only tasks have no fail-first.
+the task is contradictory. Stop if the **Knowledge base** slot is missing or
+names no section for each layer the Files table touches. Test-only tasks have no
+fail-first.
 
 ### Pass 1 — Resolve
 
-For every symbol in the task, do one exact codemap lookup. Open the named source
-file. Verify the symbol and signature in source. Do not infer an API from the
-codemap; do not assert the line number.
+For every symbol in the task, do one exact codemap lookup. Read the KB sections
+named in the task (the state model §13 and the invariants for the layers
+touched) before the source. Open the named source file. Verify the symbol and
+signature in source. Do not infer an API from the codemap; do not assert the
+line number.
 
 ### Pass 2 — Reconstruct contract
 
-Read the four-slot headers and tags for the touched modules:
+Read the four-slot headers and tags for the touched modules, and the KB's state/ownership and invariant lines alongside them (the KB is the layer map the headers sit in):
 
 - what the module owns;
 - who constructs and calls it;

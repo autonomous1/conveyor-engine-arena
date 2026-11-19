@@ -172,7 +172,7 @@ test (D6).
 
 ---
 
-## D9 — `RateLimitedLog` (next extraction, pending)
+## D9 — `RateLimitedLog` (superseded 2026-11-19 — see the superseding entry at the end)
 
 Same shape as `SnapshotStore`, different semantics. API:
 
@@ -220,3 +220,9 @@ table to every client.
 
 The race report (task 37) is the before-measurement; task 38 implements the
 claim and tests the after.
+
+
+## Superseding entry — D9 implemented (2026-11-19)
+
+`RateLimitedLog` is implemented (`src/server/rate-limited-log.ts`); the host uses
+it for both deny throttles. D9 is closed. See `agents/host-kb.md` §12/§13.3.

@@ -1,8 +1,8 @@
 # Bot task NN — <the question this run answers, imperative>
 
-Read `~/dev/conveyor-engine-arena/agents/bot-developer-role.md` first. Then this file. Then the bot session's code only for the symbols in Files.
+Read `~/dev/conveyor-engine-arena/agents/bot-developer-role.md` first. Then this file. Then the task's **Knowledge base** sections (host §… / client §… / shared §2–§3 and §11; the state model is §13 in host/client). Then the bot session's code only for the symbols in Files.
 
-**Do not read memory or skills.** Do not open `SKILL.md` bodies or a memory plugin; the run's evidence is the live log + this file.
+**Prohibitions:** `agents/AGENTS.md` (memory/skills, sibling repos); the run's evidence is the live log + this file.
 **Artifacts:** every log, trace, capture, and diff goes under `plan/dsh-tasks/logs/` (`<NN>-<what>.log`, `<NN>-trace.json`); the analysis/report under `plan/dsh-tasks/reports/`. Never the repo root. The report links the exact paths.
 **Safety:** one long-lived session per trial; clean `close()`; wait before any retry; never more than one bot in the arena while the operator is playing; never target the operator's pawn. Leftover seats are the known cause of `SERVER_FULL` and the stale-pawn confusion (task 49).
 
@@ -12,6 +12,8 @@ Read `~/dev/conveyor-engine-arena/agents/bot-developer-role.md` first. Then this
 ## Question
 
 <The one hypothesis the run resolves, and the decision it informs. Make it falsifiable: “does X happen when Y”, “before A / after B”. If there is no decision, there is no task.>
+
+**Knowledge base:** <the KB file(s) and section(s) this run depends on, with the reason: `agents/host-kb.md` §…, `agents/client-kb.md` §…, `agents/shared-kb.md` §2–§3 and §11. Read them before the run; do not edit the KB; the report's mechanism fit may cite them. If this slot is missing or names no section, stop.>
 
 ## Setup
 
@@ -50,6 +52,7 @@ Read `~/dev/conveyor-engine-arena/agents/bot-developer-role.md` first. Then this
 | File | Repo | Use |
 |---|---|---|
 | `~/dev/conveyor-engine-arena/agents/bot-developer-role.md` | conveyor-engine-arena | Read-only. The operator brief. |
+| `agents/<layer>-kb.md` | conveyor-engine-arena | Read-only. The §… named in Knowledge base (one row per layer the run touches). |
 | <the bot session/CLI file> | conveyor-engine-arena | Read-only. The commands and the log fields. |
 | <the host/arena file> | conveyor-engine-arena | Read-only. The accept path, the seat rule. |
 | `plan/dsh-tasks/logs/<NN>-*` | conveyor-engine-arena | **New.** The raw evidence. |

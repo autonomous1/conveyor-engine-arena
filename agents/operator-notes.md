@@ -1,5 +1,35 @@
 # Operator Notes & Pipeline Philosophy
 
+## Standing rules (read at session start)
+
+These are the durable rules. The dated entries below are history; the standing
+rules above them are the current process.
+
+- [all] **The cascade.** Verify symbols and invariants before a task. A flawed
+  task costs the coder time (they halt and ask) and the bot-developer time (they
+  hunt the bug live). Timebox a task design; if the root cause is unknown or too
+  complex to model statically, write a spike instead.
+- [designer] **Two flows.** Feature/bugfix: designer -> coder -> bot-developer.
+  Discovery/spike: bot-developer -> designer -> coder. The spike belongs to the
+  bot-developer, the production build belongs to the coder, and the operator has
+  final judgment. A designer-initiated spike may skip the coder only as a
+  `agents/bot-task-template.md` task with the goal, hypothesis, telemetry, and
+  boundaries.
+- [designer] **Bot-developer prompts go through the designer.** Every
+  bot-developer prompt is drafted with `agents/bot-task-template.md`. A direct
+  prompt is how 11-90 happened: the bot edited source outside the requested
+  script. Draft the task, fill the Knowledge base and Files slots, and hand the
+  file over.
+- [coder] **A live bug is a live report first.** Telemetry before the fix (the
+  Ghost in the Machine protocol); unit tests must mirror the live conditions.
+- [bot] **The prop guard.** The operator restarts the host to protect the alien
+  weapon/key. A restart closes the bot with `session abort`: wait for "ready",
+  never retry into a restarting host. A missing `alien-weapon-1` means ask for
+  a fresh map.
+- [bot] **Direct prompts stop.** A prompt without a bot-task-template file is a
+  stop: ask the designer for the task. The task's Files table bounds the edits;
+  a source change outside it is a report recommendation for the coder (11-90).
+
 ## Entry 11-18-2026 12:34 pm
 
 ## The Cascade Effect
@@ -67,3 +97,9 @@ ask for a fresh map.
 
 **Requested fix:** a "wander bots pick up props" option in the options
 interface disables wander bots from changing the test environment (host/game side, covering both the weapon and the key).
+
+## Entry 11-90-2026 2:11 pm
+
+## Bot-designer prompts need to be run through designer first
+
+When submitting a prompt directly to the bot-designer without generating task with the designer using the bot-designer task template, the bot-designer changed source files that were outside the scope. This occurred even though a specific script in tests was requested to be modified. The coder was working on a similar task and the same source files were modified by both agents.

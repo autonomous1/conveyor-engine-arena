@@ -6,7 +6,7 @@ moves a task to `invoked/` once it has run or is in progress; `invoked/` is the
 record of invoked tasks, not a next queue. Done is recorded in `reports/` and
 commits. Executor reports land in `reports/`.
 
-Read `docs/decisions.md` before drafting or executing a task.
+Read `agents/decisions.md` before drafting or executing a task.
 The coder's task template lives in `agents/task-template.md` (tracked). The bot-developer's live/run template lives in `agents/bot-task-template.md`. Do not duplicate either here.
 
 Logs, fail-first output, scoped test output, and codemap diffs land in `logs/`; reports in
@@ -23,7 +23,7 @@ Logs, fail-first output, scoped test output, and codemap diffs land in `logs/`; 
 | 11 | Tag on touch: GOAP bots + arena host | done | 14 tag lines / 8 symbols; 6 acceptance symbols couldn't appear (function-locals). Rule is **module-scoped** in AGENTS.md (header + new/changed exports only). |
 | 12 | Enforce `@invariant` → test pairing | done | fail-first demonstrated; gate green |
 | 13 | Extract `SnapshotStore` | done | pure bookkeeping; fail-first via `ERR_MODULE_NOT_FOUND` |
-| 14 | Extract `RateLimitedLog` | **recommended** | see D9 |
+| 14 | Extract `RateLimitedLog` | **done** | D9 superseded; module exists |
 | — | Four-slot headers across tree | deferred | tag-on-touch carries it |
 | — | `sceneGraphHash` test harness | deferred | last remaining `(test lands …)` deferral |
 
@@ -31,12 +31,11 @@ Logs, fail-first output, scoped test output, and codemap diffs land in `logs/`; 
 
 ## Open loops
 
-- **Stale local tag in `arena-host.ts`.** Task 13 left an `@invariant` above
-  `const snapStore = createSnapshotStore()` naming `snapByRequester`/`snapById`,
-  which the extraction removed. Delete it; the type carries it (D2). Fold into
-  task 14 step 0.
+- **Stale local tag in `arena-host.ts` — fixed (task 14).** The
+  `snapByRequester`/`snapById` tag was removed with the extraction; the type
+  carries it (D2).
 - **Template corrections from tasks 10–13.** Five accumulated edits, all now
-  reflected in `tasks/TEMPLATE.md`:
+  reflected in `agents/task-template.md`:
   - Contradictions across sections are spec bugs (task 10's `@internal`).
   - Acceptance names only symbols the generator can see (task 11).
   - Line-number churn is expected; the rule is "no signature text changes"
@@ -107,7 +106,7 @@ the **Test scope** names the scoped command and the tests it selects.
 - **Executor session:** one task file per run; writes `src/`, `test/`,
   `tasks/reports/<task>.md`; regenerates `agents/codemap.md`.
 - **User:** promotes `tasks/proposed/` → `tasks/`; resolves open questions;
-  updates `docs/decisions.md`.
+  updates `agents/decisions.md`.
 
 The filesystem is the only channel. Reports flow one way (executor → user →
 designer), tasks flow the other (designer → user → executor).

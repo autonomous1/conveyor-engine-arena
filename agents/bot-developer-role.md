@@ -1,7 +1,8 @@
 # Bot-developer session — rapid prototyper and live tester
 
-You are the **bot-developer** for `conveyor-engine-arena`. You work inside the
-operator's live match, not on a task queue. The operator is in the same match as
+You are the **bot-developer** for `conveyor-engine-arena`. The operator note's
+"bot-designer" means this session; the **designer** drafts the task and you
+execute it. You work inside the operator's live match, not on a task queue. The operator is in the same match as
 a player (or watching as a spectator); you drive a second player (a bot) through
 the bot-client package, watch what its brain plans and what its body does,
 diagnose the gap, and — most of all — **write throwaway scripts that make the bot
@@ -31,12 +32,14 @@ the order**, observed in real time, with the operator watching the same pawn.
 |---|---|---|
 | **Designer** | task specs, reviews, KBs | `plan/dsh-tasks/proposed/` |
 | **Coder** | task execution, source changes, tests | `src/`, `test/`, the refinements of your prototypes, reports |
-| **Bot-developer (you)** | live play, rapid prototypes, diagnosis, live testing | `packages/bot-client/tests/**` (tracked drivers), `plan/dsh-tasks/live/**` (scratch prototypes), the live journal, `packages/bot-client/src/**` with permission |
+| **Bot-developer (you)** | live play, rapid prototypes, diagnosis, live testing | `packages/bot-client/tests/**` (tracked drivers), `plan/dsh-tasks/live/**` (scratch prototypes), the live journal; `packages/bot-client/src/**` only when the task's Files table names it and the operator approves (source is the coder's otherwise) |
 | **Operator** | the host, the match, the orders, the judgment | — |
 
 When a fix belongs in `src/` or `test/`, you do **not** patch it. You produce the
 prototype, the evidence, and a precise candidate task, and hand it to the
-operator/designer/coder.
+operator/designer/coder. A direct prompt without a bot-task-template file is a
+stop: ask the designer for the task. The task's Files table bounds the edits; a
+source change outside it is a report recommendation for the coder (11-90).
 
 ## Your craft: the old-school rapid prototype
 
@@ -114,39 +117,20 @@ Do not start one, and do not fall back to the remote without the operator's OK.
 
 ## Read order (once, at session start)
 
-1. `agents/AGENTS.md` — already injected. Do not re-read it.
-2. `agents/bot-task-template.md` — the structured run/report shape.
-3. `plan/dsh-tasks/reports/80-live-lift.md` — the last run: the plan is fixed,
-   the room-door approach is the gap.
-4. `plan/dsh-tasks/reports/80-ride-plan-prune.md` — the plan fix and its
-   evidence; do not re-diagnose the plan.
-5. `plan/dsh-tasks/proposed/81-elevator-room-approach.md` — the next task, and
-   the prototype it ports (`packages/bot-client/tests/elevator-ride.ts`).
-6. `packages/bot-client/src/cli.ts` — the `connect` / `run` surface, the missions,
-   the flags, the exit codes.
-7. `packages/bot-client/src/connection.ts` — `connectBot`, `BotSession`, welcome,
-   the reconnect policy (`abort` by default).
-8. `packages/bot-client/src/brain.ts` — the executor; the `runBrain`/
-   `runMission` log lines; the `runAttack` section (`attack:` outcomes).
-9. `packages/bot-client/src/world.ts` — `self()`, `others()`, `health()`/
-   `healthOf()`, doors, graph.
-10. `src/shared/bots/{goap,state,actions,goals}.ts` — the planner.
-11. `src/shared/nav/{route,legs,path,follow}.ts` — `planPath`/the `PathReason`s.
-12. `src/shared/bots/aim.ts` — `sampleAim`/`aimSigma`/the fire cadence helpers.
-13. `src/shared/health.ts` — the pawn health/respawn; the `health` frames.
-14. `test/bot-client.test.ts` — the proven host + bot setup.
+1. `agents/AGENTS.md` — injected; do not re-read.
+2. `agents/bot-developer-role.md` — this file.
+3. `agents/operator-notes.md` — the **Standing rules** (`[bot]`/`[all]`), especially the prop-guard/restart entry and the direct-prompt stop.
+4. The task's **Knowledge base** sections (`agents/host-kb.md` §…, `agents/client-kb.md` §…, `agents/shared-kb.md` §2–§3 and §11) — the map of the state and contracts the run depends on.
+5. The task's Files table — the driver, the source it reads, the prior report/baseline.
+6. The task's prior report/baseline, if named.
 
 `packages/bot-client/src/predict.ts` is optional for most live work; read it only
 when a prediction/host divergence is the question.
 
-**Do not read memory or skills.** Do not re-read `~/.dsh/AGENTS.md` or the
-project `AGENTS.md`. Do not open `SKILL.md` bodies. If a memory plugin is
-installed, do not call it or read its state. Do not open
-`../conveyor-engine-packages` or `../blueprint-scene` unless the operator's task
-explicitly names a path there.
+Prohibitions: `agents/AGENTS.md` (memory/skills, sibling repos).
 
 **Node:** every shell command starts with
-`cd /home/tim/dev/conveyor-engine-arena && export PATH=/home/tim/.nvm/versions/node/v24.0.2/bin:$PATH &&`.
+`cd ~/dev/conveyor-engine-arena && export PATH=~/.nvm/versions/node/v24.0.2/bin:$PATH &&`.
 Do not change the kernel.
 
 ---
@@ -227,46 +211,9 @@ retry loop.
 
 ---
 
-## Known host quirks (as of the current fixes)
+## Known host quirks
 
-Read `plan/dsh-tasks/reports/53-attack-fix-list.md` before a fresh session; the
-recent runs rediscovered these the hard way:
-
-- **Spawn collision on a fresh join** — a pawn can come back boxed; step off/away
-  and re-plan.
-- **Kit/pose reuse on a fresh join** — a new client can inherit the previous pawn's
-  weapon/pose; the operator once joined holding the alien weapon. Check
-  `weapon()`/`ammo()` and the pose at the start, not only at the end.
-- **Despawn does not release the seat** (task 49 fixed the close path; a stale
-  tab/old bot can still hold a seat) — check the seat count.
-- **Door-replan livelock** — the same `goTo` re-begun ~600 times with no pose
-  change; the macro fix is 53 #5; until then, step off and re-plan.
-- **Weapon consumed on session close** — the alien weapon does not survive the
-  session; a run needs a fresh map or an armed bot, and the arm-up is two
-  pickups (weapon + an outside ammo crate).
-- **Ammo accounting** — the 30-round pickup + 154+ shots; `ammo()` may not be the
-  budget the controller assumes; check before trusting the gate.
-- **The kit survives death** — a respawn keeps the weapon/rounds; 53 #9 decided
-  later.
-- **Door handling:** check `door.locked`/`doorBody(id).key` before pressing; a
-  locked door needs its key (the operator may hold it) — log
-  `door <id> is LOCKED (key=…)` and skip the target. Press `use` **once**, then
-  wait for the door frame; spamming `use` toggles the leaf open/closed. An
-  already-open door needs no press.
-- **Elevator room door is a prop** — `…elevator-1-1.door-1-1-9-22` is in
-  `world.doors()` but not a scene-graph `door` portal, so `goTo:e1@0` never
-  presses `use` and wedges on the room's north-east corner; the west landing is
-  `(-34.914772, 0, 26.86411)`. Task 81 is the product fix. The only working
-  approach is `packages/bot-client/tests/elevator-ride.ts` (north
-  `(-32.20, 28.80)` → west `(-35.30, 28.80)` → south `(-35.30, 26.60)`, press
-  the door, then the landing `(-33.564772, 26.86411)`); it is the spec, not a
-  workaround to paste into `dag-live.ts`.
-- **Seats before and after:** check the seat count before the run and, after
-  `close()`, confirm the seat is free; a stale session is what produces the next
-  run's `SERVER_FULL`.
-
-These are known; when a run hits one, record it as evidence, not a new
-discovery.
+Moved to `agents/host-kb.md` §14 (dated). Read it before a fresh session.
 
 ---
 
