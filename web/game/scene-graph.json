@@ -5682,8 +5682,12 @@
           36.56062
         ],
         [
-          39.395766,
+          33.757657,
           36.56062
+        ],
+        [
+          39.395766,
+          36.510629
         ],
         [
           39.395766,
@@ -5698,6 +5702,14 @@
           41.4186
         ],
         [
+          39.413657,
+          41.4186
+        ],
+        [
+          39.414157,
+          41.368829
+        ],
+        [
           44.976157,
           41.368829
         ],
@@ -5714,11 +5726,23 @@
           41.368829
         ],
         [
-          44.976157,
-          41.368829
+          39.413657,
+          41.4186
         ],
         [
-          45.025928,
+          39.413657,
+          36.510629
+        ],
+        [
+          39.395766,
+          36.510629
+        ],
+        [
+          33.757657,
+          36.56062
+        ],
+        [
+          33.757657,
           41.4186
         ],
         [
@@ -6468,6 +6492,10 @@
         ],
         [
           -24.354651,
+          4.04917
+        ],
+        [
+          -24.30466,
           9.687279
         ],
         [
@@ -6481,6 +6509,14 @@
         [
           -29.212631,
           15.317441
+        ],
+        [
+          -29.212631,
+          9.70517
+        ],
+        [
+          -29.16286,
+          9.70567
         ],
         [
           -29.16286,
@@ -6499,12 +6535,24 @@
           9.70567
         ],
         [
-          -29.16286,
-          15.26767
+          -29.212631,
+          9.70517
+        ],
+        [
+          -24.30466,
+          9.70517
+        ],
+        [
+          -24.30466,
+          9.687279
+        ],
+        [
+          -24.354651,
+          4.04917
         ],
         [
           -29.212631,
-          15.317441
+          4.04917
         ]
       ],
       "bounds": {
@@ -7184,6 +7232,26 @@
       "y": 0,
       "polygon": [
         [
+          22.385226,
+          12.420239
+        ],
+        [
+          28.107246,
+          12.420239
+        ],
+        [
+          28.107246,
+          0.05398
+        ],
+        [
+          28.057255,
+          -5.584129
+        ],
+        [
+          19.494846,
+          -5.584129
+        ],
+        [
           19.494846,
           -11.214291
         ],
@@ -7192,6 +7260,14 @@
           -11.214291
         ],
         [
+          32.965226,
+          -5.60202
+        ],
+        [
+          32.915455,
+          -5.60252
+        ],
+        [
           32.915455,
           -11.16452
         ],
@@ -7206,14 +7282,26 @@
         [
           32.915455,
           -5.60252
-        ],
-        [
-          32.915455,
-          -11.16452
         ],
         [
           32.965226,
-          -11.214291
+          -5.60202
+        ],
+        [
+          28.057255,
+          -5.60202
+        ],
+        [
+          28.057255,
+          -5.584129
+        ],
+        [
+          28.107246,
+          0.05398
+        ],
+        [
+          32.965226,
+          0.05398
         ],
         [
           32.965226,
@@ -7246,22 +7334,6 @@
         [
           22.385226,
           18.320251
-        ],
-        [
-          22.385226,
-          12.420239
-        ],
-        [
-          28.107246,
-          12.420239
-        ],
-        [
-          28.107246,
-          -5.584129
-        ],
-        [
-          19.494846,
-          -5.584129
         ]
       ],
       "bounds": {
@@ -9162,7 +9234,6 @@
       "a": "brutalist-building-1-cbake-0.floor-3.hall",
       "b": "brutalist-building-1-cbake-0.room-a-1-5-8-0",
       "door": "brutalist-building-1-cbake-0.room-a-1-5-8-0.door-1-1-9-22-5",
-      "locked": false,
       "at": {
         "a": [
           -48.247285,
@@ -9184,7 +9255,6 @@
       "a": "brutalist-building-1-cbake-0.floor-5.hall",
       "b": "brutalist-building-1-cbake-0.room-a-1-5-8-3",
       "door": "brutalist-building-1-cbake-0.room-a-1-5-8-3.door-1-1-9-22-5",
-      "locked": false,
       "at": {
         "a": [
           -48.247285,
@@ -9206,7 +9276,6 @@
       "a": "brutalist-building-1-cbake-0.floor-2.hall",
       "b": "brutalist-building-1-cbake-0.room-a-1-5-8-8",
       "door": "brutalist-building-1-cbake-0.room-a-1-5-8-8.door-1-1-9-22-5",
-      "locked": false,
       "at": {
         "a": [
           -48.247285,
@@ -9228,7 +9297,6 @@
       "a": "brutalist-building-1-cbake-0.floor-4.hall",
       "b": "brutalist-building-1-cbake-0.room-a-1-5-8-87",
       "door": "brutalist-building-1-cbake-0.room-a-1-5-8-87.door-1-1-9-22-5",
-      "locked": false,
       "at": {
         "a": [
           -48.247285,
@@ -9250,7 +9318,6 @@
       "a": "brutalist-building-1-cbake-0.floor-5.hall",
       "b": "brutalist-building-1-cbake-0.room-a-1-5-8-9-3",
       "door": "brutalist-building-1-cbake-0.room-a-1-5-8-9-3.door-1-1-9-22-5",
-      "locked": false,
       "at": {
         "a": [
           -30.343295,
@@ -9272,7 +9339,6 @@
       "a": "brutalist-building-1-cbake-0.floor-3.hall",
       "b": "brutalist-building-1-cbake-0.room-a-1-5-8-9-6",
       "door": "brutalist-building-1-cbake-0.room-a-1-5-8-9-6.door-1-1-9-22-5",
-      "locked": false,
       "at": {
         "a": [
           -30.343295,
@@ -9294,7 +9360,6 @@
       "a": "brutalist-building-1-cbake-0.floor-2.hall",
       "b": "brutalist-building-1-cbake-0.room-a-1-5-8-9-9",
       "door": "brutalist-building-1-cbake-0.room-a-1-5-8-9-9.door-1-1-9-22-5",
-      "locked": false,
       "at": {
         "a": [
           -30.343295,
@@ -9316,7 +9381,6 @@
       "a": "brutalist-building-1-cbake-0.floor-4.hall",
       "b": "brutalist-building-1-cbake-0.room-a-1-5-8-9-90",
       "door": "brutalist-building-1-cbake-0.room-a-1-5-8-9-90.door-1-1-9-22-5",
-      "locked": false,
       "at": {
         "a": [
           -30.343295,
@@ -9338,7 +9402,6 @@
       "a": "brutalist-building-1-cbake-0.floor-1.hall",
       "b": "brutalist-building-1-cbake-0.room-a-1-5-8-9",
       "door": "brutalist-building-1-cbake-0.room-a-1-5-8-9.door-1-1-9-22-5",
-      "locked": false,
       "at": {
         "a": [
           -30.343295,
@@ -9360,7 +9423,6 @@
       "a": "brutalist-building-1-cbake-0.floor-1.hall",
       "b": "brutalist-building-1-cbake-0.room-a-1-5-8",
       "door": "brutalist-building-1-cbake-0.room-a-1-5-8.door-1-1-9-22-5",
-      "locked": false,
       "at": {
         "a": [
           -48.247285,
@@ -10574,7 +10636,6 @@
       "a": "brutalist-building-1-cbake-5.floor-3.hall",
       "b": "brutalist-building-1-cbake-5.room-a-1-5-8-0",
       "door": "brutalist-building-1-cbake-5.room-a-1-5-8-0.door-1-1-9-22-5",
-      "locked": false,
       "at": {
         "a": [
           38.913424,
@@ -10596,7 +10657,6 @@
       "a": "brutalist-building-1-cbake-5.floor-5.hall",
       "b": "brutalist-building-1-cbake-5.room-a-1-5-8-3",
       "door": "brutalist-building-1-cbake-5.room-a-1-5-8-3.door-1-1-9-22-5",
-      "locked": false,
       "at": {
         "a": [
           38.913424,
@@ -10618,7 +10678,6 @@
       "a": "brutalist-building-1-cbake-5.floor-2.hall",
       "b": "brutalist-building-1-cbake-5.room-a-1-5-8-8",
       "door": "brutalist-building-1-cbake-5.room-a-1-5-8-8.door-1-1-9-22-5",
-      "locked": false,
       "at": {
         "a": [
           38.913424,
@@ -10640,7 +10699,6 @@
       "a": "brutalist-building-1-cbake-5.floor-4.hall",
       "b": "brutalist-building-1-cbake-5.room-a-1-5-8-87",
       "door": "brutalist-building-1-cbake-5.room-a-1-5-8-87.door-1-1-9-22-5",
-      "locked": false,
       "at": {
         "a": [
           38.913424,
@@ -10662,7 +10720,6 @@
       "a": "brutalist-building-1-cbake-5.floor-5.hall",
       "b": "brutalist-building-1-cbake-5.room-a-1-5-8-9-3",
       "door": "brutalist-building-1-cbake-5.room-a-1-5-8-9-3.door-1-1-9-22-5",
-      "locked": false,
       "at": {
         "a": [
           56.817414,
@@ -10684,7 +10741,6 @@
       "a": "brutalist-building-1-cbake-5.floor-3.hall",
       "b": "brutalist-building-1-cbake-5.room-a-1-5-8-9-6",
       "door": "brutalist-building-1-cbake-5.room-a-1-5-8-9-6.door-1-1-9-22-5",
-      "locked": false,
       "at": {
         "a": [
           56.817414,
@@ -10706,7 +10762,6 @@
       "a": "brutalist-building-1-cbake-5.floor-2.hall",
       "b": "brutalist-building-1-cbake-5.room-a-1-5-8-9-9",
       "door": "brutalist-building-1-cbake-5.room-a-1-5-8-9-9.door-1-1-9-22-5",
-      "locked": false,
       "at": {
         "a": [
           56.817414,
@@ -10728,7 +10783,6 @@
       "a": "brutalist-building-1-cbake-5.floor-4.hall",
       "b": "brutalist-building-1-cbake-5.room-a-1-5-8-9-90",
       "door": "brutalist-building-1-cbake-5.room-a-1-5-8-9-90.door-1-1-9-22-5",
-      "locked": false,
       "at": {
         "a": [
           56.817414,
@@ -10750,7 +10804,6 @@
       "a": "brutalist-building-1-cbake-5.floor-1.hall",
       "b": "brutalist-building-1-cbake-5.room-a-1-5-8-9",
       "door": "brutalist-building-1-cbake-5.room-a-1-5-8-9.door-1-1-9-22-5",
-      "locked": false,
       "at": {
         "a": [
           56.817414,
@@ -10772,7 +10825,6 @@
       "a": "brutalist-building-1-cbake-5.floor-1.hall",
       "b": "brutalist-building-1-cbake-5.room-a-1-5-8",
       "door": "brutalist-building-1-cbake-5.room-a-1-5-8.door-1-1-9-22-5",
-      "locked": false,
       "at": {
         "a": [
           38.913424,
@@ -11986,7 +12038,6 @@
       "a": "brutalist-building-1-cbake-9.floor-3.hall",
       "b": "brutalist-building-1-cbake-9.room-a-1-5-8-0",
       "door": "brutalist-building-1-cbake-9.room-a-1-5-8-0.door-1-1-9-22-5",
-      "locked": false,
       "at": {
         "a": [
           -4.70892,
@@ -12008,7 +12059,6 @@
       "a": "brutalist-building-1-cbake-9.floor-5.hall",
       "b": "brutalist-building-1-cbake-9.room-a-1-5-8-3",
       "door": "brutalist-building-1-cbake-9.room-a-1-5-8-3.door-1-1-9-22-5",
-      "locked": false,
       "at": {
         "a": [
           -4.70892,
@@ -12030,7 +12080,6 @@
       "a": "brutalist-building-1-cbake-9.floor-2.hall",
       "b": "brutalist-building-1-cbake-9.room-a-1-5-8-8",
       "door": "brutalist-building-1-cbake-9.room-a-1-5-8-8.door-1-1-9-22-5",
-      "locked": false,
       "at": {
         "a": [
           -4.70892,
@@ -12052,7 +12101,6 @@
       "a": "brutalist-building-1-cbake-9.floor-4.hall",
       "b": "brutalist-building-1-cbake-9.room-a-1-5-8-87",
       "door": "brutalist-building-1-cbake-9.room-a-1-5-8-87.door-1-1-9-22-5",
-      "locked": false,
       "at": {
         "a": [
           -4.70892,
@@ -12074,7 +12122,6 @@
       "a": "brutalist-building-1-cbake-9.floor-5.hall",
       "b": "brutalist-building-1-cbake-9.room-a-1-5-8-9-3",
       "door": "brutalist-building-1-cbake-9.room-a-1-5-8-9-3.door-1-1-9-22-5",
-      "locked": false,
       "at": {
         "a": [
           -4.70892,
@@ -12096,7 +12143,6 @@
       "a": "brutalist-building-1-cbake-9.floor-3.hall",
       "b": "brutalist-building-1-cbake-9.room-a-1-5-8-9-6",
       "door": "brutalist-building-1-cbake-9.room-a-1-5-8-9-6.door-1-1-9-22-5",
-      "locked": false,
       "at": {
         "a": [
           -4.70892,
@@ -12118,7 +12164,6 @@
       "a": "brutalist-building-1-cbake-9.floor-2.hall",
       "b": "brutalist-building-1-cbake-9.room-a-1-5-8-9-9",
       "door": "brutalist-building-1-cbake-9.room-a-1-5-8-9-9.door-1-1-9-22-5",
-      "locked": false,
       "at": {
         "a": [
           -4.70892,
@@ -12140,7 +12185,6 @@
       "a": "brutalist-building-1-cbake-9.floor-4.hall",
       "b": "brutalist-building-1-cbake-9.room-a-1-5-8-9-90",
       "door": "brutalist-building-1-cbake-9.room-a-1-5-8-9-90.door-1-1-9-22-5",
-      "locked": false,
       "at": {
         "a": [
           -4.70892,
@@ -12162,7 +12206,6 @@
       "a": "brutalist-building-1-cbake-9.floor-1.hall",
       "b": "brutalist-building-1-cbake-9.room-a-1-5-8-9",
       "door": "brutalist-building-1-cbake-9.room-a-1-5-8-9.door-1-1-9-22-5",
-      "locked": false,
       "at": {
         "a": [
           -4.70892,
@@ -12184,7 +12227,6 @@
       "a": "brutalist-building-1-cbake-9.floor-1.hall",
       "b": "brutalist-building-1-cbake-9.room-a-1-5-8",
       "door": "brutalist-building-1-cbake-9.room-a-1-5-8.door-1-1-9-22-5",
-      "locked": false,
       "at": {
         "a": [
           -4.70892,
@@ -13398,7 +13440,6 @@
       "a": "brutalist-building-1-cbake.floor-3.hall",
       "b": "brutalist-building-1-cbake.room-a-1-5-8-0",
       "door": "brutalist-building-1-cbake.room-a-1-5-8-0.door-1-1-9-22-5",
-      "locked": false,
       "at": {
         "a": [
           -37.003705,
@@ -13420,7 +13461,6 @@
       "a": "brutalist-building-1-cbake.floor-5.hall",
       "b": "brutalist-building-1-cbake.room-a-1-5-8-3",
       "door": "brutalist-building-1-cbake.room-a-1-5-8-3.door-1-1-9-22-5",
-      "locked": false,
       "at": {
         "a": [
           -37.003705,
@@ -13442,7 +13482,6 @@
       "a": "brutalist-building-1-cbake.floor-2.hall",
       "b": "brutalist-building-1-cbake.room-a-1-5-8-8",
       "door": "brutalist-building-1-cbake.room-a-1-5-8-8.door-1-1-9-22-5",
-      "locked": false,
       "at": {
         "a": [
           -37.003705,
@@ -13464,7 +13503,6 @@
       "a": "brutalist-building-1-cbake.floor-4.hall",
       "b": "brutalist-building-1-cbake.room-a-1-5-8-87",
       "door": "brutalist-building-1-cbake.room-a-1-5-8-87.door-1-1-9-22-5",
-      "locked": false,
       "at": {
         "a": [
           -37.003705,
@@ -13486,7 +13524,6 @@
       "a": "brutalist-building-1-cbake.floor-5.hall",
       "b": "brutalist-building-1-cbake.room-a-1-5-8-9-3",
       "door": "brutalist-building-1-cbake.room-a-1-5-8-9-3.door-1-1-9-22-5",
-      "locked": false,
       "at": {
         "a": [
           -37.003705,
@@ -13508,7 +13545,6 @@
       "a": "brutalist-building-1-cbake.floor-3.hall",
       "b": "brutalist-building-1-cbake.room-a-1-5-8-9-6",
       "door": "brutalist-building-1-cbake.room-a-1-5-8-9-6.door-1-1-9-22-5",
-      "locked": false,
       "at": {
         "a": [
           -37.003705,
@@ -13530,7 +13566,6 @@
       "a": "brutalist-building-1-cbake.floor-2.hall",
       "b": "brutalist-building-1-cbake.room-a-1-5-8-9-9",
       "door": "brutalist-building-1-cbake.room-a-1-5-8-9-9.door-1-1-9-22-5",
-      "locked": false,
       "at": {
         "a": [
           -37.003705,
@@ -13552,7 +13587,6 @@
       "a": "brutalist-building-1-cbake.floor-4.hall",
       "b": "brutalist-building-1-cbake.room-a-1-5-8-9-90",
       "door": "brutalist-building-1-cbake.room-a-1-5-8-9-90.door-1-1-9-22-5",
-      "locked": false,
       "at": {
         "a": [
           -37.003705,
@@ -13574,7 +13608,6 @@
       "a": "brutalist-building-1-cbake.floor-1.hall",
       "b": "brutalist-building-1-cbake.room-a-1-5-8-9",
       "door": "brutalist-building-1-cbake.room-a-1-5-8-9.door-1-1-9-22-5",
-      "locked": false,
       "at": {
         "a": [
           -37.003705,
@@ -13596,7 +13629,6 @@
       "a": "brutalist-building-1-cbake.floor-1.hall",
       "b": "brutalist-building-1-cbake.room-a-1-5-8",
       "door": "brutalist-building-1-cbake.room-a-1-5-8.door-1-1-9-22-5",
-      "locked": false,
       "at": {
         "a": [
           -37.003705,
@@ -13615,17 +13647,17 @@
     {
       "id": "brutalist-building-2-cbake-1.door-1-1-9",
       "kind": "door",
-      "a": "brutalist-building-2-cbake-1.floor-1.hall",
-      "b": "brutalist-building-2-cbake-1.s1",
+      "a": "brutalist-building-2-cbake-1.s1",
+      "b": "outside",
       "door": "brutalist-building-2-cbake-1.door-1-1-9",
       "at": {
         "a": [
-          34.358657,
+          31.158657,
           0.1,
           39.566483
         ],
         "b": [
-          31.158657,
+          34.358657,
           0.1,
           39.566483
         ]
@@ -13639,7 +13671,6 @@
       "a": "brutalist-building-2-cbake-1.floor-1.hall",
       "b": "brutalist-building-2-cbake-1.rect21094-3-6",
       "door": "brutalist-building-2-cbake-1.rect21094-3-6.door-1-1-9-22",
-      "locked": false,
       "at": {
         "a": [
           42.378437,
@@ -13661,7 +13692,6 @@
       "a": "brutalist-building-2-cbake-1.rect21094-3-6",
       "b": "outside",
       "door": "brutalist-building-2-cbake-1.rect21094-3-6.door-1-1-9-22-5",
-      "locked": false,
       "at": {
         "a": [
           42.376157,
@@ -13683,7 +13713,6 @@
       "a": "brutalist-building-2-cbake-1.floor-3.hall",
       "b": "brutalist-building-2-cbake-1.rect3557-2",
       "door": "brutalist-building-2-cbake-1.rect3557-2.door-1-1-9-22-5",
-      "locked": false,
       "at": {
         "a": [
           38.814147,
@@ -13705,7 +13734,6 @@
       "a": "brutalist-building-2-cbake-1.floor-2.hall",
       "b": "brutalist-building-2-cbake-1.rect3557",
       "door": "brutalist-building-2-cbake-1.rect3557.door-1-1-9-22",
-      "locked": false,
       "at": {
         "a": [
           42.392447,
@@ -13727,7 +13755,6 @@
       "a": "brutalist-building-2-cbake-1.floor-3.hall",
       "b": "brutalist-building-2-cbake-1.rect3559-2",
       "door": "brutalist-building-2-cbake-1.rect3559-2.door-1-1-9-22-5",
-      "locked": false,
       "at": {
         "a": [
           21.862115,
@@ -13749,7 +13776,6 @@
       "a": "brutalist-building-2-cbake-1.room-a-1-5-8-6-2",
       "b": "outside",
       "door": "brutalist-building-2-cbake-1.room-a-1-5-8-6-2.door-1-1-9-22-5",
-      "locked": false,
       "at": {
         "a": [
           18.128129,
@@ -13928,19 +13954,19 @@
     {
       "id": "brutalist-building-2-cbake-3.door-1-1-9",
       "kind": "door",
-      "a": "brutalist-building-2-cbake-3.floor-1.hall",
-      "b": "brutalist-building-2-cbake-3.s1",
+      "a": "brutalist-building-2-cbake-3.s1",
+      "b": "outside",
       "door": "brutalist-building-2-cbake-3.door-1-1-9",
       "at": {
         "a": [
           -27.360514,
           0.1,
-          4.65017
+          1.45017
         ],
         "b": [
           -27.360514,
           0.1,
-          1.45017
+          4.65017
         ]
       },
       "width": 1.047216,
@@ -13952,7 +13978,6 @@
       "a": "brutalist-building-2-cbake-3.floor-1.hall",
       "b": "brutalist-building-2-cbake-3.rect21094-3-6",
       "door": "brutalist-building-2-cbake-3.rect21094-3-6.door-1-1-9-22",
-      "locked": false,
       "at": {
         "a": [
           -22.56286,
@@ -13974,7 +13999,6 @@
       "a": "brutalist-building-2-cbake-3.rect21094-3-6",
       "b": "outside",
       "door": "brutalist-building-2-cbake-3.rect21094-3-6.door-1-1-9-22-5",
-      "locked": false,
       "at": {
         "a": [
           -26.170918,
@@ -13996,7 +14020,6 @@
       "a": "brutalist-building-2-cbake-3.floor-3.hall",
       "b": "brutalist-building-2-cbake-3.rect3557-2",
       "door": "brutalist-building-2-cbake-3.rect3557-2.door-1-1-9-22-5",
-      "locked": false,
       "at": {
         "a": [
           -26.154802,
@@ -14018,7 +14041,6 @@
       "a": "brutalist-building-2-cbake-3.floor-2.hall",
       "b": "brutalist-building-2-cbake-3.rect3557",
       "door": "brutalist-building-2-cbake-3.rect3557.door-1-1-9-22",
-      "locked": false,
       "at": {
         "a": [
           -22.70454,
@@ -14040,7 +14062,6 @@
       "a": "brutalist-building-2-cbake-3.floor-3.hall",
       "b": "brutalist-building-2-cbake-3.rect3559-2",
       "door": "brutalist-building-2-cbake-3.rect3559-2.door-1-1-9-22-5",
-      "locked": false,
       "at": {
         "a": [
           -27.270949,
@@ -14062,7 +14083,6 @@
       "a": "brutalist-building-2-cbake-3.room-a-1-5-8-6-2",
       "b": "outside",
       "door": "brutalist-building-2-cbake-3.room-a-1-5-8-6-2.door-1-1-9-22-5",
-      "locked": false,
       "at": {
         "a": [
           -21.289877,
@@ -14241,19 +14261,19 @@
     {
       "id": "brutalist-building-2-cbake.door-1-1-9",
       "kind": "door",
-      "a": "brutalist-building-2-cbake.floor-1.hall",
-      "b": "brutalist-building-2-cbake.s1",
+      "a": "brutalist-building-2-cbake.s1",
+      "b": "outside",
       "door": "brutalist-building-2-cbake.door-1-1-9",
       "at": {
         "a": [
           31.113109,
           0.1,
-          -0.54702
+          2.65298
         ],
         "b": [
           31.113109,
           0.1,
-          2.65298
+          -0.54702
         ]
       },
       "width": 1.047216,
@@ -14265,7 +14285,6 @@
       "a": "brutalist-building-2-cbake.floor-1.hall",
       "b": "brutalist-building-2-cbake.rect21094-3-6",
       "door": "brutalist-building-2-cbake.rect21094-3-6.door-1-1-9-22",
-      "locked": false,
       "at": {
         "a": [
           26.315455,
@@ -14287,7 +14306,6 @@
       "a": "brutalist-building-2-cbake.rect21094-3-6",
       "b": "outside",
       "door": "brutalist-building-2-cbake.rect21094-3-6.door-1-1-9-22-5",
-      "locked": false,
       "at": {
         "a": [
           29.923513,
@@ -14309,7 +14327,6 @@
       "a": "brutalist-building-2-cbake.floor-3.hall",
       "b": "brutalist-building-2-cbake.rect3557-2",
       "door": "brutalist-building-2-cbake.rect3557-2.door-1-1-9-22-5",
-      "locked": false,
       "at": {
         "a": [
           29.907397,
@@ -14331,7 +14348,6 @@
       "a": "brutalist-building-2-cbake.floor-2.hall",
       "b": "brutalist-building-2-cbake.rect3557",
       "door": "brutalist-building-2-cbake.rect3557.door-1-1-9-22",
-      "locked": false,
       "at": {
         "a": [
           26.457135,
@@ -14353,7 +14369,6 @@
       "a": "brutalist-building-2-cbake.floor-3.hall",
       "b": "brutalist-building-2-cbake.rect3559-2",
       "door": "brutalist-building-2-cbake.rect3559-2.door-1-1-9-22-5",
-      "locked": false,
       "at": {
         "a": [
           31.023544,
@@ -14375,7 +14390,6 @@
       "a": "brutalist-building-2-cbake.room-a-1-5-8-6-2",
       "b": "outside",
       "door": "brutalist-building-2-cbake.room-a-1-5-8-6-2.door-1-1-9-22-5",
-      "locked": false,
       "at": {
         "a": [
           25.042472,

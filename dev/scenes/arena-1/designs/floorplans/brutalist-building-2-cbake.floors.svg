@@ -430,6 +430,14 @@
      id="g2684"
      inkscape:groupmode="layer">
     <rect
+       inkscape:label="void"
+       id="void-underpass"
+       x="0.0132"
+       y="273.0145"
+       width="4.958"
+       height="5.656"
+       style="fill:none;stroke:#ff00ff;stroke-width:0.02645833" />
+    <rect
        inkscape:label="model:room-b"
        y="267.452"
        x="0.113"
