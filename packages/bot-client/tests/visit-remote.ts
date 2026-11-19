@@ -7,7 +7,7 @@ import { INPUT_HZ } from "../../../src/shared/look.ts";
 import { wishTo, type Pose } from "../../../src/shared/nav/follow.ts";
 
 const STEP_MS = 1000 / INPUT_HZ;
-const URL_ = "wss://arena.tszakacs.com";
+const URL_ = "ws://localhost:4173";
 const token = (process.env.CE_TOKEN ?? "").trim() || readFileSync("/home/tim/.config/ce-arena/qa-token.pem", "utf8").trim();
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 const t0 = Date.now();

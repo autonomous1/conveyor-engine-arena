@@ -7,7 +7,7 @@ import { openNodeSocket } from "../../../packages/bot-client/src/node-socket.ts"
 import { runMission } from "../../../packages/bot-client/src/brain.ts";
 import { parseMission } from "../../../packages/bot-client/src/missions.ts";
 
-const URL_ = "wss://arena.tszakacs.com";
+const URL_ = "ws://localhost:4173";
 const TIMEOUT_MS = 90_000;
 const WAIT_MS = 10_000;
 const PADS: Record<string, string> = { "bot-1": "stand:-3.243,0,2.307", "bot-2": "stand:3.958,0,2.238" };

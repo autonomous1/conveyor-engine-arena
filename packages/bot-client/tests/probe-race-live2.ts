@@ -1,7 +1,7 @@
 import { connectBot } from "../../../packages/bot-client/src/connection.ts";
 import { openNodeSocket } from "../../../packages/bot-client/src/node-socket.ts";
 const token = (process.env.CE_TOKEN ?? "").trim();
-const session = await connectBot({ url: "wss://arena.tszakacs.com", token, name: "dev-probe", role: "qa", openSocket: openNodeSocket, onLog: () => {} });
+const session = await connectBot({ url: "ws://localhost:4173", token, name: "dev-probe", role: "qa", openSocket: openNodeSocket, onLog: () => {} });
 const world = session.world;
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 const started = Date.now();

@@ -15,7 +15,7 @@ import { doorStand } from "../../../src/shared/nav/follow.ts";
 import { createNavCache } from "../../../src/shared/nav/legs.ts";
 import { wishTo } from "../../../src/shared/nav/follow.ts";
 
-const DEFAULT_URL = "wss://arena.tszakacs.com";
+const DEFAULT_URL = "ws://localhost:4173";
 const LOG = "plan/dsh-tasks/logs/72-dag-live.log";
 const TRACE = "plan/dsh-tasks/logs/72-dag-live.json";
 const token = (process.env.CE_TOKEN ?? "").trim();

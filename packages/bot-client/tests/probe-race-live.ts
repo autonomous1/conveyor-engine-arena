@@ -6,7 +6,7 @@ import { buildWorldState } from "../../../src/shared/bots/state.ts";
 import { retrieve } from "../../../src/shared/bots/goals.ts";
 import { chooseGoal } from "../../../src/shared/bots/goap.ts";
 const token = (process.env.CE_TOKEN ?? "").trim();
-const session = await connectBot({ url: "wss://arena.tszakacs.com", token, name: "dev-probe", role: "qa", openSocket: openNodeSocket, onLog: () => {} });
+const session = await connectBot({ url: "ws://localhost:4173", token, name: "dev-probe", role: "qa", openSocket: openNodeSocket, onLog: () => {} });
 const world = session.world;
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 const started = Date.now();

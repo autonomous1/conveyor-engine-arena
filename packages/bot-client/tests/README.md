@@ -1,9 +1,9 @@
 # Bot-client live drivers and probes
 
-Scratch drivers used against a live arena (`https://arena.tszakacs.com` or the local
-`npm start`). They are not product code and not part of the test suite; the unit tests
-are in `test/*.test.ts`. Everything here is run from the repo root with the TS
-extension loader:
+Scratch drivers used against the operator's local arena (`ws://localhost:4173`,
+started with `npm start`). They are not product code and not part of the test
+suite; the unit tests are in `test/*.test.ts`. Everything here is run from the
+repo root with the TS extension loader:
 
 ```bash
 node --import ./scripts/ts-ext-register.mjs packages/bot-client/tests/<script>.ts

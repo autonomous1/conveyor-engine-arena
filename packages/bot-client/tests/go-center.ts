@@ -4,7 +4,7 @@ import { openNodeSocket } from "../../../packages/bot-client/src/node-socket.ts"
 import { wishTo } from "../../../src/shared/nav/follow.ts";
 const token = (process.env.CE_TOKEN ?? "").trim();
 const CENTER = { x: -2.40, z: 3.00 };
-const session = await connectBot({ url: "wss://arena.tszakacs.com", token, name: "dev-1", role: "qa", openSocket: openNodeSocket, onLog: (l) => console.error(l) });
+const session = await connectBot({ url: "ws://localhost:4173", token, name: "dev-1", role: "qa", openSocket: openNodeSocket, onLog: (l) => console.error(l) });
 const world = session.world;
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 const t0 = Date.now();

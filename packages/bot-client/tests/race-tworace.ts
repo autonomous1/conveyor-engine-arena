@@ -8,7 +8,7 @@ import { openNodeSocket } from "../../../packages/bot-client/src/node-socket.ts"
 import { runMission } from "../../../packages/bot-client/src/brain.ts";
 import { parseMission } from "../../../packages/bot-client/src/missions.ts";
 
-const URL_ = "wss://arena.tszakacs.com";
+const URL_ = "ws://localhost:4173";
 const MISSION_TEXT = "stand:door:brutalist-building-1-cbake-0.door-1-1-9-22-0-7:in";
 const TIMEOUT_MS = 90_000;
 const START_DELAY_MS = 5_000;

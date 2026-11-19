@@ -14,7 +14,7 @@ import { doorStand } from "../../../src/shared/nav/follow.ts";
 import { createNavCache } from "../../../src/shared/nav/legs.ts";
 import { wishTo } from "../../../src/shared/nav/follow.ts";
 
-const DEFAULT_URL = "wss://arena.tszakacs.com";
+const DEFAULT_URL = "ws://localhost:4173";
 const STAMP = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
 const LOG = `plan/dsh-tasks/logs/53-attack-run-${STAMP}.log`;
 const TRACE = `plan/dsh-tasks/logs/53-attack-run-${STAMP}.json`;
