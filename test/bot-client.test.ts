@@ -126,6 +126,27 @@ test("bot world and input modules stay free of node and ws", async () => {
   assert.equal(offline.placeOf({ x: 0, y: 0, z: 0 }), undefined);
 });
 
+test("the bot world stores grenade poses and logs the stop points", () => {
+  const world = createBotWorld({ aabbs: [], doors: [], playerSpawns: [] });
+  world.applyGrenade({ t: "grenade", id: 1, x: 1, y: 2, z: 3, yaw: 0.2 });
+  assert.deepEqual(world.grenade(1), { t: "grenade", id: 1, x: 1, y: 2, z: 3, yaw: 0.2 });
+  assert.equal(world.landed().length, 0);
+  world.applyGrenade({ t: "grenade", id: 2, x: 0, y: 1, z: 0, yaw: 0 });
+  world.applyGrenade({ t: "grenade", id: 1, x: 2, y: 0, z: 3, yaw: 0.2, stop: true, n: [0, 1, 0] });
+  assert.equal(world.grenade(1)?.x, 2, "the same id is replaced");
+  assert.equal(world.landed().length, 1);
+  assert.equal(world.landed().at(-1)?.stop, true);
+  assert.deepEqual(world.landed().at(-1)?.n, [0, 1, 0]);
+  assert.deepEqual(world.grenades().map((pose) => pose.id), [1, 2], "sorted by id");
+  // Newest last, bounded at 16.
+  for (let id = 3; id < 40; id += 1) {
+    world.applyGrenade({ t: "grenade", id, x: id, y: 0, z: 0, yaw: 0, stop: true, n: [0, 1, 0] });
+  }
+  assert.equal(world.landed().length, 16);
+  assert.equal(world.landed().at(-1)?.id, 39);
+  assert.notEqual(world.landed(), world.landed(), "landed() copies the store");
+});
+
 test("headless bot connects, models the arena, and moves", { timeout: 120_000 }, async () => {
   const dir = mkdtempSync(path.join(tmpdir(), "arena-bot-client-"));
   const keyFile = path.join(dir, "ed25519.key.pem");

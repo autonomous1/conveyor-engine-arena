@@ -4,6 +4,10 @@ import { parseMission } from "../packages/bot-client/src/missions.ts";
 import { runAttack } from "../packages/bot-client/src/brain.ts";
 import { createBotWorld } from "../packages/bot-client/src/world.ts";
 
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function session() {
   const world = createBotWorld({ aabbs: [], doors: [], playerSpawns: [] });
   world.noteOwned(1);
@@ -114,4 +118,132 @@ test("attack_does_not_fire_through_a_player", async () => {
   });
   await runAttack(clear.session, 7, { timeoutMs: 180, log: () => {} });
   assert.ok(clear.fired.length > 0);
+});
+
+/** A bot at (0,0) and a target 25 m east, with one box blocking the straight line. */
+function pursuitSession() {
+  const view = {
+    aabbs: [{ id: "box-1", source: "box-1", minX: 10, maxX: 12, minY: 0, maxY: 2, minZ: -3, maxZ: 3 }],
+    doors: [],
+    playerSpawns: [],
+    pawnRadius: 0.45,
+    pawnHeight: 1.8,
+  };
+  const world = createBotWorld(view as never);
+  world.noteOwned(1);
+  world.applySnapshot({
+    spawns: [
+      { entity: 1, view: { position: { x: 0, y: 0, z: 0 }, rotation: { y: 0, w: 1 } } },
+      { entity: 7, view: { position: { x: 25, y: 0, z: 0 }, rotation: { y: 0, w: 1 } } },
+    ],
+  });
+  world.loadSceneGraph({
+    formatVersion: 1,
+    units: "meters",
+    places: [{
+      id: "outside",
+      kind: "outside",
+      y: 0,
+      polygon: [[-100, -100], [40, -100], [40, 100], [-100, 100]],
+      bounds: { minX: -100, maxX: 40, minZ: -100, maxZ: 100 },
+    }],
+    portals: [],
+  } as never, "test-graph");
+  (world as { spatialDag?: () => unknown }).spatialDag = () => ({ hash: "test", nodes: [], chunks: [], byId: new Map() });
+  const sent: Array<{ moveX: number; moveZ: number; yaw: number }> = [];
+  const input = {
+    sendInput(command: { moveX: number; moveZ: number; yaw: number }) { sent.push(command); },
+    fire() { return true; },
+    grenade() { return true; },
+  };
+  const mode = { move: { x: 25, z: 0 } };
+  return {
+    world,
+    input,
+    sent,
+    mode,
+    session: { world, input, claims: { acquire() {}, release() {} } } as never,
+    moveTo(x: number, z: number) {
+      mode.move = { x, z };
+      world.applySnapshot({ spawns: [{ entity: 7, view: { position: { x, y: 0, z }, rotation: { y: 0, w: 1 } } }] });
+    },
+  };
+}
+
+test("attack_pursues_with_an_intercept_plan_ahead_of_a_moving_target", { timeout: 4000 }, async () => {
+  const fake = pursuitSession();
+  fake.world.applyLoadout({ weapon: "alien-weapon-1", ammo: 30 });
+  const logs: string[] = [];
+  const running = runAttack(fake.session, 7, { timeoutMs: 900, log: (line) => logs.push(line) });
+  // The target walks north at ~2.5 m/s while the attack runs.
+  for (let i = 1; i <= 4; i += 1) {
+    await delay(100);
+    fake.moveTo(25, i * 0.25);
+  }
+  await running;
+  const plans = logs.filter((line) => line.includes("attack: pursue plan"));
+  assert.ok(plans.length >= 2, `plans ${plans.length}\n${logs.join("\n")}`);
+  // Every plan after the first estimates the target's velocity; at least one must lead north.
+  const ahead = plans.filter((line) => {
+    const to = /to=(-?[\d.]+),(-?[\d.]+)/.exec(line);
+    const target = /target=(-?[\d.]+),(-?[\d.]+)/.exec(line);
+    return !!to && !!target && Number(to[2]) > Number(target[2]);
+  });
+  assert.ok(ahead.length >= 1, `no intercept ahead of a northbound target\n${plans.join("\n")}`);
+  // The first movement is the planned detour, not the straight line at the target.
+  const first = fake.sent[0]!;
+  const straightYaw = Math.atan2(25 - 0, 0 - 0);
+  const straight = { moveX: Math.sin(straightYaw), moveZ: Math.cos(straightYaw) };
+  assert.ok(
+    Math.abs(first.moveX - straight.moveX) > 0.1 || Math.abs(first.moveZ - straight.moveZ) > 0.1,
+    `first input ${JSON.stringify(first)} equals the straight ${JSON.stringify(straight)}`,
+  );
+});
+
+test("attack_replans_within_200ms_when_the_target_moves_a_metre", { timeout: 4000 }, async () => {
+  const fake = pursuitSession();
+  fake.world.applyLoadout({ weapon: "alien-weapon-1", ammo: 30 });
+  const logs: string[] = [];
+  const plans: Array<{ at: number; line: string }> = [];
+  const running = runAttack(fake.session, 7, {
+    timeoutMs: 900,
+    log: (line) => {
+      logs.push(line);
+      if (line.includes("attack: pursue plan")) plans.push({ at: Date.now(), line });
+    },
+  });
+  const waitFor = async (test: () => boolean, ms: number): Promise<boolean> => {
+    const started = Date.now();
+    while (Date.now() - started < ms) {
+      if (test()) return true;
+      await delay(20);
+    }
+    return test();
+  };
+  assert.ok(await waitFor(() => plans.length >= 1, 1000), `no first plan\n${logs.join("\n")}`);
+  const moveAt = Date.now();
+  fake.moveTo(25, 1.5);
+  const drift = () => plans.find((plan) => plan.at >= moveAt && plan.line.includes("target=25.00,1.50"));
+  assert.ok(await waitFor(() => drift() !== undefined, 1500), `no re-plan after a 1.5 m move\n${logs.join("\n")}`);
+  const since = drift()!.at;
+  // The drift plan lands on the next loop iteration (~50 ms); allow for a loaded runner.
+  assert.ok(since - moveAt < 400, `re-plan took ${since - moveAt} ms (> 400)`);
+  // A sub-metre move must not force a re-plan before the 200 ms cadence is due.
+  fake.moveTo(25, 1.9);
+  await delay(100);
+  const early = plans.filter((plan) => plan.at > since && plan.at - since < 180);
+  assert.equal(early.length, 0, `re-planned early for a 0.4 m move\n${logs.join("\n")}`);
+  await running;
+});
+
+test("attack_falls_back_to_the_straight_line_without_a_graph", { timeout: 4000 }, async () => {
+  const { world, session: fake, sent } = session();
+  world.applyLoadout({ weapon: "alien-weapon-1", ammo: 30 });
+  world.applySnapshot({
+    spawns: [{ entity: 7, view: { position: { x: 25, y: 0, z: 0 }, rotation: { y: 0, w: 1 } } }],
+  });
+  const logs: string[] = [];
+  await runAttack(fake, 7, { timeoutMs: 200, log: (line) => logs.push(line) });
+  assert.ok(sent.length > 0, "no approach command");
+  assert.ok(logs.some((line) => line.includes("attack: straight fallback")), logs.join("\n"));
 });

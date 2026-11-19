@@ -2,10 +2,11 @@
  * Arena world model for a connected bot. No Node builtins and no WebSocket.
  * Snapshots supply pawn poses. Arena frames supply doors, keys, and the scene graph.
  */
-// ARCHITECTURE: The bot's arena model: pawns, doors, elevators, pickups, claims, scene graph, and regions.
-// Wiring: connection.ts builds it from welcome/frames; the brain reads it.
+// ARCHITECTURE: The bot's arena model: pawns, doors, elevators, grenade poses, pickups, claims, scene graph, and regions.
+// Wiring: connection.ts builds it from welcome/frames (including `t: "grenade"`); the brain reads it.
 import type { ArenaView } from "../../../src/shared/arena-view.js";
 import type { ClaimRow } from "../../../src/shared/bot-protocol.js";
+import type { GrenadePose } from "../../../src/shared/grenade.js";
 import { yawFromQuat } from "../../../src/shared/look.js";
 import type { PickupKind, PickupPlacement } from "../../../src/shared/pickups.js";
 import { parseBakedRegions, type BakedRegionsFile } from "../../../src/shared/nav/regions.js";
@@ -105,6 +106,9 @@ export type PoseSnapshot = {
   despawns?: readonly { entity: unknown }[];
 };
 
+/** Stop poses kept for impact telemetry; older ones are dropped. */
+const LANDED_CAP = 16;
+
 /**
  * The bot's mutable arena model and the accessors the brain reads each tick.
  */
@@ -119,6 +123,18 @@ export type BotWorld = {
   doors(): DoorState[];
   /** Current cabs, including door state and last arrival stop. */
   cabs(): readonly CabState[];
+  /** Latest pose per grenade id (in flight and the stop point), sorted by id. */
+  grenades(): readonly GrenadePose[];
+  /** The stop poses seen so far, newest last, up to 16, as a copy. */
+  landed(): readonly GrenadePose[];
+  /** Latest pose for one id, or undefined when it was never broadcast. */
+  grenade(id: number): GrenadePose | undefined;
+  /**
+   * Store one broadcast grenade pose.
+   * @post A pose replaces the same id's previous pose; a `stop` pose is also
+   *       appended to `landed` (bounded at 16, oldest dropped); an unknown id creates it.
+   */
+  applyGrenade(pose: GrenadePose): void;
   /** Host claim table, by key. */
   claims(): ReadonlyMap<string, ClaimRow>;
   applyClaims(rows: readonly ClaimRow[]): void;
@@ -190,6 +206,9 @@ export function createBotWorld(view: WorldView): BotWorld {
   const pawns = new Map<number, PawnPose>();
   const doorMap = new Map<string, DoorState>();
   const cabs = new Map<string, ElevatorCab>();
+  const grenadePoses = new Map<number, GrenadePose>();
+  /** Stop poses, newest last, bounded by {@link LANDED_CAP}. */
+  const landedPoses: GrenadePose[] = [];
   const claimRows = new Map<string, ClaimRow>();
   let sawClaims = false;
   const vitals = new Map<number, { entity: number; hp: number; dead: boolean }>();
@@ -231,6 +250,21 @@ export function createBotWorld(view: WorldView): BotWorld {
     },
     cabs() {
       return cabStates(cabs);
+    },
+    grenades() {
+      return [...grenadePoses.values()].sort((a, b) => a.id - b.id);
+    },
+    landed() {
+      return [...landedPoses];
+    },
+    grenade(id) {
+      return grenadePoses.get(id);
+    },
+    applyGrenade(pose) {
+      grenadePoses.set(pose.id, pose);
+      if (pose.stop !== true) return;
+      landedPoses.push(pose);
+      if (landedPoses.length > LANDED_CAP) landedPoses.shift();
     },
     claims() {
       return claimRows;

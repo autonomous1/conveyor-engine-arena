@@ -4,6 +4,7 @@
  */
 // ARCHITECTURE: The bot executor: goal claim, GOAP plan, route, walk, use, ride, and pickup state machine.
 // Wiring: runMission/runBrain from the CLI and live tests; it drives BotSession input/world.
+// Invariants: A pursue plan is rebuilt on >=1 m target drift or 200 ms; the straight line is the fallback.
 import type { BotCtx } from "../../../src/shared/bots/actions.js";
 import { createBotContext, estimateSeconds, groundActions } from "../../../src/shared/bots/actions.js";
 import type { Fact, Goal, Plan, PlanOptions, WorldState } from "../../../src/shared/bots/goap.js";
@@ -11,7 +12,7 @@ import { chooseGoal } from "../../../src/shared/bots/goap.js";
 import { buildWorldState, STAND, type WorldSnapshot } from "../../../src/shared/bots/state.js";
 import { reach, standAt, type StandGoal } from "../../../src/shared/bots/goals.js";
 import { INPUT_HZ, moveIntent } from "../../../src/shared/look.js";
-import type { FloorBox } from "../../../src/shared/movements.js";
+import { MOVE_SPEED, type FloorBox } from "../../../src/shared/movements.js";
 import { createFollower, doorStand, wishTo, type FollowInput, type FollowPawn, type Pose } from "../../../src/shared/nav/follow.js";
 import { buildGrid, findLocalPath, navBoxes, specForPlace, type Grid } from "../../../src/shared/nav/grid.js";
 import { createNavCache, planLegs, type PlanLegsOptions } from "../../../src/shared/nav/legs.js";
@@ -32,6 +33,15 @@ const RIDE_SUMMON_MS = 30_000;
 const RIDE_WAIT_MS = 60_000;
 const RIDE_NEAR_M = 0.6;
 const REPLAN_MS = 5_000;
+/** Pursuit re-plan cadence (5 Hz), the intercept drift that forces one, and the lead cap. */
+const PURSUE_REPLAN_MS = 200;
+const PURSUE_DRIFT_M = 1;
+/** Velocity window: the two-pose difference is too noisy to lead on. */
+const PURSUE_WINDOW_MS = 400;
+/** A target cannot be led further than this; the walker plans ~5 s ahead. */
+const PURSUE_LEAD_M = 6;
+/** Walk speed the follower's inputs produce: `wishTo`/`moveIntent` scale 1 at the host's MOVE_SPEED. */
+const PURSUE_SPEED = MOVE_SPEED;
 const GRAPH_WAIT_MS = 1_500;
 const USE_WAIT_MS = 1_000;
 const PICKUP_WAIT_MS = 2_000;
@@ -163,6 +173,72 @@ function shutDoorBoxes(session: BotSession): Array<{ minX: number; maxX: number;
   return boxes;
 }
 
+/** The compiled door wins: a shut leaf gates its portal, locked beats closed. */
+function doorGate(session: BotSession): (portal: ScenePortal) => Gate {
+  return (portal) => {
+    if (portal.kind !== "door") return "open";
+    const id = portal.door ?? portal.id;
+    const door = session.world.door(id);
+    if (!door) return portal.locked === true ? "locked" : "closed-unlocked";
+    if (door.open) return "open";
+    if (door.locked) return "locked";
+    return "closed-unlocked";
+  };
+}
+
+/**
+ * Intercept point for a target moving at `velocity`, from `pose` at `speed`.
+ * @post The point is ahead of the target along its velocity; the path stays 2D.
+ * @why The velocity is a two-pose difference, so a snapshot jump can read as
+ *      30 m/s; cap it at the walker's speed or the intercept leaves the graph.
+ */
+function interceptPoint(
+  pose: { x: number; z: number },
+  target: { x: number; z: number },
+  velocity: { x: number; z: number },
+  speed: number,
+): { x: number; z: number } {
+  const moving = Math.hypot(velocity.x, velocity.z);
+  const k = moving > speed ? speed / moving : 1;
+  const dir = moving > 1e-6 ? { x: (velocity.x * k) / moving, z: (velocity.z * k) / moving } : { x: 0, z: 0 };
+  let t = Math.hypot(target.x - pose.x, target.z - pose.z) / speed;
+  let x = target.x;
+  let z = target.z;
+  for (let i = 0; i < 3; i += 1) {
+    const lead = Math.min(moving * t, PURSUE_LEAD_M);
+    x = target.x + dir.x * lead;
+    z = target.z + dir.z * lead;
+    t = Math.hypot(x - pose.x, z - pose.z) / speed;
+  }
+  return { x, z };
+}
+
+/**
+ * Plan a pursuit walk to the target's intercept point.
+ * @post The intercept is ahead of the live target; the plan is 2D (the target's y is kept).
+ * @why The polyline can detour around geometry the straight line cannot, and the
+ *      intercept shortens the chase; the straight line stays the fallback.
+ */
+function planPursuit(
+  session: BotSession,
+  pose: Pose,
+  target: { x: number; y: number; z: number },
+  velocity: { x: number; z: number },
+  cache: ReturnType<typeof createNavCache>,
+): { points: Triple[]; grid: Grid; intercept: { x: number; z: number } } | undefined {
+  const graph = session.world.sceneGraph();
+  if (!graph) return undefined;
+  const intercept = interceptPoint(pose, target, velocity, PURSUE_SPEED);
+  const plan = planPath(graph, pose, { x: intercept.x, y: target.y, z: intercept.z }, doorGate(session), {
+    view: navView(session, new Set()),
+    cache,
+    regions: bakedRegions(session),
+  });
+  if (!plan.ok) return undefined;
+  const points = plan.points.map(triple);
+  return { points, grid: gridFor(session, graph, points, new Set(), placeY(graph, pose)), intercept };
+}
+
 /**
  * Shoot a named pawn until its health frame says dead, it disappears, the bot
  * runs out of ammo or dies, or the deadline passes.
@@ -196,10 +272,16 @@ export async function runAttack(session: BotSession, targetId: number, opts: Bra
     return 2;
   }
   const deadline = Date.now() + (opts.timeoutMs ?? 60_000);
+  const cache = createNavCache();
   let approached = false;
   let nextFire = 0;
+  let tick = 0;
+  const seen: Array<{ x: number; z: number; at: number }> = [];
+  let pursuit: { follower: ReturnType<typeof createFollower>; target: { x: number; z: number }; at: number } | undefined;
+  let fallbackLogged = false;
   log("attack: acquire");
   while (Date.now() < deadline) {
+    const now = Date.now();
     const me = session.world.self();
     if (!me) return 2;
     const target = session.world.others().find((pawn) => pawn.id === targetId);
@@ -207,6 +289,13 @@ export async function runAttack(session: BotSession, targetId: number, opts: Bra
       log("attack: lost");
       return 2;
     }
+    seen.push({ x: target.x, z: target.z, at: now });
+    while (seen.length > 1 && now - seen[0]!.at > PURSUE_WINDOW_MS) seen.shift();
+    const oldest = seen[0]!;
+    const windowMs = now - oldest.at;
+    const velocity = windowMs > 0
+      ? { x: ((target.x - oldest.x) * 1000) / windowMs, z: ((target.z - oldest.z) * 1000) / windowMs }
+      : { x: 0, z: 0 };
     if (session.world.healthOf(targetId)?.dead === true) {
       log("attack: dead");
       return 0;
@@ -237,13 +326,43 @@ export async function runAttack(session: BotSession, targetId: number, opts: Bra
     const range = Math.hypot(dx, dz);
     const los = hasLineOfSightDag(dag, eye, targetPoint);
     if (range > 18 || !los) {
-      const yaw = Math.atan2(dx, dz);
-      session.input.sendInput({ ...moveIntent(yaw, 1, 0), yaw });
+      const pose: Pose = { x: me.x, y: me.y, z: me.z, vx: 0, vz: 0, yaw: me.yaw };
+      const stale = pursuit === undefined
+        || now - pursuit.at >= PURSUE_REPLAN_MS
+        || Math.hypot(pursuit.target.x - target.x, pursuit.target.z - target.z) >= PURSUE_DRIFT_M;
+      if (stale) {
+        const planned = planPursuit(session, pose, target, velocity, cache);
+        if (planned) {
+          // Stamp after planning so the 200 ms cadence starts when the plan exists.
+          const plannedAt = Date.now();
+          pursuit = {
+            follower: createFollower(planned.points, planned.grid, { radius: session.world.pawnRadius }),
+            target: { x: target.x, z: target.z },
+            at: plannedAt,
+          };
+          log(`attack: pursue plan to=${planned.intercept.x.toFixed(2)},${planned.intercept.z.toFixed(2)} target=${target.x.toFixed(2)},${target.z.toFixed(2)} range=${range.toFixed(1)} steps=${planned.points.length}`);
+          fallbackLogged = false;
+        } else {
+          pursuit = undefined;
+        }
+      }
+      if (pursuit) {
+        tick += 1;
+        const step = pursuit.follower.step(pose, otherPawns(session), tick);
+        session.input.sendInput(step.input);
+        if (step.status !== "running") pursuit = undefined;
+      } else {
+        const yaw = Math.atan2(dx, dz);
+        session.input.sendInput({ ...moveIntent(yaw, 1, 0), yaw });
+        if (!fallbackLogged) {
+          fallbackLogged = true;
+          log("attack: straight fallback");
+        }
+      }
       if (!approached) { approached = true; log("attack: approach"); }
     } else {
       const yaw = Math.atan2(dx, dz);
       const pitch = Math.atan2(targetPoint.y - eye.y, range);
-      const now = Date.now();
       if (now >= nextFire) {
         const player = session.world.others().find((pawn) => session.world.playerIds().has(pawn.id)
           && playerOnSegment(eye, targetPoint, pawn, session.world.pawnRadius, session.world.pawnHeight));
@@ -380,15 +499,7 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
     session.input.sendInput(command);
   };
 
-  const gate = (portal: ScenePortal): Gate => {
-    if (portal.kind !== "door") return "open";
-    const id = portal.door ?? portal.id;
-    const door = session.world.door(id);
-    if (!door) return portal.locked === true ? "locked" : "closed-unlocked";
-    if (door.open) return "open";
-    if (door.locked) return "locked";
-    return "closed-unlocked";
-  };
+  const gate = doorGate(session);
 
   const poseNow = (): Pose | undefined => {
     const auth = session.world.self();

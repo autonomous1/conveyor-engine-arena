@@ -362,6 +362,7 @@ function applyArenaText(world: BotWorld, text: string, onLog?: (line: string) =>
   else if (frame.t === "elevator") {
     world.applyElevator({ id: frame.id, y: frame.y, doorsOpen: frame.doorsOpen, stop: frame.stop });
   } else if (frame.t === "health") world.applyHealth(frame);
+  else if (frame.t === "grenade") world.applyGrenade(frame);
   else if (frame.t === "loadout") world.applyLoadout(frame);
   else if (frame.t === "sceneGraph") {
     const reason = world.loadSceneGraph(frame.graph, frame.hash);

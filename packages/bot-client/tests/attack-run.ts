@@ -7,17 +7,18 @@ import { openNodeSocket } from "../../../packages/bot-client/src/node-socket.ts"
 import { runMission } from "../../../packages/bot-client/src/brain.ts";
 import { parseMission } from "../../../packages/bot-client/src/missions.ts";
 import { hasLineOfSight } from "../../../src/shared/hitscan.ts";
+import { MOVE_SPEED } from "../../../src/shared/movements.ts";
 import { pickDoorForUse, type DoorRuntime } from "../../../src/shared/doors.ts";
 import { planPath } from "../../../src/shared/nav/path.ts";
 import { planRoute } from "../../../src/shared/nav/route.ts";
 import { doorStand } from "../../../src/shared/nav/follow.ts";
 import { createNavCache } from "../../../src/shared/nav/legs.ts";
-import { wishTo } from "../../../src/shared/nav/follow.ts";
+import { wishTo, type FollowInput, type Pose } from "../../../src/shared/nav/follow.ts";
 
 const DEFAULT_URL = "ws://localhost:4173";
 const STAMP = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-const LOG = `plan/dsh-tasks/logs/53-attack-run-${STAMP}.log`;
-const TRACE = `plan/dsh-tasks/logs/53-attack-run-${STAMP}.json`;
+const LOG = `plan/dsh-tasks/logs/108-pursuit-${STAMP}.log`;
+const TRACE = `plan/dsh-tasks/logs/108-pursuit-${STAMP}.json`;
 const token = (process.env.CE_TOKEN ?? "").trim();
 const args = new Map<string, string>();
 const argv = process.argv.slice(2);
@@ -31,7 +32,11 @@ const NO_FIRE_RING_M = 35;
 const t0 = Date.now();
 const secs = () => ((Date.now() - t0) / 1000).toFixed(2);
 const lines: string[] = [];
+let pauses = 0;
+let fallbacks = 0;
+const engagements: Array<Record<string, unknown>> = [];
 const record = (line: string) => {
+  if (/replan standAt/.test(line) && /finished/.test(line)) pauses += 1;
   const row = `t=${secs()}s ${line}`;
   lines.push(row);
   console.log(row);
@@ -201,6 +206,28 @@ const opportunity = (ringM: number): number | undefined => {
   }
   return best?.id;
 };
+// Avoid other bodies (the operator included): a repulsion in world XZ, clamped
+// with the forward wish. The brain's follower does the same; wishTo does not.
+const avoidPawns = (me: Pose, wish: FollowInput): FollowInput => {
+  let ax = 0;
+  let az = 0;
+  for (const p of world.others()) {
+    const dx = me.x - p.x;
+    const dz = me.z - p.z;
+    const d = Math.hypot(dx, dz);
+    const gap = d - 2 * world.pawnRadius;
+    if (gap > 1.5 || d < 1e-6) continue;
+    const w = (1 - gap / 1.5) * 0.8;
+    ax += (dx / d) * w;
+    az += (dz / d) * w;
+  }
+  if (ax === 0 && az === 0) return wish;
+  let mx = wish.moveX + ax;
+  let mz = wish.moveZ + az;
+  const len = Math.hypot(mx, mz);
+  if (len > 1) { mx /= len; mz /= len; }
+  return { ...wish, moveX: mx, moveZ: mz };
+};
 const followPlan = async (points: readonly (readonly number[])[], deadline: number, tolerance = 0.5): Promise<"done" | "stuck" | "timeout"> => {
   for (const point of points) {
     let last = Infinity;
@@ -213,7 +240,7 @@ const followPlan = async (points: readonly (readonly number[])[], deadline: numb
       if (d <= tolerance) break;
       if (d < last - 0.2) { last = d; lastProgress = Date.now(); }
       if (Date.now() - lastProgress > 1200) return "stuck";
-      session.input.sendInput(wishTo(me, { x: point[0]!, z: point[2]! }, d < 1.2 ? 0.4 : 1));
+      session.input.sendInput(avoidPawns(me, wishTo(me, { x: point[0]!, z: point[2]! }, d < 1.2 ? 0.4 : 1)));
       await sleep(50);
     }
   }
@@ -272,7 +299,7 @@ const enterDoor = async (doorId: string): Promise<boolean> => {
     await followPlan(plan.points, Date.now() + 15_000, 0.2);
   } else {
     record(`door ${doorId}: approach plan ${plan.reason}; straight fallback`);
-    const until = Date.now() + 15_000;
+    const until = Date.now() + 3_000;
     while (Date.now() < until) {
       const me = poseNow();
       if (!me) return false;
@@ -533,6 +560,8 @@ const heal = async (): Promise<boolean> => {
 
 let kills = 0;
 let shots = 0;
+let deaths = 0;
+let wasDead = false;
 const attacks: Array<Record<string, unknown>> = [];
 try {
   const started = Date.now();
@@ -550,6 +579,9 @@ try {
   const end = t0 + RUN_MS;
   while (Date.now() < end) {
     await sleep(150);
+    const deadNow = world.health()?.dead === true;
+    if (deadNow && !wasDead) deaths += 1;
+    wasDead = deadNow;
     if ((world.health()?.hp ?? 100) <= 50) {
       await heal();
       continue;
@@ -574,8 +606,19 @@ try {
     // if any valid pawn is inside the band with a clear lane, take the shot now.
     const graphNow = world.sceneGraph();
     const pursueEnd = Date.now() + 25_000;
-    let planPoint: { x: number; z: number } | undefined;
+    const acquireAt = Date.now();
+    const engagePauses = pauses;
+    const engageFallbacks = fallbacks;
+    let planTarget: { x: number; z: number } | undefined;
     let planPlace: string | undefined;
+    let planAt = 0;
+    let lastPlanGap = 0;
+    let firstShotMs: number | undefined;
+    let minRange = Infinity;
+    let runPast = false;
+    let pursuits = 0;
+    let stuckSlices = 0;
+    const hist: Array<{ x: number; z: number; at: number }> = [];
     while (Date.now() < pursueEnd && Date.now() < end) {
       if ((world.health()?.hp ?? 100) <= 50) { record("heal: hit during pursuit"); break; }
       const shot = opportunity(NO_FIRE_RING_M);
@@ -584,18 +627,46 @@ try {
         targetId = shot;
         break;
       }
+      const blackUntil = targetBlacklist.get(targetId);
+      if (blackUntil !== undefined && Date.now() < blackUntil) {
+        record(`pursuit: target ${targetId} is blacklisted; switching`);
+        break;
+      }
       const p = poseNow();
       const t2 = world.others().find((q) => q.id === targetId);
       if (!p || !t2 || !graphNow) break;
       const d = Math.hypot(t2.x - p.x, t2.z - p.z);
+      if (d < minRange) minRange = d;
+      if (!runPast && minRange < 18 && d > minRange + 2) {
+        runPast = true;
+        record(`pursuit: RUN-PAST id=${targetId} min=${minRange.toFixed(1)} now=${d.toFixed(1)}`);
+      }
       if (d <= 18 && losNow(targetId)) break;
+      // 20 Hz target sampling -> a 400 ms velocity for the intercept.
+      const sampleAt = Date.now();
+      hist.push({ x: t2.x, z: t2.z, at: sampleAt });
+      while (hist.length > 1 && sampleAt - hist[0]!.at > 400) hist.shift();
+      const oldest = hist[0]!;
+      const span = sampleAt - oldest.at;
+      const vt = span > 0
+        ? { x: ((t2.x - oldest.x) * 1000) / span, z: ((t2.z - oldest.z) * 1000) / span }
+        : { x: 0, z: 0 };
+      let tFlight = d / MOVE_SPEED;
+      let pred = { x: t2.x, z: t2.z };
+      for (let i = 0; i < 3; i += 1) {
+        pred = { x: t2.x + vt.x * tFlight, z: t2.z + vt.z * tFlight };
+        tFlight = Math.hypot(pred.x - p.x, pred.z - p.z) / MOVE_SPEED;
+      }
       const place = world.placeOf(t2)?.id ?? "";
-      const drifted = planPoint === undefined ? Infinity : Math.hypot(t2.x - planPoint.x, t2.z - planPoint.z);
-      if (planPoint === undefined || place !== planPlace || drifted > 3) {
-        planPoint = { x: t2.x, z: t2.z };
+      const drifted = planTarget === undefined ? Infinity : Math.hypot(t2.x - planTarget.x, t2.z - planTarget.z);
+      if (planTarget === undefined || place !== planPlace || drifted > 1 || Date.now() - planAt >= 200) {
+        if (planAt > 0) lastPlanGap = Date.now() - planAt;
+        planAt = Date.now();
+        pursuits += 1;
+        planTarget = { x: t2.x, z: t2.z };
         planPlace = place;
-        record(`pursuit plan: id=${targetId} place=${place} d=${d.toFixed(1)}`);
-        const plan = planPath(graphNow, p, { x: t2.x, y: t2.y, z: t2.z }, gateNow, { view: viewNow(), cache: navCache });
+        record(`pursuit plan: id=${targetId} place=${place} d=${d.toFixed(1)} intercept=${pred.x.toFixed(2)},${pred.z.toFixed(2)} vt=${vt.x.toFixed(2)},${vt.z.toFixed(2)} planMs=${pursuits > 1 ? lastPlanGap : 0}`);
+        const plan = planPath(graphNow, p, { x: pred.x, y: t2.y, z: pred.z }, gateNow, { view: viewNow(), cache: navCache });
         if (!plan.ok) {
           record(`pursuit no plan: ${plan.reason}`);
           const door = doorOnRoute(place);
@@ -611,18 +682,34 @@ try {
             targetBlacklist.set(targetId, Date.now() + 30_000);
             record(`pursuit: no door found for ${place}; blacklisting target ${targetId} for 30s`);
           }
-          {
-            const meNow = poseNow();
-            const hereNow = meNow ? (world.placeOf({ x: meNow.x, y: meNow.y, z: meNow.z })?.id ?? "outside") : "outside";
-            if (hereNow !== "outside") await exitBuilding();
-          }
+          const meNow = poseNow();
+          const hereNow = meNow ? (world.placeOf({ x: meNow.x, y: meNow.y, z: meNow.z })?.id ?? "outside") : "outside";
+          if (hereNow !== "outside") await exitBuilding();
           await sleep(200);
           continue;
         }
-        const followed = await followPlan(plan.points, pursueEnd);
-        record(`pursuit follow: ${followed} self=${world.self()?.x.toFixed(1)},${world.self()?.z.toFixed(1)}`);
+        // A 100 ms slice of the walk; the next plan starts from the live pose.
+        const beforePose = poseNow();
+        const followed = await followPlan(plan.points, Math.min(pursueEnd, Date.now() + 100));
+        if (followed !== "timeout") record(`pursuit follow: ${followed} self=${world.self()?.x.toFixed(1)},${world.self()?.z.toFixed(1)}`);
+        // The slice is shorter than followPlan's 1.2 s stuck detector, so watch the
+        // pose across slices: no movement over four slices is a wedge.
+        if (followed === "timeout" && beforePose) {
+          const after = poseNow();
+          const moved = after ? Math.hypot(after.x - beforePose.x, after.z - beforePose.z) : 0;
+          if (moved < 0.15) {
+            stuckSlices += 1;
+            if (stuckSlices >= 4) {
+              record(`pursuit: NO-PROGRESS at ${after?.x.toFixed(1)},${after?.z.toFixed(1)}; blacklisting target ${targetId} and backing off`);
+              targetBlacklist.set(targetId, Date.now() + 30_000);
+              targetId = undefined;
+              break;
+            }
+          } else {
+            stuckSlices = 0;
+          }
+        }
         if (followed === "stuck") {
-          // Back off the wall and force a fresh plan from the new pose.
           const me = poseNow();
           const t3 = world.others().find((q) => q.id === targetId);
           if (me && t3) {
@@ -637,12 +724,13 @@ try {
               await sleep(50);
             }
           }
-          planPoint = undefined;
+          planTarget = undefined;
         }
       } else {
-        await sleep(100);
+        await sleep(50);
       }
     }
+    if (targetId === undefined) continue;
     if ((world.health()?.hp ?? 100) <= 50) {
       record("heal: hit during pursuit");
       continue;
@@ -664,7 +752,11 @@ try {
       if (p && t3) session.input.sendInput({ moveX: 0, moveZ: 0, yaw: Math.atan2(t3.x - p.x, t3.z - p.z) });
     }, 100);
     const code = mission ? await runMission(session, mission, { timeoutMs: Math.min(20_000, Math.max(5000, end - Date.now())), log: (l) => {
-      if (l.includes("attack: fire")) shots += 1;
+      if (l.includes("attack: fire")) {
+        shots += 1;
+        if (firstShotMs === undefined) firstShotMs = Date.now() - acquireAt;
+      }
+      if (l.includes("attack: straight fallback")) fallbacks += 1;
       record(`  atk ${l}`);
     }, error: (l) => record(`  atk ERROR ${l}`) }) : 1;
     clearInterval(face);
@@ -672,15 +764,45 @@ try {
     if (code === 0 && hp?.dead === true) kills += 1;
     attacks.push({ t: Number(secs()), targetId, code, hp, shots });
     record(`attack done id=${targetId} code=${code} hp=${JSON.stringify(hp)} kills=${kills} shots=${shots}`);
+    engagements.push({
+      target: targetId,
+      t: Number(secs()),
+      acquiredMs: Date.now() - acquireAt,
+      firstShotMs: firstShotMs ?? null,
+      timeToEngageMs: firstShotMs ?? null,
+      runPast,
+      minRange: Number.isFinite(minRange) ? Number(minRange.toFixed(2)) : null,
+      pursuits,
+      lastPlanGapMs: lastPlanGap,
+      pauses: pauses - engagePauses,
+      fallbacks: fallbacks - engageFallbacks,
+      code,
+      killed: code === 0 && hp?.dead === true,
+    });
     // No spawn return in this mode: keep pursuing outside the ring.
   }
 } catch (err) {
   record(`ERROR ${err instanceof Error ? (err.stack ?? err.message) : String(err)}`);
 } finally {
-  const summary = { url: URL_, runMs: RUN_MS, kills, shots, attacks, elapsed: secs() };
+  const engageTimes = engagements.map((e) => e.timeToEngageMs).filter((n): n is number => typeof n === "number").sort((a, b) => a - b);
+  const medianEngageMs = engageTimes.length === 0 ? null : engageTimes[Math.floor(engageTimes.length / 2)];
+  const summary = {
+    url: URL_,
+    runMs: RUN_MS,
+    kills,
+    shots,
+    deaths,
+    runPast: engagements.filter((e) => e.runPast === true).length,
+    pauses,
+    fallbacks,
+    medianTimeToEngageMs: medianEngageMs,
+    engagements,
+    attacks,
+    elapsed: secs(),
+  };
   writeFileSync(TRACE, JSON.stringify({ summary, lines }, null, 1) + "\n");
   writeFileSync(LOG, lines.join("\n") + "\n");
-  record(`EXIT kills=${kills} shots=${shots} elapsed=${secs()}s`);
+  record(`EXIT kills=${kills} shots=${shots} deaths=${deaths} runPast=${summary.runPast} pauses=${pauses} fallbacks=${fallbacks} medianEngageMs=${medianEngageMs ?? "?"} elapsed=${secs()}s`);
   session.close();
   await sleep(400);
   record("closed");

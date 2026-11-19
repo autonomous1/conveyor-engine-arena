@@ -11,6 +11,6 @@
     "server": ["^host", "^game-", "^spawn-", "^pickup(\\.|-|$)", "^health(\\.|-|$)", "^audit(\\.|-|$)", "^auth-", "^character-", "^fire(\\.|-|$)", "^grenade(\\.|-|$)", "^wall-", "^server-invariants", "^solo-host", "^play\\.test", "^player-spawns", "^noclip", "^movement(\\.|-|$)", "^static-world", "^prop-clip", "^explosion", "^claims", "^spatial"],
     "client": ["^client-", "^qa-", "^scene-", "^gamepad-", "^hud-", "^audio", "^options-", "^input-", "^landing-", "^anim-", "^info-probe", "^hit-marker", "^map-marker", "^instance-mesh", "^shadows", "^svg-bounds", "^look\\.test", "^rates\\.test", "^aabb-debug", "^pawn-"],
     "shared": ["^shared-", "^wire-", "^snapshot-", "^scene-graph", "^hitscan-", "^movements-", "^pickups-", "^elevators(\\.|-|$)", "^doors-", "^velocity", "^tick-", "^rate-limited-log", "^bake-map", "^building-profile", "^placements-file", "^manifest", "^example", "^invariants", "^tag-coverage", "^ray-"],
-    "meta": ["^codemap-", "^module-", "^contract-", "^test-scope", "^scopes"]
+    "meta": ["^codemap-", "^module-", "^contract-", "^test-scope", "^scopes", "^kb-"]
   }
 }
