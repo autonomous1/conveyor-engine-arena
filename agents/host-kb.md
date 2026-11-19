@@ -5,6 +5,7 @@ doors, elevators, hitscan, bots, health, and the snapshot path.
 This is the layer above `agents/codemap.md`: the map, not the index.
 Every claim carries `file:line`. Generated code is not described here —
 follow the symbol into the codemap.
+The host's state — containers, keys, writers, lifetimes — is §13.
 
 Scale on the reviewed tree (`984e20a`, 2026-11-14): **1,618** live collision
 AABBs, **98** doors, **4** elevator cabs, **156** pickups, **16** wander agents.
@@ -30,7 +31,7 @@ shooting or leaves the first tick without door collision.
 The session object is the only surface (`ArenaSession` in the codemap). `attach`
 (`src/server/arena-host.ts:429`) owns per-connection inbound frames and the two
 deny-log throttles; `stop()` (`:554`) clears snapshot jobs, both deny logs, and
-the loop.
+the loop. The containers this boot creates, with their keys and lifetimes, are §13.
 
 ## 2. The 20 Hz tick
 
@@ -240,3 +241,126 @@ count has no invariant/limit; `releasePickupObstacle` relies on the length
 change to invalidate the floor index; `doorHost.snapshot()` is allocation-shaped
 but not documented as a per-tick call. See
 `plan/dsh-tasks/reports/19-host-review.md`.
+
+## 13. Host state model
+
+**Owns:** the map of the host's state — which container holds which record, its key,
+who writes it, and how long it lives. The flows are §1–§10; the sub-host internals
+stay in the sections linked below and in the codemap. The `S`/`B`/`X` letter is a
+classification, not a code tag: `S` structural (a container or shape checkable from
+the declaration), `B` behavioral (a lifetime rule: one-shot, per-tick clear,
+monotonic, TTL), `X` crosses the host↔kernel/client/shared boundary (the contract
+belongs to `agents/shared-kb.md` or the model repo).
+
+### 13.1 Read-only inputs (boot-only)
+
+| tag | state | container | element type | key → value | written by | lifetime |
+|---|---|---|---|---|---|---|
+| S | arena data | `loaded` | `LoadedArena` (`world-loader.ts:48`) | world, agents, view, playerSpawns, sceneGraph?, regions?, spatialDag? | `loadArena()` before the host | boot-only |
+| S | canonical privileged JSON | `sceneGraphJson`, `regionsJson` (`arena-host.ts:113-114`) | strings | — | host construction | boot-only |
+| S | page view | `arenaJson`, `propClips` (`arena-host.ts:470-471`) | strings | — | `startPropAnimation` | boot-only |
+| B | content hashes | `sceneGraphHash`, `regionsHash` (`arena-host.ts:120,122`) | `let` string | — | `sha256Hex` in `sceneGraphReady` (`:206-212`) | one-shot; stable after |
+| B | privileged arrivals before the hash | `privilegedWaiters` (`:123`) | `HostConn[]` | — | `pushPrivileged` (`:186`) | until `sceneGraphReady` splices (`:210`) |
+| S | nav view handed to the loop and brain | `wanderNav` (`:370-378`) | object | sceneGraph, regions, aabbs, doors, pawnRadius, pawnHeight, liveDoors | host construction | boot-only |
+
+### 13.2 Sub-hosts (constructed here, internals linked)
+
+| tag | state | container | element type | key → value | written by | lifetime |
+|---|---|---|---|---|---|---|
+| X | kernel server | `engine` (`:214`) | `EngineWsServer` | clientId → gateway/replicator/session | kernel + `onHello` | per session |
+| S | door leaves + blockers | `doorHost` (`:277`) | §5, `doors.ts:151` `state` Map | door id → `DoorRuntime` | `sync`/`press` | boot-only; leaves mutate per press |
+| B | goal claims | `claimHost` (`:301`) | `claims.ts:32` `table` | goal key → `{owner, expires}` | `onFrame`, `tick` | TTL 5–120 s, default 30 (`claims.ts:12-14`) |
+| S | cabs + riders | `elevatorHost` (`:308`) | §6, `elevators.ts:103` cabs | cab id → `Cab` (`riders` at `:194`) | `step` | boot-only; riders per tick |
+| B | fire seq gates | `fire` (`:380`) | `fire.ts:76` `gates`, `:78` `botGates` | clientId / bot id → gate | `onFrame` | per session |
+| B | grenade bodies + gates | `grenades` (`:329`) | `grenade.ts:84,86,87` | gates per client; `bodies` array | `throwAs`, `tick` | body ≤ `GRENADE_LIFE_S` 4 s (`grenade.ts:56`); gates per session |
+| S | bot sense/decisions/labels | `botSense`, `botBrain`, `botLabels` (`:347,:390,:418`) | §8, `bot-sense.ts:96`, `bot-brain.ts:207`, `bot-label.ts:72-73` | bot id → row / `Slot` / label | `update` | per tick |
+| S | hp, loadout, inventory, audit | `health`, `kit`, `pickupHost`, `audit` (`:133-145`) | §9, `health.ts:147`, `pickups.ts:244-246,303-306`, `audit.ts:111` | pawn id → vital / ammo+weapon / keys | tick + frames | per session |
+| S | snapshot jobs | `snapStore` (`:129`) | §10, `snapshot-store.ts:33-34` | requesterId/id → `SnapJob` | `begin`/`take` | TTL 3 s (`arena-host.ts:716`) or `take` |
+
+### 13.3 Per-client
+
+| tag | state | container | element type | key → value | written by | lifetime |
+|---|---|---|---|---|---|---|
+| X | connected clients | `engine.connected` | Set | — | kernel | per session |
+| X | seat record | `engine.gateway`/`replicator` | kernel record | clientId → `connected`, `ownedEntity`, `sessionId`, `interestRadius` | kernel + `onHello` (`:217-262`) | per session |
+| B | refused hellos | `refused` (`:213`) | Set<number> | clientId | `onHello` (`:233`) | until the welcome passes (`:676`) |
+| B | snapshot id counter | `snapSeq` (`:130`) | `let` number | — | `nextSnapId` (`:478`) | monotonic |
+| B | roster signature | `lastRoster` (`:435`) | `let` string | — | tick callback (`:440`) | replaced on change |
+| B | deny throttles | `teleportDenyLog`, `qaSnapshotDenyLog` (`:126-128`) | `RateLimitedLog` (`rate-limited-log.ts:24-25`) | clientId → last ms | `shouldLog` | 60 s window; cleared on stop (`:646-647`) |
+| B | per-connection handlers | `socketFromConn` (`:664-666`) | arrays + `self` | — | `attach` | per connection |
+
+### 13.4 Per-pawn/entity
+
+| tag | state | container | element type | key → value | written by | lifetime |
+|---|---|---|---|---|---|---|
+| X | kernel entities | `loaded.world` store | kernel | entity id → pose/radius/scale/render | `placePawn`, frame commit | until restart |
+| B | health rows | `health.rows` (`health.ts:147`) | Map | pawn id → `Vital` | `take`, respawn, `note` | per session; `forget` on close (`:633`) |
+| B | loadout | `kit` (`pickups.ts:245-246`) | two Maps | pawn id → ammo, weapon | `take` | per session; `forget` on reuse (`:241`) and close (`:634`) |
+| B | inventory | `pickupHost` (`pickups.ts:303-305`) | Set + Map + bags | placement id → placement; pawn → key set | `take`, `consumeKey` | until taken; `forget` on reuse (`:242`) |
+| B | latest input | `held` (`:124`) | Map (`game.ts:93`) | pawn id → `HeldInput` | `admit` (`:267`) | per tick; dropped on death/teleport/reuse/close |
+| S | agent records | `agents` (`world-loader.ts:18`) | `WanderAgent[]` | id → role, gait, goal, path, override, heading, nextTurn | loop + brain | boot-created; fields per tick |
+| B | wander walks | `wanderWalks` (`game.ts:295`) | WeakMap | agent → walk | `steerUnownedWander` (`:459`) | per walk; `clearWalk` (`:427-428`) |
+| S | player/NPC groups | `npcIds`, `padIds` (`:143-144`) | Sets | — | host construction | boot-only |
+| B | bot-debug ids | `botIds` (`:414-417`) | array | — | boot when `botDebug` | boot-only |
+| B | pads reserved since the last commit | `reservedPads` (`:132`) | Map | pawn id → `SpawnPick` | hello (`:253`) | cleared every tick (`:445`) |
+| S | seat render handles | `seatRender` (`:135`) | Map | player pad id → kernel render | host construction (`:136-140`) | boot-only; `role === "player"` only |
+
+### 13.5 Tick-owned and lifetime rules
+
+- Per tick the host mutates: `claimHost.tick(Date.now())` (`arena-host.ts:444`),
+  `reservedPads.clear()` (`:445`), the pickup `take` (`:446-450`), and
+  `grenades.tick()` / `botSense.update()` / `botBrain.update()` / `botLabels.update()`
+  (`:465-468`). The tick's order is §2. `held` is replaced by `admit` per input frame
+  and dropped for unowned entities by the loop (`game.ts:1019-1020`).
+- On close (`arena-host.ts:629-636`): `despawnSeat`, `held.drop`, `fire.forgetBot`,
+  `claimHost.drop`, `health.forget`, `kit.forget`, `grenades.drop`,
+  `reservedPads.delete`; `doorHost.drop(clientId)` (`:639`).
+- On seat reuse in hello (`:240-243`): `held.drop`, `kit.forget`, `pickupHost.forget`,
+  `fire.forgetBot`. On teleport (`:531`): `held.drop`.
+- On `stop()` (`:644-649`): the snapshot jobs and their timers (`:645`), both deny
+  logs (`:646-647`), then `stopLoop()` (`:648`).
+- TTLs: snapshot job 3 s (`:716`), claim row 5–120 s (`claims.ts:12-14`), deny log
+  60 s (`rate-limited-log.ts:24`), grenade body 4 s (`grenade.ts:56`).
+- A restart loses every container here; only `loaded` is rebuilt (`world-loader.ts:48`).
+
+### Ownership graph
+
+```text
+clientId ──engine.gateway/replicator──▶ ownedEntity (pawn id)
+  │                                        ├─ health.rows[id]          hp
+  │                                        ├─ kit{ammo,weapon}[id]     loadout
+  │                                        ├─ pickupHost.heldKeys[id] keys
+  │                                        ├─ held[id]                 latest input
+  │                                        └─ claimHost.table[*].owner claims
+  ├─ snapStore.byRequester[clientId]        one job
+  ├─ snapSeq / lastRoster / refused         per-client scalars
+  └─ socketFromConn(messages, closes, self) per-connection handlers
+
+pawn id (role === "player") ──▶ seatRender[id] ──▶ agent record
+npc id (role !== "player")  ──▶ npcIds ──▶ botSense.rowById / botBrain.byId / botLabels
+reservedPads[pawn id]       ──▶ the next hello's claimClearSpawn `pending`
+SnapJob: requesterId → byRequester; id → byId
+```
+
+### Trust boundary
+
+Inbound frames are untrusted and enter through the `attach` handler
+(`arena-host.ts:503-622`); the state above is the authority, and client predictions
+are never stored here. Scopes gate the privileged paths: `teleport` (`:517`), `qa`
+snapshots (`:542`), `scene-graph` delivery (`:183`). The `X` rows mark the
+containers shared with the kernel (`engine.*`, the world store), the client
+(`propClips`, the frames built from `view`), or the shared contract — their
+contracts live in `agents/shared-kb.md` or the model repo, not here.
+
+### Candidate invariants
+
+Checkable from the model; none is in §12 yet. One moves to §12 only when a test or
+`@invariant` confirms it.
+
+- `sceneGraphHash` / `regionsHash` are written once inside `sceneGraphReady` and never again — `arena-host.ts:207-208`.
+- `reservedPads` is emptied on every tick, so a pad reserved by a hello reads as occupied only until the next tick's commit — `arena-host.ts:445`.
+- `npcIds` / `padIds` are fixed at boot from `loaded.agents` — `arena-host.ts:143-144`.
+- `seatRender` holds `role === "player"` ids only — `arena-host.ts:136-140`.
+- `refused` loses a client exactly when its welcome passes — `arena-host.ts:676`.
+- A snapshot job leaves the store by `take` or the 3 s timer, and both maps are cleared together — `snapshot-store.ts:45-56`, `arena-host.ts:716`.
+- `claimHost.table` rows are expired by `tick` and dropped for a disconnected owner — `claims.ts:32`, `arena-host.ts:632`.
