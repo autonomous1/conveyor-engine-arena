@@ -1136,7 +1136,7 @@ function respawnPawn(world: AuthoritativeWorld, agents: WanderAgent[], id: numbe
     }
   }
   const pads = agent?.role === "player" ? playerSpawns : world.listSpawnPoints();
-  const spawn = claimClearSpawn(world, id, pads);
+  const spawn = claimClearSpawn(world, id, pads) ?? pads[0];
   const view = world.store.view(id);
   if (!view || !spawn) {
     world.enqueue({ kind: "setClip", entity: id, clip: "idle", speed: 0 });

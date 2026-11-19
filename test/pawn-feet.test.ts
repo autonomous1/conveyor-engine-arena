@@ -13,12 +13,12 @@ import { findClip } from "../src/shared/movements.ts";
 
 const manifest = JSON.parse(readFileSync(fileURLToPath(new URL("../web/game/arena.game.json", import.meta.url)), "utf8")) as {
   assets: Array<{ id: string; uri: string; scale?: number; animations?: Record<string, { clip: string; speed: number }> }>;
-  player: { modelChoices: string[] };
+  player: { clientPlayer: { modelChoices: string[] } };
 };
 
 test("idle and fallen pawns rest on the floor and the shot stays at eye height", async () => {
   assert.equal(EYE_HEIGHT, 1.6);
-  for (const id of manifest.player.modelChoices) {
+  for (const id of manifest.player.clientPlayer.modelChoices) {
     const asset = manifest.assets.find((item) => item.id === id);
     assert.ok(asset?.animations, `${id} has no clips`);
     const gltf = await loadGltf(fileURLToPath(new URL(`../web${asset.uri}`, import.meta.url)));

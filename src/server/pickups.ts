@@ -1,7 +1,8 @@
 // ARCHITECTURE: Host pickup grants: remaining ids, per-pawn keys/loadout, and
 //   obstacle release.
-// Wiring: arena-host.ts builds `createPickupHost`, calls `take` and
-//   `releasePickupObstacle` in `onTick`, and reads `pawnBodies`.
+// Wiring: arena-host.ts builds `createPickupHost`, filters the tick's bodies with
+//   `pickupCandidates`, calls `take` and `releasePickupObstacle` in `onTick`, and
+//   reads `pawnBodies`.
 // Order: `take` runs before grenades in `onTick`.
 // Invariants: A taken id leaves the remaining set; a key is recorded on one
 //   pawn only.
@@ -29,6 +30,26 @@ export function pawnBodies(world: AuthoritativeWorld, health: PawnHealth): PawnB
     });
   }
   return out;
+}
+
+/**
+ * The pawn bodies a prop pickup may take this tick.
+ * @why The NPC-vs-client policy is authored in the manifest; this filter is the
+ *      host's enforcement of it, not a policy source.
+ * @post A filtered pawn cannot take; the kept bodies keep their input order, and an
+ *       id in neither group is kept. The NPC set wins if an id is in both.
+ */
+export function pickupCandidates(
+  bodies: readonly PawnBody[],
+  npcIds: ReadonlySet<number>,
+  padIds: ReadonlySet<number>,
+  allow: { npc: boolean; client: boolean },
+): PawnBody[] {
+  return bodies.filter((body) => {
+    if (npcIds.has(body.id)) return allow.npc;
+    if (padIds.has(body.id)) return allow.client;
+    return true;
+  });
 }
 
 /**

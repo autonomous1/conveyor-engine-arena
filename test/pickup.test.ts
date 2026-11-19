@@ -11,7 +11,7 @@ import { createViewModel, mountWeaponMesh } from "../src/client/viewmodel.ts";
 import { compileGame, GameManifestError, type CompileSources } from "../dist/server/game-manifest.js";
 import { loadInstalledGame, projectRoot, readManifestSources } from "../dist/server/load-game.js";
 import { startArenaServer } from "../dist/server/main.js";
-import { releasePickupObstacle } from "../dist/server/pickups.js";
+import { pickupCandidates, releasePickupObstacle } from "../dist/server/pickups.js";
 import { loadArena } from "../dist/server/world-loader.js";
 import { createPawnHealth, MAX_HP } from "../src/shared/health.ts";
 import { STEP_HEIGHT } from "../src/shared/movements.ts";
@@ -24,6 +24,7 @@ import {
   HEALTH_PICKUP,
   parsePickup,
   parsePickupSet,
+  type PawnBody,
   type PickupPlacement,
 } from "../src/shared/pickups.ts";
 
@@ -920,4 +921,20 @@ test("two tabs see a full pawn clear a health crate and a second crate", { timeo
     }
     await host.close();
   }
+});
+
+test("pickup_candidates gate the npc and client groups without reordering", () => {
+  const body = (id: number): PawnBody => ({ id, x: 0, y: 0, z: 0, radius: 0.45, height: 1.8, alive: true });
+  const bodies = [body(1), body(2), body(3)];
+  const npc = new Set([2]);
+  const pad = new Set([1]);
+  const ids = (kept: PawnBody[]) => kept.map((item) => item.id);
+  // The shipped policy: the pad keeps its prop, the NPC is filtered out, unknown ids stay.
+  assert.deepEqual(ids(pickupCandidates(bodies, npc, pad, { npc: false, client: true })), [1, 3]);
+  // Both groups allowed: everything stays in order.
+  assert.deepEqual(ids(pickupCandidates(bodies, npc, pad, { npc: true, client: true })), [1, 2, 3]);
+  // The client flag drops the pad group but not the NPC group or an unknown id.
+  assert.deepEqual(ids(pickupCandidates(bodies, npc, pad, { npc: true, client: false })), [2, 3]);
+  // A body in both sets is treated as an NPC.
+  assert.deepEqual(ids(pickupCandidates([body(2)], new Set([2]), new Set([2]), { npc: false, client: true })), []);
 });

@@ -33,7 +33,7 @@ import { shutDoorBoxes } from "../shared/bots/cover.js";
 import { despawnSeat, setSeatAlive } from "./seats.js";
 import { createArenaGrenades } from "./grenade.js";
 import { createHostSocketPaths } from "./host-path.js";
-import { pawnBodies, releasePickupObstacle } from "./pickups.js";
+import { pawnBodies, pickupCandidates, releasePickupObstacle } from "./pickups.js";
 import { createRateLimitedLog } from "./rate-limited-log.js";
 import { createSnapshotStore, type SnapJob } from "./snapshot-store.js";
 import type { LoadedArena } from "./world-loader.js";
@@ -139,6 +139,9 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
     if (render !== undefined) seatRender.set(agent.id, render);
   }
   const pickupHost = createPickupHost(loaded.view.pickups ?? []);
+  /** The two player groups the manifest gates prop pickups by. Built once; the roles are fixed. */
+  const npcIds = new Set(loaded.agents.filter((agent) => agent.role !== "player").map((agent) => agent.id));
+  const padIds = new Set(loaded.agents.filter((agent) => agent.role === "player").map((agent) => agent.id));
   const audit = createAudit();
   for (const agent of loaded.agents) health.note(agent.id);
   function roster(): number[] {
@@ -440,7 +443,10 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
     }
     claimHost.tick(Date.now());
     reservedPads.clear();
-    const bodies = pawnBodies(loaded.world, health);
+    const bodies = pickupCandidates(pawnBodies(loaded.world, health), npcIds, padIds, {
+      npc: loaded.view.npcPickupProps !== false,
+      client: loaded.view.clientPickupProps !== false,
+    });
     const grants = pickupHost.take(bodies, health, kit);
     for (const grant of grants) {
       releasePickupObstacle(loaded.world, loaded.view.aabbs, grant.id);

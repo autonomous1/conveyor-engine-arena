@@ -204,10 +204,14 @@ export type ArenaView = {
     key?: string;
   }>;
   characters: Array<{ id: string; model: string; scale: number; animations: Record<Movement, CharacterAnimation> }>;
-  /** Human-selectable character ids, in `player.modelChoices` order. */
+  /** Human-selectable character ids, in `player.clientPlayer.modelChoices` order. */
   modelChoices: string[];
-  /** Wander-pawn character ids. Absent when bots use `modelChoices`. */
+  /** Wander-pawn character ids from `player.npcPlayer.modelChoices`. Absent when bots use `modelChoices`. */
   npcModelChoices?: string[];
+  /** Client players may take prop pickups (`player.clientPlayer.pickupProps`). Absent: true. */
+  clientPickupProps?: boolean;
+  /** NPC wander pawns may take prop pickups (`player.npcPlayer.pickupProps`). Absent: true. */
+  npcPickupProps?: boolean;
   /**
    * Model URIs whose asset says `"instance": "static"`. Repeated placements of
    * one of these share one InstancedMesh per source mesh. URIs absent from this

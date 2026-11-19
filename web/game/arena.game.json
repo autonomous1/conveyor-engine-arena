@@ -1386,17 +1386,23 @@
   "player": {
     "radius": 0.45,
     "height": 1.8,
-    "modelChoices": [
-      "grok-bot",
-      "player-1"
-    ],
-    "npcModelChoices": [
-      "steampunk-dog",
-      "ratty",
-      "cyborg-endoskeleton",
-      "player-a",
-      "player-b",
-      "player-d"
-    ]
+    "clientPlayer": {
+      "pickupProps": true,
+      "modelChoices": [
+        "grok-bot",
+        "player-1"
+      ]
+    },
+    "npcPlayer": {
+      "pickupProps": false,
+      "modelChoices": [
+        "steampunk-dog",
+        "ratty",
+        "cyborg-endoskeleton",
+        "player-a",
+        "player-b",
+        "player-d"
+      ]
+    }
   }
 }

@@ -156,6 +156,8 @@ test("installed manifest matches the authoritative world and keeps spawns clear"
   assert.ok(game.view.modelChoices.includes("player-1"));
   assert.ok(game.view.modelChoices.length >= 2);
   assert.deepEqual(game.view.npcModelChoices, ["steampunk-dog", "ratty", "cyborg-endoskeleton", "player-a", "player-b", "player-d"]);
+  assert.equal(game.view.clientPickupProps, true);
+  assert.equal(game.view.npcPickupProps, false);
   assert.equal(game.view.characters.find((character) => character.id === "player-1")?.model, "/assets/models/player-2.glb");
   assert.ok(game.view.characters.some((character) => character.id === "cyborg-endoskeleton"));
   for (const character of game.view.characters) assert.ok(character.scale > 0, character.id);
@@ -216,6 +218,36 @@ test("invalid manifest names the field", () => {
   assert.throws(() => compile(instanced, read), (err: unknown) => {
     assert.ok(err instanceof GameManifestError);
     assert.ok(err.issues.some((issue) => issue.path.endsWith(".instance") && issue.message === "must be static"));
+    return true;
+  });
+});
+
+test("player groups gate pickup props, and absent groups keep the old behaviour", () => {
+  const doc = document();
+  const files = filesFromDisk();
+  const read = (uri: string) => files.get(uri);
+
+  const malformed = structuredClone(doc) as { player: { npcPlayer: { pickupProps: unknown } } };
+  malformed.player.npcPlayer.pickupProps = "yes";
+  assert.throws(() => compile(malformed, read), (err: unknown) => {
+    assert.ok(err instanceof GameManifestError);
+    assert.ok(err.issues.some((issue) => issue.path === "player.npcPlayer.pickupProps"));
+    return true;
+  });
+
+  const bare = structuredClone(doc) as { player: Record<string, unknown> };
+  delete bare.player.npcPlayer;
+  const compiled = compile(bare, read);
+  assert.equal(compiled.view.npcPickupProps, undefined);
+  assert.equal(compiled.view.npcModelChoices, undefined);
+  assert.equal(compiled.view.clientPickupProps, true);
+  assert.deepEqual(compiled.view.modelChoices, ["grok-bot", "player-1"]);
+
+  const noClient = structuredClone(doc) as { player: Record<string, unknown> };
+  delete noClient.player.clientPlayer;
+  assert.throws(() => compile(noClient, read), (err: unknown) => {
+    assert.ok(err instanceof GameManifestError);
+    assert.ok(err.issues.some((issue) => issue.path === "player.clientPlayer.modelChoices"));
     return true;
   });
 });

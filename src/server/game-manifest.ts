@@ -816,6 +816,15 @@ function str(value: unknown, path: string, issues: GameIssue[]): string | undefi
   return value;
 }
 
+/** Absent stays absent; anything not a boolean is an issue at `path`. */
+function bool(value: unknown, path: string, issues: GameIssue[]): boolean | undefined {
+  if (typeof value !== "boolean") {
+    issues.push({ path, message: "required boolean" });
+    return undefined;
+  }
+  return value;
+}
+
 function isPublicAssetPath(uri: string): boolean {
   return uri.charCodeAt(0) === 47 && uri.startsWith("assets/", 1);
 }
@@ -2003,10 +2012,25 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
     });
     return ids;
   };
-  const modelChoices = takeCharacters(player?.modelChoices, "player.modelChoices", 2);
-  const npcModelChoices = player && Object.prototype.hasOwnProperty.call(player, "npcModelChoices")
-    ? takeCharacters(player.npcModelChoices, "player.npcModelChoices", undefined)
+  const clientPlayer = player && isObject(player.clientPlayer) ? player.clientPlayer : undefined;
+  const npcPlayer = player && isObject(player.npcPlayer) ? player.npcPlayer : undefined;
+  if (player && player.clientPlayer !== undefined && !clientPlayer) {
+    issues.push({ path: "player.clientPlayer", message: "required object" });
+  }
+  if (player && player.npcPlayer !== undefined && !npcPlayer) {
+    issues.push({ path: "player.npcPlayer", message: "required object" });
+  }
+  const modelChoices = takeCharacters(clientPlayer?.modelChoices, "player.clientPlayer.modelChoices", 2);
+  const npcModelChoices = npcPlayer
+    ? takeCharacters(npcPlayer.modelChoices, "player.npcPlayer.modelChoices", undefined)
     : [];
+  // Absent flags keep the historical behaviour: both groups may take props.
+  const clientPickupProps = clientPlayer && Object.prototype.hasOwnProperty.call(clientPlayer, "pickupProps")
+    ? bool(clientPlayer.pickupProps, "player.clientPlayer.pickupProps", issues)
+    : undefined;
+  const npcPickupProps = npcPlayer && Object.prototype.hasOwnProperty.call(npcPlayer, "pickupProps")
+    ? bool(npcPlayer.pickupProps, "player.npcPlayer.pickupProps", issues)
+    : undefined;
 
   const readSpawns = (entries: Array<{ item: unknown; path: string }>, seen: Set<string>) => {
     const parsed: Array<{ id: string; x: number; y: number; z: number; yaw: number }> = [];
@@ -2282,6 +2306,8 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
     characters,
     modelChoices,
     ...(npcModelChoices.length > 0 ? { npcModelChoices } : {}),
+    ...(clientPickupProps !== undefined ? { clientPickupProps } : {}),
+    ...(npcPickupProps !== undefined ? { npcPickupProps } : {}),
     staticModels: [...assets.values()]
       .filter((asset) => asset.kind === "model" && asset.instance === "static")
       .map((asset) => asset.uri)
