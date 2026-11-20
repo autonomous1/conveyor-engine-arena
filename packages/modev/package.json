@@ -1,11 +1,16 @@
 {
   "name": "@conveyor-engine/modev",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "Model lints over agents/ knowledge bases (the model developer's tool).",
+  "description": "Model lints and the modev query CLI over agents/ (the model developer's tool).",
+  "bin": {
+    "modev": "./cli.mjs"
+  },
   "scripts": {
     "check": "node check.mjs",
-    "self-check": "node self-check.mjs"
+    "self-check": "node self-check.mjs",
+    "test": "node --test test/*.test.mjs",
+    "verify": "npm run check && npm run self-check && npm run test"
   }
 }
