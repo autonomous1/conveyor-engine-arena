@@ -633,3 +633,119 @@ coder's mid-task tree and overwrote the pre-edit map. Restored from `HEAD` via a
 temporary `git worktree` (the map is gitignored, so `git checkout` cannot), with
 the mtime backdated to `HEAD` so the new warning reports correctly. `codemap:check`
 is now legitimately red until the coder regenerates at the end of the task.
+
+## 14. First full pipeline run: adoption and one found gap (2026-11-20)
+
+The first designer → coder → bot-developer → designer run is done. The query log
+(76 queries, session-tagged) shows:
+
+| session | queries | role (inferred from the commands) |
+|---|---:|---|
+| `b6a4f47d` | 13 | designer: `section host 9/13.4/13.5`, then a symbol sweep |
+| `60a9f09e` | 7 | coder: sections + `GRENADE_DAMAGE` + the new blast names |
+| `d2046747` | 5 | second task session |
+| unknown | 16 | before session tagging (operator tests) |
+
+The coder is the main volume user, as expected: it reads one task's sections and
+symbols, while the designer drafts from the KB and the bot reads §14. The useful
+signal is not the count, it is the **miss rate**: one session ran
+`self`, `others`, `healthOf`, `landed`, `playerIds`, `health` — six misses in a
+row — and `find "laser damage"` returned 0.
+
+Cause: those are **methods on `BotWorld`**, declared in
+`packages/bot-client/src/world.ts`. `query symbol` only knows top-level symbols,
+and the codemap's roots are `src/` — `packages/` is not indexed at all
+(`query file packages/bot-client/src/world.ts` misses). The session was asking a
+legitimate question the model cannot answer.
+
+Fixed in the model, not in the tool:
+
+- `find` on zero hits now says what it matches (names and section titles) and
+  points at `rg` for source text, member names and `packages/`.
+- AGENTS: **"A member is not a symbol"** — query the owner's file and read the
+  declaration.
+- Designer and bot roles name `packages/bot-client/src/world.ts` as the `BotWorld`
+  surface, outside the codemap.
+
+### Task proposal — extend the codemap roots (coder)
+
+- **Architecture note:** the codemap is the index of what agents may query; the
+  bot lane is half the pipeline and is currently invisible.
+- **Files:** `scripts/codemap.ts` (default roots), `package.json` (`codemap`),
+  the codemap gates if they assume `src/` only.
+- **Change:** add `packages/bot-client/src` to the default roots (9 files,
+  2,791 lines). Do not add `tests/`.
+- **Fail-first:** `node packages/modev/cli.mjs query file
+  packages/bot-client/src/world.ts` exits 1 today; after, it lists `BotWorld`.
+- **Acceptance:** `npm run codemap` includes the 9 files; `query symbol BotWorld`
+  hits; `codemap:check` green; `test:scope meta` green.
+- **Risk:** cross-root `used by` edges (bot-client imports `../../../src/…`) and
+  a larger map; both are visible in the regenerated diff.
+
+Adoption verdict so far: the loop works, the misses are the model's fault when
+they happen, and the fix is either a pointer (member/packages) or a day of
+generator work (scope) — not a change in the agents.
+
+## 15. The scoped test loop is the wall clock (2026-11-20)
+
+The operator: coding takes <5 minutes, then the test phase dominates. Profile,
+per test file, Node 24, 4 cores (numbers taken while a cancelled suite may still
+have been draining — treat them as upper bounds):
+
+| test | s | note |
+|---|---:|---|
+| `manifest-data` | 21.8 | **always gate**, calls `loadInstalledGame` three times |
+| `ray-broadphase` | 12.5 | |
+| `grenade` | 12.3 | |
+| `scene-graph` | 11.5 | imports `../dist/` |
+| `grenade-dag` | 11.0 | |
+| `placements-file` | 10.1 | |
+| `example` | 9.7 | imports `../dist/` |
+| `codemap-tags` | 7.5 | always gate |
+| `module-headers` | 5.3 | always gate |
+| `codemap-calls` | 4.8 | always gate |
+| `jsdoc-exports` | 4.2 | always gate |
+| `tag-coverage` | 3.8 | |
+
+For a grenade change the related run selects **25/137** tests and `build yes`;
+`npm run build:server` alone is **14.6 s**. The six always-gates are ~25–45 s on
+every run. The full related run exceeded six minutes twice (killed); the per-file
+sum is ~4 minutes, so the parallel default is not buying what it should — that
+gap is a suspicion, not a measurement.
+
+Three causes, three candidate tasks (one concern each, for the designer):
+
+1. **`manifest-data` reloads the game three times** (once uncached by design, to
+   emit warnings; the other two do not need it). Cache one load for the tests
+   that do not capture warnings — an always-gate saving on every run.
+2. **The `dist` build is unconditional when a selected test imports `dist/`**
+   (5 of them). Skip the build when `dist` is newer than every `src/` file, or
+   have `scene-graph.test.ts` import `src/` if deploy parity is not the point.
+3. **Profile the parallel run** — 25 files taking >6 min against a ~4 min
+   sequential sum; measure `--test-concurrency`, then fix the concurrency or the
+   test that stalls under load.
+
+Not a gate change: every proposal caches or reuses work; none weakens an
+assertion. Interim, landed in the coder role: iterate on the edited test file
+alone, run the scoped command once before the report.
+
+## 16. The dispatcher convention: `Next:` only when action is needed (2026-11-20)
+
+The operator reported spending more time reading turn endings to decide whether a
+post-task action was needed. Rule added to AGENTS and all four briefs:
+
+- **Normal finish → no line.** Work complete, report written, task file on disk:
+  the turn ends there. Silence means nothing to dispatch.
+- **Question, blocker, or operator decision → exactly one line:**
+  `Next: operator — <the one action>`. If the next actor is another agent, name
+  it so the operator routes it (`Next: designer — draft the follow-up task`).
+- Never end with both a summary and an unexplained question.
+
+Why this and not `Next: none`: the operator's scan is "is there a Next line?" —
+one grep-shaped check per turn, instead of reading the prose. A mandatory line
+would restore the reading cost it removes.
+
+Applied in `AGENTS.md` (injected, canonical), `designer-role.md` (rule 8),
+`coder-role.md` (Role contract), `bot-developer-role.md` (Interaction protocol),
+and `model-developer-role.md` (With the operator). Sessions started before this
+change need a restart to see it.

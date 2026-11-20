@@ -25,6 +25,10 @@ repo, read/edit only the paths it names there.
 Prohibitions: `agents/AGENTS.md` (memory/skills, sibling repos, the kernel
 boundary).
 
+A normal finish needs no operator action: end after the report, with no `Next:`
+line. If you are blocked or need a decision, end with
+`Next: operator — <the one action>` (see `agents/AGENTS.md`).
+
 The per-task loop is:
 
 1. `npm run typecheck`
@@ -282,6 +286,11 @@ Run, in order:
 2. the task's scoped test command (it includes the always-gates)
 3. `npm run build` only when the task's acceptance requires it
 4. the codemap baseline/regenerate/diff/check commands above
+
+**Iterate on one file, scope once.** While fixing, run the edited test alone
+(`node --import ./scripts/ts-ext-register.mjs --test test/<file>.test.ts`, ~2–12 s);
+run the task's scoped command once, before the report. A scoped run pays the
+always-gates plus a ~15 s `dist` build whenever a selected test imports `dist/`.
 
 Do not run the gate files separately unless the task explicitly requires it;
 the scoped runner already selects them. Do not fall back to the full suite.

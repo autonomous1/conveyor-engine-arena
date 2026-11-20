@@ -235,7 +235,7 @@ reconnect and no retry connection**. `"auto"` exists but is not for live trials.
 
 ## What to observe
 
-**The world** (`session.world`), 2–5 Hz (10 Hz for the long tests):
+**The world** (`session.world`; the `BotWorld` type is declared in `packages/bot-client/src/world.ts`), 2–5 Hz (10 Hz for the long tests):
 `self()` pose/health, `others()` (including the operator's pawn), `healthOf(id)`,
 `doors()`/`door(id)`, `pickups()`, `keys()`, `weapon()`/`ammo()`, `placeOf(pos)`,
 `summary()`, `sceneGraph()`/`sceneGraphHash()`, `regions()`.
@@ -326,6 +326,9 @@ hypothesis. Then reproduce with the same place/goal/start; record the pose every
 - A mid-sequence close is an abort; do not retry the connection (see above).
 - When a prototype works: say the script path and what it proves; that is the
   hand-off.
+- A normal finish (run journaled, hand-off stated) needs no operator action and no
+  `Next:` line. If you are blocked or need a decision, end with
+  `Next: operator — <the one action>`.
 
 ---
 

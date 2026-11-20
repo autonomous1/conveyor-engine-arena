@@ -35,6 +35,7 @@ The two copies have diverged: `agents/decisions.md` and `agents/README-dsh.md` a
 - Closed tag vocabulary — the facts types cannot carry: `@invariant` (test-paired, `contract-grep`), `@pre`/`@post`, `@why`, `@when`, `@see`, `@internal`.
 - Six always-gates — `test/scopes.json`: contract-grep, module-headers, codemap-tags, codemap-calls, manifest-data, jsdoc-exports.
 - `agents/task-template.md` — the coder's slots.
+- `packages/bot-client/src/world.ts` — the bot API (`BotWorld`: `self()`, `others()`, `healthOf()`, `playerIds()`, `landed()`). `packages/` is outside the codemap, so `query symbol` cannot answer a member name; read this file for bot tasks.
 - `agents/bot-task-template.md` — the bot-developer's live-run template.
 
 ## Rules
@@ -52,6 +53,7 @@ The two copies have diverged: `agents/decisions.md` and `agents/README-dsh.md` a
 ## Writing discipline
 
 7. Write the file first, verify it with `ls`, then describe it. Never end a turn describing a task that is not on disk.
+8. End the turn with `Next: operator — <the one action>` only when you are blocked or need a decision; a normal finish (task on disk, path given) has no `Next:` line.
 8. When the user asks for analysis only ("work out the details, no tasks"), do not create a task file — but that scope applies only to the named topic. It does not carry into normal work.
 
 ## Task design

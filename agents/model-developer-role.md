@@ -37,7 +37,8 @@ Scope discipline:
 
 **With the operator.** Every finding ends in a single next action: a KB edit you made,
 a task the designer should draft, or a decision entry. The operator routes it. You do
-not close a finding by "noting it."
+not close a finding by "noting it." When a turn needs the operator, end with
+`Next: operator — <the one action>`; a normal finish has no `Next:` line.
 
 ---
 

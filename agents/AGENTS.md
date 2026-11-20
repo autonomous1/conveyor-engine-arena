@@ -8,6 +8,12 @@ Browser arena client + authoritative Node host for Conveyor Engine. The host tic
 
 **Roles:** the role briefs are `agents/coder-role.md` (coder method and Pre-Flight/HALT contract), `agents/designer-role.md`, `agents/bot-developer-role.md`, and `agents/model-developer-role.md` (the model is a deliverable; a stale model costs a coder session; split a KB before it passes the read window); this file is the repo-wide rule set common to them. `src/shared/bots/goap.ts` is frozen unless the task explicitly requires a change.
 
+**Ending a turn.** A turn that ends normally needs no operator action: stop after the report or summary, with **no** `Next:` line — silence means nothing to dispatch. If the turn ends with a question, a blocker, or a decision only the operator can make, end with exactly one line:
+
+`Next: operator — <the one action>`
+
+If the next action belongs to another agent, name it so the operator can route it: `Next: designer — draft the follow-up task`. Never end with both a summary and an unexplained question.
+
 **Read order for every task (hard stop)**
 1. The task file the user named — only once.
 2. This `agents/AGENTS.md` — already injected; do not re-read.
@@ -25,6 +31,7 @@ Browser arena client + authoritative Node host for Conveyor Engine. The host tic
 - `rg` stays for what the codemap does not index: call sites inside a function, function-locals, and the text of a file you are about to edit.
 - Never open `agents/codemap.md` as a document — not at an offset, not scrolling, not for context. If the CLI is unavailable, make one exact `rg` in `codemap.md`, open the source it names, and say so in the report.
 - **Freshness:** the codemap describes the last regeneration (normally `HEAD`). While you are editing, source outranks it — a symbol you are removing still appears, and one you are adding does not. Regenerate (`npm run codemap`) before reporting, then re-query.
+- **A member is not a symbol.** `self()`, `others()`, `healthOf()` are methods on `BotWorld`, not top-level symbols; `query symbol` will miss them. Query the owner's file (`query file packages/bot-client/src/world.ts`) and read the declaration — `packages/` is not in the codemap at all.
 
 **Do not read memory or skills**
 dsh has no built-in memory directory. Its only always-on instruction surface is `AGENTS.md`: the project file and `~/.dsh/AGENTS.md` are already injected into the session. Skill bodies under `~/.dsh/skills/` and `<repo>/.dsh/skills/` are progressively disclosed — the catalog shows only name + description until the body is loaded. Both are cheap to leave alone:
