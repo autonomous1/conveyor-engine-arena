@@ -88,6 +88,8 @@
   "player": {
     "radius": 0.5,
     "height": 1.8,
-    "modelChoices": ["grok-bot", "player-1"]
+    "clientPlayer": {
+      "modelChoices": ["grok-bot", "player-1"]
+    }
   }
 }
