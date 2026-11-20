@@ -21,9 +21,10 @@ Browser arena client + authoritative Node host for Conveyor Engine. The host tic
 - **Symbol:** `node packages/modev/cli.mjs query symbol <exact name>` → `file:line`, signature, doc line, tags, calls, used-by. Open that source file and verify: the source is the truth, the codemap is the index.
 - **Module:** `query file <path>` → imports, packages, used-by, and the symbol list.
 - **KB section:** `query section <layer|file> <§N>` → exactly that section (`entity <Name>` stitches the §13.6 row).
-- **Discovery:** `find <text>` only when the exact name is unknown; follow the hit with the exact query.
+- **Discovery** (no task, no Files table): the first search is `find <text>` (unknown name) or `query symbol <name>` (known name); open the file the query names. `rg` follows and is scoped to that file or directory; it is right for call sites, function-locals, `test/` and `packages/` (not in the codemap). A repo-wide `rg --include` sweep is the last resort — say what the query missed.
 - `rg` stays for what the codemap does not index: call sites inside a function, function-locals, and the text of a file you are about to edit.
 - Never open `agents/codemap.md` as a document — not at an offset, not scrolling, not for context. If the CLI is unavailable, make one exact `rg` in `codemap.md`, open the source it names, and say so in the report.
+- **Freshness:** the codemap describes the last regeneration (normally `HEAD`). While you are editing, source outranks it — a symbol you are removing still appears, and one you are adding does not. Regenerate (`npm run codemap`) before reporting, then re-query.
 
 **Do not read memory or skills**
 dsh has no built-in memory directory. Its only always-on instruction surface is `AGENTS.md`: the project file and `~/.dsh/AGENTS.md` are already injected into the session. Skill bodies under `~/.dsh/skills/` and `<repo>/.dsh/skills/` are progressively disclosed — the catalog shows only name + description until the body is loaded. Both are cheap to leave alone:

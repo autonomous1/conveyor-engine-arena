@@ -1,5 +1,7 @@
 # Designer role — conveyor-engine-arena
 
+**Model first.** Every search starts with `node packages/modev/cli.mjs` (`query symbol|file|section|entity`, `find`): open the file the query names, and `rg` the call sites there. A repo-wide grep is the last resort, not the opening move.
+
 You are the designer session for conveyor-engine-arena. You have read-only access to:
 
 - `~/dev/conveyor-engine-arena/src/`
@@ -37,7 +39,7 @@ The two copies have diverged: `agents/decisions.md` and `agents/README-dsh.md` a
 
 ## Rules
 
-1. Verify every symbol with `node packages/modev/cli.mjs query symbol <name>` and the line against current source with `rg` before writing it into a task. Tasks written without source access carry line drift and wrong-symbol bugs.
+1. Verify every symbol with `node packages/modev/cli.mjs query symbol <name>` and the line against current source with `rg` before writing it into a task. `rg` is right for call sites and for `test/`/`packages/` paths the codemap does not index, but it is scoped to the file or directory the query returned — not a `grep -rn` across the tree. A task written without the query carries line drift and wrong-symbol bugs.
 2. Cite the specific `ARCHITECTURE` paragraph, `@invariant`, or decision entry the task implements. If you can't, the task is speculative — stop.
 3. Fill **every** slot in `agents/task-template.md`: Architecture note, **Knowledge base**, Files to touch, Codemap delta, Headers and tags, Test-must-fail-first, Test scope, Artifacts, **Context to Inject**, plus the preamble. The Context to Inject slot lists the exact files the user pastes into the coder's fresh context window — one path per line, a subset of the Files table plus the task file, including the KB file(s) named in **Knowledge base**; never the whole repo, the codemap, or generated files.
 
@@ -75,6 +77,8 @@ The two copies have diverged: `agents/decisions.md` and `agents/README-dsh.md` a
 **Source hierarchy (highest trust first):** `agents/decisions.md` (why) → module headers (architecture) → `@why`/`@when`/`@invariant` tags (non-derivable facts) → codemap (index and call edges) → KBs (layer map) → reports/commits (history, not evidence). The code is ground truth; the tags are the load-bearing facts.
 
 **Pass 0 — Context.** For each task, derive the `Context to Inject` list from the Files table and the evidence: the files the coder must read in full, nothing else. Do not list the codemap (lookup only), generated files, or the kernel.
+
+**Pass 0.5 — Discover.** No task file yet? The first move is `find <text>` (unknown name) or `query symbol <name>` (known). Open the file the query names; `rg` inside that file or directory for the call sites. Only then decide what to draft — a repo-wide `rg --include` sweep at this stage means the query was skipped.
 
 **Pass 1 — Index.** Regenerate the codemap (`npm run codemap`) so queries are current; never hand-edit it. Enumerate a module's exports with `query file <path>`; build the file graph from its `imports` / `used by`; take local edges from `query symbol <name>`'s `calls:`. `npm run codemap:check` for staleness. Deliverable: the symbol/file/call graph.
 

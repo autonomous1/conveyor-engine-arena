@@ -80,7 +80,7 @@ Read `agents/AGENTS.md` first. Then this file. Then the KB sections named in **K
 
 ### Appendix: <pre-flight cross-check | fixture | exact diffs>
 
-<If the task edits a file with n scattered references to a symbol, put an `rg` here so the executor verifies the reference set before editing. This is the check that caught task 13's clean extraction — without it, an unexpected extra reference site makes the extraction silently wrong.>
+<If the task edits a file with n scattered references to a symbol, put an `rg` here so the executor verifies the reference set before editing. This is the check that caught task 13's clean extraction — without it, an unexpected extra reference site makes the extraction silently wrong. Also record the `node packages/modev/cli.mjs query symbol|file|section` commands used to verify this task's symbols; a cited symbol with no query in the appendix was not verified against the model.>
 
 <If the task uses a fixture, put the full fixture here so the executor doesn't have to search for one.>
 

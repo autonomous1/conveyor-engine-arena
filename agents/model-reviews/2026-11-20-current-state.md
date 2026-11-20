@@ -526,3 +526,110 @@ sees whether a session used the CLI or went back to grep.
 **Still open:** the generated codemap header itself says "Find a symbol: grep the
 Symbol index" (`scripts/codemap.ts`). That line now contradicts AGENTS; it is a
 coder task (outside my surface) — the header should name `modev query symbol`.
+
+## 11. The designer did not query — a wording and placement failure (2026-11-20)
+
+The operator reported the designer's search:
+
+```text
+grep -rn "GRENADE_DAMAGE\|wound(" --include='*.ts' src test packages | head -40
+```
+
+and "the agent did not run `modev query symbol GRENADE_DAMAGE`". My first read of
+the query log contradicted that; the operator then confirmed the entries at
+12:09–12:12 were **their own manual tests**. The designer session has no query
+entries: it grepped. The false correction was recorded here and is retracted.
+
+Two causes, both real:
+
+1. **The wording licensed it.** The first Discovery bullet said "`rg` is expected
+   for call sites, and for `test/` and `packages/`". That describes the captured
+   command exactly — a repo-wide `--include` sweep over those trees. An
+   "expected rg" clause is permission, and a session can rationalize any sweep
+   under it.
+2. **Placement.** In the designer role the rule sat in rule 1 and the Resources
+   list, both about *verifying symbols while drafting*. A pre-task exploration
+   has no task file and no Files table, so nothing said what the first move was.
+
+Fixes:
+
+- **AGENTS Discovery:** the first search is `find` (unknown name) or
+  `query symbol` (known); `rg` follows, scoped to the file or directory the query
+  returned; a repo-wide `rg --include` sweep is the last resort and must say what
+  the query missed.
+- **Designer role:** **"Model first"** is now the first line of the role; rule 1
+  says `rg` is scoped to the query's file/directory; **Pass 0.5 — Discover** gives
+  the exploration workflow the method was missing.
+- **Task template Appendix:** records the `query symbol|file|section` commands
+  used; a cited symbol with no query in the appendix was not verified.
+- **Tool:** session attribution (`DSH_SESSION_ID`, previous section) makes a
+  zero-query session visible instead of invisible.
+
+Lesson: a log without attribution is not evidence, and "rg is expected here" is
+permission — write the *order* (query, then scoped rg), not a list of allowed
+trees.
+
+## 12. Coder finding: `used by` is module-level (2026-11-20)
+
+The coder flagged that `query symbol GRENADE_DAMAGE` listed
+`used by: src/client/boot.ts, src/client/net.ts, src/shared/bot-protocol.ts`
+as if those files imported the symbol. The data is right and the label was
+wrong:
+
+- `src/client/boot.ts` imports `advanceGrenadeClock`, `src/client/net.ts` and
+  `src/shared/bot-protocol.ts` import `parseGrenadePose`/`grenadeFrame`,
+  `src/server/grenade.ts` imports the block that includes `GRENADE_DAMAGE`.
+- The codemap records importers **per module** (`used by` in the file record),
+  never per symbol; there is no per-symbol reverse index to print.
+
+Fixed: the symbol output now says **`module used by:`**; the `query file` output
+keeps `used by:` (it is the module record, so it is unambiguous). The README
+states the limitation. The coder's move — verify the model's claim with `rg`
+before trusting it — is the artifact hierarchy working (source outranks the map).
+Adding per-symbol importers would mean parsing `import { … }` names into the
+generator's file records; not worth it while `rg` answers the question exactly.
+
+**The coder's second wording is imprecise, and part of it is now moot.** The
+list was never stale at the time it was printed: `boot.ts`, `net.ts` and
+`bot-protocol.ts` all reference the *module* (three different export names), and
+at `HEAD` `src/server/grenade.ts` imported `GRENADE_DAMAGE`. But the coder's
+task **replaces that symbol**: `git diff src/shared/grenade.ts` shows
+`GRENADE_DAMAGE` removed for `GRENADE_BLAST_RADIUS` / `GRENADE_BLAST_MIN_PERCENT`
+/ `grenadeBlastDamage`. So mid-task every model claim about `GRENADE_DAMAGE` is
+stale by design — the codemap describes the last regeneration, not the working
+tree. That is now stated in AGENTS ("Freshness"): source outranks the map while
+editing; regenerate and re-query before reporting.
+
+## 13. Auto-regenerating the codemap? No — stat and warn (2026-11-20)
+
+The operator asked whether `modev` should regenerate the codemap whenever the
+coder creates or changes a symbol, since the map is stale during a task.
+
+Measured on the working tree (Node 24.0.2):
+
+| Operation | Measured |
+|---|---|
+| full regeneration (`node scripts/codemap.ts`) | **4.48 s** — 121 files, 1,885 symbols, 5,285 lines |
+| staleness stat (src file vs `agents/codemap.md`) | ~0 ms (one stat); whole-tree walk 0.00 s |
+
+Feasible, but not advisable, for three reasons:
+
+1. **Cost.** 4.5 s is a full AST parse; a task changes symbols many times. The
+   coder would pay seconds per edit for information it already has in context.
+2. **D5's review surface.** The codemap is regenerated once at the end so the
+   pre-regeneration delta is the review artifact. Auto-updating mid-task destroys
+   the baseline: the reviewer can no longer see what the task changed.
+3. **Write surface.** `modev` is read-only; a query that writes `agents/` turns a
+   read into a mutation and makes the answer depend on when it ran.
+
+What landed instead: **per-result freshness.** A symbol/file result stats its
+source file against the map and prints
+`stale: <file> changed after agents/codemap.md — run npm run codemap`; a miss on a
+stale tree carries the same hint. Two stats, targeted at the file the result is
+about, so unrelated queries stay quiet. The CLI never regenerates.
+
+Incident, disclosed: measuring the regeneration ran the generator against the
+coder's mid-task tree and overwrote the pre-edit map. Restored from `HEAD` via a
+temporary `git worktree` (the map is gitignored, so `git checkout` cannot), with
+the mtime backdated to `HEAD` so the new warning reports correctly. `codemap:check`
+is now legitimately red until the coder regenerates at the end of the task.
