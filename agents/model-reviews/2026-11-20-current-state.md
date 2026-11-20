@@ -422,3 +422,107 @@ resolves against the post-split tree.
 **Verdict:** the three sessions are ready. The only blocker-shaped item is the
 host not running for the bot-developer — the operator's start — and 108's KB
 slot is cosmetic (it resolves).
+
+## 9. modev gains the query CLI (2026-11-20, operator-approved)
+
+The model is now queryable without reading it: `node packages/modev/cli.mjs`
+returns one symbol, one KB section, one entity row, or the drift report.
+
+### Why, in bytes
+
+| The agent reads today | Size | ~tokens |
+|---|---:|---:|
+| `agents/codemap.md` (grep-then-read, or read) | 385 KB / 5,278 lines | ~96k |
+| `host-model` §13 (a state question) | 118 lines | ~2,200 |
+| `shared-model` §13.6 (one entity) | 11 lines | ~300 |
+| **`query symbol createArenaHost`** | **376 B** | **~95** |
+
+JSON is the CLI's internal shape; the agent-facing output is compact text. The
+saving is the query, not the format.
+
+### What landed
+
+| File | Role |
+|---|---|
+| `packages/modev/cli.mjs` | the command line: `query symbol|section|entity`, `find`, `drift`, `stats`; `--root`, `--json`; exit 0 found, 1 miss/findings, 2 usage |
+| `lib/parse-codemap.mjs` | module sections → files (imports, used-by, doc) and symbols (kind, local flag, line, signature, doc, tags, calls) |
+| `lib/parse-kb.mjs` | numbered sections (bounded), tables, §13.6 entities |
+| `lib/index.mjs` | the query layer + the drift report |
+| `lib/refs.mjs` | the `layer-kb §N` scanner, moved out of the lint so the gate and `drift` share one implementation |
+| `test/cli.test.mjs` + `test/fixtures/` | 8 tests: exactness, locality, section boundaries, entity row, drift (one finding per defect), CLI exit codes |
+
+Two rules worth recording:
+
+- **Exact lookup only.** `query symbol` takes one name; a miss is exit 1 with no
+  guess. `find` is the only substring entry point.
+- **Section boundaries.** A numbered subsection stops at the next heading of any
+  kind (`### 13.6` stops at `### Ownership…`), while a chapter keeps its
+  unnumbered subsections (`## 13` includes the ownership graph). The first
+  attempt only saw numbered headings and inflated §13.6 from 11 to 60 lines.
+
+`drift` is advisory and mechanical — three defect kinds: a `§` ref that does not
+resolve, a KB `src/…` path that is gone or absent from the codemap, a §13.6 test
+pin with no test file. It reports no symbol-level prose accuracy (D6).
+
+### Wiring
+
+- `npm --prefix packages/modev run verify` = the three lints + the 8 CLI tests.
+- Root `modev:check` now runs `verify`; CI already runs it before `npm test`.
+- The query log lands in `packages/modev/.cache/queries.jsonl` (gitignored);
+  `modev stats` reads it. That is the evidence for tuning the KBs later.
+
+### Not done
+
+- **Role adoption.** The read order still says "one codemap lookup"; pointing
+  AGENTS/roles at `modev query` is the next change, after a before/after count.
+- **`scripts/codemap.ts --json`** (a coder task, outside my surface); the CLI
+  parses the markdown until then.
+- **Symbol-level drift** (a KB name that no longer resolves) — deferred as noisy
+  until the §13 table rows are the only input.
+- **`promote/`** — still unbuilt; `drift` is the advisory report that would feed it.
+- **blueprint-scene root** — it has a codemap but no KBs; `--root` already takes
+  any repo, but its agents set has no KBs to query.
+
+## 10. Wiring the CLI into the agent instructions (2026-11-20, operator-approved)
+
+The query surface is now the instructed way to read the model. The rule changed
+from "one exact `rg` in the codemap" to "ask modev, then open the source".
+
+| File | Change |
+|---|---|
+| `AGENTS.md` | read order steps 4 and 6 name the commands; "Codemap is an index, not a document" is replaced by **"Query the model — never read the map"**; Find-code-fast and Commands updated |
+| `coder-role.md` | read order; artifact hierarchy (the modev query is the reading interface, the codemap file is never read); KB spec; Pass 1; Pass 3; the codemap spec's "correct use"; Pre-Flight now carries **`Model queries:`**; the report's Verification carries the queries and `modev drift` |
+| `designer-role.md` | resources; rule 1 (query the symbol, `rg` the line); Pass 1 (`query file` per module); Pass 5 (`query section` / `query entity`) |
+| `bot-developer-role.md` | read order step 4 queries the sections |
+| `model-developer-role.md` | the 78% fallback is the section query; the read order distinguishes *query for a reader* from *read the file to edit* |
+| `task-template.md` | preamble, **Context to Inject** (KB files are the fallback), **Knowledge base** slot names the query |
+| `bot-task-template.md` | preamble and Knowledge base slot |
+| `agents/README-dsh.md` | a **Model queries** section |
+
+Design points kept from the review:
+
+- **`rg` is not banned.** It stays for what the codemap does not index:
+  function-locals, call sites inside a function, and the text of a file about to
+  be edited. The instruction says exactly that, so the coder does not stop
+  grepping the source.
+- **A fallback exists.** If the CLI is unavailable: one exact `rg` in
+  `codemap.md`, open the source it names, and say so in the report. No silent
+  return to reading the map.
+- **Query to read, open to edit.** The model developer and coder read a section
+  by query and open the file only when editing it.
+
+Verification (the path a coder now walks):
+
+```text
+$ node packages/modev/cli.mjs query section host-model 13.2     # 13 lines, not the 258-line file
+$ node packages/modev/cli.mjs query symbol noteArenaInterest     # entry + file + used-by
+$ node packages/modev/cli.mjs query file src/server/game.ts      # module header + imports + symbol list
+```
+
+Gates: `modev:check` 9 tests + 3 lints + self-check, `test:scope meta` 30/30,
+`drift` clean. `modev stats` now records the queries, which is how the operator
+sees whether a session used the CLI or went back to grep.
+
+**Still open:** the generated codemap header itself says "Find a symbol: grep the
+Symbol index" (`scripts/codemap.ts`). That line now contradicts AGENTS; it is a
+coder task (outside my surface) — the header should name `modev query symbol`.

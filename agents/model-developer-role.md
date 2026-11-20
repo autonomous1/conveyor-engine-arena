@@ -51,8 +51,9 @@ not close a finding by "noting it."
    maintaining.
 5. `agents/README-dsh.md` — the pipeline state and the open loops.
 6. The KBs (`host-flow.md`, `host-model.md`, `shared-flow.md`, `shared-model.md`,
-   `client-kb.md`; the `*-kb.md` files are indexes) — read each in full before
-   editing any of them; the model is cross-file.
+   `client-kb.md`; the `*-kb.md` files are indexes) — query the section for a
+   reader (`modev query section`); read the file in full before editing it; the
+   model is cross-file.
 7. The task templates and the role briefs — read the template before editing it, the
    brief before editing it.
 
@@ -78,9 +79,9 @@ section past the read window does not exist for the agent reading it. That means
   shared are split; client is still one file (306 lines, the next candidate).
 - A task's **Knowledge base** slot names one section per layer, not the whole KB.
 
-If splitting is not yet done, the fallback is: grep the KB by section header, read
-the slice, and grep the codemap by exact symbol. Do not trust the read to reach the
-tail.
+For a reader, `node packages/modev/cli.mjs query section <layer> <§N>` returns the
+slice and `query symbol` the entry; open the file to edit. Do not trust a
+whole-file read to reach the tail.
 
 ---
 
@@ -118,12 +119,15 @@ Re-verify before working — the tree moves.
   names it says "both sides import the one file".
 - **Template slot count — was stale.** `decisions.md` D7 said five; the template
   carries nine plus the preamble. Superseding entry added.
-- **`packages/modev` — bootstrapped (2026-11-20).** `check.mjs` plus three lints
-  (`kb-length`, `kb-section-refs`, `kb-count-claims`) and `self-check.mjs`;
-  `npm run modev:check` (root script) is green, and the self-check proves one
-  failure mode per lint. CI runs it before `npm test`, so a stale model fails
-  the 2-hour run. `test/kb-symbols.test.ts` covers all seven KB files, split
-  halves included (7 tests).
+- **`packages/modev` — lints + query CLI (2026-11-20).** `check.mjs` and three
+  lints (`kb-length`, `kb-section-refs`, `kb-count-claims`), plus `cli.mjs`:
+  `query symbol|section|entity`, `find`, `drift`, `stats` — exact lookups over
+  the codemap and bounded KB sections, so a session reads one entry (~100
+  tokens) instead of the map (~96k). `npm run modev:check` = lints + 8 CLI
+  tests; CI runs it before `npm test`. `drift` is the advisory update report
+  (a `§` ref, a `src/` path, a §13.6 test pin). `test/kb-symbols.test.ts` covers
+  all seven KB files. Wired into `AGENTS.md`, the three roles and both templates
+  (2026-11-20); `modev stats` shows whether a session queried or grepped.
 
 ---
 

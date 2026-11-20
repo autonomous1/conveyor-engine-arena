@@ -66,6 +66,14 @@ The coder runs a scope, not the full suite, for each task. The manifest is
   working-tree diff.
 - Seven scopes: `nav`, `doors`, `bot`, `server`, `client`, `shared`, `meta`.
 
+## Model queries
+
+Symbols and KB sections are queried, not read: `node packages/modev/cli.mjs
+query symbol|file|section|entity`, `find`, `drift`, `stats`. `npm run
+modev:check` is the gate; `packages/modev/README.md` is the reference. The
+read order in `AGENTS.md` is the enforcement point — a session that reads
+`agents/codemap.md` as a document is off the contract.
+
 ## Logs and artifacts
 
 - `plan/dsh-tasks/logs/` — fail-first runs, scoped test output, codemap diffs (`<task>-<what>.log`, `<task>-codemap.diff`).

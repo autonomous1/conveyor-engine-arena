@@ -12,8 +12,10 @@ boundary, and comment-as-contract. If it is absent, stop with
 
 Read the task file **once**, then `agents/AGENTS.md` once, then
 `agents/operator-notes.md` (the Standing rules; the `[coder]`/`[all]` entries),
-then the task's **Knowledge base** sections, then only the task's Files table
-paths. Do not re-read the task or `AGENTS.md` for “context”.
+then the task's **Knowledge base** sections (`node packages/modev/cli.mjs
+query section <layer> <§N>`), then only the task's Files table paths. Look each
+symbol up with `query symbol <name>` and open the source file it names; never
+read `agents/codemap.md`. Do not re-read the task or `AGENTS.md` for “context”.
 
 Write only the files named in the task's **Files to touch** table. Do not edit
 the kernel (`conveyor-engine-*`), `src/shared/bots/goap.ts`, memory, skill
@@ -67,10 +69,12 @@ Highest trust first:
    `Invariants`.
 6. **JSDoc tags** — `@invariant`, `@pre`, `@post`, `@why`, `@when`, `@see`,
    `@internal`.
-7. **`agents/codemap.md`** — generated symbol/file/call index.
-8. **`agents/{host,shared}-{flow,model}.md` + `agents/client-kb.md`** — the curated layer map (`*-kb.md` is the split's index page).
-9. **`agents/task-template.md`** — execution contract for one task.
-10. **Reports and commits** — history, never primary evidence.
+7. **The modev query** — `query symbol|file|section` returns the codemap entry
+   or the KB section on demand; it is the reading interface to 7–8.
+8. **`agents/codemap.md`** — the generated map behind it; never read as a document.
+9. **`agents/{host,shared}-{flow,model}.md` + `agents/client-kb.md`** — the curated layer map; query a section, open the file to edit.
+10. **`agents/task-template.md`** — execution contract for one task.
+11. **Reports and commits** — history, never primary evidence.
 
 A report or commit can claim a fix the tests never covered. The source and the
 scoped tests outrank both.
@@ -91,10 +95,12 @@ whole tree.
 - determinism: stable file and symbol order, no clocks/randomness;
 - staleness: `npm run codemap:check`.
 
-Correct use: **one exact-symbol lookup** from the task's Files table, then open
-the named source file and verify the symbol and signature there. The codemap is
-an index, not a design document. Do not dump, scroll, or read it for context.
-A line number in the codemap is for navigation only; never assert it.
+Correct use: **one exact query** (`node packages/modev/cli.mjs query symbol
+<name>`) for a symbol from the task's Files table, then open the named source
+file and verify the symbol and signature there. `query file <path>` gives a
+module's imports, packages, used-by and symbols in one read. The codemap is an
+index, not a design document: do not dump, scroll, or read it for context. A
+line number in the codemap is for navigation only; never assert it.
 
 After source edits:
 
@@ -121,7 +127,7 @@ codemap cannot express. The KBs are curated, not generated:
 
 Method:
 
-Read the KB for each layer the task touches before the source; update it after the edit (Pass 7).
+Query the named KB sections (`node packages/modev/cli.mjs query section <layer> <§N>`) before the source; open the file when you edit it (Pass 7).
 
 1. Cluster modules by runtime role using headers and imports.
 2. Record entry points, construction order, and data flow.
@@ -141,7 +147,7 @@ Purpose: one atomic, executable contract for one coder session.
 Required slots:
 
 - **Preamble** — read order, memory/skill prohibition, repo boundaries, Node
-  prefix, codemap rule, artifact roots.
+  prefix, modev query rule, artifact roots.
 - **Context to Inject** — exact files the fresh session reads; not the codemap,
   generated files, or the kernel.
 - **Architecture note** — cite a header, tag, or decision. No citation means a
@@ -177,6 +183,7 @@ PRE-FLIGHT
 Task: <number + title>
 Files to edit: <exact paths from the Files table>
 Symbols verified in source: <name → file:signature>
+Model queries: <the exact modev commands you will run>
 Existing tests to run: <file::test name>
 New fail-first test: <planned test name, or "none — test-only task">
 Scoped command: <exact command>
@@ -219,11 +226,11 @@ fail-first.
 
 ### Pass 1 — Resolve
 
-For every symbol in the task, do one exact codemap lookup. Read the KB sections
+For every symbol in the task, do one exact `query symbol`. Query the KB sections
 named in the task (the state model §13 and the invariants for the layers
-touched) before the source. Open the named source file. Verify the symbol and
-signature in source. Do not infer an API from the codemap; do not assert the
-line number.
+touched) with `query section` before the source. Open the named source file.
+Verify the symbol and signature in source. Do not infer an API from the codemap;
+do not assert the line number.
 
 ### Pass 2 — Reconstruct contract
 
@@ -236,7 +243,8 @@ Read the four-slot headers and tags for the touched modules, and the KB's state/
 
 ### Pass 3 — Build the edit graph
 
-From codemap imports / `used by` / `calls:` and source `rg`, list:
+From `query file` / `query symbol` (imports, `used by`, `calls:`) and source
+`rg`, list:
 
 - definition sites;
 - call sites;
@@ -287,7 +295,8 @@ assertion, or skipping a test.
 Write `plan/dsh-tasks/reports/<task>-<slug>.md` with:
 
 - **Changed** — files and symbols;
-- **Verification** — exact commands and counts;
+- **Verification** — exact commands and counts, the modev queries used, and
+  `node packages/modev/cli.mjs drift` (or "clean");
 - **Fail-first** — the failing and passing output, or the explicit exception;
 - **Not done** — honest gaps and the next task required;
 - **Artifacts** — links under `plan/dsh-tasks/logs/`.

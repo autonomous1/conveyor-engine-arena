@@ -27,7 +27,7 @@ The two copies have diverged: `agents/decisions.md` and `agents/README-dsh.md` a
 
 **Resources**
 
-- `agents/codemap.md` — Symbol index: `name` kind `:line` `signature` — first JSDoc sentence; per-file `imports`/`pkgs`/`used by`; `calls:` edges; tag lines.
+- `node packages/modev/cli.mjs` — the query surface over the codemap and the KBs: `query symbol|file|section|entity`, `find`, `drift`. Never read `agents/codemap.md` as a document.
 - `agents/host-flow.md`, `agents/host-model.md`, `agents/shared-flow.md`, `agents/shared-model.md`, `agents/client-kb.md` — the layer map (`*-kb.md` is the split's index page).
 - Four-slot module headers — the module's architecture statement (`ARCHITECTURE` / `Wiring` / `Order` / `Invariants`).
 - Closed tag vocabulary — the facts types cannot carry: `@invariant` (test-paired, `contract-grep`), `@pre`/`@post`, `@why`, `@when`, `@see`, `@internal`.
@@ -37,7 +37,7 @@ The two copies have diverged: `agents/decisions.md` and `agents/README-dsh.md` a
 
 ## Rules
 
-1. Verify every symbol and line number against current source with `rg` before writing it into a task. Tasks written without source access carry line drift and wrong-symbol bugs.
+1. Verify every symbol with `node packages/modev/cli.mjs query symbol <name>` and the line against current source with `rg` before writing it into a task. Tasks written without source access carry line drift and wrong-symbol bugs.
 2. Cite the specific `ARCHITECTURE` paragraph, `@invariant`, or decision entry the task implements. If you can't, the task is speculative — stop.
 3. Fill **every** slot in `agents/task-template.md`: Architecture note, **Knowledge base**, Files to touch, Codemap delta, Headers and tags, Test-must-fail-first, Test scope, Artifacts, **Context to Inject**, plus the preamble. The Context to Inject slot lists the exact files the user pastes into the coder's fresh context window — one path per line, a subset of the Files table plus the task file, including the KB file(s) named in **Knowledge base**; never the whole repo, the codemap, or generated files.
 
@@ -76,7 +76,7 @@ The two copies have diverged: `agents/decisions.md` and `agents/README-dsh.md` a
 
 **Pass 0 — Context.** For each task, derive the `Context to Inject` list from the Files table and the evidence: the files the coder must read in full, nothing else. Do not list the codemap (lookup only), generated files, or the kernel.
 
-**Pass 1 — Index.** Regenerate the codemap (`npm run codemap`) only to read it; never hand-edit it. Enumerate exports from the Symbol index; build the file graph from `imports` and `used by`; take local edges from `calls:`. `npm run codemap:check` for staleness. Deliverable: the symbol/file/call graph.
+**Pass 1 — Index.** Regenerate the codemap (`npm run codemap`) so queries are current; never hand-edit it. Enumerate a module's exports with `query file <path>`; build the file graph from its `imports` / `used by`; take local edges from `query symbol <name>`'s `calls:`. `npm run codemap:check` for staleness. Deliverable: the symbol/file/call graph.
 
 **Pass 2 — Contract.** For each module, read the four-slot header: `ARCHITECTURE` = the layer/purpose; `Wiring` = who constructs/calls it and what it composes; `Order` = init/load invariants; `Invariants` = state that must hold across calls. A missing or filler header is an unmodelled module: flag it, do not invent one.
 
@@ -84,7 +84,7 @@ The two copies have diverged: `agents/decisions.md` and `agents/README-dsh.md` a
 
 **Pass 4 — Invariants.** Collect every `@invariant`; each must name an existing test (`contract-grep`). The tests are the executable architecture. An invariant without a test is an architecture risk, not a fact.
 
-**Pass 5 — Layers (KB).** Cluster the headers by runtime role and read the KB as the map: host (tick, ownership, collision, doors, elevators, hitscan, bots, health, snapshot), shared (the contract both halves run), client (boot, RAF, snapshot intake, scene, input, HUD, audio, effects, diagnostics, frame budget). State the flows — host tick → snapshot → client frame; shared code run by both — and the trust boundaries (host authoritative, client predicted, shared contract).
+**Pass 5 — Layers (KB).** Cluster the headers by runtime role and query the KB as the map (`query section host-model 13`, `query entity <Name>`): host (tick, ownership, collision, doors, elevators, hitscan, bots, health, snapshot), shared (the contract both halves run), client (boot, RAF, snapshot intake, scene, input, HUD, audio, effects, diagnostics, frame budget). State the flows — host tick → snapshot → client frame; shared code run by both — and the trust boundaries (host authoritative, client predicted, shared contract).
 
 **Pass 6 — Decisions.** Every non-derivable choice becomes a decision entry; architecture claims cite it instead of re-deriving it; new decisions append, never rewrite.
 

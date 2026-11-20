@@ -1,6 +1,6 @@
 # Task NN — <one-line title, imperative: "Extract X", "Add Y", "Fix Z">
 
-Read `agents/AGENTS.md` first. Then this file. Then the KB sections named in **Knowledge base** (the map; do not edit it). Then `agents/codemap.md` only for symbols in the Files table.
+Read `agents/AGENTS.md` first. Then this file. Then the KB sections named in **Knowledge base**: `node packages/modev/cli.mjs query section <layer> <§N>` (the map; do not edit it). Then `query symbol <name>` for each symbol in the Files table and open the source file it names — never read `agents/codemap.md`.
 
 **Prohibitions:** `agents/AGENTS.md` (memory/skills, sibling repos).
 **Codemap:** at most one exact-symbol search from the Files table, then open that source file. Do not scroll or re-open `codemap.md`.
@@ -9,13 +9,13 @@ Read `agents/AGENTS.md` first. Then this file. Then the KB sections named in **K
 **Node:** start shell commands with `cd ~/dev/conveyor-engine-arena && export PATH=~/.nvm/versions/node/v24.0.2/bin:$PATH &&`.
 **Artifacts:** logs, fail-first output, scoped test output, and codemap diffs go under `plan/dsh-tasks/logs/` (name `<task>-<what>.log` / `<task>-codemap.diff`); the report goes under `plan/dsh-tasks/reports/`; live traces under `plan/dsh-tasks/live/`. Never write these to the repo root.
 
-**Context to Inject:** <the exact files the user pastes into the coder's fresh context window, together with this task file. One path per line, each with a one-line reason; repo-relative, or absolute for `~/dev/blueprint-scene`. List only the files the coder must read in full: the source under edit, its test file, and the specific report/log/evidence. Do not list `agents/codemap.md` (symbol lookup only, regenerated), generated files (`dist/`, codemap), or the kernel; `agents/AGENTS.md` is injected by the runner, do not list it. Every source/test path here must also appear in the Files table. If the task reproduces an existing failure, list the reproduction script and its log here too. Also list the KB file(s) named in **Knowledge base** — read the named sections, not necessarily the whole file.>
+**Context to Inject:** <the exact files the user pastes into the coder's fresh context window, together with this task file. One path per line, each with a one-line reason; repo-relative, or absolute for `~/dev/blueprint-scene`. List only the files the coder must read in full: the source under edit, its test file, and the specific report/log/evidence. Do not list `agents/codemap.md` (symbol lookup only, regenerated), generated files (`dist/`, codemap), or the kernel; `agents/AGENTS.md` is injected by the runner, do not list it. Every source/test path here must also appear in the Files table. If the task reproduces an existing failure, list the reproduction script and its log here too. Also list the KB file(s) named in **Knowledge base** as the fallback; the coder queries the named sections with `node packages/modev/cli.mjs query section <layer> <§N>`, not the whole file.>
 
 > **Changed in vX.Y:** <one sentence: what this task assumes from prior tasks, what it closes, what it defers. Delete the whole line for a clean task with no dependency.>
 
 **Architecture note:** <cite the specific `ARCHITECTURE` paragraph, `@invariant`, or decision entry this task implements. If it can't cite one, the task is speculative — stop and reconsider.>
 
-**Knowledge base:** <the KB file(s) and section(s) this task touches, with the reason. E.g. `agents/host-model.md` §13 (the host state model) and `agents/host-flow.md` §5 (doors); `agents/client-kb.md` §13 (the client state model); `agents/shared-flow.md` §2–§3 (wire/protocol, data model) and `agents/shared-model.md` §11 (invariants). Name one half, not both: the section decides the file. Read the named sections before the source. The KB is the map, not a field dump; a stale claim is a report note, not an edit. If this slot is missing or names no section, stop.>
+**Knowledge base:** <the KB file(s) and section(s) this task touches, with the reason. E.g. `agents/host-model.md` §13 (the host state model) and `agents/host-flow.md` §5 (doors); `agents/client-kb.md` §13 (the client state model); `agents/shared-flow.md` §2–§3 (wire/protocol, data model) and `agents/shared-model.md` §11 (invariants). Name one half, not both: the section decides the file. Query the named section with `node packages/modev/cli.mjs query section <layer> <§N>` before the source; open the file only if the query fails. The KB is the map, not a field dump; a stale claim is a report note, not an edit. If this slot is missing or names no section, stop.>
 
 **Files to touch:** <paths with a one-line purpose each. This bounds the executor's codemap scope; nothing outside this list is in scope.>
 

@@ -12,14 +12,18 @@ Browser arena client + authoritative Node host for Conveyor Engine. The host tic
 1. The task file the user named — only once.
 2. This `agents/AGENTS.md` — already injected; do not re-read.
 3. `agents/operator-notes.md` — the **Standing rules** at the top (the dated entries are history); apply the rules tagged for your role.
-4. The KB sections named in the task's **Knowledge base** slot (only those sections; the KB is the map, not a field dump). `*-kb.md` is an index: a § number it lists resolves to the half in its table — follow the index, that is not a missing section. If the slot is missing or names no section, stop.
+4. The KB sections named in the task's **Knowledge base** slot (only those sections; the KB is the map, not a field dump). Query them: `node packages/modev/cli.mjs query section <host|shared|client|file> <§N>`. `*-kb.md` is an index of the split; that is not a missing section. If the slot is missing or names no section, stop.
 5. The task’s **Files table** paths (and only the line ranges / symbols it names).
-6. `agents/codemap.md` — **symbol lookup only** (see below). Never open it first. Never re-read it for “context”.
+6. **Symbol lookup:** `node packages/modev/cli.mjs query symbol <exact name>`, then open the source file it names. Never read `agents/codemap.md`.
 
-**Codemap is an index, not a document**
-- Allowed: one `rg`/search for an **exact** symbol or filename from the Files table (e.g. `compileGame`, `loadArenaVisuals`, `readManifestSources`). Jump to that line; read that symbol’s entry and the file path it names; open **that source file**.
-- Forbidden: opening `codemap.md` at a random offset; scrolling; reading multiple chunks; searching vague words (`lights`, `hash`, `scene`); using codemap to decide design; opening it more than twice in one task.
-- If the Files table already names the file and symbol, open the source file directly. Skip codemap.
+**Query the model — never read the map**
+`agents/codemap.md` and the KB files are inputs to `modev`; a session asks for one entry, not the document.
+- **Symbol:** `node packages/modev/cli.mjs query symbol <exact name>` → `file:line`, signature, doc line, tags, calls, used-by. Open that source file and verify: the source is the truth, the codemap is the index.
+- **Module:** `query file <path>` → imports, packages, used-by, and the symbol list.
+- **KB section:** `query section <layer|file> <§N>` → exactly that section (`entity <Name>` stitches the §13.6 row).
+- **Discovery:** `find <text>` only when the exact name is unknown; follow the hit with the exact query.
+- `rg` stays for what the codemap does not index: call sites inside a function, function-locals, and the text of a file you are about to edit.
+- Never open `agents/codemap.md` as a document — not at an offset, not scrolling, not for context. If the CLI is unavailable, make one exact `rg` in `codemap.md`, open the source it names, and say so in the report.
 
 **Do not read memory or skills**
 dsh has no built-in memory directory. Its only always-on instruction surface is `AGENTS.md`: the project file and `~/.dsh/AGENTS.md` are already injected into the session. Skill bodies under `~/.dsh/skills/` and `<repo>/.dsh/skills/` are progressively disclosed — the catalog shows only name + description until the body is loaded. Both are cheap to leave alone:
@@ -34,9 +38,9 @@ Do **not** open `../conveyor-engine-packages` or `../blueprint-scene` unless the
 If the task sketches collision / movement / lights / input, implement **exactly** that sketch in the listed files. Do not rediscover behaviour by searching the kernel or sibling repos.
 
 ## Find code fast
-- **Look up an exact symbol in `agents/codemap.md`.** Use the Symbol index only for a symbol or filename named by the task's Files table; open the named source file and verify it there. Do not read the codemap first or use it for design.
-- Grep the source for the exact symbol when it is not listed (local helpers, call sites inside a function), or to verify the entry.
-- Regenerate with `npm run codemap` after adding, moving or renaming exports. `npm run codemap:check` exits 1 if it is stale.
+- **Ask modev for the exact symbol** (`node packages/modev/cli.mjs query symbol <name>`); open the file it names and verify it there. Do not read the codemap first or use it for design.
+- `rg` the source for a symbol modev does not know (function-locals, call sites inside a function), or to verify an entry.
+- Regenerate with `npm run codemap` after adding, moving or renaming exports. `npm run codemap:check` exits 1 if it is stale. `node packages/modev/cli.mjs drift` reports a KB/codemap mismatch.
 
 ## Comment as contract
 Comments carry what types cannot: *why*, *when*, and cross-call invariants. They are load-bearing, not decorative — the codemap extracts them and the per-task diff surfaces them. A stale comment is a bug.
@@ -85,6 +89,7 @@ A candidate invariant is not an `@invariant` until a test or tag confirms it; th
 - Typecheck: `npm run typecheck` (server, client and util tsconfigs).
 - Build: `npm run build` (server via `tsc -p tsconfig.server.json` → `dist/`, client via esbuild → `dist/web/client.js`). Run: `npm start` (http://127.0.0.1:4173, `PORT` overrides).
 - Scene bake: `npm run bake:scene`. Codemap: `npm run codemap`.
+- Model queries: `node packages/modev/cli.mjs query symbol|file|section|entity …`, `find`, `drift`, `stats` (`packages/modev/README.md`).
 
 ## Rules
 - **Do not change the kernel** (`conveyor-engine-*` packages from conveyor-engine-packages). Work around it in the arena; if a kernel change seems needed, stop and describe it.

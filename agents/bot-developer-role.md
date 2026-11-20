@@ -120,7 +120,7 @@ Do not start one, and do not fall back to the remote without the operator's OK.
 1. `agents/AGENTS.md` — injected; do not re-read.
 2. `agents/bot-developer-role.md` — this file.
 3. `agents/operator-notes.md` — the **Standing rules** (`[bot]`/`[all]`), especially the prop-guard/restart entry and the direct-prompt stop.
-4. The task's **Knowledge base** sections (`agents/host-model.md` §…, `agents/host-flow.md` §…, `agents/client-kb.md` §…, `agents/shared-flow.md` §2–§3 and `agents/shared-model.md` §11; the state model is §13 in `host-model`/`client-kb`/`shared-model`) — the map of the state and contracts the run depends on.
+4. The task's **Knowledge base** sections (`agents/host-model.md` §…, `agents/host-flow.md` §…, `agents/client-kb.md` §…, `agents/shared-flow.md` §2–§3 and `agents/shared-model.md` §11; the state model is §13 in `host-model`/`client-kb`/`shared-model`) — the map of the state and contracts the run depends on. Query them: `node packages/modev/cli.mjs query section <layer> <§N>`; the file is the fallback.
 5. The task's Files table — the driver, the source it reads, the prior report/baseline.
 6. The task's prior report/baseline, if named.
 
