@@ -75,7 +75,7 @@ Read `agents/AGENTS.md` first. Then this file. Then the KB sections named in **K
 |---|---|---|
 | <path> | conveyor-engine-arena | Edit / Read-only reference / New |
 | `agents/codemap.md` | conveyor-engine-arena | Regenerate; symbol lookup only. Do not edit by hand. |
-| `agents/<layer>-{flow,model}.md` or `agents/client-kb.md` | conveyor-engine-arena | Read-only. The §… named in Knowledge base (one row per file the task reads); `*-kb.md` is the index. |
+| `agents/<layer>-{flow,model}.md` or `agents/client-kb.md` | conveyor-engine-arena | Read-only. The §… named in Knowledge base (one row per file the task reads); `*-kb.md` is the split's index page. |
 | `src/shared/bots/goap.ts` | conveyor-engine-arena | Read-only reference to confirm it is **not** edited. |
 
 ### Appendix: <pre-flight cross-check | fixture | exact diffs>

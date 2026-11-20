@@ -19,16 +19,16 @@ Never the repo root. Do not edit `src/`, `test/`, `packages/`, or the kernel (`c
 
 Before drafting any task, read:
 
-- `agents/decisions.md` (D1–D10; the rationale for the pipeline)
+- `agents/decisions.md` (D1–D11 and the superseding entries; the rationale for the pipeline)
 - `agents/README-dsh.md` (template, state table, open loops, common failures)
 - `agents/operator-notes.md` — the **Standing rules** (`[designer]`/`[all]`): the two flows, the designer-initiated spike, the timebox, and the 11-90 rule that every bot-developer prompt goes through the bot-task-template.
 
-The `agents/` and `plan/dsh-tasks/` copies of both files are identical today; use the `agents/` copies. (The README's "docs/decisions.md" line is stale.)
+The two copies have diverged: `agents/decisions.md` and `agents/README-dsh.md` are current; `plan/dsh-tasks/` holds older copies (its README still says `docs/decisions.md` and five always-gates). Read the `agents/` copies; treat the `plan/dsh-tasks/` ones as history.
 
 **Resources**
 
 - `agents/codemap.md` — Symbol index: `name` kind `:line` `signature` — first JSDoc sentence; per-file `imports`/`pkgs`/`used by`; `calls:` edges; tag lines.
-- `agents/host-flow.md`, `agents/host-model.md`, `agents/shared-flow.md`, `agents/shared-model.md`, `agents/client-kb.md` — the map, not the index (`*-kb.md` is the index).
+- `agents/host-flow.md`, `agents/host-model.md`, `agents/shared-flow.md`, `agents/shared-model.md`, `agents/client-kb.md` — the layer map (`*-kb.md` is the split's index page).
 - Four-slot module headers — the module's architecture statement (`ARCHITECTURE` / `Wiring` / `Order` / `Invariants`).
 - Closed tag vocabulary — the facts types cannot carry: `@invariant` (test-paired, `contract-grep`), `@pre`/`@post`, `@why`, `@when`, `@see`, `@internal`.
 - Six always-gates — `test/scopes.json`: contract-grep, module-headers, codemap-tags, codemap-calls, manifest-data, jsdoc-exports.

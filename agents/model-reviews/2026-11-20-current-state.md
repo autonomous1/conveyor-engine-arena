@@ -366,3 +366,59 @@ Wiring is complete: root script, split-half gate, CI step.
 5. **`promote/`** — unbuilt and unneeded; it lands when a lint has a mechanical
    fix worth proposing.
 6. **§14 quirks** — nothing appended; no live failure was reported this session.
+
+## 8. Readiness check for new role sessions (2026-11-20)
+
+The operator is about to open the designer, coder and bot-developer sessions by
+pasting the role briefs. Checked that every brief and template in that set
+resolves against the post-split tree.
+
+| Check | Result |
+|---|---|
+| Role briefs present (`designer` 91, `coder` 311, `bot-developer` 350 lines) | yes |
+| Path scan over AGENTS + 4 roles + 2 templates (backticked paths) | no real missing path — 7 hits were prose, URLs, or paths relative to `packages/bot-client/src` |
+| `npm run …` referenced by those docs | 9/9 exist (incl. `modev:check`) |
+| `layer-kb §N` references | 0 dangling (`modev: kb-section-refs`) |
+| KB files over the 312-line ceiling | none (largest 306) |
+| `test/kb-symbols` (7 files) / `test:scope meta` | 7/7 · 30/30 |
+| `codemap:check` | up to date |
+| Bot token `~/.config/ce-arena/qa-token.pem` | present |
+| Local host on `127.0.0.1:4173` | **not listening** — the operator starts it (expected) |
+| Tasks 80/81 | both in `invoked/`; report 80 exists, no report 81 |
+
+### Fixed this pass
+
+- `designer-role.md` — "(D1–D10)" → D1–D11 + superseding entries. The claim that
+  the `agents/` and `plan/dsh-tasks/` copies are "identical today" was false
+  (`diff` shows the plan copies at five gates / `docs/decisions.md` / D9
+  pending); the line now says the `agents/` copies are current and the `plan/`
+  ones are history.
+- `coder-role.md` — artifact hierarchy said
+  `agents/{host,shared,client}-kb.md`; now the five content files.
+- `bot-developer-role.md` — "the handover section (the `dag-live.ts` command
+  there)" was a dead cross-reference (no such section); now
+  `packages/bot-client/tests/elevator-ride.ts` + `host-model.md` §14.
+- `agents/README-dsh.md` — the State table is the task 10–14 record; added the
+  scope line so a fresh designer does not read it as the current queue.
+- `AGENTS.md` — read-order step 4 now states that a `*-kb.md` index's §N
+  resolves to its half, so an older task naming `host-kb §13` is not a missing
+  section; the Roles sentence is repaired.
+- Both templates and the designer/coder KB lists: "split's index page" wording
+  (the codemap remains *the* index).
+
+### Outside my write surface
+
+1. `plan/dsh-tasks/proposed/108-pursuit-implementation.md` — the only proposed
+   task — names `agents/host-kb.md` §8/§13 and `agents/shared-kb.md`
+   §6/§7/§9/§13. It resolves through the indexes (AGENTS now says so), but the
+   slot should name `host-flow` §8, `host-model` §13, `shared-flow` §6/§7/§9,
+   `shared-model` §13.
+2. `plan/dsh-tasks/README-dsh.md` and `plan/dsh-tasks/decisions.md` are older
+   copies (five gates, `docs/decisions.md`, D9 pending). The designer role now
+   warns; keep them as history or delete them.
+3. Task 81 is `invoked/` with no report; the bot role's "ask whether 81 has
+   landed" is answered by the operator, not by a file.
+
+**Verdict:** the three sessions are ready. The only blocker-shaped item is the
+host not running for the bot-developer — the operator's start — and 108's KB
+slot is cosmetic (it resolves).

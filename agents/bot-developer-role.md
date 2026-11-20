@@ -341,8 +341,8 @@ hypothesis. Then reproduce with the same place/goal/start; record the pose every
    the seat is free.
 4. Check `weapon()`/`ammo()` and the pose (the kit/pose reuse quirk).
 5. Ask whether task 81 has landed. If yes, the first order is the lift check in
-   the handover section (the `dag-live.ts` command there); if no, the operator's
-   order.
+   `packages/bot-client/tests/elevator-ride.ts` (the working approach and its
+   coordinates are recorded in `host-model.md` §14); if no, the operator's order.
 6. Post the Trial Plan and wait for the operator's `GO`; run it; journal it; only
    then propose a change or a hand-off.
 

@@ -6,13 +6,13 @@ Browser arena client + authoritative Node host for Conveyor Engine. The host tic
 
 **Node version:** use `~/.nvm/versions/node/v24.0.2/bin/node`. PATH `node` is nvm v4.4.2, which can't run this repo. Start shell commands with `cd ~/dev/conveyor-engine-arena && export PATH=~/.nvm/versions/node/v24.0.2/bin:$PATH &&` so `node`, `npm` and `npx` are Node 24. Don't try other Node versions.
 
-**Roles:** the role briefs are `agents/coder-role.md` (coder method and Pre-Flight/HALT contract), `agents/designer-role.md`, and `agents/bot-developer-role.md`; `agents/model-developer-role.md`(The model is a deliverable; a stale model costs a coder session; split a KB before it passes the read window.); this file is the repo-wide rule set common to them. `src/shared/bots/goap.ts` is frozen unless the task explicitly requires a change.
+**Roles:** the role briefs are `agents/coder-role.md` (coder method and Pre-Flight/HALT contract), `agents/designer-role.md`, `agents/bot-developer-role.md`, and `agents/model-developer-role.md` (the model is a deliverable; a stale model costs a coder session; split a KB before it passes the read window); this file is the repo-wide rule set common to them. `src/shared/bots/goap.ts` is frozen unless the task explicitly requires a change.
 
 **Read order for every task (hard stop)**
 1. The task file the user named — only once.
 2. This `agents/AGENTS.md` — already injected; do not re-read.
 3. `agents/operator-notes.md` — the **Standing rules** at the top (the dated entries are history); apply the rules tagged for your role.
-4. The KB sections named in the task's **Knowledge base** slot (only those sections; the KB is the map, not a field dump). If the slot is missing or names no section, stop.
+4. The KB sections named in the task's **Knowledge base** slot (only those sections; the KB is the map, not a field dump). `*-kb.md` is an index: a § number it lists resolves to the half in its table — follow the index, that is not a missing section. If the slot is missing or names no section, stop.
 5. The task’s **Files table** paths (and only the line ranges / symbols it names).
 6. `agents/codemap.md` — **symbol lookup only** (see below). Never open it first. Never re-read it for “context”.
 

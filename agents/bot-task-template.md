@@ -52,7 +52,7 @@ Read `~/dev/conveyor-engine-arena/agents/bot-developer-role.md` first. Then this
 | File | Repo | Use |
 |---|---|---|
 | `~/dev/conveyor-engine-arena/agents/bot-developer-role.md` | conveyor-engine-arena | Read-only. The operator brief. |
-| `agents/<layer>-{flow,model}.md` or `agents/client-kb.md` | conveyor-engine-arena | Read-only. The §… named in Knowledge base (one row per file the run reads); `*-kb.md` is the index. |
+| `agents/<layer>-{flow,model}.md` or `agents/client-kb.md` | conveyor-engine-arena | Read-only. The §… named in Knowledge base (one row per file the run reads); `*-kb.md` is the split's index page. |
 | <the bot session/CLI file> | conveyor-engine-arena | Read-only. The commands and the log fields. |
 | <the host/arena file> | conveyor-engine-arena | Read-only. The accept path, the seat rule. |
 | `plan/dsh-tasks/logs/<NN>-*` | conveyor-engine-arena | **New.** The raw evidence. |

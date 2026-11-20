@@ -68,7 +68,7 @@ Highest trust first:
 6. **JSDoc tags** — `@invariant`, `@pre`, `@post`, `@why`, `@when`, `@see`,
    `@internal`.
 7. **`agents/codemap.md`** — generated symbol/file/call index.
-8. **`agents/{host,shared,client}-kb.md`** — curated layer map.
+8. **`agents/{host,shared}-{flow,model}.md` + `agents/client-kb.md`** — the curated layer map (`*-kb.md` is the split's index page).
 9. **`agents/task-template.md`** — execution contract for one task.
 10. **Reports and commits** — history, never primary evidence.
 

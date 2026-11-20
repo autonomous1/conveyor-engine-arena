@@ -17,6 +17,10 @@ Logs, fail-first output, scoped test output, and codemap diffs land in `logs/`; 
 
 ## State
 
+Tasks 10–14 are the codemap/tag work that produced this file; tasks 15–108 live in
+`plan/dsh-tasks/` (`proposed/`, `invoked/`, `reports/`). This table is history, not
+the current queue.
+
 | Task | Title | Status | Notes |
 |------|-------|--------|-------|
 | 10 | Codemap generator extracts JSDoc tags | done | deviated from ts-morph to a `typescript` AST walker; justified |
