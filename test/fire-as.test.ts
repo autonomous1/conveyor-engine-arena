@@ -157,5 +157,10 @@ test("throwAsBot launches a body the next tick advances, owned by the bot", () =
   assert.ok(moved.z > spawned.z, `tick advanced z from ${spawned.z} to ${moved.z}`);
   for (let i = 0; i < 40 && health.get(TARGET).hp === MAX_HP; i++) host.tick();
   assert.equal(health.lastDamage(TARGET)?.attacker, BOT);
-  assert.equal(health.get(BOT).hp, MAX_HP);
+  // The owner is inside its own blast: the thrower stands ~3.7 m from the impact.
+  const stop = poses.find((pose) => pose.stop === true);
+  assert.ok(stop);
+  const d = Math.hypot(stop.x - rows[0]!.position.x, stop.y - rows[0]!.position.y, stop.z - rows[0]!.position.z);
+  assert.ok(d < 10, `the thrower is inside the blast: ${d} m`);
+  assert.equal(health.get(BOT).hp, 100 - Math.max(1, Math.round(100 * (1 - d / 10) ** 2)));
 });

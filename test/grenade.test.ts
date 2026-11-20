@@ -37,6 +37,13 @@ const { createArenaGrenades } = await import("../src/server/grenade.ts");
 
 const DT = 0.05;
 
+/** The blast's hp loss at `point`, independent of the host's implementation. */
+function blastLoss(point: { x: number; y: number; z: number }, pawn: { position: { x: number; y: number; z: number } }): number {
+  const d = Math.hypot(point.x - pawn.position.x, point.y - pawn.position.y, point.z - pawn.position.z);
+  if (d >= 10) return 0;
+  return Math.min(100, Math.max(1, Math.round(100 * (1 - d / 10) ** 2)));
+}
+
 test("a grenade aimed at a wall hits the same face as the laser, then stops on the next hit", () => {
   const wall: TraceAabb = { id: 10, minX: -2, maxX: 2, minY: 0, maxY: 3, minZ: 4, maxZ: 4.4 };
   const floor: TraceAabb = { id: 11, minX: -8, maxX: 8, minY: -0.2, maxY: 0, minZ: -4, maxZ: 8 };
@@ -111,7 +118,7 @@ test("two grenades in flight pass through each other", () => {
   assert.equal(b.bounced, false);
 });
 
-test("a pawn hit applies the existing damage and a grenade frame is not a laser", () => {
+test("a pawn hit detonates a distance-scaled blast, and a grenade frame is not a laser", () => {
   const health = createPawnHealth(() => 0);
   health.note(1);
   health.note(2);
@@ -161,11 +168,77 @@ test("a pawn hit applies the existing damage and a grenade frame is not a laser"
   }
   assert.equal(stopped, true);
   assert.equal(sent.every((frame) => frame.t === "grenade"), true);
-  assert.equal(grenade.GRENADE_DAMAGE, MAX_HP / 2);
-  assert.equal(health.get(2).hp, 100 - grenade.GRENADE_DAMAGE);
-  assert.equal(health.get(1).hp, 100);
+  const stop = sent.find((frame) => frame.stop === true);
+  assert.ok(stop);
+  assert.equal(health.get(2).hp, 100 - blastLoss(stop, pawns[1]!));
+  assert.equal(health.get(1).hp, 100 - blastLoss(stop, pawns[0]!));
   assert.equal(health.lastDamage(2)?.attacker, 1);
-  assert.equal(health.lastDamage(1), undefined);
+  assert.equal(health.lastDamage(1)?.attacker, 1);
+});
+
+test("grenade blast damage falls quadratically from 100% at the point to 1% inside 10 m and 0 beyond", () => {
+  assert.equal(grenade.GRENADE_BLAST_RADIUS, 10);
+  assert.equal(grenade.grenadeBlastDamage(0), MAX_HP);
+  assert.equal(grenade.grenadeBlastDamage(1), 81);
+  assert.equal(grenade.grenadeBlastDamage(2), 64);
+  assert.equal(grenade.grenadeBlastDamage(2.5), 56);
+  assert.equal(grenade.grenadeBlastDamage(5), 25);
+  assert.equal(grenade.grenadeBlastDamage(7), 9);
+  assert.equal(grenade.grenadeBlastDamage(8), 4);
+  assert.equal(grenade.grenadeBlastDamage(9), 1);
+  assert.equal(grenade.grenadeBlastDamage(9.9), 1);
+  assert.equal(grenade.grenadeBlastDamage(9.99), 1);
+  assert.equal(grenade.grenadeBlastDamage(10), 0);
+  assert.equal(grenade.grenadeBlastDamage(12), 0);
+  assert.equal(grenade.grenadeBlastDamage(-1), 0);
+  assert.equal(grenade.grenadeBlastDamage(Number.NaN), 0);
+  assert.equal(grenade.grenadeBlastDamage(5, 20), 56);
+});
+
+test("a blast wounds every living pawn by distance and stops at 10 m", () => {
+  const health = createPawnHealth(() => 0);
+  const wall: TraceAabb = { id: 10, minX: -2, maxX: 2, minY: 0, maxY: 3, minZ: 0, maxZ: 0.4 };
+  const pawns = [
+    // The thrower is 8 m behind the wall; the others sit 2 m past it, off the flight line.
+    { id: 1, position: { x: 0, y: 0, z: -8 }, lifecycle: "alive" as const, radius: 0.5 },
+    { id: 2, position: { x: -3, y: 0, z: 2 }, lifecycle: "alive" as const, radius: 0.5 },
+    { id: 3, position: { x: -6, y: 0, z: 2 }, lifecycle: "alive" as const, radius: 0.5 },
+    { id: 4, position: { x: -9, y: 0, z: 2 }, lifecycle: "alive" as const, radius: 0.5 },
+    { id: 5, position: { x: -13, y: 0, z: 2 }, lifecycle: "alive" as const, radius: 0.5 },
+  ];
+  for (const pawn of pawns) health.note(pawn.id);
+  const sent: grenade.GrenadePose[] = [];
+  const host = createArenaGrenades({
+    world: {
+      store: { view: (id: number) => pawns.find((pawn) => pawn.id === id) },
+      pawnHeight: 1.8,
+      listObstacles: () => [wall],
+      query: () => pawns,
+    } as never,
+    server: {
+      session: () => ({ sessionId: 1 }),
+      replicator: { get: () => ({ ownedEntity: 1, connected: true, known: new Set<number>([1]) }) },
+      connected: [1],
+    } as never,
+    now: () => 0,
+    health,
+    send(_clientId, frame) {
+      sent.push(frame);
+    },
+  });
+  host.onFrame(1, grenade.grenadeFrame(1, 0, 0));
+  let stop: grenade.GrenadePose | undefined;
+  for (let i = 0; i < 40 && !stop; i++) {
+    host.tick();
+    stop = sent.find((frame) => frame.stop === true);
+  }
+  assert.ok(stop);
+  for (const pawn of pawns) {
+    assert.equal(health.get(pawn.id).hp, 100 - blastLoss(stop, pawn), `pawn ${pawn.id}`);
+  }
+  assert.ok(health.get(1).hp < 100, "the owner is inside its own blast");
+  assert.equal(health.get(5).hp, 100);
+  assert.equal(health.lastDamage(2)?.attacker, 1);
 });
 
 test("P throws on its own clock and does not fire", () => {
@@ -880,7 +953,8 @@ test("the launcher host explodes on first impact and still damages a pawn", () =
   }
   assert.ok(stopped);
   assert.ok(stopped.z < 3 + 0.5, `should detonate on the pawn, not the wall (z ${stopped.z})`);
-  assert.equal(health.get(2).hp, 100 - grenade.GRENADE_DAMAGE);
+  assert.equal(health.get(2).hp, 100 - blastLoss(stopped, pawns[1]!));
+  assert.equal(health.get(1).hp, 100 - blastLoss(stopped, pawns[0]!));
   assert.equal(health.lastDamage(2)?.attacker, 1);
 
   sent.length = 0;
@@ -1100,8 +1174,8 @@ test("a grenade kill's health frame carries cause grenade", () => {
   const health = createPawnHealth(() => 0);
   health.note(1);
   health.note(2);
-  // One launcher hit is half health, so a prior wound is needed for a kill.
-  health.wound(2, 1, grenade.GRENADE_DAMAGE);
+  // The blast alone is not always lethal; a prior wound makes the kill deterministic.
+  health.wound(2, 1, 50);
   const pawns = [
     { id: 1, position: { x: 0, y: 0, z: 0 }, lifecycle: "alive" as const, radius: 0.5 },
     { id: 2, position: { x: 0, y: 0, z: 3 }, lifecycle: "alive" as const, radius: 0.5 },
