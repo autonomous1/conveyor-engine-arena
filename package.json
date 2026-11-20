@@ -29,7 +29,7 @@
     "test:scope": "node scripts/test-scope.mjs scope",
     "test:related": "node scripts/test-scope.mjs related",
     "verify": "npm run build && npm run typecheck && npm test",
-    "codemap:check": "node scripts/codemap.ts --check",
+    "codemap:check": "node scripts/codemap.ts --check --root src --root packages/bot-client/src",
     "modev:check": "npm --prefix packages/modev run verify",
     "start": "node dist/server/main.js",
     "serve:solo": "node scripts/serve-solo.mjs",
@@ -47,7 +47,7 @@
     "bench:rays": "node --import ./scripts/ts-ext-register.mjs scripts/bench-rays.ts",
     "token": "node dist/server/auth/token-cli.js",
     "dev": "npm run build && npm run start",
-    "codemap": "node scripts/codemap.ts",
+    "codemap": "node scripts/codemap.ts --root src --root packages/bot-client/src",
     "viewer": "npm run start",
     "live:arena": "npm run start"
   },
