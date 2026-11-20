@@ -6,7 +6,7 @@ Browser arena client + authoritative Node host for Conveyor Engine. The host tic
 
 **Node version:** use `~/.nvm/versions/node/v24.0.2/bin/node`. PATH `node` is nvm v4.4.2, which can't run this repo. Start shell commands with `cd ~/dev/conveyor-engine-arena && export PATH=~/.nvm/versions/node/v24.0.2/bin:$PATH &&` so `node`, `npm` and `npx` are Node 24. Don't try other Node versions.
 
-**Roles:** the role briefs are `agents/coder-role.md` (coder method and Pre-Flight/HALT contract), `agents/designer-role.md`, and `agents/bot-developer-role.md`; this file is the repo-wide rule set common to them. `src/shared/bots/goap.ts` is frozen unless the task explicitly requires a change.
+**Roles:** the role briefs are `agents/coder-role.md` (coder method and Pre-Flight/HALT contract), `agents/designer-role.md`, and `agents/bot-developer-role.md`; `agents/model-developer-role.md`(The model is a deliverable; a stale model costs a coder session; split a KB before it passes the read window.); this file is the repo-wide rule set common to them. `src/shared/bots/goap.ts` is frozen unless the task explicitly requires a change.
 
 **Read order for every task (hard stop)**
 1. The task file the user named — only once.
@@ -58,10 +58,10 @@ Comments carry what types cannot: *why*, *when*, and cross-call invariants. They
 
 Do not tag `@param` / `@returns` when the signature already says it. Do not restate the types.
 
-**KB row classifications.** The state-model tables (`host-kb`/`client-kb`/`shared-kb` §13) tag each row:
+**KB row classifications.** The state-model tables (`host-model`/`client-kb`/`shared-model` §13) tag each row:
 - `S` structural — a container or shape checkable from the declaration.
 - `B` behavioral — a lifetime rule: one-shot, per-tick/snapshot/frame clear, monotonic, TTL.
-- `X` cross-boundary — the state or reference crosses the host↔client↔shared boundary; the contract lives in `agents/shared-kb.md`.
+- `X` cross-boundary — the state or reference crosses the host↔client↔shared boundary; the contract lives in `agents/shared-model.md`.
 A candidate invariant is not an `@invariant` until a test or tag confirms it; then it moves to that layer's §12/§11 and the tag is added.
 
 **Editorial rule: why and when, not how.** "How it works" duplicates the body and rots fastest. If the *how* is non-obvious, the fix is a named type, a helper, or a test — not a comment. The exception is *how to use it* (calling convention), which is `@pre` / `@when`.

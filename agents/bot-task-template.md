@@ -1,6 +1,6 @@
 # Bot task NN — <the question this run answers, imperative>
 
-Read `~/dev/conveyor-engine-arena/agents/bot-developer-role.md` first. Then this file. Then the task's **Knowledge base** sections (host §… / client §… / shared §2–§3 and §11; the state model is §13 in host/client). Then the bot session's code only for the symbols in Files.
+Read `~/dev/conveyor-engine-arena/agents/bot-developer-role.md` first. Then this file. Then the task's **Knowledge base** sections (host §… / client §… / shared §2–§3 and §11; the state model is §13 in `host-model`/`client-kb`/`shared-model`; `*-kb.md` is the index, name the half). Then the bot session's code only for the symbols in Files.
 
 **Prohibitions:** `agents/AGENTS.md` (memory/skills, sibling repos); the run's evidence is the live log + this file.
 **Artifacts:** every log, trace, capture, and diff goes under `plan/dsh-tasks/logs/` (`<NN>-<what>.log`, `<NN>-trace.json`); the analysis/report under `plan/dsh-tasks/reports/`. Never the repo root. The report links the exact paths.
@@ -13,7 +13,7 @@ Read `~/dev/conveyor-engine-arena/agents/bot-developer-role.md` first. Then this
 
 <The one hypothesis the run resolves, and the decision it informs. Make it falsifiable: “does X happen when Y”, “before A / after B”. If there is no decision, there is no task.>
 
-**Knowledge base:** <the KB file(s) and section(s) this run depends on, with the reason: `agents/host-kb.md` §…, `agents/client-kb.md` §…, `agents/shared-kb.md` §2–§3 and §11. Read them before the run; do not edit the KB; the report's mechanism fit may cite them. If this slot is missing or names no section, stop.>
+**Knowledge base:** <the KB file(s) and section(s) this run depends on, with the reason: `agents/host-flow.md` §…, `agents/host-model.md` §…, `agents/client-kb.md` §…, `agents/shared-flow.md` §2–§3 and `agents/shared-model.md` §11. Name one half, not both. Read them before the run; do not edit the KB; the report's mechanism fit may cite them. If this slot is missing or names no section, stop.>
 
 ## Setup
 
@@ -52,7 +52,7 @@ Read `~/dev/conveyor-engine-arena/agents/bot-developer-role.md` first. Then this
 | File | Repo | Use |
 |---|---|---|
 | `~/dev/conveyor-engine-arena/agents/bot-developer-role.md` | conveyor-engine-arena | Read-only. The operator brief. |
-| `agents/<layer>-kb.md` | conveyor-engine-arena | Read-only. The §… named in Knowledge base (one row per layer the run touches). |
+| `agents/<layer>-{flow,model}.md` or `agents/client-kb.md` | conveyor-engine-arena | Read-only. The §… named in Knowledge base (one row per file the run reads); `*-kb.md` is the index. |
 | <the bot session/CLI file> | conveyor-engine-arena | Read-only. The commands and the log fields. |
 | <the host/arena file> | conveyor-engine-arena | Read-only. The accept path, the seat rule. |
 | `plan/dsh-tasks/logs/<NN>-*` | conveyor-engine-arena | **New.** The raw evidence. |

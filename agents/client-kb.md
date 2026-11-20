@@ -258,7 +258,7 @@ Host snapshots are authoritative: `pawnVital`, `doorOpen`, `cabState`,
 `EngineClient` ); its local fire/grenade play is deduped against the host
 echo. The QA/diag paths are gated by `qa`.
 The `X` rows name the boundary only — the contract lives in
-`agents/shared-kb.md` or the model repo.
+`agents/shared-model.md` or the model repo.
 
 ### Candidate invariants
 
@@ -277,7 +277,7 @@ Checkable from the model; none is in §12 yet. One moves to §12 only when a tes
 
 ## 14. Layer map and single sources
 
-Replicated from `agents/shared-kb.md` §1/§9; the test pins are shared §11.
+Replicated from `agents/shared-flow.md` §1/§9; the test pins are `agents/shared-model.md` §11.
 
 | Group | Files | Host consumer | Client consumer | Cadence |
 |---|---|---|---|---|
@@ -290,7 +290,7 @@ Replicated from `agents/shared-kb.md` §1/§9; the test pins are shared §11.
 
 The host is the authority for movement, doors, health, and pickups; the client
 predicts only the camera and its own visual step; the bot-client and the host's bots import the frozen planner `goap.ts`
-(`src/shared/bots/goap.ts`, kernel-independent;).
+(`src/shared/bots/goap.ts`, kernel-independent; both sides import the one file).
 
 | Convention | Shared | Consumer copy |
 |---|---|---|

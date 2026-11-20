@@ -1,0 +1,11 @@
+{
+  "name": "@conveyor-engine/modev",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Model lints over agents/ knowledge bases (the model developer's tool).",
+  "scripts": {
+    "check": "node check.mjs",
+    "self-check": "node self-check.mjs"
+  }
+}

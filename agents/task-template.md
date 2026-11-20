@@ -15,7 +15,7 @@ Read `agents/AGENTS.md` first. Then this file. Then the KB sections named in **K
 
 **Architecture note:** <cite the specific `ARCHITECTURE` paragraph, `@invariant`, or decision entry this task implements. If it can't cite one, the task is speculative — stop and reconsider.>
 
-**Knowledge base:** <the KB file(s) and section(s) this task touches, with the reason. E.g. `agents/host-kb.md` §13 (the host state model) and §5 (doors); `agents/client-kb.md` §13 (the client state model); `agents/shared-kb.md` §2–§3 (wire/protocol, data model) and §11 (invariants). Read the named sections before the source. The KB is the map, not a field dump; a stale claim is a report note, not an edit. If this slot is missing or names no section, stop.>
+**Knowledge base:** <the KB file(s) and section(s) this task touches, with the reason. E.g. `agents/host-model.md` §13 (the host state model) and `agents/host-flow.md` §5 (doors); `agents/client-kb.md` §13 (the client state model); `agents/shared-flow.md` §2–§3 (wire/protocol, data model) and `agents/shared-model.md` §11 (invariants). Name one half, not both: the section decides the file. Read the named sections before the source. The KB is the map, not a field dump; a stale claim is a report note, not an edit. If this slot is missing or names no section, stop.>
 
 **Files to touch:** <paths with a one-line purpose each. This bounds the executor's codemap scope; nothing outside this list is in scope.>
 
@@ -75,7 +75,7 @@ Read `agents/AGENTS.md` first. Then this file. Then the KB sections named in **K
 |---|---|---|
 | <path> | conveyor-engine-arena | Edit / Read-only reference / New |
 | `agents/codemap.md` | conveyor-engine-arena | Regenerate; symbol lookup only. Do not edit by hand. |
-| `agents/<layer>-kb.md` | conveyor-engine-arena | Read-only. The §… named in Knowledge base (one row per layer the task touches). |
+| `agents/<layer>-{flow,model}.md` or `agents/client-kb.md` | conveyor-engine-arena | Read-only. The §… named in Knowledge base (one row per file the task reads); `*-kb.md` is the index. |
 | `src/shared/bots/goap.ts` | conveyor-engine-arena | Read-only reference to confirm it is **not** edited. |
 
 ### Appendix: <pre-flight cross-check | fixture | exact diffs>

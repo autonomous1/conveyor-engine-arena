@@ -5,7 +5,17 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
-const KBS = ["host-kb.md", "client-kb.md", "shared-kb.md"] as const;
+// The split halves are content; the *-kb.md files are indexes. All of them are
+// KB prose with the same no-path:line rule (agents/model-developer-role.md).
+const KBS = [
+  "host-kb.md",
+  "host-flow.md",
+  "host-model.md",
+  "shared-kb.md",
+  "shared-flow.md",
+  "shared-model.md",
+  "client-kb.md",
+] as const;
 const pathLine = /[A-Za-z0-9_./-]+\.(?:ts|json|md):\d+/;
 const bareLine = /`:\d+(?:-\d+)?`/;
 

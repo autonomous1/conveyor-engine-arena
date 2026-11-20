@@ -24,4 +24,6 @@ jobs:
       - run: cp agents/codemap.md /tmp/codemap-1.md
       - run: npm run codemap
       - run: cmp /tmp/codemap-1.md agents/codemap.md
+      # Model lints over agents/; cheap, so fail before the full suite.
+      - run: npm run modev:check
       - run: npm test

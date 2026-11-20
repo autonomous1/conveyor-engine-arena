@@ -28,7 +28,7 @@ The `agents/` and `plan/dsh-tasks/` copies of both files are identical today; us
 **Resources**
 
 - `agents/codemap.md` — Symbol index: `name` kind `:line` `signature` — first JSDoc sentence; per-file `imports`/`pkgs`/`used by`; `calls:` edges; tag lines.
-- `agents/host-kb.md`, `agents/shared-kb.md`, `agents/client-kb.md` — the map, not the index.
+- `agents/host-flow.md`, `agents/host-model.md`, `agents/shared-flow.md`, `agents/shared-model.md`, `agents/client-kb.md` — the map, not the index (`*-kb.md` is the index).
 - Four-slot module headers — the module's architecture statement (`ARCHITECTURE` / `Wiring` / `Order` / `Invariants`).
 - Closed tag vocabulary — the facts types cannot carry: `@invariant` (test-paired, `contract-grep`), `@pre`/`@post`, `@why`, `@when`, `@see`, `@internal`.
 - Six always-gates — `test/scopes.json`: contract-grep, module-headers, codemap-tags, codemap-calls, manifest-data, jsdoc-exports.

@@ -226,3 +226,20 @@ claim and tests the after.
 
 `RateLimitedLog` is implemented (`src/server/rate-limited-log.ts`); the host uses
 it for both deny throttles. D9 is closed. See `agents/host-kb.md` §12/§13.3.
+
+## - Model developer role D11
+Model developer role: owns the model substrate; writes only agents/** and packages/modev/**; hands code findings to the designer
+
+
+## Superseding entry — D7 slot count (2026-11-20)
+
+D7 says the task template has **five** slots. The template now carries **nine**
+plus the preamble: Context to Inject, Architecture note, Knowledge base, Files
+to touch, Codemap delta, Headers and tags, Test-must-fail-first, Test scope,
+Artifacts. D7's five are the review *floor* it argued for, not the current file;
+the additions came with the tasks 10–14 corrections (the KB slot, tag-on-touch,
+the scoped-run split, the artifacts rule, the paste list).
+
+**In practice:** count `agents/task-template.md`, not this file. When a count in
+prose disagrees with the file it describes (slots, always-gates, scopes), the
+file wins and the prose is a model finding.

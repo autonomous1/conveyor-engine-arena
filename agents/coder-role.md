@@ -110,10 +110,12 @@ npm run codemap:check
 Purpose: preserve the layer map, runtime flows, and trust boundaries that the
 codemap cannot express. The KBs are curated, not generated:
 
-- `agents/host-kb.md` — tick order, ownership, collision, doors, elevators,
-  hitscan, bots, health, snapshots.
-- `agents/shared-kb.md` — the contract both halves execute: movement, hitscan,
-  doors, pickups, protocol.
+- `agents/host-flow.md` — tick order, ownership, collision, doors, elevators,
+  hitscan, bots, health, snapshots. (`host-kb.md` is the index.)
+- `agents/host-model.md` — the host's containers, state model §13, quirks §14.
+- `agents/shared-flow.md` — the contract both halves execute: movement, hitscan,
+  doors, pickups, protocol. (`shared-kb.md` is the index.)
+- `agents/shared-model.md` — the invariants §11 and the cross-layer contract §13.
 - `agents/client-kb.md` — boot, RAF, snapshot intake, scene, input, HUD, audio,
   effects, diagnostics, frame budget.
 

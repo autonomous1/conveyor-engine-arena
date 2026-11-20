@@ -56,7 +56,7 @@ Logs, fail-first output, scoped test output, and codemap diffs land in `logs/`; 
 The coder runs a scope, not the full suite, for each task. The manifest is
 `test/scopes.json`; the runner is `scripts/test-scope.mjs`.
 
-- `npm run test:scope nav,bot` — the named scopes plus the five `always` gates.
+- `npm run test:scope nav,bot` — the named scopes plus the six `always` gates.
 - `npm run test:related -- <changed files>` — scopes from the path map plus
   tests that directly import a changed file, plus the gates. Defaults to the
   working-tree diff.

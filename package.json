@@ -30,6 +30,7 @@
     "test:related": "node scripts/test-scope.mjs related",
     "verify": "npm run build && npm run typecheck && npm test",
     "codemap:check": "node scripts/codemap.ts --check",
+    "modev:check": "npm --prefix packages/modev run check",
     "start": "node dist/server/main.js",
     "serve:solo": "node scripts/serve-solo.mjs",
     "start:arena": "node dist/run.js arena",
