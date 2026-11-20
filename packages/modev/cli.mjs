@@ -219,7 +219,11 @@ export function main(argv) {
     if (!text) { console.error("modev: find <text>"); return 2; }
     const hits = findText(index, text, opts.limit);
     log(opts, "find", text, hits.length);
-    if (hits.length === 0) { console.error(`modev: nothing matches ${text}`); return 1; }
+    if (hits.length === 0) {
+      console.error(`modev: nothing matches ${text}`);
+      console.error("  find matches symbol names and section titles; for source text, member names, and packages/ use rg");
+      return 1;
+    }
     if (opts.json) console.log(JSON.stringify(hits, null, 2));
     else {
       for (const hit of hits) {
