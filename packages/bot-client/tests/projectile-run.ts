@@ -11,8 +11,20 @@ import { runMission } from "../../../packages/bot-client/src/brain.ts";
 import { parseMission } from "../../../packages/bot-client/src/missions.ts";
 import { hasLineOfSight } from "../../../src/shared/hitscan.ts";
 import { EYE_HEIGHT, PITCH_LIMIT } from "../../../src/shared/look.ts";
-import { GRENADE_GRAVITY, GRENADE_SPEED, type GrenadePose } from "../../../src/shared/grenade.ts";
+import { GRENADE_BLAST_MIN_PERCENT, GRENADE_BLAST_RADIUS, GRENADE_GRAVITY, GRENADE_SPEED, type GrenadePose } from "../../../src/shared/grenade.ts";
+import { MAX_HP } from "../../../src/shared/health.ts";
+import { createNavCache } from "../../../src/shared/nav/legs.ts";
+import { planPath } from "../../../src/shared/nav/path.ts";
 import { wishTo } from "../../../src/shared/nav/follow.ts";
+
+// Task 110: the expected blast curve, re-derived from the constants rather than
+// calling the host's `grenadeBlastDamage` — a stale host build must show up as
+// a residual, not be hidden by the function under test.
+const expectedLoss = (d: number): number => {
+  if (!(d < GRENADE_BLAST_RADIUS)) return 0;
+  const pct = Math.max(GRENADE_BLAST_MIN_PERCENT, Math.min(100, Math.round(100 * (1 - d / GRENADE_BLAST_RADIUS))));
+  return (MAX_HP * pct) / 100;
+};
 
 const args = new Map<string, string>();
 const argv = process.argv.slice(2);
@@ -21,19 +33,63 @@ const token = (process.env.CE_TOKEN ?? "").trim() || readFileSync("/home/tim/.co
 const BANDS = (args.get("bands") ?? "5,10,20").split(",").map(Number).filter((n) => Number.isFinite(n) && n > 0);
 const THROWS = Number(args.get("throws") ?? 4);
 const RUN_MS = Number(args.get("for-s") ?? 300) * 1000;
+// Task 112 trial config: A = --fallback none, B = --filter path,
+// C = --route place. The defaults reproduce the 110 control exactly.
+const TRIAL = args.get("trial") ?? "control";
+const FALLBACK = args.get("fallback") ?? "straight";
+const FILTER = args.get("filter") ?? "none";
+const ROUTE = args.get("route") ?? "point";
+const SAMPLER_MS = 50;
 const STAMP = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-const LOG = `plan/dsh-tasks/logs/108-pursuit-throw-${STAMP}.log`;
-const JSON_OUT = `plan/dsh-tasks/logs/108-pursuit-throw-${STAMP}.json`;
+const LOG = `plan/dsh-tasks/logs/112-plan-${STAMP}.log`;
+const JSON_OUT = `plan/dsh-tasks/logs/112-trace-${STAMP}.json`;
 
 const t0 = Date.now();
 const secs = (): number => Math.round((Date.now() - t0) / 100) / 10;
 const lines: string[] = [];
 const rows: Array<Record<string, unknown>> = [];
 let noSend = 0;
+// The trace/attempt state is declared before `record` because the plan-line
+// parser inside `record` feeds the trace's `plan` column.
+type TraceRow = { t: number; x: number; z: number; y: number; yaw: number; place: string; band: number | null; d: number | null; los: boolean; stand: string | null; plan: string; cmd: string; slide: boolean; stuck: boolean };
+type AttemptRow = { t: number; band: number; offset: number; point: string; place: string; los: boolean; pathOk: boolean | null; pathReason: string | null; code: number | null; reason: string | null; fallback: string; slide: number; stuck: number; bandReached: number | null; timeToBand: number | null; dt: number };
+const trace: TraceRow[] = [];
+const attempts: AttemptRow[] = [];
+let planNow = "none";
+let lastNoPlan: string | null = null;
+let bandNow: number | null = null;
+let standNow: string | null = null;
+let lastCmd = { moveX: 0, moveZ: 0, yaw: 0 };
+let stopSampler: () => void = () => {};
 const record = (line: string): void => {
   const row = `t=${secs().toFixed(1)}s ${line}`;
   lines.push(row);
   console.log(row);
+  const trimmed = line.trim();
+  if (/(plan start|plan done|no plan:|replan |start |finish )/.test(trimmed)) planNow = trimmed;
+  const noPlan = /no plan: ([a-z-]+)/.exec(trimmed);
+  if (noPlan) lastNoPlan = `no plan: ${noPlan[1]}`;
+};
+const summarize = (): Record<string, unknown> => {
+  const planLines = lines.filter((l) => l.includes("plan done"));
+  const steps = planLines.map((l) => Number(/steps=(\d+)/.exec(l)?.[1] ?? 0));
+  const noPlan: Record<string, number> = {};
+  for (const l of lines) {
+    const m = /no plan: ([a-z-]+)/.exec(l);
+    if (m) noPlan[m[1]!] = (noPlan[m[1]!] ?? 0) + 1;
+  }
+  return {
+    plans: planLines.length,
+    plansStepsGt1: steps.filter((n) => n > 1).length,
+    noPlan,
+    replanStuck: lines.filter((l) => l.includes("replan stuck")).length,
+    bandMoveFailed: lines.filter((l) => l.includes("band move failed")).length,
+    fallbacks: attempts.filter((a) => a.fallback === "straight").length,
+    attempts: attempts.length,
+    slideSeconds: Math.round((trace.filter((r) => r.slide).length * SAMPLER_MS) / 100) / 10,
+    stuckSeconds: Math.round((trace.filter((r) => r.stuck).length * SAMPLER_MS) / 100) / 10,
+    traceRows: trace.length,
+  };
 };
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
@@ -46,14 +102,22 @@ const session = await connectBot({
   onLog: (l) => record(`[conn] ${l}`),
 });
 const world = session.world;
+// Task 112: capture the last input frame the brain sent (the trace `cmd`).
+const rawSend = session.input.sendInput.bind(session.input);
+session.input.sendInput = (cmd: { moveX: number; moveZ: number; yaw: number }) => {
+  lastCmd = { moveX: cmd.moveX, moveZ: cmd.moveZ, yaw: cmd.yaw };
+  rawSend(cmd);
+};
 const finish = (code: number): never => {
+  stopSampler();
   mkdirSync("plan/dsh-tasks/logs", { recursive: true });
   const fired = rows.filter((r) => r.fired === true).length;
   const hits = rows.filter((r) => r.hit === true).length;
   const kills = rows.filter((r) => r.kill === true).length;
-  record(`EXIT rows=${rows.length} fired=${fired} hits=${hits} kills=${kills} elapsed=${secs()}s`);
+  const metrics = summarize();
+  record(`EXIT rows=${rows.length} fired=${fired} hits=${hits} kills=${kills} attempts=${attempts.length} elapsed=${secs()}s`);
   writeFileSync(LOG, `${lines.join("\n")}\n`);
-  writeFileSync(JSON_OUT, `${JSON.stringify({ throws: rows }, null, 1)}\n`);
+  writeFileSync(JSON_OUT, `${JSON.stringify({ trial: { name: TRIAL, fallback: FALLBACK, filter: FILTER, route: ROUTE }, metrics, attempts, trace, throws: rows }, null, 1)}\n`);
   session.close();
   process.exit(code);
 };
@@ -69,6 +133,24 @@ const selfId = me0!.id;
 const players = new Set(world.playerIds());
 record(`joined self=${selfId} at ${me0!.x.toFixed(2)},${me0!.y.toFixed(2)},${me0!.z.toFixed(2)} place=${world.placeOf(me0!)?.id ?? "?"} players=[${[...players].join(",")}] others=${world.others().length}`);
 record(`weapon=${world.weapon() ?? "none"} ammo=${world.ammo()} hp=${world.health()?.hp ?? "?"}`);
+
+// --- blast snapshot (task 110) ---------------------------------------------
+// Every pawn visible at the press/stop/after sample, with the host's latest
+// health frame. `owner` is the thrower; `player` is a human (operator) pawn.
+type PawnRow = { id: number; owner: boolean; player: boolean; hp: number | null; dead: boolean; x: number; y: number; z: number };
+const snapshotPawns = (): PawnRow[] => {
+  const me = world.self();
+  if (!me) return [];
+  const rows: PawnRow[] = [];
+  const push = (p: { id: number; x: number; y: number; z: number }, owner: boolean): void => {
+    const h = world.healthOf(p.id);
+    rows.push({ id: p.id, owner, player: players.has(p.id), hp: h?.hp ?? null, dead: h?.dead === true, x: p.x, y: p.y, z: p.z });
+  };
+  push(me, true);
+  for (const p of world.others()) push(p, false);
+  return rows;
+};
+let throwNo = 0;
 
 // --- target + velocity -----------------------------------------------------
 type Sample = { t: number; x: number; z: number };
@@ -163,24 +245,128 @@ const standWalk = async (point: { x: number; z: number }, timeoutMs: number, lab
   });
   return code === 0;
 };
+// --- trial trace + reachability probe (task 112) ---------------------------
+const planCache = createNavCache();
+// One 20 Hz pose/command row. `slide` is a commanded move whose observed
+// displacement is >45° off the wish; `stuck` is <0.02 m per sample for >0.5 s
+// with a non-zero wish. Both are proxies, computed only from the live pose.
+const traceStart = (): void => {
+  let prev: { x: number; z: number; t: number } | null = null;
+  let stuckStart: number | null = null;
+  const timer = setInterval(() => {
+    const me = world.self();
+    if (!me) {
+      prev = null;
+      stuckStart = null;
+      return;
+    }
+    const now = Date.now();
+    const dt = prev ? (now - prev.t) / 1000 : 0;
+    const dx = prev ? me.x - prev.x : 0;
+    const dz = prev ? me.z - prev.z : 0;
+    const moved = Math.hypot(dx, dz);
+    const wish = Math.hypot(lastCmd.moveX, lastCmd.moveZ);
+    let slide = false;
+    if (prev && dt > 0 && moved > 0.05 && wish > 0.1) {
+      const dot = (dx * lastCmd.moveX + dz * lastCmd.moveZ) / (moved * wish);
+      slide = dot < Math.SQRT1_2; // 45°
+    }
+    if (wish > 0.1 && moved < 0.02) stuckStart ??= now;
+    else stuckStart = null;
+    const stuck = stuckStart !== null && now - stuckStart > 500;
+    const tg = targetId === undefined ? undefined : poseOf(targetId);
+    trace.push({
+      t: secs(),
+      x: me.x,
+      z: me.z,
+      y: me.y,
+      yaw: me.yaw,
+      place: world.placeOf(me)?.id ?? "?",
+      band: bandNow,
+      d: tg ? Math.hypot(tg.x - me.x, tg.z - me.z) : null,
+      los: hasLosNow(),
+      stand: standNow,
+      plan: planNow.slice(0, 80),
+      cmd: `${lastCmd.moveX.toFixed(2)},${lastCmd.moveZ.toFixed(2)}`,
+      slide,
+      stuck,
+    });
+    prev = { x: me.x, z: me.z, t: now };
+  }, SAMPLER_MS);
+  stopSampler = () => clearInterval(timer);
+};
+const spanStats = (from: number): { slide: number; stuck: number } => {
+  let slide = 0;
+  let stuck = 0;
+  for (let i = from; i < trace.length; i += 1) {
+    if (trace[i]!.slide) slide += 1;
+    if (trace[i]!.stuck) stuck += 1;
+  }
+  return { slide: (slide * SAMPLER_MS) / 1000, stuck: (stuck * SAMPLER_MS) / 1000 };
+};
+// Same planPath the brain's `stand:` uses (navView + doorGate rebuilt here so
+// the probe sees the same grid). `--filter path` rejects a candidate before the
+// walk instead of discovering the block after the 2 s straight fallback.
+const probePath = (point: { x: number; z: number }): { ok: boolean; reason: string | null } => {
+  const graph = world.sceneGraph();
+  const me = world.self();
+  if (!graph || !me) return { ok: false, reason: "no-graph" };
+  const live = new Map(world.doors().map((d) => [d.id, d] as const));
+  const doors = world
+    .doors()
+    .map((d) => {
+      const body = world.doorBody(d.id);
+      return body ? { ...body, open: d.open, locked: d.locked } : undefined;
+    })
+    .filter((d) => d !== undefined);
+  const gate = (portal: any): any => {
+    if (portal.kind !== "door") return "open";
+    const id = portal.door ?? portal.id;
+    const door = live.get(id);
+    if (!door) return portal.locked === true ? "locked" : "closed-unlocked";
+    if (door.open) return "open";
+    if (door.locked) return "locked";
+    return "closed-unlocked";
+  };
+  const plan = planPath(graph as any, { x: me.x, y: me.y, z: me.z }, { x: point.x, y: 0, z: point.z }, gate, {
+    view: { aabbs: world.aabbs, doors: doors as any, pawnRadius: world.pawnRadius, pawnHeight: world.pawnHeight },
+    cache: planCache,
+    regions: world.regions(),
+  });
+  return plan.ok ? { ok: true, reason: null } : { ok: false, reason: plan.reason };
+};
+// C: the place route (`reach:<place>`) the point-only `stand:` never takes.
+const walkPlace = async (place: string, timeoutMs: number, label: string): Promise<boolean> => {
+  const mission = parseMission(`reach:${place}`);
+  if (!mission) return false;
+  const code = await runMission(session, mission, {
+    timeoutMs,
+    log: (l) => record(`  ${label} ${l}`),
+    error: (l) => record(`  ${label} ERROR ${l}`),
+  });
+  return code === 0;
+};
 // Pick a point at `band` from the target that has line of sight to it, orbiting
 // the target if the straight-away point is behind a wall. The planner walks
-// there; a moved target is re-evaluated each attempt.
-function pickLosPoint(band: number): { x: number; z: number; y: number } | undefined {
+// there; a moved target is re-evaluated each attempt. `tried` skips offsets the
+// caller has already rejected (A/B).
+const OFFSETS = [0, 25, -25, 50, -50, 90, -90, 135, -135, 180];
+function pickLosPoint(band: number, tried: ReadonlySet<number>): { x: number; z: number; y: number; offset: number } | undefined {
   if (targetId === undefined) return undefined;
   const me = world.self();
   const tg = poseOf(targetId);
   if (!me || !tg) return undefined;
   const base = Math.atan2(me.x - tg.x, me.z - tg.z);
   const aimPoint = { x: tg.x, y: tg.y + 1.0, z: tg.z };
-  for (const off of [0, 25, -25, 50, -50, 90, -90, 135, -135, 180]) {
+  for (const off of OFFSETS) {
+    if (tried.has(off)) continue;
     const a = base + (off * Math.PI) / 180;
     const x = tg.x + Math.sin(a) * band;
     const z = tg.z + Math.cos(a) * band;
     const place = world.placeOf({ x, y: 0, z });
     if (!place || place.id !== "outside") continue;
     const eye = { x, y: 0 + EYE_HEIGHT, z };
-    if (hasLineOfSight(eye, aimPoint, world.aabbs)) return { x, z, y: 0 };
+    if (hasLineOfSight(eye, aimPoint, world.aabbs)) return { x, z, y: 0, offset: off };
   }
   return undefined;
 }
@@ -191,41 +377,88 @@ function hasLosNow(): boolean {
   return hasLineOfSight({ x: me.x, y: me.y + EYE_HEIGHT, z: me.z }, { x: tg.x, y: tg.y + 1.0, z: tg.z }, world.aabbs);
 }
 async function reachBand(band: number, deadline: number): Promise<number> {
+  const tried = new Set<number>();
   for (let attempt = 0; attempt < 4 && Date.now() < deadline; attempt += 1) {
     const me = world.self();
     const tg = targetId === undefined ? undefined : poseOf(targetId);
     if (!me || !tg) return Infinity;
     const d = Math.hypot(tg.x - me.x, tg.z - me.z);
     if (Math.abs(d - band) <= 1.2 && hasLosNow()) return d;
-    const point = pickLosPoint(band);
-    if (!point) {
+    const cand = pickLosPoint(band, tried);
+    if (!cand) {
       record(`  no LOS point at band=${band} for target ${targetId}; blacklisting it`);
       badTargets.set(targetId!, Date.now() + 20_000);
       targetId = undefined;
       return Infinity;
     }
-    record(`  move band=${band}: target=${targetId} d=${d.toFixed(2)} to (${point.x.toFixed(2)},${point.z.toFixed(2)}) los=${hasLosNow()}`);
+    const place = world.placeOf(cand)?.id ?? "?";
+    // C: route to the candidate's place first when it differs from ours.
+    if (ROUTE === "place") {
+      const here = world.placeOf(me)?.id ?? "?";
+      if (here !== place) {
+        const fromC = trace.length;
+        const startedC = Date.now();
+        bandNow = band;
+        standNow = `place:${place}`;
+        record(`  move band=${band}: place ${here} -> ${place} for point ${cand.x.toFixed(2)},${cand.z.toFixed(2)}`);
+        const okPlace = await walkPlace(place, Math.min(15_000, Math.max(1000, deadline - Date.now())), `place${band}`);
+        const statsC = spanStats(fromC);
+        attempts.push({ t: secs(), band, offset: cand.offset, point: `${cand.x.toFixed(2)},${cand.z.toFixed(2)}`, place, los: true, pathOk: null, pathReason: null, code: okPlace ? 0 : 2, reason: okPlace ? null : "place-route-failed", fallback: "place", ...statsC, bandReached: null, timeToBand: null, dt: (Date.now() - startedC) / 1000 });
+        if (!okPlace) tried.add(cand.offset);
+        continue;
+      }
+      attempts.push({ t: secs(), band, offset: cand.offset, point: `${cand.x.toFixed(2)},${cand.z.toFixed(2)}`, place, los: true, pathOk: null, pathReason: null, code: null, reason: "place-noop", fallback: "place-noop", slide: 0, stuck: 0, bandReached: null, timeToBand: null, dt: 0 });
+    }
+    // B: reject an unreachable candidate before the walk.
+    let pathOk: boolean | null = null;
+    let pathReason: string | null = null;
+    if (FILTER === "path") {
+      const probe = probePath(cand);
+      pathOk = probe.ok;
+      pathReason = probe.reason;
+      if (!probe.ok) {
+        record(`  ATTEMPT band=${band} point=${cand.x.toFixed(2)},${cand.z.toFixed(2)} place=${place} los=1 path=0 reason=${probe.reason}; next offset`);
+        attempts.push({ t: secs(), band, offset: cand.offset, point: `${cand.x.toFixed(2)},${cand.z.toFixed(2)}`, place, los: true, pathOk, pathReason, code: null, reason: null, fallback: "none", slide: 0, stuck: 0, bandReached: null, timeToBand: null, dt: 0 });
+        tried.add(cand.offset);
+        continue;
+      }
+    }
+    const from = trace.length;
+    const started = Date.now();
+    bandNow = band;
+    standNow = `${cand.x.toFixed(2)},${cand.z.toFixed(2)}`;
+    record(`  move band=${band}: target=${targetId} d=${d.toFixed(2)} to (${cand.x.toFixed(2)},${cand.z.toFixed(2)}) los=${hasLosNow()}${pathOk === null ? "" : ` path=${pathOk ? 1 : 0}`}`);
     sampleTarget();
-    const ok = await standWalk(point, Math.min(8000, Math.max(1000, deadline - Date.now())), `band${band}`);
+    lastNoPlan = null;
+    const ok = await standWalk(cand, Math.min(8000, Math.max(1000, deadline - Date.now())), `band${band}`);
     const end = world.self();
     const endT = targetId === undefined ? undefined : poseOf(targetId);
-    record(`  band move ${ok ? "done" : "failed"} d=${end && endT ? Math.hypot(endT.x - end.x, endT.z - end.z).toFixed(2) : "?"} los=${hasLosNow()}`);
-    if (!ok) {
+    let fallback = "none";
+    if (!ok && FALLBACK === "straight") {
+      fallback = "straight";
       const until = Date.now() + 2000;
       while (Date.now() < until) {
         const m2 = world.self();
         if (!m2) break;
-        const d2 = Math.hypot(point.x - m2.x, point.z - m2.z);
+        const d2 = Math.hypot(cand.x - m2.x, cand.z - m2.z);
         if (d2 <= 0.6) break;
-        session.input.sendInput(wishTo({ x: m2.x, y: m2.y, z: m2.z, vx: 0, vz: 0, yaw: m2.yaw }, { x: point.x, z: point.z }, 1));
+        session.input.sendInput(wishTo({ x: m2.x, y: m2.y, z: m2.z, vx: 0, vz: 0, yaw: m2.yaw }, { x: cand.x, z: cand.z }, 1));
         await sleep(80);
       }
     }
+    const stats = spanStats(from);
+    const endD = end && endT ? Math.hypot(endT.x - end.x, endT.z - end.z) : null;
+    const reached = endD !== null && Math.abs(endD - band) <= 1.2 && hasLosNow() ? endD : null;
+    const reason = lastNoPlan ? lastNoPlan.replace(/^no plan:\s*/, "") : ok ? null : "walk-failed";
+    record(`  band move ${ok ? "done" : "failed"} d=${endD === null ? "?" : endD.toFixed(2)} los=${hasLosNow()} fallback=${fallback} slide=${stats.slide.toFixed(1)}s stuck=${stats.stuck.toFixed(1)}s`);
+    attempts.push({ t: secs(), band, offset: cand.offset, point: `${cand.x.toFixed(2)},${cand.z.toFixed(2)}`, place, los: true, pathOk, pathReason, code: ok ? 0 : reason === "walk-failed" ? 3 : 2, reason, fallback, ...stats, bandReached: reached, timeToBand: reached === null ? null : (Date.now() - started) / 1000, dt: (Date.now() - started) / 1000 });
+    if (!ok && FALLBACK !== "straight") tried.add(cand.offset);
   }
   const m = world.self();
   const t = targetId === undefined ? undefined : poseOf(targetId);
   return m && t ? Math.hypot(t.x - m.x, t.z - m.z) : Infinity;
 }
+traceStart();
 
 // --- one throw ---// --- one throw -------------------------------------------------------------
 // Fresh 10 Hz samples so the velocity (and the lead) is current, not from before
@@ -240,6 +473,20 @@ async function track(ms = 700): Promise<void> {
 
 async function throwOne(band: number, model: "flat" | "ballistic" | "ballistic+lead"): Promise<void> {
   if (targetId === undefined) return;
+  // Task 110: the owner is inside its own band-5 blast. Never throw from a dead
+  // pawn — wait for the respawn (up to 10 s), else close and report.
+  const respawnBy = Date.now() + 10_000;
+  for (;;) {
+    const me = world.self();
+    const hp = me ? world.healthOf(me.id) : undefined;
+    if (me && hp?.dead !== true && (hp?.hp ?? 1) > 0) break;
+    if (Date.now() >= respawnBy) {
+      record("DEAD no respawn within 10 s; closing");
+      finish(3);
+    }
+    await sleep(200);
+  }
+  const no = (throwNo += 1);
   await track(400);
   if (targetId === undefined) return;
   const lead = model === "ballistic+lead";
@@ -296,6 +543,8 @@ async function throwOne(band: number, model: "flat" | "ballistic" | "ballistic+l
   }
   const vt = velocityOf(targetId);
   const hp0 = world.healthOf(targetId)?.hp ?? null;
+  const aimedId = targetId;
+  const before = snapshotPawns();
   const beforeIds = new Set(world.grenades().map((g) => g.id));
   const sent = session.input.grenade(yaw, pitch);
   record(`THROW band=${band} model=${model} d=${shotAim.d.toFixed(2)} dh=${shotAim.dh.toFixed(2)} vt=(${vt.x.toFixed(2)},${vt.z.toFixed(2)})|${vt.speed.toFixed(2)} aim=(${yaw.toFixed(3)},${pitch.toFixed(3)}) poseYaw=${me.yaw.toFixed(2)} faceYaw=${faceYaw.toFixed(2)} tFlight=${shotAim.tFlight.toFixed(2)} pred=(${shotAim.pred.x.toFixed(2)},${shotAim.pred.y.toFixed(2)},${shotAim.pred.z.toFixed(2)}) los=${losFinal} sent=${sent} hp0=${hp0}`);
@@ -317,6 +566,8 @@ async function throwOne(band: number, model: "flat" | "ballistic" | "ballistic+l
   let stop: GrenadePose | null = null;
   let stopTarget: { x: number; y: number; z: number } | null = null;
   let stopAt: number | null = null;
+  let atStop: PawnRow[] | null = null;
+  let after: PawnRow[] | null = null;
   let flightUpdates = 0;
   let lastPose: string | null = null;
   while (Date.now() - start < 4_500) {
@@ -326,6 +577,7 @@ async function throwOne(band: number, model: "flat" | "ballistic" | "ballistic+l
       if (fresh) {
         stop = fresh;
         stopAt = Math.round((now - start) / 10) / 100;
+        atStop = snapshotPawns();
         const t = targetId === undefined ? undefined : poseOf(targetId);
         if (t) stopTarget = { x: t.x, y: t.y, z: t.z };
       }
@@ -343,7 +595,10 @@ async function throwOne(band: number, model: "flat" | "ballistic" | "ballistic+l
       if (t) atFlight = { x: t.x, z: t.z };
     }
     if (hp600 === null && now - start >= 600) hp600 = targetId === undefined ? null : world.healthOf(targetId)?.hp ?? null;
-    if (hp1600 === null && now - start >= 1600) hp1600 = targetId === undefined ? null : world.healthOf(targetId)?.hp ?? null;
+    if (hp1600 === null && now - start >= 1600) {
+      hp1600 = targetId === undefined ? null : world.healthOf(targetId)?.hp ?? null;
+      after = snapshotPawns();
+    }
     if (hp1600 !== null && (stop !== null || now - start > 4_000)) break;
     await sleep(50);
   }
@@ -355,6 +610,58 @@ async function throwOne(band: number, model: "flat" | "ballistic" | "ballistic+l
   const dead = world.healthOf(targetId)?.dead === true;
   const drop = hp0 !== null && hp1600 !== null ? hp0 - hp1600 : 0;
   const hit = dead || drop >= 40;
+  // --- blast measurement (task 110) ---------------------------------------
+  // Every pawn at the press, by its 3-D feet distance from the stop point. The
+  // stop point is the detonation; d uses the pose sampled when the stop frame
+  // arrived, hp0/hp1 the health frames at the press and the 1600 ms read.
+  const stopPos = stop ? { x: stop.x, y: stop.y, z: stop.z } : null;
+  const atStopById = new Map((atStop ?? []).map((r) => [r.id, r] as const));
+  const afterById = new Map((after ?? []).map((r) => [r.id, r] as const));
+  type BlastRow = PawnRow & { hp1: number | null; d: number | null; loss: number | null; exp: number | null; res: number | null; match: boolean | null; exact: boolean | null; missing: boolean; inR: boolean; beyondWounded: boolean; wounded: boolean };
+  const blastRows: BlastRow[] = [];
+  for (const b of before) {
+    const q = atStopById.get(b.id);
+    if (!q || !stopPos) continue; // not visible at the stop: no distance to measure
+    const d = Math.hypot(stopPos.x - q.x, stopPos.y - q.y, stopPos.z - q.z);
+    const a = afterById.get(b.id);
+    // A killed pawn despawns from `others()`; its hp 0 frame still exists.
+    const hp1 = a?.hp ?? world.healthOf(b.id)?.hp ?? null;
+    const loss = b.hp !== null && hp1 !== null ? b.hp - hp1 : null;
+    const exp = b.hp !== null ? Math.min(expectedLoss(d), b.hp) : null;
+    const res = loss !== null && exp !== null ? loss - exp : null;
+    const frameDead = a?.dead === true || world.healthOf(b.id)?.dead === true;
+    blastRows.push({
+      ...b,
+      hp1,
+      d,
+      loss,
+      exp,
+      res,
+      match: res === null ? null : b.owner ? res === 0 : Math.abs(res) <= 2,
+      exact: res === null ? null : res === 0,
+      dead: frameDead || hp1 === 0,
+      missing: hp1 === null,
+      inR: d < GRENADE_BLAST_RADIUS,
+      beyondWounded: d >= GRENADE_BLAST_RADIUS && loss !== null && loss > 0,
+      wounded: loss !== null && loss > 0,
+    });
+  }
+  const num = (n: number | null): string => (n === null ? "?" : `${Math.round(n * 100) / 100}`);
+  const bit = (v: boolean | null): string => (v === null ? "?" : v ? "1" : "0");
+  for (const r of blastRows) {
+    record(`BLAST throw=${no} id=${r.id} owner=${r.owner ? 1 : 0} player=${r.player ? 1 : 0} d=${num(r.d)} hp0=${num(r.hp)} hp1=${num(r.hp1)} loss=${num(r.loss)} exp=${num(r.exp)} res=${num(r.res)} match=${bit(r.match)} dead=${r.dead ? 1 : 0}`);
+  }
+  const blastSum = {
+    inR: blastRows.filter((r) => r.inR).length,
+    wounded: blastRows.filter((r) => r.wounded).length,
+    multi: blastRows.filter((r) => r.wounded).length >= 2,
+    ownerLoss: blastRows.find((r) => r.owner)?.loss ?? null,
+    targetLoss: blastRows.find((r) => r.id === aimedId)?.loss ?? null,
+    beyondWounded: blastRows.filter((r) => r.beyondWounded).length,
+    missing: blastRows.filter((r) => r.missing).length,
+    mismatch: blastRows.filter((r) => r.match === false).length,
+  };
+  record(`BLAST-SUM throw=${no} band=${band} model=${model} stop=${stop ? `${stop.x.toFixed(2)},${stop.y.toFixed(2)},${stop.z.toFixed(2)}` : "none"} n=${stop?.n ? stop.n.join(",") : "-"} surface=${surface} pawns=${blastRows.length} inR=${blastSum.inR} wounded=${blastSum.wounded} multi=${blastSum.multi ? 1 : 0} ownerLoss=${num(blastSum.ownerLoss)} targetLoss=${num(blastSum.targetLoss)} beyondWounded=${blastSum.beyondWounded} missing=${blastSum.missing} mismatch=${blastSum.mismatch}`);
   record(`  RESULT band=${band} model=${model} leadErr=${leadErr === null ? "?" : leadErr.toFixed(2)} landed=${stop ? `${stop.x.toFixed(2)},${stop.y.toFixed(2)},${stop.z.toFixed(2)}${stop.n ? ` n=${stop.n.join(",")}` : ""}` : "none"} surface=${surface} missH=${missH === null ? "?" : missH.toFixed(2)} missV=${missV === null ? "?" : missV.toFixed(2)} toTarget=${toTarget === null ? "?" : toTarget.toFixed(2)} stopAt=${stopAt === null ? "?" : stopAt.toFixed(2)} flight=${flightUpdates} hp600=${hp600} hp1600=${hp1600} hit=${hit} kill=${dead} selfHp=${world.health()?.hp ?? "?"}`);
   rows.push({
     t: secs(),
@@ -381,6 +688,14 @@ async function throwOne(band: number, model: "flat" | "ballistic" | "ballistic+l
     toTarget: toTarget === null ? null : Math.round(toTarget * 100) / 100,
     stopAt,
     flight: flightUpdates,
+    blast: {
+      stop: stopPos,
+      n: stop?.n ?? null,
+      surface,
+      pawns: blastRows,
+      ...blastSum,
+      kills: blastRows.filter((r) => r.dead && r.wounded).length,
+    },
     hit,
     kill: dead,
   });
