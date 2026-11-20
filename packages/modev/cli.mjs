@@ -5,13 +5,14 @@
 // Wiring: `node packages/modev/cli.mjs <cmd>`; tests import this file's main().
 // Invariants: `query symbol` is exact (no fuzzy guess); a miss exits 1 without
 // output; every query is logged to .cache/queries.jsonl, never to the repo.
-import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { drift, findFiles, findSymbols, findText, loadIndex, queryEntity, querySection } from "./lib/index.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_ROOT = path.resolve(HERE, "../..");
+let optsRoot = DEFAULT_ROOT;
 
 const USAGE = `modev — query the codemap and the KBs without reading them
 
@@ -23,11 +24,20 @@ const USAGE = `modev — query the codemap and the KBs without reading them
   node packages/modev/cli.mjs drift
   node packages/modev/cli.mjs stats
 
-Options: --root <dir> (default: this repo), --json (machine output).
+Options: --root <dir> (default: this repo), --json (machine output),
+--session <id> (or MODEV_SESSION / DSH_SESSION_ID).
 Exit: 0 found/clean, 1 no result or drift findings, 2 usage.`;
 
 function parseArgs(argv) {
-  const opts = { root: DEFAULT_ROOT, json: false, file: undefined, kind: undefined, limit: 10 };
+  const opts = {
+    root: DEFAULT_ROOT,
+    json: false,
+    file: undefined,
+    kind: undefined,
+    limit: 10,
+    // Attribution without friction: the harness sets DSH_SESSION_ID per session.
+    session: process.env.MODEV_SESSION ?? process.env.DSH_SESSION_ID ?? "unknown",
+  };
   const positional = [];
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -37,6 +47,7 @@ function parseArgs(argv) {
       case "--file": opts.file = argv[++i]; break;
       case "--kind": opts.kind = argv[++i]; break;
       case "--limit": opts.limit = Number(argv[++i] ?? 10); break;
+      case "--session": opts.session = argv[++i] ?? "unknown"; break;
       case "--help": case "-h": opts.help = true; break;
       default: positional.push(arg);
     }
@@ -50,11 +61,36 @@ function log(opts, command, arg, hits) {
     mkdirSync(dir, { recursive: true });
     appendFileSync(
       path.join(dir, "queries.jsonl"),
-      JSON.stringify({ ts: new Date().toISOString(), command, arg, hits }) + "\n",
+      JSON.stringify({ ts: new Date().toISOString(), session: opts.session, command, arg, hits }) + "\n",
     );
   } catch {
     // A log write must never fail a query.
   }
+}
+
+// Two stats: is the queried file newer than the codemap? Mid-task it is, and
+// the entry is a snapshot of the last regeneration — say so instead of writing.
+function isStale(root, file) {
+  try {
+    const map = statSync(path.join(root, "agents/codemap.md")).mtimeMs;
+    return statSync(path.join(root, file)).mtimeMs > map;
+  } catch {
+    return false;
+  }
+}
+
+function anySrcNewer(root) {
+  try {
+    const map = statSync(path.join(root, "agents/codemap.md")).mtimeMs;
+    for (const entry of readdirSync(path.join(root, "src"), { recursive: true, withFileTypes: true })) {
+      if (entry.isFile() && entry.name.endsWith(".ts")) {
+        if (statSync(path.join(entry.parentPath, entry.name)).mtimeMs > map) return true;
+      }
+    }
+  } catch {
+    return false;
+  }
+  return false;
 }
 
 function clip(list, max) {
@@ -68,7 +104,9 @@ function printSymbol(symbol, index) {
   if (symbol.doc) console.log(`  ${symbol.doc}`);
   for (const tag of symbol.tags) console.log(`  ${tag.tag} ${tag.text}`.trimEnd());
   if (symbol.calls.length) console.log(`  calls: ${clip(symbol.calls, 8)}`);
-  if (file?.usedBy.length) console.log(`  used by: ${clip(file.usedBy, 6)}`);
+  // The codemap tracks importers per module, not per symbol.
+  if (file?.usedBy.length) console.log(`  module used by: ${clip(file.usedBy, 6)}`);
+  if (isStale(optsRoot, symbol.file)) console.log(`  stale: ${symbol.file} changed after agents/codemap.md — run npm run codemap`);
 }
 
 function printSection(section) {
@@ -99,6 +137,7 @@ export function main(argv) {
     return 2;
   }
 
+  optsRoot = opts.root;
   const [command, sub, ...rest] = positional;
   const index = loadIndex(opts.root);
 
@@ -107,7 +146,11 @@ export function main(argv) {
     if (!name) { console.error("modev: query symbol <name>"); return 2; }
     const hits = findSymbols(index, name, { file: opts.file, kind: opts.kind });
     log(opts, "symbol", name, hits.length);
-    if (hits.length === 0) { console.error(`modev: no symbol ${name}`); return 1; }
+    if (hits.length === 0) {
+      const hint = anySrcNewer(opts.root) ? " (src/ changed after agents/codemap.md — run npm run codemap)" : "";
+      console.error(`modev: no symbol ${name}${hint}`);
+      return 1;
+    }
     if (opts.json) console.log(JSON.stringify(hits, null, 2));
     else hits.forEach((hit, i) => { if (i) console.log(""); printSymbol(hit, index); });
     return 0;
@@ -132,6 +175,7 @@ export function main(argv) {
       if (file.imports.length) console.log(`  imports: ${clip(file.imports, 8)}`);
       if (file.pkgs.length) console.log(`  pkgs: ${clip(file.pkgs, 6)}`);
       if (file.usedBy.length) console.log(`  used by: ${clip(file.usedBy, 6)}`);
+      if (isStale(opts.root, file.path)) console.log(`  stale: ${file.path} changed after agents/codemap.md — run npm run codemap`);
       for (const symbol of file.symbols) {
         const doc = symbol.doc ? `  ${symbol.doc}` : "";
         console.log(`  ${symbol.name}  ${symbol.kind}${symbol.local ? " (local)" : ""}  :${symbol.line}${doc}`);
@@ -201,14 +245,19 @@ export function main(argv) {
     const file = path.join(HERE, ".cache/queries.jsonl");
     if (!existsSync(file)) { console.log("modev: no queries logged yet"); return 0; }
     const rows = readFileSync(file, "utf8").trim().split("\n").filter(Boolean).map((line) => JSON.parse(line));
+    const bySession = new Map();
     const byCommand = new Map();
     const byArg = new Map();
     for (const row of rows) {
+      bySession.set(row.session ?? "unknown", (bySession.get(row.session ?? "unknown") ?? 0) + 1);
       byCommand.set(row.command, (byCommand.get(row.command) ?? 0) + 1);
       const key = `${row.command} ${row.arg}`;
       byArg.set(key, (byArg.get(key) ?? 0) + 1);
     }
     console.log(`queries: ${rows.length}`);
+    console.log("by session:");
+    for (const [name, count] of [...bySession].sort((a, b) => b[1] - a[1])) console.log(`  ${name}: ${count}`);
+    console.log("by command:");
     for (const [name, count] of [...byCommand].sort((a, b) => b[1] - a[1])) console.log(`  ${name}: ${count}`);
     console.log("top:");
     for (const [key, count] of [...byArg].sort((a, b) => b[1] - a[1]).slice(0, 10)) console.log(`  ${count}× ${key}`);

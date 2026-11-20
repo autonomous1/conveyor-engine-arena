@@ -20,7 +20,7 @@ No dependencies, no build step, no daemon, no network. Node 24.
 
 | Command | Prints | Exit |
 |---|---|---|
-| `query symbol <name> [--file <substr>] [--kind <k>]` | `name kind file:line`, signature, doc line, tags, calls, used-by | 0 hit, 1 miss |
+| `query symbol <name> [--file <substr>] [--kind <k>]` | `name kind file:line`, signature, doc line, tags, calls, and the module's importers (`module used by` — the codemap has no per-symbol reverse index) | 0 hit, 1 miss |
 | `query file <path>` | the module: line count, doc, imports, packages, used-by, and every symbol | 0, 1 |
 | `query section <layer\|file> <§N>` | that section's text, bounded; `shared` or `shared-model` both work | 0, 1 |
 | `query entity <name>` | the `shared-model` §13.6 row: shared factory, host container, client copy, tests | 0, 1 |
@@ -28,7 +28,9 @@ No dependencies, no build step, no daemon, no network. Node 24.
 | `drift` | advisory findings: a `§` ref that does not resolve, a KB `src/…` path that is gone or absent from the codemap, a §13.6 test pin with no test file | 0 clean, 1 findings |
 | `stats` | what has been queried (from `.cache/queries.jsonl`) | 0 |
 
-Options: `--root <dir>` (default: this repo), `--json` (machine output), `--help`.
+Options: `--root <dir>` (default: this repo), `--json` (machine output),
+`--session <id>` (or `MODEV_SESSION`; falls back to the harness's
+`DSH_SESSION_ID`), `--help`.
 
 **Exact, not fuzzy.** `query symbol` takes one name; a miss exits 1 with no
 guess. `find` is the only substring entry point. That preserves the codemap rule
@@ -40,8 +42,20 @@ memory, but the agent-facing output is compact text: the token saving comes from
 returning one entry (~6 lines) rather than the file (5,278 lines). `--json` is
 for piping, not for reading.
 
+**Freshness.** Each symbol/file result stats the source file against
+`agents/codemap.md` and prints `stale: <file> changed after … run npm run codemap`
+when the file changed after the map; a miss on a stale tree carries the same hint.
+It **never regenerates** — the map is regenerated once per task so its diff stays
+reviewable (D5). A full regeneration is ~4.5 s for 121 files at the time of
+writing; per-result stat is negligible.
+
 **Read-only.** It reads `agents/codemap.md`, the KB halves and `test/`; it writes
 only `.cache/` (the query log). It never writes `agents/`.
+
+**Attribution.** Every query is logged with the session id (`--session`,
+`MODEV_SESSION`, or the harness's `DSH_SESSION_ID`), so `modev stats` shows which
+session queried what — the evidence that a session used the CLI rather than
+grepping the map.
 
 ## The lints
 

@@ -6,7 +6,7 @@
 // Invariants: a miss is exit 1 and no output; drift names one place per defect.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -104,4 +104,33 @@ test("query file lists a module's contract", () => {
   assert.deepEqual(file.symbols.map((s) => s.name), ["Fact", "plan", "LOCAL", "Aabb"]);
   assert.equal(findFiles(index, "goap.ts").length, 1);
   assert.equal(findFiles(index, "nope.ts").length, 0);
+});
+
+test("the query log records the session", () => {
+  const result = spawnSync(process.execPath, [CLI, "query", "symbol", "plan", "--root", FIXTURE], {
+    encoding: "utf8",
+    env: { ...process.env, MODEV_SESSION: "test-cli" },
+  });
+  assert.equal(result.status, 0, result.stderr);
+  const log = path.join(HERE, "..", ".cache", "queries.jsonl");
+  const lines = readFileSync(log, "utf8").trim().split("\n");
+  const last = JSON.parse(lines[lines.length - 1]);
+  assert.equal(last.session, "test-cli");
+  assert.equal(last.command, "symbol");
+  assert.equal(last.arg, "plan");
+});
+
+test("a file newer than the codemap is flagged stale, and a miss says why", () => {
+  const root = tempFixture();
+  const future = new Date(Date.now() + 60_000);
+  utimesSync(path.join(root, "src/shared/bots/goap.ts"), future, future);
+
+  const hit = spawnSync(process.execPath, [CLI, "query", "symbol", "plan", "--root", root], { encoding: "utf8" });
+  assert.equal(hit.status, 0);
+  assert.match(hit.stdout, /stale: src\/shared\/bots\/goap\.ts changed after/);
+
+  const miss = spawnSync(process.execPath, [CLI, "query", "symbol", "nope", "--root", root], { encoding: "utf8" });
+  assert.equal(miss.status, 1);
+  assert.match(miss.stderr, /run npm run codemap/);
+  rmSync(root, { recursive: true, force: true });
 });
