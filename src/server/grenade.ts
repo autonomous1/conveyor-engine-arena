@@ -1,19 +1,19 @@
-// ARCHITECTURE: Host grenade bodies: gates, launch, sweep, bounce/explode, and
-//   pose broadcast.
+// ARCHITECTURE: Host grenade bodies: gates, launch, sweep, bounce/explode, the
+//   blast, and pose broadcast.
 // Wiring: arena-host.ts builds it and ticks it in `onTick`; inbound grenade
 //   frames arrive through arena-host.ts.
 // Order: `tick` runs after pickups in `onTick`, before `replicator.publish`.
 import type { EngineWsServer } from "conveyor-engine-transport-ws";
 import type { AuthoritativeWorld } from "conveyor-engine-world";
 import { aimDirection, clampPitch, EYE_HEIGHT } from "../shared/look.js";
-import { healthFrame, type PawnHealth } from "../shared/health.js";
+import { healthFrame, type HealthFrame, type PawnHealth } from "../shared/health.js";
 import { MOVE_DT } from "../shared/movements.js";
 import type { SpatialDAG } from "../shared/spatial-dag.js";
 import {
   admitGrenade,
   freshGrenadeGate,
-  GRENADE_DAMAGE,
   GRENADE_SPEED,
+  grenadeBlastDamage,
   grenadePose,
   launchGrenade,
   parseGrenade,
@@ -38,7 +38,7 @@ export interface ArenaGrenades {
   onFrame(clientId: number, frame: unknown): void;
   /**
    * One host tick. `dt` is seconds and defaults to {@link MOVE_DT}. No-op when nothing is flying.
-   * May wound and broadcast. A non-finite step is dropped without a pose.
+   * May broadcast and wound by blast. A non-finite step is dropped without a pose.
    */
   tick(dt?: number): void;
   /**
@@ -73,8 +73,6 @@ export function createArenaGrenades(opts: {
    * Pass `"bounce"` for a toss (one bounce, then a stop).
    */
   impact?: GrenadeImpact;
-  /** Direct pawn hit. Default {@link GRENADE_DAMAGE}. */
-  damage?: number;
   /** Static DAG. Absent keeps the flat sweep for tests. */
   dag?: SpatialDAG;
   /** Dynamic shut-door boxes for the DAG sweep. */
@@ -94,11 +92,27 @@ export function createArenaGrenades(opts: {
     }
   }
 
-  function wound(hitId: number, attacker: number) {
+  /**
+   * One detonation at `point`. Every living pawn inside the blast radius loses
+   * hp by its distance from `point`; the owner is included.
+   * @post At most one wound per pawn per detonation; the resulting frames go
+   *       out once through `deliverHealthFrames`.
+   */
+  function blast(point: { x: number; y: number; z: number }, attacker: number) {
     if (!opts.health) return;
-    const next = opts.health.wound(hitId, attacker, opts.damage ?? GRENADE_DAMAGE, "grenade");
-    if (!next) return;
-    deliverHealthFrames(opts.server, opts.server.connected, [healthFrame(hitId, next.hp, next.dead, next.dead ? "grenade" : undefined)]);
+    const frames: HealthFrame[] = [];
+    for (const entity of opts.world.query()) {
+      if (entity.lifecycle !== "alive" || !(entity.radius > 0)) continue;
+      if (opts.health.isDead(entity.id)) continue;
+      const damage = grenadeBlastDamage(
+        Math.hypot(point.x - entity.position.x, point.y - entity.position.y, point.z - entity.position.z),
+      );
+      if (!(damage > 0)) continue;
+      const next = opts.health.wound(entity.id, attacker, damage, "grenade");
+      if (!next) continue;
+      frames.push(healthFrame(entity.id, next.hp, next.dead, next.dead ? "grenade" : undefined));
+    }
+    deliverHealthFrames(opts.server, opts.server.connected, frames);
   }
 
   function throwAs(entity: number, yaw: number, pitch: number): "dead" | "done" {
@@ -172,7 +186,7 @@ export function createArenaGrenades(opts: {
         if (!finitePoint(point)) continue;
         if (step.kind === "stop") {
           broadcast(body.owner, grenadePose(body.id, point, body.yaw, true, stopSurfaceNormal(step.hit)));
-          if (step.hit.pawn && step.hit.id !== undefined) wound(step.hit.id, body.owner);
+          blast(point, body.owner);
           continue;
         }
         broadcast(body.owner, grenadePose(body.id, point, body.yaw));

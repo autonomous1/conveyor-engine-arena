@@ -5,8 +5,8 @@
  * Grenades do not collide with each other. There is no second dynamic body.
  */
 
-// ARCHITECTURE: Grenade body math: launch, step/sweep, bounce or explode, and
-//   the pose frame.
+// ARCHITECTURE: Grenade body math: launch, step/sweep, bounce or explode, the
+//   blast falloff, and the pose frame.
 // Wiring: server/grenade.ts owns bodies; client/boot.ts and client/net.ts apply
 //   poses; shared/bot-protocol.ts parses the frame.
 import { MAX_HP } from "./health.js";
@@ -23,10 +23,34 @@ export const GRENADE_INTERVAL_MS = 1000;
  */
 export const GRENADE_SPEED = 24;
 /**
- * Direct pawn hit.
- * @why Half of {@link MAX_HP}, because a grenade is harder to land than a laser.
+ * Metres from the detonation at which blast damage reaches zero.
+ * @why The operator's spec is 10 m; tune it here, never at a call site.
  */
-export const GRENADE_DAMAGE = MAX_HP / 2;
+export const GRENADE_BLAST_RADIUS = 10;
+/**
+ * The least a blast removes, in percent of {@link MAX_HP}, anywhere strictly
+ * inside {@link GRENADE_BLAST_RADIUS}.
+ * @why Without the floor a point at 9.99 m rounds to 0 and the blast misses.
+ */
+export const GRENADE_BLAST_MIN_PERCENT = 1;
+/**
+ * Hp a blast removes at `distance` metres from the detonation: {@link MAX_HP}
+ * at the point, {@link GRENADE_BLAST_MIN_PERCENT} just inside the radius, 0 at
+ * or beyond it. Quadratic in between (the remaining fraction is squared);
+ * `radius` defaults to {@link GRENADE_BLAST_RADIUS}.
+ * @why The 110 live run judged the linear far field too strong (5 m still cost
+ *      50); squaring halves it (5 m → 25, 7 m → 9) while the point and the
+ *      floor stay put.
+ * @post A non-finite or negative `distance`, or a non-positive/non-finite
+ *       `radius`, yields 0.
+ */
+export function grenadeBlastDamage(distance: number, radius = GRENADE_BLAST_RADIUS): number {
+  if (!(distance >= 0) || !(radius > 0) || !Number.isFinite(radius)) return 0;
+  if (distance >= radius) return 0;
+  const remaining = 1 - distance / radius;
+  const percent = Math.max(GRENADE_BLAST_MIN_PERCENT, Math.min(100, Math.round(100 * remaining * remaining)));
+  return (MAX_HP * percent) / 100;
+}
 /**
  * Meters per second squared, subtracted from velocity Y once per host tick.
  */
@@ -311,7 +335,7 @@ export function launchGrenade(
  * A pawn hit stops immediately. `"explode"` (launcher): the first box, floor,
  * or pawn contact stops, with no bounce. The owner is ignored until
  * {@link GRENADE_ARMING_S} so the launch can leave the shooter's capsule.
- * A pawn hit is marked so the caller can apply the existing damage.
+ * A pawn hit is marked; the stop point is the blast origin for the caller.
  */
 export function stepGrenade(
   body: GrenadeBody,
