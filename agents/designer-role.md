@@ -72,7 +72,7 @@ The two copies have diverged: `agents/decisions.md` and `agents/README-dsh.md` a
 
 ## Bot-developer runs
 
-14. Bot tasks use `agents/bot-task-template.md`; they are runs, not code changes. One bot, operator as spectator, clean close, seat check, no grenades unless asked. Target rules: wander bots within 35 m of the spawn point; buildings are valid; outside 35 m ignored. Pick up health at hp ≤ 50 before re-engaging.
+14. Bot tasks use `agents/bot-task-template.md`; they are runs, not code changes. The **Files** table names the run's script under `packages/bot-client/tests/` (tracked, reviewable) — never `plan/dsh-tasks/live/`, which is gitignored. One bot, operator as spectator, clean close, seat check, no grenades unless asked. Target rules: wander bots within 35 m of the spawn point; buildings are valid; outside 35 m ignored. Pick up health at hp ≤ 50 before re-engaging.
 
 ## Method: deriving system architecture from these sources
 

@@ -32,7 +32,7 @@ the order**, observed in real time, with the operator watching the same pawn.
 |---|---|---|
 | **Designer** | task specs, reviews, KBs | `plan/dsh-tasks/proposed/` |
 | **Coder** | task execution, source changes, tests | `src/`, `test/`, the refinements of your prototypes, reports |
-| **Bot-developer (you)** | live play, rapid prototypes, diagnosis, live testing | `packages/bot-client/tests/**` (tracked drivers), `plan/dsh-tasks/live/**` (scratch prototypes), the live journal; `packages/bot-client/src/**` only when the task's Files table names it and the operator approves (source is the coder's otherwise) |
+| **Bot-developer (you)** | live play, rapid prototypes, diagnosis, live testing | `packages/bot-client/tests/**` (the tracked drivers and the task's script), `plan/dsh-tasks/live/**` (raw captures only), the live journal; `packages/bot-client/src/**` only when the task's Files table names it and the operator approves (source is the coder's otherwise) |
 | **Operator** | the host, the match, the orders, the judgment | — |
 
 When a fix belongs in `src/` or `test/`, you do **not** patch it. You produce the
@@ -70,9 +70,11 @@ Rules of the craft:
   desired behaviour.
 - **The operator's method.** Rapid prototype → observe → fix → hand off to the
   coder for the refined implementation. That is the division of labour.
-- **The driver home.** Reusable live drivers live in `packages/bot-client/tests/`
-  (tracked, commit `d624495`); scratch prototypes in `plan/dsh-tasks/live/`;
-  logs/reports in `plan/dsh-tasks/logs/` and `reports/`. Never the repo root.
+- **The driver home.** Every script a task asks for goes in
+  `packages/bot-client/tests/` (tracked, reviewable); the task's Files table
+  names it. `plan/dsh-tasks/live/` is gitignored — raw captures only, never a
+  deliverable. Logs/reports in `plan/dsh-tasks/logs/` and `reports/`. Never the
+  repo root.
 
 ---
 
@@ -131,6 +133,9 @@ Prohibitions: `agents/AGENTS.md` (memory/skills, sibling repos).
 
 **Node:** every shell command starts with
 `cd ~/dev/conveyor-engine-arena && export PATH=~/.nvm/versions/node/v24.0.2/bin:$PATH &&`.
+Then use repo-relative paths (`plan/dsh-tasks/logs/…`, `packages/…`) — never a
+`/home/tim/…` literal in a command or a script; the token comes from `CE_TOKEN`
+or `~/.config/ce-arena/qa-token.pem` read via `process.env`/`os.homedir()`.
 Do not change the kernel.
 
 ---
@@ -279,8 +284,8 @@ hypothesis. Then reproduce with the same place/goal/start; record the pose every
 2. **Runs table** — one row per run: start (wall-clock), goal, kills, shots,
    deaths, plan failures, outcome, elapsed.
 3. **Observations** — timestamped world + brain facts.
-4. **Prototypes** — the script paths (`packages/bot-client/tests/**` or
-   `plan/dsh-tasks/live/**`), what each tried, the state it reached.
+4. **Prototypes** — the script paths (under `packages/bot-client/tests/`), what
+   each tried, the state it reached.
 5. **Findings** — evidence, layer, hypothesis, severity, the bug found/fixed,
    the smallest test.
 6. **Changes made** — diff summary, rebuild, re-test, before/after.
@@ -293,11 +298,11 @@ hypothesis. Then reproduce with the same place/goal/start; record the pose every
 ## Permissions and boundaries
 
 - **Read** `src/`, `test/`, `packages/`, `agents/`, `plan/`.
-- **Write** the tracked drivers under `packages/bot-client/tests/**`, the
-  prototypes under `plan/dsh-tasks/live/**`, the logs under
-  `plan/dsh-tasks/logs/**`, the journal under `plan/dsh-tasks/reports/**`.
-  `plan/` is gitignored; the drivers under `packages/` are tracked and
-  reviewable. Never the repo root.
+- **Write** the drivers and the task's script under
+  `packages/bot-client/tests/**`, the logs under `plan/dsh-tasks/logs/**`, the
+  journal under `plan/dsh-tasks/reports/**`; `plan/dsh-tasks/live/**` only for a
+  raw capture. `plan/` is gitignored; the drivers under `packages/` are tracked
+  and reviewable. Never the repo root.
 - **`packages/bot-client/src/**` edits**: only after telling the operator what
   and why and getting an explicit OK; still prototype-grade; rebuild, start a
   fresh session, re-run the same trial, report before/after.

@@ -104,3 +104,4 @@ A candidate invariant is not an `@invariant` until a test or tag confirms it; th
 - Server-authoritative: clients send inputs only; gameplay rules live on the host or in `src/shared/`.
 - Source is ESM, strict TS. Server/shared imports use `.js` extensions (Node16 resolution).
 - Add or update tests in `test/` for behavior changes; run the scoped command from the task's Test scope slot (`npm run test:scope …` or `test:related`) and `npm run typecheck`. The full `npm test` is the merge gate (push/PR and every two hours), not the per-task loop.
+- **Scripts are tracked.** A bot task's script lives under `packages/bot-client/tests/` and is named in the task's Files table; `plan/` is gitignored, so a script there is not reviewable. Use repo-relative paths — never `/home/tim/…`; the bot token comes from `CE_TOKEN` or `~/.config/ce-arena/qa-token.pem` via `os.homedir()`.

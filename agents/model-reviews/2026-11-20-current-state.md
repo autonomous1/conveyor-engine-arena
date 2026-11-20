@@ -749,3 +749,36 @@ Applied in `AGENTS.md` (injected, canonical), `designer-role.md` (rule 8),
 `coder-role.md` (Role contract), `bot-developer-role.md` (Interaction protocol),
 and `model-developer-role.md` (With the operator). Sessions started before this
 change need a restart to see it.
+
+## 17. Bot scripts are tracked; paths are repo-relative (2026-11-20)
+
+The designer sent the bot to `plan/dsh-tasks/live/114-threat-response.ts` — a
+gitignored folder, so the script is not reviewable. Rule changed:
+
+- **AGENTS Rules:** a bot task's script lives under `packages/bot-client/tests/`
+  and is named in the task's Files table; `plan/` is gitignored. Paths are
+  repo-relative — no `/home/tim/…`; the token comes from `CE_TOKEN` or
+  `~/.config/ce-arena/qa-token.pem` via `os.homedir()`.
+- **bot-developer-role:** lane table, "driver home", journal item 4, permissions,
+  and the Node line all say the same.
+- **bot-task-template:** the preamble and a new Files row put the script under
+  `packages/bot-client/tests/<name>.ts`.
+- **designer-role rule 14:** the Files table names a tracked script, never
+  `plan/dsh-tasks/live/`.
+- `plan/dsh-tasks/live/` remains for raw captures only.
+
+Absolute-path inventory (checked):
+
+| where | count | what |
+|---|---:|---|
+| `packages/bot-client/tests/*.ts` | 28 | `readFileSync("/home/tim/.config/ce-arena/qa-token.pem")` |
+| `scripts/room.sh`, `scripts/room-dev.sh`, `scripts/ws-stick.ts` | 3 | `/home/tim/dev/conveyor-engine-arena/...` |
+| `plan/dsh-tasks/live/114-threat-response.ts` | 1 | untracked, same token literal |
+| `agents/` | 0 | clean |
+
+Proposed coder task: a `packages/bot-client/tests/token.ts` helper
+(`CE_TOKEN` → `join(homedir(), ".config/ce-arena/qa-token.pem")`), the 28 inline
+reads replaced, the 3 scripts made repo-relative (`ROOT=$(cd "$(dirname "$0")/.." && pwd)`),
+acceptance `rg -n "/home/tim" packages scripts` empty plus typecheck. The drivers
+are outside `tsconfig.bot` (src only), so the sweep is `rg`-driven; adding the
+drivers to a typecheck is a separate task.

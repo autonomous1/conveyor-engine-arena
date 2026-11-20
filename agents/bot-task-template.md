@@ -7,7 +7,7 @@ Read `~/dev/conveyor-engine-arena/agents/bot-developer-role.md` first. Then this
 **Safety:** one long-lived session per trial; clean `close()`; wait before any retry; never more than one bot in the arena while the operator is playing; never target the operator's pawn. Leftover seats are the known cause of `SERVER_FULL` and the stale-pawn confusion (task 49).
 
 > **This is a run/prototype, not a code change.** The bot-developer measures, diagnoses, and recommends; the coder implements.
-> You may write throwaway scripts under `plan/dsh-tasks/live/` to make the scenario happen; they are rough probes, not modules, and the coder refines the useful ones into `src/` with the tests. A code change you discover goes in the report as a recommended task, with the evidence line that justifies it.
+> Write the run's script under `packages/bot-client/tests/<name>.ts` — tracked and reviewable; the **Files** table names it. It is a rough probe, not a module, and the coder refines the useful ones into `src/` with the tests. `plan/dsh-tasks/live/` is gitignored and is for raw captures only. A code change you discover goes in the report as a recommended task, with the evidence line that justifies it.
 
 ## Question
 
@@ -55,6 +55,7 @@ Read `~/dev/conveyor-engine-arena/agents/bot-developer-role.md` first. Then this
 | `agents/<layer>-{flow,model}.md` or `agents/client-kb.md` | conveyor-engine-arena | Read-only. The §… named in Knowledge base (one row per file the run reads); `*-kb.md` is the split's index page. |
 | <the bot session/CLI file> | conveyor-engine-arena | Read-only. The commands and the log fields. |
 | <the host/arena file> | conveyor-engine-arena | Read-only. The accept path, the seat rule. |
+| `packages/bot-client/tests/<name>.ts` | conveyor-engine-arena | **New.** The run's script (tracked, reviewable). |
 | `plan/dsh-tasks/logs/<NN>-*` | conveyor-engine-arena | **New.** The raw evidence. |
 | `plan/dsh-tasks/reports/<NN>-<slug>.md` | conveyor-engine-arena | **New.** The report. |
 
