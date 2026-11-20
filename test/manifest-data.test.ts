@@ -5,6 +5,11 @@ import { nodeGameFiles } from "../src/server/game-files-node.ts";
 import { loadInstalledGame } from "../src/server/load-game.ts";
 import { loadArena } from "../src/server/world-loader.ts";
 
+let game: ReturnType<typeof loadInstalledGame> | undefined;
+const gameOnce = (): ReturnType<typeof loadInstalledGame> => (game ??= loadInstalledGame());
+let arena: ReturnType<typeof loadArena> | undefined;
+const arenaOnce = (): ReturnType<typeof loadArena> => (arena ??= loadArena());
+
 function pngSize(path: string): { width: number; height: number } {
   const bytes = readFileSync(path);
   assert.equal(bytes.toString("ascii", 1, 4), "PNG", `${path} is not a PNG`);
@@ -27,7 +32,7 @@ test("manifest_loads_without_warnings", () => {
 });
 
 test("baked_regions_match_the_manifest_player_capsule", () => {
-  const game = loadInstalledGame(nodeGameFiles());
+  const game = gameOnce();
   const regions = JSON.parse(readFileSync("web/game/regions.json", "utf8")) as {
     radius?: number;
     height?: number;
@@ -70,7 +75,7 @@ test("scene_graph_locks_match_doors", () => {
   const graph = JSON.parse(readFileSync("web/game/scene-graph.json", "utf8")) as {
     portals?: Array<{ id?: string; door?: string; locked?: boolean; key?: string }>;
   };
-  const doors = new Map(loadArena().view.doors.map((door) => [door.id, door]));
+  const doors = new Map(arenaOnce().view.doors.map((door) => [door.id, door]));
   const problems: string[] = [];
   for (const portal of graph.portals ?? []) {
     const door = doors.get(portal.door ?? portal.id ?? "");
@@ -85,7 +90,7 @@ test("scene_graph_locks_match_doors", () => {
 });
 
 test("spatial_dag_is_loaded_and_hashed", () => {
-  const loaded = loadArena();
+  const loaded = arenaOnce();
   assert.ok(loaded.spatialDag, "server did not load the DAG");
   assert.ok(loaded.view.spatialDagHash, "view has no spatialDagHash");
   assert.equal(loaded.spatialDag.hash, loaded.view.spatialDagHash);

@@ -1,7 +1,7 @@
 // Scope and related-test selector. The manifest is the single source of scope
 // membership; the CLI is a development loop, never the merge gate.
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, normalize, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -90,12 +90,49 @@ function needsDist(file) {
   return /from ["']\.\.\/dist\//.test(readFileSync(`test/${file}`, "utf8"));
 }
 
+/** Server-build outputs that are not under `dist/server|shared|bot|util`. */
+const SERVER_DIST = /dist\/(?:server|shared|bot|util)\/|dist\/(?:index|arena-assets)\.js/;
+
 function buildCommands(tests) {
   const list = tests.filter((file) => needsDist(file));
   const commands = [];
   if (list.some((file) => /dist\/web/.test(readFileSync(`test/${file}`, "utf8")))) commands.push("npm run build:client");
-  if (list.some((file) => /dist\/(server|shared|bot|util)/.test(readFileSync(`test/${file}`, "utf8")))) commands.push("npm run build:server");
+  if (list.some((file) => SERVER_DIST.test(readFileSync(`test/${file}`, "utf8")))) commands.push("npm run build:server");
   return commands;
+}
+
+/** Inputs a command reads and the output that proves it ran. */
+const BUILD_INPUTS = {
+  "npm run build:server": ["src", "tsconfig.server.json", "package.json"],
+  "npm run build:client": ["src", "web", "scripts/build-client.mjs", "package.json"],
+};
+const BUILD_OUTPUT = {
+  "npm run build:server": "dist/server/main.js",
+  "npm run build:client": "dist/web/client.js",
+};
+
+/** Newest mtime under a file or directory; a missing path is Infinity so it forces a build. */
+function newestMtime(target) {
+  try {
+    const stat = statSync(target);
+    if (!stat.isDirectory()) return stat.mtimeMs;
+    let newest = 0;
+    for (const entry of readdirSync(target, { recursive: true, withFileTypes: true })) {
+      if (!entry.isFile()) continue;
+      const mtime = statSync(`${entry.parentPath}/${entry.name}`).mtimeMs;
+      if (mtime > newest) newest = mtime;
+    }
+    return newest;
+  } catch {
+    return Infinity;
+  }
+}
+
+/** A command's output is fresh when it is at least as new as every input it reads. */
+function isFresh(output, inputs) {
+  const out = newestMtime(output);
+  if (!Number.isFinite(out)) return false;
+  return inputs.every((input) => out >= newestMtime(input));
 }
 
 function run(args) {
@@ -126,15 +163,16 @@ function main() {
   }
 
   const commands = buildCommands(selected);
-  console.log(`selected ${selected.length}/${tests.length} (always ${manifest.always.length}); build ${commands.length ? "yes" : "no"}`);
+  const pending = commands.filter((command) => !isFresh(BUILD_OUTPUT[command], BUILD_INPUTS[command]));
+  console.log(`selected ${selected.length}/${tests.length} (always ${manifest.always.length}); build ${commands.length === 0 ? "no" : pending.length === 0 ? "skipped (fresh)" : "yes"}`);
   if (dryRun) {
     for (const file of selected) console.log(file);
-    for (const command of commands) console.log(`build: ${command}`);
+    for (const command of pending) console.log(`build: ${command}`);
     return;
   }
   if (commands.length) {
     if (noBuild) for (const command of commands) console.log(`build skipped: ${command}`);
-    else for (const command of commands) run(command.split(" ").slice(2));
+    else for (const command of pending) run(command.split(" ").slice(2));
   }
   const child = spawnSync(
     process.execPath,
