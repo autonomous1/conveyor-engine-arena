@@ -2,8 +2,12 @@
 // membership; the CLI is a development loop, never the merge gate.
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { availableParallelism } from "node:os";
 import { dirname, normalize, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+
+/** File concurrency for `node --test`; the env override is the profile knob. */
+const concurrency = process.env.TEST_CONCURRENCY ?? String(Math.max(1, availableParallelism() - 1));
 
 export function allTests() {
   return readdirSync("test").filter((file) => file.endsWith(".test.ts")).sort();
@@ -176,7 +180,7 @@ function main() {
   }
   const child = spawnSync(
     process.execPath,
-    ["--import", "./scripts/ts-ext-register.mjs", "--test", ...selected.map((file) => `test/${file}`)],
+    ["--import", "./scripts/ts-ext-register.mjs", "--test", `--test-concurrency=${concurrency}`, ...selected.map((file) => `test/${file}`)],
     { stdio: "inherit" },
   );
   process.exit(child.status ?? 1);
