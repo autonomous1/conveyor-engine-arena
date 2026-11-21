@@ -316,6 +316,11 @@ export type InfoSession = {
   readonly graph: SceneGraph | undefined;
   /** Id of the last inspect hit. Absent after a miss or after the readout expires. */
   readonly hitId: string | undefined;
+  /**
+   * Place under the last inspect hit, or the own place with no hit.
+   * @post The hit's place, else the own place, else `undefined` when no graph has arrived.
+   */
+  readonly hitPlace: string | undefined;
   inspect(args: {
     now: number;
     origin: Vec3;
@@ -350,6 +355,7 @@ export function createInfoSession(opts: {
   let graph: SceneGraph | undefined;
   let shown: { until: number; hit?: InfoHit } | undefined;
   let lastHitId: string | undefined;
+  let lastPlace: string | undefined;
 
   const text = (own?: InfoOwn, cabs?: readonly CabState[]): string => {
     if (!shown) return "";
@@ -400,6 +406,7 @@ export function createInfoSession(opts: {
       remaining.delete(id);
     },
     onSceneGraph(frame) {
+      lastPlace = undefined;
       if (!frame) {
         graph = undefined;
         return;
@@ -419,10 +426,18 @@ export function createInfoSession(opts: {
     get hitId() {
       return lastHitId;
     },
+    get hitPlace() {
+      return lastPlace;
+    },
     inspect(args) {
       const hit = pickInfoTarget(args.origin, args.direction, args.candidates, args.range ?? INFO_RANGE_M);
       shown = { until: args.now + INFO_SHOW_MS, ...(hit ? { hit } : {}) };
       lastHitId = hit && hit.id.length > 0 ? hit.id : undefined;
+      lastPlace = undefined;
+      if (graph) {
+        if (hit) lastPlace = placeAt(graph, hit.point.x, placeSampleY(hit), hit.point.z, args.cabs).id;
+        else if (args.own && finiteOwn(args.own)) lastPlace = placeAt(graph, args.own.x, args.own.y, args.own.z, args.cabs).id;
+      }
       return text(args.own, args.cabs);
     },
     refresh(now, own, cabs) {
@@ -430,6 +445,7 @@ export function createInfoSession(opts: {
       if (!(now < shown.until)) {
         shown = undefined;
         lastHitId = undefined;
+        lastPlace = undefined;
         return "";
       }
       return text(own, cabs);

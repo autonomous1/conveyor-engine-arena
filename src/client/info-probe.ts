@@ -174,8 +174,8 @@ export function createInfoProbe(opts: {
         cabs: args.cabs,
       });
       paint(value);
-      const id = session.hitId;
-      if (id) opts.copy?.(id);
+      const copied = session.hitPlace ?? session.hitId;
+      if (copied) opts.copy?.(copied);
     },
     refresh(now, nextOwn, nextCabs) {
       if (nextOwn) own = nextOwn;

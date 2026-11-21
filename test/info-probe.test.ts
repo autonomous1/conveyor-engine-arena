@@ -325,6 +325,50 @@ test("place and you follow placeAt, including a nested room, a tall wall, and ou
   assert.match(moved, /place room/);
 });
 
+test("the info copy is the place under the hit", () => {
+  const file = placeFile();
+  const session = createInfoSession({ doors: [], pickups: [] });
+  session.onSceneGraph(frame(file));
+  const wall = box("collision", "wall", [2.5, 0, 3], [3.5, 8, 3.2]);
+  const own = { x: 1, y: 0, z: 1 };
+  session.inspect({ now: 0, origin: vec(3, 5, 0), direction: vec(0, 0, 1), candidates: [wall], own });
+  assert.equal(session.hitId, "wall");
+  assert.equal(session.hitPlace, "room");
+
+  session.inspect({ now: 0, origin: vec(40, 1, 40), direction: vec(0, 0, 1), candidates: [], own });
+  assert.equal(session.hitPlace, "hall");
+
+  session.onSceneGraph(undefined);
+  assert.equal(session.hitPlace, undefined);
+
+  const copied: string[] = [];
+  const probe = createInfoProbe({
+    doors: [],
+    pickups: [],
+    props: [],
+    show() {},
+    copy: (text) => copied.push(text),
+  });
+  probe.onSceneGraph(frame(file));
+  const volumes = [{ id: 7, source: "wall", minX: 2.5, maxX: 3.5, minY: 0, maxY: 8, minZ: 3, maxZ: 3.2 }];
+  const look = () => probe.inspect({
+    now: 0,
+    origin: vec(3, 5, 0),
+    direction: vec(0, 0, 1),
+    leaves: new Map(),
+    volumes,
+    pawns: [],
+    radius: 0.4,
+    height: 1.8,
+    own,
+  });
+  look();
+  assert.deepEqual(copied, ["room"]);
+  probe.onSceneGraph(undefined);
+  look();
+  assert.deepEqual(copied, ["room", "wall"]);
+});
+
 test("a cab stop is the place under the rider, and a moving cab reports the shaft", () => {
   const file = placeFile();
   const graph = loadGraph(file);
