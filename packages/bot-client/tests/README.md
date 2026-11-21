@@ -43,6 +43,12 @@ scratch; the scripts here are the tracked record.
 `elevator-drive.ts`, `floor5-door.ts`, `floor5b.ts`, `return-center.ts`, `go-center.ts`,
 `stuck-test.ts`, `walk-via.ts`, `visit-remote.ts`.
 
+## Link / mailbox
+
+| Script | Use |
+|---|---|
+| `live-link.ts` | one persistent seat driven by a file mailbox: commands in `<dir>/inbox.ndjson`, events in `outbox.ndjson`, `status.json` every 250 ms; messages use the host `msg` frame (`to` = pawn id or `*`). One bot: `… live-link.ts --dir plan/dsh-tasks/live/122-link-a --label 122-link-a --name link-a`; two bots (operator spectating): a second instance with `122-link-b`/`link-b` |
+
 ## Read-only probes
 
 `probe-*.ts` — state/geometry/A* checks (pawns, pickups, doors, grid, seats, health,

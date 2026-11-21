@@ -2,10 +2,10 @@
  * Arena world model for a connected bot. No Node builtins and no WebSocket.
  * Snapshots supply pawn poses. Arena frames supply doors, keys, and the scene graph.
  */
-// ARCHITECTURE: The bot's arena model: pawns, doors, elevators, grenade poses, pickups, claims, scene graph, and regions.
+// ARCHITECTURE: The bot's arena model: pawns, doors, elevators, grenade poses, pickups, claims, messages, scene graph, and regions.
 // Wiring: connection.ts builds it from welcome/frames (including `t: "grenade"`); the brain reads it.
 import type { ArenaView } from "../../../src/shared/arena-view.js";
-import type { ClaimRow } from "../../../src/shared/bot-protocol.js";
+import type { ClaimRow, MsgRow } from "../../../src/shared/bot-protocol.js";
 import type { GrenadePose } from "../../../src/shared/grenade.js";
 import { yawFromQuat } from "../../../src/shared/look.js";
 import type { PickupKind, PickupPlacement } from "../../../src/shared/pickups.js";
@@ -82,13 +82,14 @@ type WorldPickup = {
 };
 
 /**
- * Per-client welcome state: pickups, doors, keys, role, scope, elevators, claims.
+ * Per-client welcome state: pickups, doors, keys, role, scope, elevators, claims, messages.
  */
 export type WelcomeState = {
   pickups: readonly string[];
   doors: readonly DoorState[];
   elevators?: readonly ElevatorCab[];
   claims?: readonly ClaimRow[];
+  messages?: boolean;
   players?: readonly number[];
   weapon?: string;
   ammo: number;
@@ -108,6 +109,8 @@ export type PoseSnapshot = {
 
 /** Stop poses kept for impact telemetry; older ones are dropped. */
 const LANDED_CAP = 16;
+/** Last host signal rows kept; older ones are dropped. */
+const MSG_RING = 64;
 
 /**
  * The bot's mutable arena model and the accessors the brain reads each tick.
@@ -140,6 +143,12 @@ export type BotWorld = {
   applyClaims(rows: readonly ClaimRow[]): void;
   /** True after a welcome/claims frame carried the field. */
   claimsSupported(): boolean;
+  /** Host signals, oldest first, bounded at 64 rows. A copy: mutating it does not touch the ring. */
+  messages(): readonly MsgRow[];
+  /** Append a host batch; the ring drops its oldest rows past 64. */
+  applyMessages(rows: readonly MsgRow[]): void;
+  /** True after a welcome or `msg` frame carried the capability. */
+  messagesSupported(): boolean;
   /** Placement leaf. Open and locked stay on `door()`. */
   doorBody(id: string): DoorBody | undefined;
   pickups(): readonly string[];
@@ -211,6 +220,9 @@ export function createBotWorld(view: WorldView): BotWorld {
   const landedPoses: GrenadePose[] = [];
   const claimRows = new Map<string, ClaimRow>();
   let sawClaims = false;
+  /** Host signal rows, oldest first, bounded by {@link MSG_RING}. */
+  const msgRows: MsgRow[] = [];
+  let sawMessages = false;
   const vitals = new Map<number, { entity: number; hp: number; dead: boolean }>();
   const players = new Set<number>();
   let ownedId: number | undefined;
@@ -276,6 +288,19 @@ export function createBotWorld(view: WorldView): BotWorld {
     },
     claimsSupported() {
       return sawClaims;
+    },
+    messages() {
+      return [...msgRows];
+    },
+    applyMessages(rows) {
+      for (const row of rows) {
+        msgRows.push({ ...row });
+        if (msgRows.length > MSG_RING) msgRows.shift();
+      }
+      sawMessages = true;
+    },
+    messagesSupported() {
+      return sawMessages;
     },
     doorBody(id: string) {
       return doorBodies.get(id);
@@ -361,6 +386,7 @@ export function createBotWorld(view: WorldView): BotWorld {
         for (const cab of welcome.elevators) cabs.set(cab.id, { ...cab });
       }
       if (welcome.claims) this.applyClaims(welcome.claims);
+      if (welcome.messages) sawMessages = true;
       if (welcome.players) this.applyPlayers(welcome.players);
       weapon = welcome.weapon;
       ammo = welcome.ammo;

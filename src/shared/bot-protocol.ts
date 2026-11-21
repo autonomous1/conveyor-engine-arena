@@ -3,7 +3,7 @@
  * No Node builtin imports, no filesystem, and no WebSocket package.
  */
 // ARCHITECTURE: Arena frame parsers and the small wire types for client and bot
-//   frames (health, doors, elevators, lasers, grenades, QA).
+//   frames (health, doors, elevators, lasers, grenades, QA, messages).
 // Wiring: client/net.ts parses snapshots; client/boot.ts and
 //   client/info-probe.ts parse arena frames; shared/info-probe.ts reads the
 //   scene-graph frame.
@@ -122,6 +122,15 @@ export type ClaimRow = { key: string; owner: number; expires: number };
 export type ClaimsFrame = { t: "claims"; rows: ClaimRow[] };
 
 /**
+ * One host-stamped bot signal. `to: 0` is broadcast.
+ */
+export type MsgRow = { from: number; to: number; seq: number; text: string; at: number };
+/**
+ * Host → client batch of bot signals; one frame per host tick.
+ */
+export type MsgFrame = { t: "msg"; rows: MsgRow[] };
+
+/**
  * Host → client arena frames. Elevator is cab state. Grenade is the replicated pose.
  */
 export type ArenaFrame =
@@ -137,6 +146,7 @@ export type ArenaFrame =
   | InventoryFrame
   | PlayersFrame
   | ClaimsFrame
+  | MsgFrame
   | SceneGraphFrame
   | RegionsFrame
   | TeleportResultFrame
@@ -157,6 +167,7 @@ export type WelcomeExtras = {
   scope?: string[];
   players?: number[];
   claims?: ClaimRow[];
+  messages?: boolean;
 };
 
 /**
@@ -184,6 +195,7 @@ export function parseArenaFrame(text: string): ArenaFrame | undefined {
   if (t === "inventory") return parseInventory(value);
   if (t === "players") return parsePlayers(value);
   if (t === "claims") return parseClaims(value);
+  if (t === "msg") return parseMsg(value);
   if (t === "sceneGraph") return parseSceneGraphFrame(value);
   if (t === "regions") return parseRegionsFrame(value);
   if (t === "teleportResult") return parseTeleportResult(value);
@@ -210,6 +222,32 @@ export function parseClaims(frame: unknown): ClaimsFrame | undefined {
   }
   rows.sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
   return { t: "claims", rows };
+}
+
+const MAX_MSG_ROWS = 64;
+
+/**
+ * Parses one `msg` frame: malformed rows are dropped, not fatal.
+ * @post A non-`msg` frame is `undefined`; rows past `MAX_MSG_ROWS` are dropped.
+ */
+export function parseMsg(frame: unknown): MsgFrame | undefined {
+  if (!frame || typeof frame !== "object" || Array.isArray(frame)) return undefined;
+  const rec = frame as Record<string, unknown>;
+  if (rec.t !== "msg" || !Array.isArray(rec.rows)) return undefined;
+  const rows: MsgRow[] = [];
+  for (const value of rec.rows) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) continue;
+    const row = value as Record<string, unknown>;
+    const { from, to, seq, at } = row;
+    if (typeof from !== "number" || !Number.isInteger(from) || from <= 0) continue;
+    if (typeof to !== "number" || !Number.isInteger(to) || to < 0) continue;
+    if (typeof seq !== "number" || !Number.isInteger(seq) || seq <= 0) continue;
+    if (typeof at !== "number" || !Number.isFinite(at)) continue;
+    if (typeof row.text !== "string") continue;
+    rows.push({ from, to, seq, text: row.text, at });
+    if (rows.length >= MAX_MSG_ROWS) break;
+  }
+  return { t: "msg", rows };
 }
 
 /**
@@ -390,6 +428,7 @@ export function parseWelcomeExtras(welcome: unknown): WelcomeExtras | undefined 
     keys: parsePickupSet(rec.keys) ?? [],
     ...(players !== undefined ? { players } : {}),
     ...(claims !== undefined ? { claims } : {}),
+    ...(rec.messages === true ? { messages: true } : {}),
     ...(role ? { role } : {}),
     ...(scope ? { scope } : {}),
   };

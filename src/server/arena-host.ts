@@ -29,6 +29,7 @@ import { createArenaFire } from "./fire.js";
 import { applyPawnModel, claimClearSpawn, createHeldInputs, placePawn, startPropAnimation, startWanderLoop, teleportBlockReason } from "./game.js";
 import { playerRoster } from "./players.js";
 import { createArenaClaims } from "./claims.js";
+import { createArenaMessages } from "./messages.js";
 import { shutDoorBoxes } from "../shared/bots/cover.js";
 import { despawnSeat, setSeatAlive } from "./seats.js";
 import { createArenaGrenades } from "./grenade.js";
@@ -164,6 +165,7 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
     if (elevators.length > 0) welcome.elevators = elevators;
     welcome.players = roster();
     welcome.claims = claimHost.snapshot();
+    welcome.messages = true;
     const owned = welcome.ownedEntityId;
     if (typeof owned === "number") {
       const weapon = kit.weaponOf(owned);
@@ -305,6 +307,13 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
     },
     log: (line) => console.error(line),
   });
+  const msgHost = createArenaMessages({
+    sendAll(frame) {
+      const text = encodeFrame(frame);
+      for (const clientId of engine.connected) engine.session(clientId)?.socket.send(text);
+    },
+    log: (line) => console.error(line),
+  });
   const elevatorHost = createArenaElevators({
     elevators: loaded.view.elevators ?? [],
     aabbs: loaded.view.aabbs,
@@ -440,7 +449,9 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
       const frame = encodeFrame({ t: "players", ids: rosterIds });
       for (const clientId of engine.connected) engine.session(clientId)?.socket.send(frame);
     }
-    claimHost.tick(Date.now());
+    const now = Date.now();
+    claimHost.tick(now);
+    msgHost.tick(now);
     reservedPads.clear();
     // The pickup gate is not the sense gate: grants filter by the manifest, the
     // bot sense must still see every pawn.
@@ -608,6 +619,7 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
           console.error("grenade threw", err);
         }
         claimHost.onFrame(clientId, frame, conn.claims?.scope, engine.replicator.get(clientId)?.ownedEntity);
+        msgHost.onFrame(clientId, frame, conn.claims?.scope, engine.replicator.get(clientId)?.ownedEntity);
         try {
           elevatorHost.onFrame(clientId, frame);
         } catch (err) {
@@ -632,6 +644,7 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
             held.drop(pawnId);
             fire.forgetBot(pawnId);
             claimHost.drop(pawnId);
+            msgHost.drop(pawnId);
             health.forget(pawnId);
             kit.forget(pawnId);
             grenades.drop(pawnId);

@@ -4,7 +4,7 @@
  * This file does not import `ws` or Node builtins. The CLI injects `openSocket`.
  */
 // ARCHITECTURE: The headless bot connection: hello/welcome, snapshot frames, reconnect, and the public BotSession.
-// Wiring: connectBot from the CLI and live tests; it composes BotWorld, BotInput, and the claim sender.
+// Wiring: connectBot from the CLI and live tests; it composes BotWorld, BotInput, and the claim and message senders.
 import { EngineClient } from "conveyor-engine-client";
 import { parseArenaFrame, parseWelcomeExtras } from "../../../src/shared/bot-protocol.js";
 import { asSnapshot, revive } from "../../../src/shared/wire.js";
@@ -65,7 +65,7 @@ export type ConnectBotOptions = {
 };
 
 /**
- * A live bot seat: world view, input frames, claim sender, and close().
+ * A live bot seat: world view, input frames, claim and message senders, and close().
  */
 export type BotSession = {
   world: BotWorld;
@@ -74,6 +74,7 @@ export type BotSession = {
     acquire(key: string, ttlMs: number): void;
     release(key: string): void;
   };
+  messages: { say(text: string, to?: number): boolean };
   spectate: boolean;
   close(): void;
 };
@@ -133,6 +134,16 @@ export async function connectBot(o: ConnectBotOptions): Promise<BotSession> {
       const ws = current;
       if (!ws || ws.readyState !== 1 || ownedId === undefined) return;
       ws.send(JSON.stringify({ v: 1, t: "release", key }));
+    },
+  };
+  const messages = {
+    say(text: string, to = 0): boolean {
+      const ws = current;
+      const body = text.trim();
+      if (!ws || ws.readyState !== 1 || ownedId === undefined) return false;
+      if (body.length === 0 || body.length > 256 || !Number.isInteger(to) || to < 0) return false;
+      ws.send(JSON.stringify({ v: 1, t: "msg", to, text: body }));
+      return true;
     },
   };
   const input = createBotInput({
@@ -319,6 +330,7 @@ export async function connectBot(o: ConnectBotOptions): Promise<BotSession> {
     world,
     input,
     claims,
+    messages,
     spectate: o.spectate === true,
     close() {
       stopped = true;
@@ -356,6 +368,7 @@ function applyArenaText(world: BotWorld, text: string, onLog?: (line: string) =>
   if (!frame) return;
   if (frame.t === "inventory") world.applyInventory(frame.keys);
   else if (frame.t === "claims") world.applyClaims(frame.rows);
+  else if (frame.t === "msg") world.applyMessages(frame.rows);
   else if (frame.t === "players") world.applyPlayers(frame.ids);
   else if (frame.t === "pickup") world.applyPickupGone(frame.id);
   else if (frame.t === "door") world.applyDoor(frame);

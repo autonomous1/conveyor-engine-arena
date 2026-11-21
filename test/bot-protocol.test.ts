@@ -28,7 +28,7 @@ const { loadSigner, mint } = await import("../src/server/auth/tokens.ts");
 const { placePawn } = await import("../src/server/game.ts");
 const { startArenaServer } = await import("../src/server/main.ts");
 const { loadArena } = await import("../src/server/world-loader.ts");
-const { parseArenaFrame, parseWelcomeExtras } = await import("../src/shared/bot-protocol.ts");
+const { parseArenaFrame, parseMsg, parseWelcomeExtras } = await import("../src/shared/bot-protocol.ts");
 const { doorUseVolume, useFrame } = await import("../src/shared/doors.ts");
 
 const HOUR_S = 60 * 60;
@@ -207,6 +207,19 @@ test("parseArenaFrame round-trips host frames and drops an unknown t", () => {
   assert.equal(parseWelcomeExtras({ type: "reject" }), undefined);
 });
 
+test("parseMsg drops bad rows and caps the batch", () => {
+  assert.deepEqual(parseArenaFrame(JSON.stringify({ t: "msg", rows: [] })), { t: "msg", rows: [] });
+  const good = { from: 7, to: 0, seq: 1, text: "hello", at: 1_000 };
+  const frame = parseMsg({
+    t: "msg",
+    rows: [good, { ...good, seq: 0 }, { ...good, from: -1 }, { ...good, text: 5 }],
+  });
+  assert.deepEqual(frame, { t: "msg", rows: [good] });
+  const many = Array.from({ length: 70 }, (_, i) => ({ from: 7, to: 0, seq: i + 1, text: `m${i}`, at: i }));
+  assert.equal(parseMsg({ t: "msg", rows: many })?.rows.length, 64);
+  assert.equal(parseMsg({ t: "claims", rows: [] }), undefined);
+});
+
 test("shared wire parsers do not import node", () => {
   for (const file of ["src/shared/wire.ts", "src/shared/bot-protocol.ts"]) {
     const text = readFileSync(file, "utf8");
@@ -232,6 +245,7 @@ test("inventory is owner-only, unlock keeps the key, and welcome repeats it", { 
     assert.notEqual(owner.owned(), other.owned());
     const welcome = parsed(owner.messages).find((frame) => frame.type === "welcome");
     assert.ok(welcome);
+    assert.equal(welcome.messages, true);
     assert.deepEqual(parseWelcomeExtras(welcome)?.keys, []);
     assert.equal(welcome.role, undefined);
     assert.equal(welcome.scope, undefined);
