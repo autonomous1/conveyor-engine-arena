@@ -8,7 +8,7 @@ described.
 The client's state — containers, keys, writers, lifetimes — is §13.
 
 Baseline (`984e20a`, 2026-11-14): 1,618 boxes, 98 doors, 4 cabs, 156 pickups,
-16 agents (`loadArena()`); 630 tests at that commit, 748 today (746 pass, 2 skipped). Target frame is 16.7 ms at 60 Hz.
+16 agents (`loadArena()`); 630 tests at that commit; 757 on 2026-11-21 (755 pass, 2 skipped). Target frame is 16.7 ms at 60 Hz.
 
 ## 1. Boot and composition
 

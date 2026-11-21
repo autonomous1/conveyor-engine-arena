@@ -243,3 +243,24 @@ the scoped-run split, the artifacts rule, the paste list).
 **In practice:** count `agents/task-template.md`, not this file. When a count in
 prose disagrees with the file it describes (slots, always-gates, scopes), the
 file wins and the prose is a model finding.
+
+## D12 — Host-mediated `msg` signal frame (task 121)
+
+A bot needs to signal a player without a chat log. The frame is host-mediated,
+like D10's claims: client → host `{ v: 1, t: "msg", to, text }` (untrusted; the
+host stamps `from` with the sender's pawn and never reads a client `from`); the
+host queues per sender and emits **at most one `msg` batch per tick** —
+`{ t: "msg", rows: [{ from, to, seq, text, at }] }`, `seq` per sender and
+monotonic, ≤4 rows/s and ≤64 queued. The welcome carries `messages: true`; the
+client keeps a 64-row ring, and `parseMsg` drops rows past `MAX_MSG_ROWS` (64).
+
+- **Scope:** the existing `chat` scope (bot and player have it; QA does not); no
+  new scope, no token change.
+- **Why one batch per tick, not per write:** claims rebroadcasts the whole table
+  on each write (~39 KB/s per client at 5 msg/s); a signal is fire-and-forget, so
+  the tick is the cost bound.
+- **Why the host stamps the sender:** it is the only arbiter and the only place
+  `from` can be trusted.
+- **Not a chat:** no persistence, no ordering across senders, no ack. A dropped
+  row is counted (`stats().dropped`) and logged; a `msgReject` frame is a
+  follow-up, not this design.

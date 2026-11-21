@@ -50,6 +50,8 @@ Existing `@invariant`s that protect this layer (from the codemap):
  (`src/shared/nav/route.ts`).
 - `resolvedScopes` — extras never remove a default scope
  (`src/server/auth/tokens.ts`).
+- `createArenaMessages` — one `seq` per sender, monotonic; a row leaves the
+ queue only by `tick` or `drop` (`src/server/messages.ts`).
 
 Missing, found by this review (report findings, not tags): the grenade body
 count has no invariant/limit; `releasePickupObstacle` relies on the length
@@ -82,6 +84,7 @@ stay in the sections linked below and in the codemap. `S`/`B`/`X`: see
 | X | kernel server | `engine` | `EngineWsServer` | clientId → gateway/replicator/session | kernel + `onHello` | per session |
 | S | door leaves + blockers | `doorHost` | §5, `doors.ts` `state` Map | door id → `DoorRuntime` | `sync`/`press` | boot-only; leaves mutate per press |
 | B | goal claims | `claimHost` | `claims.ts` `table` | goal key → `{owner, expires}` | `onFrame`, `tick` | TTL 5–120 s, default 30 (`claims.ts`) |
+| B | signal queue | `msgHost` | `messages.ts` `pending` + `seqBySender` | sender pawn → `MsgRow`; per-sender seq | `onFrame`, `tick`, `drop` | drained by `tick` (≤4 rows/s), queue ≤64, dropped on close |
 | S | cabs + riders | `elevatorHost` | §6, `elevators.ts` cabs | cab id → `Cab` (`riders`) | `step` | boot-only; riders per tick |
 | B | fire seq gates | `fire` | `fire.ts` `gates`, `botGates` | clientId / bot id → gate | `onFrame` | per session |
 | B | grenade bodies + gates | `grenades` | `grenade.ts` | gates per client; `bodies` array | `throwAs`, `tick` | body ≤ `GRENADE_LIFE_S` 4 s (`grenade.ts`); gates per session |
@@ -124,19 +127,21 @@ The roster frame is `playerRoster` (`players.ts`), a pure function over
 
 ### 13.5 Tick-owned and lifetime rules
 
-- Per tick the host mutates: `claimHost.tick(Date.now())` (`arena-host.ts`),
+- Per tick the host mutates: `claimHost.tick(now)` and `msgHost.tick(now)`
+ (`arena-host.ts`, one `Date.now()`),
  `reservedPads.clear()`, the pickup `take`, and
  `grenades.tick()` / `botSense.update()` / `botBrain.update()` / `botLabels.update()`. The tick's order is §2. `held` is replaced by `admit` per input frame
  and dropped for unowned entities by the loop (`game.ts`).
 - On close (`arena-host.ts`): `despawnSeat`, `held.drop`, `fire.forgetBot`,
- `claimHost.drop`, `health.forget`, `kit.forget`, `grenades.drop`,
+ `claimHost.drop`, `msgHost.drop(pawnId)`, `health.forget`, `kit.forget`, `grenades.drop`,
  `reservedPads.delete`; `doorHost.drop(clientId)`.
 - On seat reuse in hello: `held.drop`, `kit.forget`, `pickupHost.forget`,
  `fire.forgetBot`. On teleport: `held.drop`.
 - On `stop`: the snapshot jobs and their timers, both deny
  logs, then `stopLoop()`.
 - TTLs: snapshot job 3 s, claim row 5–120 s (`claims.ts`), deny log
- 60 s (`rate-limited-log.ts`), grenade body 4 s (`grenade.ts`).
+ 60 s (`rate-limited-log.ts`), grenade body 4 s (`grenade.ts`); the msg queue
+ drains per tick (≤4 rows/s, ≤64 queued, `messages.ts`).
 - A restart loses every container here; only `loaded` is rebuilt (`world-loader.ts`).
 
 ### Ownership graph

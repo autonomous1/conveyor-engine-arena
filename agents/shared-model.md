@@ -69,10 +69,12 @@ linked from the `X` rows rather than restated here.
 |---|---|---|---|---|---|---|
 | X | snapshot envelope | `revive` (`wire.ts`), `asSnapshot`; kernel `IncomingSnapshot` | revived tree → client snapshot | — | client `net.ts` per frame → client §13 | per snapshot; **trusted but unvalidated** |
 | X | inbound arena frames | `parseArenaFrame` (`bot-protocol.ts`); `ArenaFrame` union | frames | `t` → frame | client/host per frame → host §13 | **untrusted**; finite checks non-uniform |
-| X | welcome extras | `parseWelcomeExtras`; `WelcomeExtras` | object | ammo/keys/scope/claims | host welcome | once per connection |
+| X | welcome extras | `parseWelcomeExtras`; `WelcomeExtras` | object | ammo/keys/scope/claims/messages | host welcome | once per connection |
 | X | spawn row | `spawnFrame` (`spawn-frame.ts`), `parseSpawn`; `SpawnFrame` | row | entity id → pose | host frame / client parse | per spawn |
 | X | QA result frames | `parseSnapshotResult` (`bot-protocol.ts`), `parseQaCapture` | frames | request id | client reply | per request |
 | X | fire / grenade input | `parseFire` (`hitscan.ts`), `parseGrenade` (`grenade.ts`) | frames | seq → shot | client input → host §13 gates | per frame, seq-gated |
+| X | bot signals in | `parseMsg` (`bot-protocol.ts`), `MsgRow`; `ArenaMessages.onFrame` (`server/messages.ts`) | rows | sender pawn → text/to | client `msg` frame → host §13.2 queue | untrusted; `chat` scope, text 1–256, `from` never read from the client |
+| X | bot signals out | `MsgFrame` (`bot-protocol.ts`), `MAX_MSG_ROWS` 64; `parseMsg` | rows | one `msg` batch per tick, host-stamped `from`/`seq`/`at` | host `tick` → `sendAll` | ≤4 rows/s, ≤64 rows/frame; 64-row client ring |
 
 ### 13.2 Baked and manifest inputs
 

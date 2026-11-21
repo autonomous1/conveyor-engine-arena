@@ -891,3 +891,32 @@ second lint).
 
 The full suite takes **11.5 minutes** (748 tests, 4 cores) — the reason the
 scoped loop matters and the per-file iteration rule exists.
+
+## 22. Task 121 model updates: the `msg` frame (2026-11-21)
+
+Source: `plan/dsh-tasks/reports/121-msg-frame.md`. The coder listed four model
+items; all landed, plus one section the report did not name.
+
+| Item | Change |
+|---|---|
+| host §13.2 | `msgHost` row: `messages.ts` `pending` + `seqBySender`; `onFrame`/`tick`/`drop`; drained per tick (≤4 rows/s), queue ≤64, dropped on close |
+| host §13.5 | `claimHost.tick(now)` + `msgHost.tick(now)` share one `Date.now()` per tick; `msgHost.drop(pawnId)` on close; the queue noted in the TTL line |
+| **host-flow §2** | *not in the report*: the `onTick` order now starts with the claim/msg tick (`arena-host.ts:453`) — the flow half had the old order |
+| shared §13.1 | `bot signals in` (untrusted, `chat` scope, text 1–256, `from` host-stamped) and `bot signals out` (one batch/tick, ≤4 rows/s, `MAX_MSG_ROWS` 64, 64-row client ring) rows; welcome extras gains `messages` |
+| shared-flow §2 | one sentence: the `msg` frame is fire-and-forget, counted not acked |
+| decisions | **D12** appended: host-mediated signal frame, the `chat` scope, one batch per tick, not a chat |
+
+One deviation from the report: it suggested the `createArenaMessages`
+`@invariant` go in `shared-model` §11, but the module is `src/server/messages.ts`
+— a host container. It went to **host §12**, where the other host invariants
+live; shared §11 keeps the contract rows.
+
+Test count refreshed twice in a day (748 → 757); if it keeps drifting, the KB
+line should carry a date rather than "today". 757 (755 pass, 2 skipped) in 720 s.
+
+Not model work, from the same report: `connection.say` has no unit test, and the
+host rejection is silent to the sender (`msgReject` is a follow-up). Those are
+designer/coder items.
+
+Gates: modev check green (lints + 11 tests + self-check), `drift` clean,
+`test:scope meta` 37/37.

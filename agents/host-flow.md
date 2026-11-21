@@ -57,7 +57,8 @@ path, 50 ms (`TICK_MS`). One tick, in order:
  `steerUnownedWander` then `stepUnownedWander`.
 6. Respawn timers.
 7. `commitShielded` for riders/noclip, else `world.commit`.
-8. `onTick`: pickup grant + obstacle release, grenade tick, bot
+8. `onTick`: `claimHost.tick(now)` + `msgHost.tick(now)` (one `Date.now()` per
+ tick), then pickup grant + obstacle release, grenade tick, bot
  sense, bot brain, bot labels — in that order (`arena-host.ts`).
 9. Publish replication envelopes and send one snapshot per client
  (`game.ts`), then health frames and audit.
