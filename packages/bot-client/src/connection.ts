@@ -178,6 +178,9 @@ export async function connectBot(o: ConnectBotOptions): Promise<BotSession> {
       client.connect(owned, clientId);
       input.resetSeq();
     }
+    if (extras?.hp !== undefined && Number.isFinite(owned) && owned > 0) {
+      world.applyHealth({ entity: owned, hp: extras.hp, dead: extras.dead === true });
+    }
     if (o.role && extras?.role && extras.role !== o.role) {
       o.onLog?.(`welcome role ${extras.role} != ${o.role}`);
     }

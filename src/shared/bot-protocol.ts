@@ -155,6 +155,8 @@ export type ArenaFrame =
 
 /**
  * Welcome Extras type.
+ * @why The health frame is change-driven (unseen `hp|dead` only), so a pawn that
+ *      never takes damage is never sent one; the welcome seeds the owner's vital.
  */
 export type WelcomeExtras = {
   pickups: string[];
@@ -168,6 +170,9 @@ export type WelcomeExtras = {
   players?: number[];
   claims?: ClaimRow[];
   messages?: boolean;
+  /** The owned pawn's vital at join. Absent means unknown — never 0, never dead. */
+  hp?: number;
+  dead?: boolean;
 };
 
 /**
@@ -419,6 +424,8 @@ export function parseWelcomeExtras(welcome: unknown): WelcomeExtras | undefined 
   const elevators = Array.isArray(rec.elevators) ? parseElevatorSet(rec.elevators) : undefined;
   const players = Array.isArray(rec.players) ? parsePlayers({ t: "players", ids: rec.players })?.ids : undefined;
   const claims = Array.isArray(rec.claims) ? parseClaims({ t: "claims", rows: rec.claims })?.rows : undefined;
+  const hp = typeof rec.hp === "number" && Number.isFinite(rec.hp) ? rec.hp : undefined;
+  const dead = typeof rec.dead === "boolean" ? rec.dead : undefined;
   return {
     pickups: parsePickupSet(rec.pickups) ?? [],
     doors: parseDoorSet(rec.doors) ?? [],
@@ -429,6 +436,7 @@ export function parseWelcomeExtras(welcome: unknown): WelcomeExtras | undefined 
     ...(players !== undefined ? { players } : {}),
     ...(claims !== undefined ? { claims } : {}),
     ...(rec.messages === true ? { messages: true } : {}),
+    ...(hp !== undefined && dead !== undefined ? { hp, dead } : {}),
     ...(role ? { role } : {}),
     ...(scope ? { scope } : {}),
   };

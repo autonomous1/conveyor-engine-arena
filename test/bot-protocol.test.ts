@@ -197,12 +197,16 @@ test("parseArenaFrame round-trips host frames and drops an unknown t", () => {
     keys: [],
     role: "bot",
     scope: ["play", "chat", "scene-graph"],
+    hp: 100,
+    dead: false,
     scopes: ["ignored"],
   });
   assert.equal(stamped?.role, "bot");
   assert.deepEqual(stamped?.scope, ["play", "chat", "scene-graph"]);
   assert.equal(stamped?.weapon, "alien-weapon-enh");
   assert.equal(stamped?.ammo, 10);
+  assert.equal(stamped?.hp, 100);
+  assert.equal(stamped?.dead, false);
   assert.equal(stamped?.elevators?.[0]?.id, "e");
   assert.equal(parseWelcomeExtras({ type: "reject" }), undefined);
 });
@@ -246,6 +250,8 @@ test("inventory is owner-only, unlock keeps the key, and welcome repeats it", { 
     const welcome = parsed(owner.messages).find((frame) => frame.type === "welcome");
     assert.ok(welcome);
     assert.equal(welcome.messages, true);
+    assert.equal(welcome.hp, 100);
+    assert.equal(welcome.dead, false);
     assert.deepEqual(parseWelcomeExtras(welcome)?.keys, []);
     assert.equal(welcome.role, undefined);
     assert.equal(welcome.scope, undefined);

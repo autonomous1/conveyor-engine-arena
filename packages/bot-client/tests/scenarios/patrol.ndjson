@@ -1,0 +1,2 @@
+{"send":{"t":"cmd","id":"p1","name":"patrol","args":{"places":["brutalist-building-2-cbake-1.s1","brutalist-building-2-cbake-1.rect21094-3-6"],"minutes":2}},"await":"done","timeoutMs":180000,"expect":{"ok":true}}
+{"send":{"t":"cmd","id":"q1","name":"status"},"await":"status","timeoutMs":10000}

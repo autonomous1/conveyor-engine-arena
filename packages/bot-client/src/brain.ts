@@ -961,7 +961,10 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
       planAt = Date.now();
       pending = "";
       lastReason = reason;
-      if (!plan) return satisfies(worldState(), goal.want) ? 0 : 2;
+      if (!plan) {
+        log("no plan: unsatisfiable");
+        return satisfies(worldState(), goal.want) ? 0 : 2;
+      }
     } else {
       watchPickups = parts.pickups;
     }

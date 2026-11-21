@@ -396,6 +396,28 @@ serial("two patrol bots do not overlap for more than a second", async () => {
   }
 }, 90_000);
 
+serial("an unreachable goal names a no-plan reason", async () => {
+  const arena = await boot(FIXTURE);
+  let bot: Awaited<ReturnType<typeof connectBot>> | undefined;
+  try {
+    const token = readFileSync(arena.tokenFile, "utf8").trim();
+    bot = await connectBot({ url: arena.host.url, token, role: "bot", openSocket, name: "bot-1" });
+    await until(() => bot?.world.self(), 5_000, "owned pawn");
+    const io = capture();
+    const mission = parseMission("reach:no-such-place");
+    assert.ok(mission);
+    const code = await runMission(bot, mission, { timeoutMs: 10_000, ...ioOf(io) });
+    assert.equal(code, 2);
+    assert.ok(
+      io.log.some((line) => line.startsWith("no plan:")),
+      `no no-plan line; log:\n${io.log.join("\n")}`,
+    );
+  } finally {
+    bot?.close();
+    await arena.close();
+  }
+}, 30_000);
+
 serial("omitting the game root still loads arena-1", async () => {
   const host = await withEnv({
     ARENA_GAME_ROOT: undefined,

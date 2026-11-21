@@ -1,0 +1,4 @@
+{"send":{"t":"cmd","id":"c1","name":"arm","args":{}},"await":"done","timeoutMs":180000,"expect":{"ok":true}}
+{"send":{"t":"cmd","id":"q1","name":"status"},"await":"status","timeoutMs":10000,"expect":{"weapon":"alien-weapon-enh"}}
+{"send":{"t":"cmd","id":"g1","name":"goto","args":{"place":"outside"}},"await":"done","timeoutMs":120000,"expect":{"ok":true}}
+{"send":{"t":"cmd","id":"q2","name":"status"},"await":"status","timeoutMs":10000,"expect":{"place":"outside"}}

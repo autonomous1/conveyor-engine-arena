@@ -43,6 +43,12 @@ scratch; the scripts here are the tracked record.
 `elevator-drive.ts`, `floor5-door.ts`, `floor5b.ts`, `return-center.ts`, `go-center.ts`,
 `stuck-test.ts`, `walk-via.ts`, `visit-remote.ts`.
 
+## Command host
+
+| Script | Use |
+|---|---|
+| `command-host.ts` | one persistent seat as a message-driven command surface: `arm`/`reload`/`hunt` (laser)/`patrol`/`goto`/`stand`/`status` handlers, `start`/`done`/`fail` events to the sender with the mission counters (`kills`/`shots`/`places`/`ammo`), packed `status` (≤256). Commands in via the mailbox (`{"cmd":"task","id","name","args"}`) or a `msg` row (`{"t":"cmd",…}`); `--scenario scenarios/hunt-laser.ndjson` or `scenarios/patrol.ndjson` replays a chain over the msg loopback |
+
 ## Link / mailbox
 
 | Script | Use |

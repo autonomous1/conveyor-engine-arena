@@ -168,6 +168,9 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
     welcome.messages = true;
     const owned = welcome.ownedEntityId;
     if (typeof owned === "number") {
+      const vital = health.get(owned);
+      welcome.hp = vital.hp;
+      welcome.dead = vital.dead;
       const weapon = kit.weaponOf(owned);
       const ammo = kit.ammoOf(owned);
       if (weapon) welcome.weapon = weapon;

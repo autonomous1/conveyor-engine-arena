@@ -209,6 +209,8 @@ test("headless bot connects, models the arena, and moves", { timeout: 120_000 },
       sessions.push(session);
       const self = await until(() => session.world.self(), 5_000, "no owned pawn");
       assert.equal(self.kind, "pawn");
+      assert.equal(session.world.healthOf(self.id)?.hp, 100);
+      assert.equal(session.world.healthOf(self.id)?.dead, false);
       const pads = view.playerSpawns ?? [];
       assert.equal(pads.length, 3);
       const near = pads.some((pad) => Math.hypot(self.x - pad.x, self.z - pad.z) <= 0.5);
