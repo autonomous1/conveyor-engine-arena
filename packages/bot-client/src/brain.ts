@@ -242,7 +242,7 @@ function planPursuit(
 /**
  * Shoot a named pawn until its health frame says dead, it disappears, the bot
  * runs out of ammo or dies, or the deadline passes.
- * @post Returns 0 on dead, 2 on refused/lost/no_ammo/died/no_dag, 3 on
+ * @post Returns 0 on dead, 2 on refused/lost/no_ammo/died/no_dag/retreat, 3 on
  *       timeout; no shot whose eye-to-target corridor contains a player.
  */
 export async function runAttack(session: BotSession, targetId: number, opts: BrainOptions = {}): Promise<number> {
@@ -272,9 +272,77 @@ export async function runAttack(session: BotSession, targetId: number, opts: Bra
     return 2;
   }
   const deadline = Date.now() + (opts.timeoutMs ?? 60_000);
+  // Policy knobs live here, not at module scope, so the codemap delta of this
+  // change stays a line shift.
+  /**
+   * Fire band: inside it stand and shoot, closer back-step, farther pursue.
+   * @why point-blank fighting at respawn time is how the 125 hunts died.
+   */
+  const FIRE_MIN_M = 12;
+  const FIRE_MAX_M = 18;
+  /**
+   * The body turns before the shot.
+   * @why the fire frame's yaw is authoritative, so the body must turn first or the
+   *      shot leaves a sideways pawn.
+   */
+  const FACE_SETTLE_MS = 150;
+  const FACE_RAD = 0.05;
+  /** Hold cover when wounded; break contact when nearly dead or surrounded. */
+  const COVER_REACH_M = 0.6;
+  const RETREAT_HP = 25;
+  const RETREAT_THREATS = 2;
+  const RETREAT_THREAT_M = 8;
+  const RETREAT_ESCAPE_M = 18;
+  const RETREAT_MAX_MS = 6_000;
+  const STANDOFF_LOG_MS = 500;
+  /** Non-player pawns within `radius` of `me`. */
+  const threatsNear = (me: { x: number; z: number }, radius: number): number => {
+    const players = session.world.playerIds();
+    let count = 0;
+    for (const pawn of session.world.others()) {
+      if (players.has(pawn.id)) continue;
+      if (Math.hypot(pawn.x - me.x, pawn.z - me.z) <= radius) count += 1;
+    }
+    return count;
+  };
+  /**
+   * Back away from the threat centroid (or `fallback` when none is near) until the
+   * nearest threat is out of range, the retreat cap passes, or the deadline does.
+   */
+  const retreatFrom = async (me: { x: number; z: number }, fallback: { x: number; z: number }, until: number): Promise<void> => {
+    const players = session.world.playerIds();
+    let sumX = 0;
+    let sumZ = 0;
+    let count = 0;
+    for (const pawn of session.world.others()) {
+      if (players.has(pawn.id)) continue;
+      if (Math.hypot(pawn.x - me.x, pawn.z - me.z) > RETREAT_THREAT_M) continue;
+      sumX += pawn.x;
+      sumZ += pawn.z;
+      count += 1;
+    }
+    const from = count > 0 ? { x: sumX / count, z: sumZ / count } : fallback;
+    const away = Math.atan2(me.x - from.x, me.z - from.z);
+    while (Date.now() < until) {
+      const nowSelf = session.world.self();
+      if (!nowSelf) return;
+      let nearest = Infinity;
+      for (const pawn of session.world.others()) {
+        if (players.has(pawn.id)) continue;
+        nearest = Math.min(nearest, Math.hypot(pawn.x - nowSelf.x, pawn.z - nowSelf.z));
+      }
+      if (nearest > RETREAT_ESCAPE_M) return;
+      session.input.sendInput({ ...moveIntent(away, 1, 0), yaw: away });
+      await delay(50);
+    }
+  };
   const cache = createNavCache();
   let approached = false;
   let nextFire = 0;
+  let nextStandoffLog = 0;
+  let facing = false;
+  /** Chosen cover point while wounded; `broken` samples the target's LOS. */
+  let coverHold: { x: number; z: number; broken: boolean | undefined } | undefined;
   let tick = 0;
   const seen: Array<{ x: number; z: number; at: number }> = [];
   let pursuit: { follower: ReturnType<typeof createFollower>; target: { x: number; z: number }; at: number } | undefined;
@@ -305,27 +373,49 @@ export async function runAttack(session: BotSession, targetId: number, opts: Bra
       return 2;
     }
     const health = session.world.health();
-    const coverDag = health && health.hp < 50 ? session.world.spatialDag() : undefined;
-    if (health && health.hp < 50 && coverDag) {
-      const cover = nearestCover(coverDag, session.world.sceneGraph(), me, target, { dynamic: shutDoorBoxes(session) });
-      if (cover) {
-        session.input.sendInput({ moveX: cover.x - me.x, moveZ: cover.z - me.z, yaw: Math.atan2(cover.x - me.x, cover.z - me.z) });
-        log(`attack: cover hp=${health.hp} score=${cover.score.toFixed(2)}`);
-        await delay(100);
-        continue;
-      }
-    }
-    if (session.world.ammo() <= 0) {
-      log("attack: no_ammo");
-      return 2;
-    }
     const eye = { x: me.x, y: me.y + session.world.pawnHeight * 0.8, z: me.z };
     const targetPoint = { x: target.x, y: target.y + session.world.pawnHeight * 0.75, z: target.z };
     const dx = targetPoint.x - eye.x;
     const dz = targetPoint.z - eye.z;
     const range = Math.hypot(dx, dz);
     const los = hasLineOfSightDag(dag, eye, targetPoint);
-    if (range > 18 || !los) {
+    // Fight or flee before trading: a nearly dead or surrounded bot breaks contact.
+    const threats = threatsNear(me, RETREAT_THREAT_M);
+    if (health && (health.hp < RETREAT_HP || threats >= RETREAT_THREATS)) {
+      log(`attack: retreat hp=${health.hp} threats=${threats}`);
+      // The retreat shares the attack deadline; `now` is this tick's clock.
+      await retreatFrom(me, target, Math.min(deadline, now + RETREAT_MAX_MS));
+      return 2;
+    }
+    // Wounded: reach the cover point once, then hold it without firing.
+    if (health && health.hp < 50) {
+      if (!coverHold) {
+        const cover = nearestCover(dag, session.world.sceneGraph(), me, target, { dynamic: shutDoorBoxes(session) });
+        if (cover) coverHold = { x: cover.x, z: cover.z, broken: undefined };
+      }
+      const hold = coverHold;
+      if (hold) {
+        if (Math.hypot(hold.x - me.x, hold.z - me.z) > COVER_REACH_M) {
+          const yaw = Math.atan2(hold.x - me.x, hold.z - me.z);
+          session.input.sendInput({ ...moveIntent(yaw, 1, 0), yaw });
+        } else {
+          const broken = !hasLineOfSightDag(dag, eye, targetPoint);
+          if (broken !== hold.broken) {
+            hold.broken = broken;
+            log(`attack: cover hold hp=${health.hp} broken=${broken}`);
+          }
+        }
+        await delay(100);
+        continue;
+      }
+    } else {
+      coverHold = undefined;
+    }
+    if (session.world.ammo() <= 0) {
+      log("attack: no_ammo");
+      return 2;
+    }
+    if (range > FIRE_MAX_M || !los) {
       const pose: Pose = { x: me.x, y: me.y, z: me.z, vx: 0, vz: 0, yaw: me.yaw };
       const stale = pursuit === undefined
         || now - pursuit.at >= PURSUE_REPLAN_MS
@@ -361,17 +451,32 @@ export async function runAttack(session: BotSession, targetId: number, opts: Bra
       }
       if (!approached) { approached = true; log("attack: approach"); }
     } else {
-      const yaw = Math.atan2(dx, dz);
+      const aimYaw = Math.atan2(dx, dz);
       const pitch = Math.atan2(targetPoint.y - eye.y, range);
-      if (now >= nextFire) {
+      if (Math.abs(angleDiff(me.yaw, aimYaw)) > FACE_RAD) {
+        if (!facing) {
+          facing = true;
+          log(`attack: face yaw=${aimYaw.toFixed(2)} pose=${me.yaw.toFixed(2)}`);
+        }
+        session.input.sendInput({ moveX: 0, moveZ: 0, yaw: aimYaw });
+        await delay(FACE_SETTLE_MS);
+        continue;
+      }
+      if (range < FIRE_MIN_M) {
+        session.input.sendInput({ ...moveIntent(aimYaw, -1, 0), yaw: aimYaw });
+        if (now >= nextStandoffLog) {
+          nextStandoffLog = now + STANDOFF_LOG_MS;
+          log(`attack: standoff range=${range.toFixed(1)}`);
+        }
+      } else if (now >= nextFire) {
         const player = session.world.others().find((pawn) => session.world.playerIds().has(pawn.id)
           && playerOnSegment(eye, targetPoint, pawn, session.world.pawnRadius, session.world.pawnHeight));
         if (player) {
           log(`attack: friendly_blocked id=${player.id}`);
         } else {
           nextFire = now + 250;
-          session.input.fire(yaw, pitch);
-          log(`attack: fire range=${range.toFixed(1)} los=${los ? "yes" : "no"}`);
+          session.input.fire(aimYaw, pitch);
+          log(`attack: fire range=${range.toFixed(1)} los=${los ? "yes" : "no"} yaw=${aimYaw.toFixed(2)}`);
         }
       }
     }
@@ -962,7 +1067,7 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
       pending = "";
       lastReason = reason;
       if (!plan) {
-        log("no plan: unsatisfiable");
+        log(`no plan: ${noPlanReason(session, stand?.place ?? placeWanted(goal), pose, gate)}`);
         return satisfies(worldState(), goal.want) ? 0 : 2;
       }
     } else {
@@ -1307,6 +1412,29 @@ function angleDiff(a: number, b: number): number {
 function satisfies(state: WorldState, want: WorldState): boolean {
   for (const key in want) if ((state[key] ?? false) !== want[key]) return false;
   return true;
+}
+
+/** The place a goal names, if any (`at` for reach goals; stand goals use the stand). */
+function placeWanted(goal: Goal): string | undefined {
+  const at = goal.want.at;
+  return typeof at === "string" ? at : undefined;
+}
+
+/**
+ * Why the plan was empty. A goal behind a locked door whose key is not held is
+ * named `door-locked`; anything else stays `unsatisfiable`.
+ * @post Lowercase-hyphen, matching the command host's `no plan: ([a-z-]+)` capture.
+ */
+function noPlanReason(session: BotSession, place: string | undefined, pose: Pose, gate: (portal: ScenePortal) => Gate): string {
+  if (!place) return "unsatisfiable";
+  const graph = session.world.sceneGraph();
+  if (!graph || !graph.placeById.has(place)) return "unsatisfiable";
+  const route = planRoute(graph, pose, place, gate);
+  const alt = route.lockedAlternative;
+  if (!alt || alt.doors.length === 0) return "unsatisfiable";
+  const held = new Set(session.world.keys());
+  const blocked = alt.doors.some((door) => door.key === undefined || !held.has(door.key));
+  return blocked ? "door-locked" : "unsatisfiable";
 }
 
 function delay(ms: number): Promise<void> {

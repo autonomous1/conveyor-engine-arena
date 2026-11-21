@@ -520,6 +520,9 @@ export function estimateSeconds(
     if (mode === undefined) {
       // `at` may be `pickup:<id>` or `door:<id>` after that step finishes.
       const spots = spotsOf(at, s);
+      // A door token does not record the side it was reached from; one side may
+      // be the goal place itself, which is a zero-metre walk, not a locked route.
+      if (spots.includes(place)) return pickupS;
       const spot = spots.find((id) => ctx.graph.placeById.has(id));
       if (spot) classify(spot, s);
     }

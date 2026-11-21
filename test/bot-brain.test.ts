@@ -278,6 +278,26 @@ serial("retrieve with the key removed exits 2", async () => {
   }
 }, 20_000);
 
+serial("a reach behind a locked door with no key fails as door-locked", async () => {
+  const root = noKeyRoot();
+  const arena = await boot(root);
+  try {
+    const io = capture();
+    const started = Date.now();
+    const code = await runCli([
+      "run", "--url", arena.host.url, "--token-file", arena.tokenFile,
+      "--goal", "reach:room-b", "--timeout-s", "10", "--name", "nokey-reach",
+    ], ioOf(io));
+    const wall = Date.now() - started;
+    assert.equal(code, 2, [...io.log, ...io.error].join("\n"));
+    assert.ok(wall < 2_000, `wall ${wall}ms`);
+    assert.ok(io.log.some((line) => line.includes("no plan: door-locked")), io.log.join("\n"));
+  } finally {
+    await arena.close();
+    rmSync(root, { recursive: true, force: true });
+  }
+}, 20_000);
+
 serial("yaw pi and moveIntent(pi, 1, 0) travels at least 3 m in -Z", async () => {
   const arena = await boot(FIXTURE);
   try {

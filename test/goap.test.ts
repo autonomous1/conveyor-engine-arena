@@ -4,12 +4,13 @@ import { dirname, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import type { ArenaView } from "../src/shared/arena-view.ts";
-import { createBotContext, groundActions, placeOfPickup } from "../dist/shared/bots/actions.js";
-import { armUp, idle, reach, retrieve } from "../dist/shared/bots/goals.js";
+import { createBotContext, estimateSeconds, groundActions, placeOfPickup } from "../dist/shared/bots/actions.js";
+import { armUp, idle, reach, retrieve, standAt } from "../dist/shared/bots/goals.js";
 import { chooseGoal, plan, type Goal, type WorldState } from "../dist/shared/bots/goap.js";
 import { HAS_WEAPON, availFact, buildWorldState } from "../dist/shared/bots/state.js";
 import type { PickupPlacement } from "../src/shared/pickups.ts";
 import { parseSceneGraph, type SceneGraph } from "../dist/shared/scene-graph.js";
+import { standKey } from "../dist/shared/nav/stand.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..");
@@ -129,6 +130,28 @@ test("an open door is not a key detour", () => {
   assert.equal(result.steps.includes("pickup:key"), false);
   assert.equal(result.steps.some((step) => step.startsWith("unlock:")), false);
   assert.equal(result.steps.at(-1), "pickup:prize");
+});
+
+test("a key at the door plans the unlock before the walk in", () => {
+  const graph = loadGraph();
+  const pickups = items();
+  const target = { kind: "point", x: 2, y: 0, z: 2 } as const;
+  const stand = { place: "hall-b.room-1", key: standKey(target), x: 2, y: 0, z: 2, yaw: 0 };
+  const goal = standAt(target);
+  const actions = groundActions(graph, pickups, [goal], stand);
+  const ctx = createBotContext(graph, pickups);
+  const state = buildWorldState({
+    at: `door:${DOOR}`,
+    pickups: ["prize"],
+    heldKeys: ["key"],
+    doors: doorsOf([DOOR]),
+  });
+  // The brain passes this exact heuristic; at a door token it must not prune.
+  const opts = { minCost: ctx.minActionS, heuristic: estimateSeconds(goal, ctx, pickups, stand) };
+  const result = plan(state, goal, actions, ctx, opts);
+  assert.ok(result, "no plan at the door with the key held");
+  assert.ok(result.steps.includes(`unlock:${DOOR}`), result.steps.join(","));
+  assert.ok(result.steps.indexOf(`unlock:${DOOR}`) < result.steps.indexOf("goTo:hall-b.room-1"), result.steps.join(","));
 });
 
 test("one key unlocks every leaf that names it", () => {

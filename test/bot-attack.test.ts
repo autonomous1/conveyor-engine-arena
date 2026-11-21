@@ -14,18 +14,33 @@ function session() {
   world.applySnapshot({
     spawns: [
       { entity: 1, view: { position: { x: 0, y: 0, z: 0 }, rotation: { y: 0, w: 1 } } },
-      { entity: 7, view: { position: { x: 10, y: 0, z: 0 }, rotation: { y: 0, w: 1 } } },
+      { entity: 7, view: { position: { x: 14, y: 0, z: 0 }, rotation: { y: 0, w: 1 } } },
     ],
   });
   const fired: Array<{ yaw: number; pitch: number }> = [];
   const sent: Array<{ moveX: number; moveZ: number; yaw: number }> = [];
+  /** Inputs and shots in discharge order, for the "face precedes fire" check. */
+  const events: Array<{ kind: "input" | "fire"; yaw: number }> = [];
   const input = {
-    sendInput(command: { moveX: number; moveZ: number; yaw: number }) { sent.push(command); },
-    fire(yaw: number, pitch: number) { fired.push({ yaw, pitch }); return true; },
+    sendInput(command: { moveX: number; moveZ: number; yaw: number }) {
+      sent.push(command);
+      events.push({ kind: "input", yaw: command.yaw });
+      // The host turns the body to the input's yaw; the stub does the same so a
+      // face step settles and the next tick can fire.
+      const half = command.yaw / 2;
+      world.applySnapshot({
+        spawns: [{ entity: 1, view: { position: { x: 0, y: 0, z: 0 }, rotation: { y: Math.sin(half), w: Math.cos(half) } } }],
+      });
+    },
+    fire(yaw: number, pitch: number) {
+      fired.push({ yaw, pitch });
+      events.push({ kind: "fire", yaw });
+      return true;
+    },
     grenade() { return true; },
   };
   (world as { spatialDag?: () => unknown }).spatialDag = () => ({ hash: "test", nodes: [], chunks: [], byId: new Map() });
-  return { world, input, fired, sent, session: { world, input, claims: { acquire() {}, release() {} } } as never };
+  return { world, input, fired, sent, events, session: { world, input, claims: { acquire() {}, release() {} } } as never };
 }
 
 test("attack_mission_parses_positive_ids_only", () => {
@@ -106,7 +121,7 @@ test("attack_does_not_fire_through_a_player", async () => {
     spawns: [{ entity: 8, view: { position: { x: 5, y: 0, z: 0 }, rotation: { y: 0, w: 1 } } }],
   });
   const blockedLogs: string[] = [];
-  await runAttack(blocked.session, 7, { timeoutMs: 180, log: (line) => blockedLogs.push(line) });
+  await runAttack(blocked.session, 7, { timeoutMs: 500, log: (line) => blockedLogs.push(line) });
   assert.equal(blocked.fired.length, 0);
   assert.ok(blockedLogs.some((line) => line.includes("friendly_blocked")));
 
@@ -116,8 +131,48 @@ test("attack_does_not_fire_through_a_player", async () => {
   clear.world.applySnapshot({
     spawns: [{ entity: 8, view: { position: { x: 5, y: 0, z: 4 }, rotation: { y: 0, w: 1 } } }],
   });
-  await runAttack(clear.session, 7, { timeoutMs: 180, log: () => {} });
+  await runAttack(clear.session, 7, { timeoutMs: 500, log: () => {} });
   assert.ok(clear.fired.length > 0);
+});
+
+test("attack_faces_before_firing", { timeout: 10_000 }, async () => {
+  const { world, session: fake, events } = session();
+  world.applyLoadout({ weapon: "alien-weapon-1", ammo: 30 });
+  const logs: string[] = [];
+  await runAttack(fake, 7, { timeoutMs: 700, log: (line) => logs.push(line) });
+  assert.ok(logs.some((line) => line.includes("attack: face")), logs.join("\n"));
+  const shots = events.flatMap((event, i) => (event.kind === "fire" ? [i] : []));
+  assert.ok(shots.length > 0, `no fire\n${logs.join("\n")}`);
+  for (const at of shots) {
+    const shot = events[at]!;
+    const faced = events.slice(0, at).some((event) => event.kind === "input" && Math.abs(event.yaw - shot.yaw) < 1e-9);
+    assert.ok(faced, `shot ${at} has no preceding input at its yaw\n${logs.join("\n")}`);
+  }
+});
+
+test("attack_steps_back_inside_the_band", { timeout: 10_000 }, async () => {
+  const { world, session: fake, fired, sent } = session();
+  world.applyLoadout({ weapon: "alien-weapon-1", ammo: 30 });
+  world.applySnapshot({
+    spawns: [{ entity: 7, view: { position: { x: 5, y: 0, z: 0 }, rotation: { y: 0, w: 1 } } }],
+  });
+  const logs: string[] = [];
+  await runAttack(fake, 7, { timeoutMs: 400, log: (line) => logs.push(line) });
+  assert.equal(fired.length, 0, `fired at 5 m\n${logs.join("\n")}`);
+  assert.ok(logs.some((line) => line.includes("attack: standoff")), logs.join("\n"));
+  assert.ok(sent.some((command) => command.moveX < 0), `no back-step\n${JSON.stringify(sent)}`);
+});
+
+test("attack_retreats_below_25_hp", { timeout: 10_000 }, async () => {
+  const { world, session: fake, fired, sent } = session();
+  world.applyLoadout({ weapon: "alien-weapon-1", ammo: 30 });
+  world.applyHealth({ entity: 1, hp: 20, dead: false });
+  const logs: string[] = [];
+  const code = await runAttack(fake, 7, { timeoutMs: 400, log: (line) => logs.push(line) });
+  assert.equal(code, 2);
+  assert.ok(logs.some((line) => line.includes("attack: retreat")), logs.join("\n"));
+  assert.equal(fired.length, 0, `fired while retreating\n${logs.join("\n")}`);
+  assert.ok(sent.some((command) => command.moveX < 0), `no retreat move\n${JSON.stringify(sent)}`);
 });
 
 /** A bot at (0,0) and a target 25 m east, with one box blocking the straight line. */
