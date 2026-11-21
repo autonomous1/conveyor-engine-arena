@@ -920,3 +920,15 @@ designer/coder items.
 
 Gates: modev check green (lints + 11 tests + self-check), `drift` clean,
 `test:scope meta` 37/37.
+
+## 23. Task 123: the welcome seeds the owner's vital (2026-11-21)
+
+The command host needed the bot's hp at join; the health frame is change-driven,
+so a pawn that never takes damage never receives one. The welcome now carries
+`hp`/`dead` (`parseWelcomeExtras` requires both to be present; the world applies
+them in `connectBot`).
+
+Model change: the shared §13.1 welcome row lists the new keys and says they seed
+the change-driven health frame. Nothing else: the `cmd` surface rides the
+existing `msg` row (a JSON `text` payload), so no wire row is added, and
+`command-host.ts` is bot-client test tooling, not host state.

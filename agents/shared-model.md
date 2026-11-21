@@ -69,7 +69,7 @@ linked from the `X` rows rather than restated here.
 |---|---|---|---|---|---|---|
 | X | snapshot envelope | `revive` (`wire.ts`), `asSnapshot`; kernel `IncomingSnapshot` | revived tree → client snapshot | — | client `net.ts` per frame → client §13 | per snapshot; **trusted but unvalidated** |
 | X | inbound arena frames | `parseArenaFrame` (`bot-protocol.ts`); `ArenaFrame` union | frames | `t` → frame | client/host per frame → host §13 | **untrusted**; finite checks non-uniform |
-| X | welcome extras | `parseWelcomeExtras`; `WelcomeExtras` | object | ammo/keys/scope/claims/messages | host welcome | once per connection |
+| X | welcome extras | `parseWelcomeExtras`; `WelcomeExtras` | object | ammo/keys/scope/claims/messages/hp/dead | host welcome | once per connection; `hp`/`dead` seed the change-driven health frame |
 | X | spawn row | `spawnFrame` (`spawn-frame.ts`), `parseSpawn`; `SpawnFrame` | row | entity id → pose | host frame / client parse | per spawn |
 | X | QA result frames | `parseSnapshotResult` (`bot-protocol.ts`), `parseQaCapture` | frames | request id | client reply | per request |
 | X | fire / grenade input | `parseFire` (`hitscan.ts`), `parseGrenade` (`grenade.ts`) | frames | seq → shot | client input → host §13 gates | per frame, seq-gated |
