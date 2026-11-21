@@ -113,6 +113,10 @@ the **Test scope** names the scoped command and the tests it selects.
 
 ## Role split (summary; full rationale in D8)
 
+- **Researcher session:** reads `src/`, `test/`, `packages/`, `agents/` and the
+  public web; writes `agents/research/` only; returns a feasibility report that
+  ends in a task proposal, a spike, or no action.
+
 - **Designer session:** read-only on `src/`; writes `tasks/proposed/`; verifies
   every symbol and line number with `rg` before writing it into a task.
 - **Executor session:** one task file per run; writes `src/`, `test/`,

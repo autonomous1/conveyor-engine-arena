@@ -7,7 +7,7 @@ Read `~/dev/conveyor-engine-arena/agents/bot-developer-role.md` first. Then this
 **Safety:** one long-lived session per trial; clean `close()`; wait before any retry; never more than one bot in the arena while the operator is playing; never target the operator's pawn. Leftover seats are the known cause of `SERVER_FULL` and the stale-pawn confusion (task 49).
 
 > **This is a run/prototype, not a code change.** The bot-developer measures, diagnoses, and recommends; the coder implements.
-> Write the run's script under `packages/bot-client/tests/<name>.ts` — tracked and reviewable; the **Files** table names it. It is a rough probe, not a module, and the coder refines the useful ones into `src/` with the tests. `plan/dsh-tasks/live/` is gitignored and is for raw captures only. A code change you discover goes in the report as a recommended task, with the evidence line that justifies it.
+> Write the run's script under `packages/bot-client/tests/<name>.ts` — tracked and reviewable; the **Files** table names it. It is a rough probe, not a module: when it works repeatedly and the runs table shows it, the script plus its measurements is a **proof-of-concept for the designer**, who drafts the production task from it; the coder builds that. `plan/dsh-tasks/live/` is gitignored and is for raw captures only. A code change you discover goes in the report as a recommended task, with the evidence line that justifies it.
 
 ## Question
 
@@ -37,7 +37,7 @@ Read `~/dev/conveyor-engine-arena/agents/bot-developer-role.md` first. Then this
 
 ## Report
 
-<The report must contain: the timeline (t, actor, event, detail); the metrics table; the findings (numbered, each with a log/trace line); the mechanism fit (which explanation the evidence supports and which it does not); the recommendation (the next coder task or “no change”); the open questions. The report is the deliverable, not the chat.>
+<The report must contain: the timeline (t, actor, event, detail); the metrics table; the findings (numbered, each with a log/trace line); the mechanism fit (which explanation the evidence supports and which it does not); the **POC hand-off** (script path, what production must preserve, the failure modes, the open questions) addressed to the designer; the recommendation (the next coder task or “no change”). The report is the deliverable, not the chat.>
 
 ## Safety and abort
 

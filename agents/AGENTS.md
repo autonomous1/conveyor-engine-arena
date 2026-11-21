@@ -6,7 +6,7 @@ Browser arena client + authoritative Node host for Conveyor Engine. The host tic
 
 **Node version:** use `~/.nvm/versions/node/v24.0.2/bin/node`. PATH `node` is nvm v4.4.2, which can't run this repo. Start shell commands with `cd ~/dev/conveyor-engine-arena && export PATH=~/.nvm/versions/node/v24.0.2/bin:$PATH &&` so `node`, `npm` and `npx` are Node 24. Don't try other Node versions.
 
-**Roles:** the role briefs are `agents/coder-role.md` (coder method and Pre-Flight/HALT contract), `agents/designer-role.md`, `agents/bot-developer-role.md`, and `agents/model-developer-role.md` (the model is a deliverable; a stale model costs a coder session; split a KB before it passes the read window); this file is the repo-wide rule set common to them. `src/shared/bots/goap.ts` is frozen unless the task explicitly requires a change.
+**Roles:** the role briefs are `agents/coder-role.md` (coder method and Pre-Flight/HALT contract), `agents/designer-role.md`, `agents/bot-developer-role.md`, `agents/model-developer-role.md` (the model is a deliverable; a stale model costs a coder session; split a KB before it passes the read window), and `agents/researcher-role.md` (external sources measured against this tree; writes `agents/research/` only); this file is the repo-wide rule set common to them. `src/shared/bots/goap.ts` is frozen unless the task explicitly requires a change.
 
 **Ending a turn.** A turn that ends normally needs no operator action: stop after the report or summary, with **no** `Next:` line — silence means nothing to dispatch. If the turn ends with a question, a blocker, or a decision only the operator can make, end with exactly one line:
 

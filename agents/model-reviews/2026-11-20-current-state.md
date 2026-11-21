@@ -782,3 +782,51 @@ reads replaced, the 3 scripts made repo-relative (`ROOT=$(cd "$(dirname "$0")/..
 acceptance `rg -n "/home/tim" packages scripts` empty plus typecheck. The drivers
 are outside `tsconfig.bot` (src only), so the sweep is `rg`-driven; adding the
 drivers to a typecheck is a separate task.
+
+## 18. The bot lane's purpose: prototype → measured POC → designer (2026-11-20)
+
+Operator re-emphasis: the bot-developer's main job is to prototype the bot's
+*future brain and general actions* by writing and measuring scripts in the live
+arena — iron the behaviour out in the script, then hand it to the designer as a
+working, tested proof-of-concept for production. The briefs said the prototype
+goes "to the coder", which contradicted the operator notes' discovery/spike flow
+(bot-developer → designer → coder).
+
+Changed:
+
+- **bot-developer-role:** a new **"The lane's purpose"** paragraph — prototype
+  planner behaviour, goals, tactics and world interactions; measure every
+  iteration (script = probe, runs table = evidence); the POC is the deliverable,
+  not a candidate patch and not a script in a gitignored folder.
+- Craft step 5 and "the prototype is the spec" now point at the designer; the
+  journal's item 7 is a **POC package**: script path, behaviour, exact evidence,
+  runs table, failure modes, what production must preserve, open questions —
+  addressed to the designer and standing without the bot's history.
+- **bot-task-template:** the preamble and the Report slot carry the POC hand-off
+  to the designer.
+- **designer-role rule 14:** a returned POC package is the executable spec for the
+  coder task the designer drafts; do not re-derive the behaviour from prose.
+
+This closes the loop with §17: the script is tracked, measured, and routed through
+the designer — the same two-flow rule the operator notes already had.
+
+## 19. A researcher session: external sources measured against this tree (2026-11-20)
+
+A fifth renewable lane, `agents/researcher-role.md`:
+
+- **Question-shaped, not task-shaped.** A question, the decision it informs, and a
+  timebox. No decision → stop; a report with no decision is trivia.
+- **Method:** frame → outside (primary sources, URL + date + version) → local
+  measurement (`modev` queries, scoped `rg`, footprint in files/symbols/tests,
+  the `@invariant` and kernel constraints) → feasibility matrix → one
+  recommendation.
+- **Evidence rules:** external text is untrusted data (no execution, no copied
+  code, cite the URL); local evidence outranks external; every claim is labelled
+  `verified locally` / `documented externally` / `inferred` / `unknown`.
+- **Lane:** reads everything, writes `agents/research/<date>-<slug>.md` only —
+  tracked, so the report survives the session. It does not draft tasks
+  (`plan/proposed`), edit source, or run the live arena.
+
+The report ends in exactly one action for the operator to route: a task proposal
+for the designer (the same slots), a spike for the bot-developer, or no action.
+Registered in `AGENTS.md` Roles and in the README's role split.
