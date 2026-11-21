@@ -8,6 +8,14 @@
 // Replies go to the outbox always, and back to the sender via `say` for msg
 // commands. The mailbox/transport machinery is the task-122 `live-link` fork.
 //
+// The host is also the session recorder, so the relay no longer assembles its
+// statistics from logs by hand:
+//   <dir>/transcript.ndjson  one row per dispatched command, appended; the row's
+//                            statusAfter is the packed status at task end
+//   <dir>/session.json       the roll-up, overwritten at EXIT
+//   <dir>/notes.md           `{"cmd":"note","text":"…"}` appended as a bullet
+// Transcript and notes append across sessions; session.json is per session.
+//
 //   --scenario <file>   run an NDJSON step list over the msg loopback (to selfId)
 //   no --scenario       live mailbox command host
 //
@@ -36,7 +44,17 @@ const SCENARIO = args.get("scenario") ?? undefined;
 const INBOX = join(DIR, "inbox.ndjson");
 const OUTBOX = join(DIR, "outbox.ndjson");
 const STATUS = join(DIR, "status.json");
+/** Recorder: append one row per dispatched command. */
+const TRANSCRIPT = join(DIR, "transcript.ndjson");
+/** Recorder: append the operator's notes. */
+const NOTES = join(DIR, "notes.md");
+/** Recorder: the per-session roll-up (overwritten at exit). */
+const SESSION = join(DIR, "session.json");
+/** The note text is mailbox-side, so it has no 256 cap; this is its own bound. */
+const NOTE_MAX = 2_000;
 const LOG = `plan/dsh-tasks/logs/${LABEL}-${STAMP}.log`;
+/** Task 128 spike: the 250 ms trace of the wedge (task, step, nearest door, presses). */
+const TRACE = `plan/dsh-tasks/logs/${LABEL}-${STAMP}.ndjson`;
 const SAMPLE_MS = 250;
 const SEND_MS = 250;
 const MAX_TEXT = 256;
@@ -45,6 +63,9 @@ const TASK_TIMEOUT_MS = 180_000;
 mkdirSync(DIR, { recursive: true });
 mkdirSync("plan/dsh-tasks/logs", { recursive: true });
 const t0 = Date.now();
+const START_ISO = new Date(t0).toISOString();
+/** First known hp after the welcome; set once the seat is ours. Null when unknown. */
+let hpStart: number | null = null;
 const secs = (): number => Math.round((Date.now() - t0) / 100) / 10;
 const lines: string[] = [];
 const record = (line: string): void => {
@@ -82,6 +103,8 @@ if (!me0) {
 }
 const selfId = me0.id;
 const players = new Set(world.playerIds());
+/** First known hp after the welcome (the welcome seeds it); null when unknown. */
+hpStart = world.healthOf(selfId)?.hp ?? null;
 
 // --- packed status --------------------------------------------------------
 const round2 = (n: number): number => Math.round(n * 100) / 100;
@@ -135,7 +158,62 @@ type Cmd = { t: "cmd"; id: string; name: string; args?: Record<string, unknown> 
 let busy: { id: string; name: string } | undefined;
 let lastResult: { id: string; ok: boolean } | null = null;
 const executed = new Set<string>();
+// Cooperative abort: the brain calls `onTick` each mission-loop pass; the tick
+// throws when an abort command set the flag, so the mission unwinds, the task
+// reports `aborted`, and a queued follow-up command starts.
+class AbortMission extends Error {}
+let abortRequested = false;
+let pending: { cmd: Cmd; origin: Origin } | undefined;
+const abortTick = (): void => {
+  if (abortRequested) throw new AbortMission("aborted");
+};
 const replies = new Map<string, Record<string, unknown>>();
+
+// --- task 128 spike state -------------------------------------------------
+let presses = 0;
+let brainStep = "";
+let replanReason = "";
+let planSteps = 0;
+let lastDoorId: string | null = null;
+const rawUse = session.input.use.bind(session.input);
+session.input.use = () => {
+  presses += 1;
+  record(`USE n=${presses}`);
+  return rawUse();
+};
+
+// --- recorder -------------------------------------------------------------
+// The host owns the session record: one transcript row per dispatched command,
+// a roll-up at exit, and the operator's notes. Shapes are in the task's brief.
+type TranscriptRow = {
+  at: string;
+  via: "mailbox" | "msg";
+  from: number | null;
+  id: string;
+  name: string;
+  args: Record<string, unknown>;
+  ev: "done" | "fail" | "status" | "ack";
+  ok: boolean;
+  why: string | null;
+  ms: number;
+  statusAfter: Record<string, unknown>;
+};
+/** Session counters. `commands` counts terminal task rows (done|fail, not status/note). */
+const tally = { commands: 0, ok: 0, fail: 0, kills: 0, shots: 0, visits: 0 };
+function writeTranscript(row: TranscriptRow): void {
+  const line = JSON.stringify(row);
+  appendFileSync(TRANSCRIPT, `${line}\n`);
+  record(`TRANSCRIPT id=${row.id} name=${row.name} ev=${row.ev} ok=${row.ok} len=${line.length}`);
+}
+/** Count one terminal task event: commands/ok/fail plus the hunt and patrol counters. */
+function countTask(ev: Record<string, unknown>): void {
+  tally.commands += 1;
+  if (ev.ev === "done") tally.ok += 1;
+  else tally.fail += 1;
+  if (typeof ev.kills === "number") tally.kills += ev.kills;
+  if (typeof ev.shots === "number") tally.shots += ev.shots;
+  if (Array.isArray(ev.places)) tally.visits += ev.places.length;
+}
 
 function emit(cmd: Cmd, origin: Origin, ev: Record<string, unknown>): void {
   const text = JSON.stringify(ev);
@@ -145,12 +223,13 @@ function emit(cmd: Cmd, origin: Origin, ev: Record<string, unknown>): void {
   if (origin.via === "msg" && origin.from !== undefined) enqueueSay(text, origin.from);
 }
 
-function sendStatus(cmd: Cmd, origin: Origin): void {
+function sendStatus(cmd: Cmd, origin: Origin): Record<string, unknown> {
   const body = buildStatus(cmd.id);
   const text = JSON.stringify(body);
   out({ ...body });
   record(`STATUS id=${cmd.id} len=${text.length} ${text}`);
   if (origin.via === "msg" && origin.from !== undefined) enqueueSay(text, origin.from);
+  return body;
 }
 
 // --- handlers -------------------------------------------------------------
@@ -225,10 +304,17 @@ const runMissionTask = async (missionText: string, label: string): Promise<Resul
   try {
     const code = await runMission(session, mission, {
       timeoutMs: TASK_TIMEOUT_MS,
+      onTick: abortTick,
       log: (line) => {
         record(`  ${label} ${line}`);
         const m = /no plan: ([a-z-]+)/.exec(line);
         if (m) lastNoPlan = m[1]!;
+        const st = /^start (\S+)/.exec(line);
+        if (st) brainStep = st[1]!;
+        const rp = /^replan (\S+)/.exec(line);
+        if (rp) replanReason = rp[1]!;
+        const pd = /plan done .*?steps=(\d+)/.exec(line);
+        if (pd) planSteps = Number(pd[1]);
       },
       error: (line) => record(`  ${label} ERROR ${line}`),
     });
@@ -237,6 +323,7 @@ const runMissionTask = async (missionText: string, label: string): Promise<Resul
     if (code === 3) return { ok: false, code: 3, why: "timeout" };
     return { ok: false, code, why: `code:${code}` };
   } catch (err) {
+    if (err instanceof AbortMission) return { ok: false, code: 4, why: "aborted" };
     return { ok: false, code: 1, why: `error:${err instanceof Error ? err.message : String(err)}` };
   }
 };
@@ -277,6 +364,7 @@ const reloadHandler = async (a: Record<string, unknown>): Promise<Result> => {
   let lastNoPlan: string | null = null;
   const code = await runMission(session, mission, {
     timeoutMs: RELOAD_TIMEOUT_MS,
+    onTick: abortTick,
     log: (line) => {
       record(`  reload ${line}`);
       const m = /no plan: ([a-z-]+)/.exec(line);
@@ -330,6 +418,7 @@ const huntHandler = async (a: Record<string, unknown>): Promise<Result> => {
     if (!mission) continue;
     const code = await runMission(session, mission, {
       timeoutMs: Math.min(60_000, Math.max(1_000, deadline - Date.now())),
+      onTick: abortTick,
       log: (line) => {
         record(`  hunt ${line}`);
         if (/attack: fire/.test(line)) { shots += 1; targetShots += 1; }
@@ -390,6 +479,7 @@ const patrolHandler = async (a: Record<string, unknown>): Promise<Result> => {
   try {
     code = await runMission(session, mission, {
       timeoutMs: minutes * 60_000,
+      onTick: abortTick,
       log: (line) => {
         record(`  patrol ${line}`);
         const m = /no plan: ([a-z-]+)/.exec(line);
@@ -407,6 +497,51 @@ const patrolHandler = async (a: Record<string, unknown>): Promise<Result> => {
   return { ok: false, code, why: `code:${code}` };
 };
 
+type PickupRow = { id: string; kind?: string; minX: number; maxX: number; minZ: number; maxZ: number; minY?: number; maxY?: number };
+function pickupPlace(item: PickupRow): string {
+  return world.placeOf({ x: (item.minX + item.maxX) / 2, y: (item.minY ?? 0) + 0.2, z: (item.minZ + item.maxZ) / 2 })?.id ?? "outside";
+}
+const retrieveHandler = async (a: Record<string, unknown>): Promise<Result> => {
+  const pickup = typeof a.pickup === "string" ? a.pickup : "";
+  if (pickup.length === 0) return { ok: false, code: 1, why: "bad-args" };
+  const item = (world.pickupPlacements() as PickupRow[]).find((row) => row.id === pickup);
+  if (!item) return { ok: false, code: 1, why: "no-pickup" };
+  const place = typeof a.place === "string" && a.place.length > 0 ? a.place : pickupPlace(item);
+  const mission = parseMission(`retrieve:${pickup}@${place}`);
+  if (!mission) return { ok: false, code: 1, why: "bad-args" };
+  record(`RETRIEVE start pickup=${pickup} place=${place}`);
+  let lastNoPlan: string | null = null;
+  const code = await runMission(session, mission, {
+    timeoutMs: TASK_TIMEOUT_MS,
+    onTick: abortTick,
+    log: (line) => {
+      record(`  retrieve ${line}`);
+      const m = /no plan: ([a-z-]+)/.exec(line);
+      if (m) lastNoPlan = m[1]!;
+      const st = /^start (\S+)/.exec(line);
+      if (st) brainStep = st[1]!;
+      const rp = /^replan (\S+)/.exec(line);
+      if (rp) replanReason = rp[1]!;
+    },
+    error: (line) => record(`  retrieve ERROR ${line}`),
+  });
+  const held = world.keys().includes(pickup) || !world.pickups().includes(pickup);
+  if (code === 0 && held) {
+    record(`RETRIEVE done pickup=${pickup} place=${place}`);
+    return { ok: true, code: 0, data: { pickup, place } };
+  }
+  if (code === 0) return { ok: false, code: 1, why: "not-picked" };
+  if (code === 2) return { ok: false, code: 2, why: `no-plan:${lastNoPlan ?? "unknown"}` };
+  if (code === 3) return { ok: false, code: 3, why: "timeout" };
+  return { ok: false, code, why: `code:${code}` };
+};
+
+const getkeyHandler = async (): Promise<Result> => {
+  const key = (world.pickupPlacements() as PickupRow[]).find((row) => row.kind === "key" && world.pickups().includes(row.id));
+  if (!key) return { ok: false, code: 1, why: "no-key" };
+  return retrieveHandler({ pickup: key.id });
+};
+
 const HANDLERS: Record<string, (a: Record<string, unknown>) => Promise<Result>> = {
   arm: armHandler,
   goto: gotoHandler,
@@ -414,12 +549,18 @@ const HANDLERS: Record<string, (a: Record<string, unknown>) => Promise<Result>> 
   reload: reloadHandler,
   hunt: huntHandler,
   patrol: patrolHandler,
+  retrieve: retrieveHandler,
+  getkey: getkeyHandler,
 };
 
 // --- dispatcher -----------------------------------------------------------
 async function runTask(cmd: Cmd, origin: Origin): Promise<void> {
   const t = Date.now();
   busy = { id: cmd.id, name: cmd.name };
+  abortRequested = false;
+  brainStep = "";
+  replanReason = "";
+  planSteps = 0;
   record(`TASK-START id=${cmd.id} name=${cmd.name} t=${secs()}s`);
   emit(cmd, origin, { t: "ev", id: cmd.id, name: cmd.name, ev: "start" });
   let result: Result;
@@ -427,8 +568,11 @@ async function runTask(cmd: Cmd, origin: Origin): Promise<void> {
     const handler = HANDLERS[cmd.name];
     result = handler ? await handler(cmd.args ?? {}) : { ok: false, code: 1, why: "unknown-task" };
   } catch (err) {
-    result = { ok: false, code: 1, why: `error:${err instanceof Error ? err.message : String(err)}` };
+    result = err instanceof AbortMission
+      ? { ok: false, code: 4, why: "aborted" }
+      : { ok: false, code: 1, why: `error:${err instanceof Error ? err.message : String(err)}` };
   }
+  abortRequested = false;
   const ms = Date.now() - t;
   busy = undefined;
   lastResult = { id: cmd.id, ok: result.ok };
@@ -437,21 +581,75 @@ async function runTask(cmd: Cmd, origin: Origin): Promise<void> {
     : { t: "ev", id: cmd.id, name: cmd.name, ev: "fail", ok: false, code: result.code, why: result.why, ms };
   record(`TASK-DONE id=${cmd.id} name=${cmd.name} ok=${result.ok} code=${ev.code} why=${result.ok ? "-" : result.why} ms=${ms}`);
   emit(cmd, origin, ev);
+  countTask(ev);
+  writeTranscript({
+    at: new Date().toISOString(),
+    via: origin.via,
+    from: origin.from ?? null,
+    id: cmd.id,
+    name: cmd.name,
+    args: cmd.args ?? {},
+    ev: result.ok ? "done" : "fail",
+    ok: result.ok,
+    why: result.ok ? null : result.why,
+    ms,
+    statusAfter: buildStatus(cmd.id),
+  });
+  const next = pending;
+  pending = undefined;
+  if (next) handleCommand(next.cmd, next.origin);
 }
 
 function handleCommand(cmd: Cmd, origin: Origin): void {
   record(`CMD-RECV via=${origin.via} from=${origin.from ?? "-"} id=${cmd.id} name=${cmd.name} args=${JSON.stringify(cmd.args ?? {})}`);
   if (executed.has(cmd.id)) {
-    emit(cmd, origin, { t: "ev", id: cmd.id, name: cmd.name, ev: "fail", ok: false, code: 1, why: "duplicate", ms: 0 });
+    const ev = { t: "ev", id: cmd.id, name: cmd.name, ev: "fail", ok: false, code: 1, why: "duplicate", ms: 0 };
+    emit(cmd, origin, ev);
+    countTask(ev);
+    writeTranscript({
+      at: new Date().toISOString(), via: origin.via, from: origin.from ?? null,
+      id: cmd.id, name: cmd.name, args: cmd.args ?? {},
+      ev: "fail", ok: false, why: "duplicate", ms: 0, statusAfter: buildStatus(cmd.id),
+    });
+    return;
+  }
+  if (cmd.name === "abort") {
+    executed.add(cmd.id);
+    const wasBusy = busy?.name ?? null;
+    abortRequested = true;
+    const ev = { t: "ev", id: cmd.id, name: "abort", ev: "done", ok: true, code: 0, note: wasBusy ? `aborting:${wasBusy}` : "no-task", ms: 0 };
+    emit(cmd, origin, ev);
+    writeTranscript({
+      at: new Date().toISOString(), via: origin.via, from: origin.from ?? null,
+      id: cmd.id, name: "abort", args: cmd.args ?? {},
+      ev: "ack", ok: true, why: null, ms: 0, statusAfter: buildStatus(cmd.id),
+    });
     return;
   }
   if (cmd.name === "status") {
     executed.add(cmd.id);
-    sendStatus(cmd, origin);
+    const body = sendStatus(cmd, origin);
+    writeTranscript({
+      at: new Date().toISOString(), via: origin.via, from: origin.from ?? null,
+      id: cmd.id, name: cmd.name, args: cmd.args ?? {},
+      ev: "status", ok: true, why: null, ms: 0, statusAfter: body,
+    });
     return;
   }
   if (busy) {
-    emit(cmd, origin, { t: "ev", id: cmd.id, name: cmd.name, ev: "fail", ok: false, code: 1, why: "busy", ms: 0 });
+    if (abortRequested && pending === undefined) {
+      pending = { cmd, origin };
+      record(`CMD-QUEUED id=${cmd.id} name=${cmd.name} behind the abort of ${busy.id}`);
+      return;
+    }
+    const ev = { t: "ev", id: cmd.id, name: cmd.name, ev: "fail", ok: false, code: 1, why: "busy", ms: 0 };
+    emit(cmd, origin, ev);
+    countTask(ev);
+    writeTranscript({
+      at: new Date().toISOString(), via: origin.via, from: origin.from ?? null,
+      id: cmd.id, name: cmd.name, args: cmd.args ?? {},
+      ev: "fail", ok: false, why: "busy", ms: 0, statusAfter: buildStatus(cmd.id),
+    });
     return;
   }
   executed.add(cmd.id);
@@ -521,6 +719,28 @@ function handleMailbox(raw: string): void {
       const body = buildStatus(id ?? "status");
       out({ ...body });
       record(`STATUS id=${id ?? "status"} len=${JSON.stringify(body).length}`);
+      writeTranscript({
+        at: new Date().toISOString(), via: "mailbox", from: null,
+        id: id ?? "status", name: "status", args: {},
+        ev: "status", ok: true, why: null, ms: 0, statusAfter: body,
+      });
+      break;
+    }
+    case "note": {
+      const text = typeof msg.text === "string" ? msg.text.trim() : "";
+      if (text.length === 0) {
+        out({ type: "error", id, why: "empty-note" });
+        break;
+      }
+      const note = text.length > NOTE_MAX ? text.slice(0, NOTE_MAX) : text;
+      const at = new Date().toISOString();
+      appendFileSync(NOTES, `- ${at} ${note}\n`);
+      out({ type: "ack", id, what: "note", len: note.length });
+      record(`NOTE len=${note.length} file=${NOTES}`);
+      writeTranscript({
+        at, via: "mailbox", from: null, id, name: "note", args: { text: note },
+        ev: "ack", ok: true, why: null, ms: 0, statusAfter: buildStatus(id),
+      });
       break;
     }
     case "send":
@@ -635,10 +855,29 @@ function finish(code: number): never {
   stop = true;
   clearInterval(timer);
   clearInterval(sender);
+  clearInterval(traceTimer);
   try {
     writeStatus(snapshot());
   } catch {
     // best effort
+  }
+  try {
+    const roll = {
+      start: START_ISO,
+      elapsed: Math.round((Date.now() - t0) / 1000),
+      commands: tally.commands,
+      ok: tally.ok,
+      fail: tally.fail,
+      kills: tally.kills,
+      shots: tally.shots,
+      visits: tally.visits,
+      hpStart,
+      hpEnd: world.healthOf(selfId)?.hp ?? null,
+    };
+    writeFileSync(SESSION, `${JSON.stringify(roll)}\n`);
+    record(`SESSION commands=${roll.commands} ok=${roll.ok} fail=${roll.fail} kills=${roll.kills} shots=${roll.shots} visits=${roll.visits}`);
+  } catch (err) {
+    record(`SESSION write failed: ${String(err)}`);
   }
   record(`EXIT scenario=${exitScenario} steps=${exitSteps} msgKeys=${msgKeyCount()} elapsed=${secs()}s`);
   writeFileSync(LOG, `${lines.join("\n")}\n`);
@@ -649,6 +888,51 @@ function finish(code: number): never {
 const sender = setInterval(() => {
   if (!stop) flushOne();
 }, SEND_MS);
+// Task 128 spike: 250 ms pose/step/nearest-door/press trace for the wedge.
+const traceTimer = setInterval(() => {
+  if (stop) return;
+  const me = world.self();
+  if (!me) return;
+  let nearest: { id: string; d: number; open: boolean; locked: boolean } | undefined;
+  let best = Infinity;
+  let doorsOpen = 0;
+  for (const door of world.doors()) {
+    if (door.open) doorsOpen += 1;
+    const body = world.doorBody(door.id);
+    if (!body) continue;
+    const dist = Math.hypot(body.position[0] - me.x, body.position[2] - me.z);
+    if (dist < best) {
+      best = dist;
+      nearest = { id: door.id, d: round2(dist), open: door.open, locked: door.locked };
+    }
+  }
+  if (nearest && nearest.id !== lastDoorId) {
+    lastDoorId = nearest.id;
+    record(`DOORBODY id=${nearest.id} body=${JSON.stringify(world.doorBody(nearest.id))}`);
+  }
+  const row = {
+    t: secs(),
+    x: round2(me.x),
+    y: round2(me.y),
+    z: round2(me.z),
+    place: world.placeOf(me)?.id ?? "?",
+    task: busy?.name ?? null,
+    step: brainStep,
+    planSteps,
+    nearest,
+    doorsOpen,
+    usePresses: presses,
+    keyAvail: world.pickups().includes("key"),
+    pickupCount: world.pickups().length,
+    replanReason,
+    keys: [...world.keys()],
+  };
+  try {
+    appendFileSync(TRACE, `${JSON.stringify(row)}\n`);
+  } catch {
+    // best effort
+  }
+}, SAMPLE_MS);
 const timer = setInterval(() => {
   if (stop) return;
   try {

@@ -47,7 +47,7 @@ scratch; the scripts here are the tracked record.
 
 | Script | Use |
 |---|---|
-| `command-host.ts` | one persistent seat as a message-driven command surface: `arm`/`reload`/`hunt` (laser)/`patrol`/`goto`/`stand`/`status` handlers, `start`/`done`/`fail` events to the sender with the mission counters (`kills`/`shots`/`places`/`ammo`), packed `status` (≤256). Commands in via the mailbox (`{"cmd":"task","id","name","args"}`) or a `msg` row (`{"t":"cmd",…}`); `--scenario scenarios/hunt-laser.ndjson` or `scenarios/patrol.ndjson` replays a chain over the msg loopback |
+| `command-host.ts` | one persistent seat as a message-driven command surface: `arm`/`reload`/`hunt` (laser)/`patrol`/`goto`/`stand`/`status` handlers, `start`/`done`/`fail` events to the sender with the mission counters (`kills`/`shots`/`places`/`ammo`), packed `status` (≤256). Commands in via the mailbox (`{"cmd":"task","id","name","args"}`) or a `msg` row (`{"t":"cmd",…}`); `--scenario scenarios/hunt-laser.ndjson` or `scenarios/patrol.ndjson` replays a chain over the msg loopback. Also the session recorder: `<dir>/transcript.ndjson` (one row per dispatched command, with the packed `statusAfter`), `<dir>/session.json` (the roll-up, rewritten at exit), `<dir>/notes.md` (the `{"cmd":"note","text":"…"}` command); transcript and notes append across sessions |
 
 ## Link / mailbox
 
