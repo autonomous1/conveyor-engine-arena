@@ -13,7 +13,7 @@ Read `agents/AGENTS.md` first. Then this file. Then the KB sections named in **K
 
 > **Changed in vX.Y:** <one sentence: what this task assumes from prior tasks, what it closes, what it defers. Delete the whole line for a clean task with no dependency.>
 
-**Architecture note:** <cite the specific `ARCHITECTURE` paragraph, `@invariant`, or decision entry this task implements. If it can't cite one, the task is speculative — stop and reconsider.>
+**Architecture note:** <cite the specific `ARCHITECTURE` paragraph, `@invariant`, decision entry, or the **prototype/report** this task productionizes (a bot POC row, a research report). If it can't cite one, the task is speculative — stop and reconsider.>
 
 **Knowledge base:** <the KB file(s) and section(s) this task touches, with the reason. E.g. `agents/host-model.md` §13 (the host state model) and `agents/host-flow.md` §5 (doors); `agents/client-kb.md` §13 (the client state model); `agents/shared-flow.md` §2–§3 (wire/protocol, data model) and `agents/shared-model.md` §11 (invariants). Name one half, not both: the section decides the file. Query the named section with `node packages/modev/cli.mjs query section <layer> <§N>` before the source; open the file only if the query fails. The KB is the map, not a field dump; a stale claim is a report note, not an edit. If this slot is missing or names no section, stop.>
 
@@ -77,6 +77,7 @@ Read `agents/AGENTS.md` first. Then this file. Then the KB sections named in **K
 | `agents/codemap.md` | conveyor-engine-arena | Regenerate; symbol lookup only. Do not edit by hand. |
 | `agents/<layer>-{flow,model}.md` or `agents/client-kb.md` | conveyor-engine-arena | Read-only. The §… named in Knowledge base (one row per file the task reads); `*-kb.md` is the split's index page. |
 | `src/shared/bots/goap.ts` | conveyor-engine-arena | Read-only reference to confirm it is **not** edited. |
+| <prototype/report path> | conveyor-engine-arena | Read-only. The behaviour this task productionizes (a bot POC, a research report). |
 
 ### Appendix: <pre-flight cross-check | fixture | exact diffs>
 

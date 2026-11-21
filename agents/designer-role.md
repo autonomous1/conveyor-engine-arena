@@ -23,6 +23,8 @@ Before drafting any task, read:
 
 - `agents/decisions.md` (D1–D11 and the superseding entries; the rationale for the pipeline)
 - `agents/README-dsh.md` (template, state table, open loops, common failures)
+- `packages/bot-client/tests/POCS.md` — the bot lane's ledger of proven prototypes: behaviour, script, evidence, status. A `proven` row is a ready-made task; a `proposed` one cites its report.
+- `plan/dsh-tasks/reports/live-*.md` and `agents/research/*.md` — the live and research reports for the area you are drafting in; a task that builds on one cites it.
 
 **Standing rules.** Two flows: feature/bugfix → designer → coder → bot-developer;
 discovery/spike → bot-developer → designer → coder. A designer-initiated spike
@@ -30,6 +32,11 @@ may skip the coder only as an `agents/bot-task-template.md` file with the goal,
 the hypothesis, the telemetry, and the boundaries. Timebox a task design; if the
 root cause is unknown or too complex to model statically, write the spike
 instead of a task.
+
+**A proven POC is a task.** When the ledger has a `proven` row whose behaviour is
+wanted, draft the coder task from it in one pass: cite the script and its report
+in the Architecture note and the Files table, and set the row to `proposed`.
+Do not re-design what the prototype already measured.
 
 The two copies have diverged: `agents/decisions.md` and `agents/README-dsh.md` are current; `plan/dsh-tasks/` holds older copies (its README still says `docs/decisions.md` and five always-gates). Read the `agents/` copies; treat the `plan/dsh-tasks/` ones as history.
 

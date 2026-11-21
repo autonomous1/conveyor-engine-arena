@@ -83,6 +83,10 @@ Rules of the craft:
   names it. `plan/dsh-tasks/live/` is gitignored — raw captures only, never a
   deliverable. Logs/reports in `plan/dsh-tasks/logs/` and `reports/`. Never the
   repo root.
+- **Build on the ledger.** `packages/bot-client/tests/POCS.md` records every
+  behaviour a run has proven. A `proven` row is not re-prototyped: extend its
+  script, its report and its row. A row that is `proven` and not `proposed` is
+  the one to hand to the designer next.
 
 ---
 
@@ -129,9 +133,10 @@ Do not start one, and do not fall back to the remote without the operator's OK.
 
 1. `agents/AGENTS.md` — injected; do not re-read.
 2. `agents/bot-developer-role.md` — this file.
-3. The task's **Knowledge base** sections (`agents/host-model.md` §…, `agents/host-flow.md` §…, `agents/client-kb.md` §…, `agents/shared-flow.md` §2–§3 and `agents/shared-model.md` §11; the state model is §13 in `host-model`/`client-kb`/`shared-model`) — the map of the state and contracts the run depends on. Query them: `node packages/modev/cli.mjs query section <layer> <§N>`; the file is the fallback.
-4. The task's Files table — the driver, the source it reads, the prior report/baseline.
-5. The task's prior report/baseline, if named.
+3. `packages/bot-client/tests/POCS.md` — the POC ledger — and `packages/bot-client/tests/README.md` — the drivers. Before a new run, find the prior prototype for this behaviour: a `proven` row means extend that script and its report, not start a new one.
+4. The task's **Knowledge base** sections (`agents/host-model.md` §…, `agents/host-flow.md` §…, `agents/client-kb.md` §…, `agents/shared-flow.md` §2–§3 and `agents/shared-model.md` §11; the state model is §13 in `host-model`/`client-kb`/`shared-model`) — the map of the state and contracts the run depends on. Query them: `node packages/modev/cli.mjs query section <layer> <§N>`; the file is the fallback.
+5. The task's Files table — the driver, the source it reads, the prior report/baseline.
+6. The task's prior report/baseline, if named.
 
 `packages/bot-client/src/predict.ts` is optional for most live work; read it only
 when a prediction/host divergence is the question.
@@ -298,8 +303,10 @@ hypothesis. Then reproduce with the same place/goal/start; record the pose every
 6. **Changes made** — diff summary, rebuild, re-test, before/after.
 7. **POC hand-off** — the script path + the behaviour + the **exact evidence
    lines** + the runs table + the failure modes + what production must preserve +
-   open questions, addressed to the designer. This is the package the designer
-   turns into the coder task; it must stand without your history.
+   open questions, addressed to the designer, **plus a task proposal** (the
+   template's slots) and the row in `packages/bot-client/tests/POCS.md`. This is
+   the package the designer turns into the coder task; it must stand without your
+   history.
 
 ---
 
@@ -307,9 +314,9 @@ hypothesis. Then reproduce with the same place/goal/start; record the pose every
 
 - **Read** `src/`, `test/`, `packages/`, `agents/`, `plan/`.
 - **Write** the drivers and the task's script under
-  `packages/bot-client/tests/**`, the logs under `plan/dsh-tasks/logs/**`, the
-  journal under `plan/dsh-tasks/reports/**`; `plan/dsh-tasks/live/**` only for a
-  raw capture. `plan/` is gitignored; the drivers under `packages/` are tracked
+  `packages/bot-client/tests/**` (including the `POCS.md` row), the logs under
+  `plan/dsh-tasks/logs/**`, the journal under `plan/dsh-tasks/reports/**`;
+  `plan/dsh-tasks/live/**` only for a raw capture. `plan/` is gitignored; the drivers under `packages/` are tracked
   and reviewable. Never the repo root.
 - **`packages/bot-client/src/**` edits**: only after telling the operator what
   and why and getting an explicit OK; still prototype-grade; rebuild, start a

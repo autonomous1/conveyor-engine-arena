@@ -23,6 +23,18 @@ If the next action belongs to another agent, name it so the operator can route i
 
 `agents/operator-notes.md` is the operator's dated record; it is not a read-order step — the durable rules live in the role briefs.
 
+**Reports are the handoff.** The pipeline is a graph, not a line: each session writes a report, and the next session reads the one for its area before acting.
+
+| Lane | Writes | Reads before acting |
+|---|---|---|
+| bot-developer | `plan/dsh-tasks/reports/live-*.md`; the row in `packages/bot-client/tests/POCS.md` | the ledger, the drivers README, the prior `live-*.md` |
+| coder | `plan/dsh-tasks/reports/<task>-*.md` | the prototype/report the task cites |
+| designer | `plan/dsh-tasks/proposed/*.md` | `POCS.md`, `live-*.md`, `agents/research/*.md` |
+| researcher | `agents/research/*.md` | the model (`modev`) and the source |
+| model | `agents/model-reviews/*.md` | the reports a task or run cites |
+
+A task or run cites the report it builds on (Architecture note or Files table). A report with no consumer is not done: end it with the proposal or the `Next:` line.
+
 **Query the model — never read the map**
 `agents/codemap.md` and the KB files are inputs to `modev`; a session asks for one entry, not the document.
 - **Symbol:** `node packages/modev/cli.mjs query symbol <exact name>` → `file:line`, signature, doc line, tags, calls, used-by. Open that source file and verify: the source is the truth, the codemap is the index.

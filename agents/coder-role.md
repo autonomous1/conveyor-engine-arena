@@ -14,7 +14,9 @@ Read the task file **once**, then `agents/AGENTS.md` once, then the task's
 **Knowledge base** sections (`node packages/modev/cli.mjs
 query section <layer> <§N>`), then only the task's Files table paths. Look each
 symbol up with `query symbol <name>` and open the source file it names; never
-read `agents/codemap.md`. Do not re-read the task or `AGENTS.md` for “context”.
+read `agents/codemap.md`. If the task cites a prototype or a report, read it
+before the source — the prototype is the executable spec. Do not re-read the task
+or `AGENTS.md` for “context”.
 
 Write only the files named in the task's **Files to touch** table. Do not edit
 the kernel (`conveyor-engine-*`), `src/shared/bots/goap.ts`, memory, skill

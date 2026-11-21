@@ -932,3 +932,34 @@ Model change: the shared §13.1 welcome row lists the new keys and says they see
 the change-driven health frame. Nothing else: the `cmd` surface rides the
 existing `msg` row (a JSON `text` payload), so no wire row is added, and
 `command-host.ts` is bot-client test tooling, not host state.
+
+## 24. Reports are the handoff; the bot POC ledger (2026-11-21)
+
+Operator: the bot lane's successful missions stay prototypes, no one reads them,
+and the coder found a bot report useful — the pipeline is a graph, not a line.
+
+**`packages/bot-client/tests/POCS.md`** is the missing index: one row per
+behaviour a run has proven — behaviour, script, evidence, status. Seeded with 11
+rows: three `landed` (127 combat policy, 129 info probe, 131 plan unlock) and
+eight `proven` (command surface, link/mailbox, interior-door spike, attack loop,
+door press, elevator ride, two-bot claims, visibility diagnosis). Status moves
+`proven` → `proposed` (a designer task cites it) → `landed` (task/commit).
+
+Wiring, so it is read rather than remembered:
+
+- **AGENTS:** "Reports are the handoff" — a table of each lane's writes and what
+  it reads before acting; a task or run cites the report it builds on; a report
+  with no consumer is not done.
+- **bot-developer:** read order step 3 is the ledger + drivers README; a new rule
+  "Build on the ledger" (a `proven` row means extend that script, not restart);
+  the POC hand-off now includes a **task proposal** and the ledger row; `POCS.md`
+  is in its write set.
+- **designer:** reads `POCS.md`, the `live-*.md` reports and `agents/research/`;
+  "A proven POC is a task" — cite the script and report, set the row to
+  `proposed`, do not re-design what the prototype measured.
+- **coder:** if the task cites a prototype or report, read it before the source.
+- **task template:** the Architecture note may cite a prototype/report; a Files
+  row names it.
+
+Gates: modev check green, `drift` clean. The running sessions need a restart to
+pick up the new briefs.
