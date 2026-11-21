@@ -50,6 +50,18 @@ const session = await connectBot({
   onLog: (l) => record(`[conn] ${l}`),
 });
 const world = session.world;
+// Diagnostic: the first frames this driver actually sends. If the pawn never
+// moves, this says whether the wishes left the client at all and with what
+// owned id (the 2026-11-21 pin had self() defined but no displacement).
+let inputFrames = 0;
+const rawSendInput = session.input.sendInput.bind(session.input);
+session.input.sendInput = (cmd) => {
+  if (inputFrames < 5) {
+    inputFrames += 1;
+    record(`INPUT#${inputFrames} self=${world.self()?.id ?? "-"} move=${cmd.moveX.toFixed(2)},${cmd.moveZ.toFixed(2)} yaw=${cmd.yaw.toFixed(2)}`);
+  }
+  rawSendInput(cmd);
+};
 const started = Date.now();
 while ((!world.self() || !world.sceneGraph()) && Date.now() - started < 15_000) await sleep(50);
 const me0 = world.self();
@@ -613,7 +625,11 @@ try {
         break;
       }
       if ((hpAt() ?? 100) < 70) record(`HEAL hp=${await healUp()}`);
-      if (!(await ensureWeapon())) {
+      // --arm 0 is the no-pickup diagnostic: the 110 grenade needs no weapon,
+      // so never arm up here either (the pickup path is the suspected
+      // ownership/movement trigger). The old unconditional call re-armed on
+      // cycle 1 and made --arm 0 a no-op.
+      if (ARM && !(await ensureWeapon())) {
         record("no weapon; stop");
         break;
       }
