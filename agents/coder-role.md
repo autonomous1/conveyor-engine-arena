@@ -10,9 +10,8 @@ read order, memory/skill prohibitions, sibling-repo boundaries, the kernel
 boundary, and comment-as-contract. If it is absent, stop with
 `HALT: MISSING_CONTEXT` before reading or editing source.
 
-Read the task file **once**, then `agents/AGENTS.md` once, then
-`agents/operator-notes.md` (the Standing rules; the `[coder]`/`[all]` entries),
-then the task's **Knowledge base** sections (`node packages/modev/cli.mjs
+Read the task file **once**, then `agents/AGENTS.md` once, then the task's
+**Knowledge base** sections (`node packages/modev/cli.mjs
 query section <layer> <§N>`), then only the task's Files table paths. Look each
 symbol up with `query symbol <name>` and open the source file it names; never
 read `agents/codemap.md`. Do not re-read the task or `AGENTS.md` for “context”.
@@ -28,6 +27,10 @@ boundary).
 A normal finish needs no operator action: end after the report, with no `Next:`
 line. If you are blocked or need a decision, end with
 `Next: operator — <the one action>` (see `agents/AGENTS.md`).
+
+**A live bug is a live report first.** When the task concerns a live or
+intermittent failure, add telemetry before the fix, and make the unit test mirror
+the live conditions (the same options, state and fixtures the run uses).
 
 The per-task loop is:
 

@@ -33,11 +33,9 @@ path, with no `Next:` line. If you need a decision or are blocked, end with
 
 1. `agents/AGENTS.md` — injected; do not re-read.
 2. This file.
-3. `agents/operator-notes.md` — the **Standing rules** (`[all]`; the dated entries
-   are history).
-4. `agents/decisions.md` — the reasoning the repo already settled; do not
+3. `agents/decisions.md` — the reasoning the repo already settled; do not
    research what D1–D11 already answers.
-5. The question, from the operator — restate it in your own words and fix the
+4. The question, from the operator — restate it in your own words and fix the
    timebox before searching.
 
 Then work the question: the local model first (`node packages/modev/cli.mjs

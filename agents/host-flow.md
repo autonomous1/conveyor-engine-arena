@@ -35,6 +35,10 @@ The session object is the only surface (`ArenaSession` in the codemap). `attach`
 deny-log throttles; `stop` clears snapshot jobs, both deny logs, and
 the loop. The containers this boot creates, with their keys and lifetimes, are §13.
 
+Auth is its own subtree: `src/server/auth/` mints and verifies tokens
+(`tokens.ts`, `resolvedScopes`), gates the privileged paths (`gate.ts`), and
+keeps the revocation list — host state, §13.2.
+
 ## 2. The 20 Hz tick
 
 **Owns:** everything that changes authoritative state without a client frame.
@@ -67,7 +71,7 @@ grenade interactions depend on tick parity.
 
 **Owns:** which client may move which pawn, and which frames are fresh.
 
-`HeldInputs` (`src/shared/movements.ts` `createHeldInputs`) stores the latest
+`HeldInputs` (`src/server/game.ts` `createHeldInputs`) stores the latest
 command per entity; `HeldInputs.entities()` (`game.ts`) is what the loop
 drops for unowned entities. Ownership is `server.replicator.get(clientId)` →
 `ownedEntity` (`game.ts`). `clearInput` is enqueued on death so the clip
@@ -170,7 +174,7 @@ outside.
 **Owns:** hp/respawn timers, per-session sent state, and the 156 pickup
 placements.
 
-`createPawnHealth` (`src/server/health.ts`) owns hp; the tick applies respawns
+`createPawnHealth` (`src/shared/health.ts`) owns hp; the tick applies respawns
 and sends only changed rows (`deliverHealthFrames`, `health.ts`). Sent state
 is per server and per session (`sentFor`); it prunes stale clients only
 when the cache is larger than the connected set. Audit uses the same

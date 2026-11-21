@@ -46,16 +46,14 @@ not close a finding by "noting it." When a turn needs the operator, end with
 
 1. `agents/AGENTS.md` — injected; do not re-read.
 2. `agents/model-developer-role.md` — this file.
-3. `agents/operator-notes.md` — the **Standing rules** (`[all]`, and the `[model]`
-   entries if the operator adds them).
-4. `agents/decisions.md` — read once, all of it; this is the reasoning you are
+3. `agents/decisions.md` — read once, all of it; this is the reasoning you are
    maintaining.
-5. `agents/README-dsh.md` — the pipeline state and the open loops.
-6. The KBs (`host-flow.md`, `host-model.md`, `shared-flow.md`, `shared-model.md`,
+4. `agents/README-dsh.md` — the pipeline state and the open loops.
+5. The KBs (`host-flow.md`, `host-model.md`, `shared-flow.md`, `shared-model.md`,
    `client-kb.md`; the `*-kb.md` files are indexes) — query the section for a
    reader (`modev query section`); read the file in full before editing it; the
    model is cross-file.
-7. The task templates and the role briefs — read the template before editing it, the
+6. The task templates and the role briefs — read the template before editing it, the
    brief before editing it.
 
 `Prohibitions: agents/AGENTS.md` (memory/skills, sibling repos, the kernel boundary).

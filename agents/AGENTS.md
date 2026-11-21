@@ -17,10 +17,11 @@ If the next action belongs to another agent, name it so the operator can route i
 **Read order for every task (hard stop)**
 1. The task file the user named — only once.
 2. This `agents/AGENTS.md` — already injected; do not re-read.
-3. `agents/operator-notes.md` — the **Standing rules** at the top (the dated entries are history); apply the rules tagged for your role.
-4. The KB sections named in the task's **Knowledge base** slot (only those sections; the KB is the map, not a field dump). Query them: `node packages/modev/cli.mjs query section <host|shared|client|file> <§N>`. `*-kb.md` is an index of the split; that is not a missing section. If the slot is missing or names no section, stop.
-5. The task’s **Files table** paths (and only the line ranges / symbols it names).
-6. **Symbol lookup:** `node packages/modev/cli.mjs query symbol <exact name>`, then open the source file it names. Never read `agents/codemap.md`.
+3. The KB sections named in the task's **Knowledge base** slot (only those sections; the KB is the map, not a field dump). Query them: `node packages/modev/cli.mjs query section <host|shared|client|file> <§N>`. `host-kb.md`/`shared-kb.md` are indexes of their split (not a missing section); `client-kb.md` is a full KB. If the slot is missing or names no section, stop.
+4. The task’s **Files table** paths (and only the line ranges / symbols it names).
+5. **Symbol lookup:** `node packages/modev/cli.mjs query symbol <exact name>`, then open the source file it names. Never read `agents/codemap.md`.
+
+`agents/operator-notes.md` is the operator's dated record; it is not a read-order step — the durable rules live in the role briefs.
 
 **Query the model — never read the map**
 `agents/codemap.md` and the KB files are inputs to `modev`; a session asks for one entry, not the document.

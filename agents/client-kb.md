@@ -8,7 +8,7 @@ described.
 The client's state — containers, keys, writers, lifetimes — is §13.
 
 Baseline (`984e20a`, 2026-11-14): 1,618 boxes, 98 doors, 4 cabs, 156 pickups,
-16 agents (`loadArena()`); 630 tests. Target frame is 16.7 ms at 60 Hz.
+16 agents (`loadArena()`); 630 tests at that commit, 748 today (746 pass, 2 skipped). Target frame is 16.7 ms at 60 Hz.
 
 ## 1. Boot and composition
 
@@ -85,7 +85,7 @@ point/rect lights; lights have no draw call.
 
 **Owns:** keyboard, mouse, pointer lock, and the one gamepad.
 
-`createInput` installs 9 window/document listeners once (`input.ts`);
+`attachPlayInput` installs 9 window/document listeners once (`input.ts`);
 `update(dt)` polls the pad and `sample` returns the frame's
 `PlaySample`. Menu-open and pointer-lock gates live in `sample`; fire/use/
 grenade bits are consumed by `boot`'s clocks. Listeners are page-lifetime; the
@@ -103,7 +103,7 @@ options dialog adds its own 8 (`options.ts`), HUD 5 (`hud.ts`), scene map 2
 `paintInfo` rewrites `textContent` **and the whole `cssText`**;
 `setStats` is gated by `statsVisible`. `drawFrame` calls
 `setStatus`/`setProfile`/`setPad` every frame (`boot.ts`) and
-`probe.refresh` → `paint("")` every frame via the info probe. The scene map
+`probe.refresh` → `paint("")` every frame via the info probe (`createInfoProbe`, `info-probe.ts`). The scene map
 repaints only when `selfMoved`/dirty (`scene-map.ts`).
 
 ## 8. Audio
@@ -277,30 +277,9 @@ Checkable from the model; none is in §12 yet. One moves to §12 only when a tes
 
 ## 14. Layer map and single sources
 
-Replicated from `agents/shared-flow.md` §1/§9; the test pins are `agents/shared-model.md` §11.
+The group table is `agents/shared-flow.md` §1; the single-source table is §9;
+the test pins are `agents/shared-model.md` §11. Do not replicate either here —
+a second copy is the drift hazard the single-source table exists to prevent.
 
-| Group | Files | Host consumer | Client consumer | Cadence |
-|---|---|---|---|---|
-| wire/protocol | `wire.ts`, `bot-protocol.ts`, `fire-debug.ts`, `spawn-frame.ts` | frames out | frames in | per snapshot/frame |
-| data model | `arena-view.ts`, `scene-graph.ts`, `pickups.ts`, `health.ts`, `audit.ts` | boot + tick | boot + snapshot | boot, tick, event |
-| geometry | `doors.ts`, `elevators.ts`, `building-profile.ts`, `svg-bounds.ts`, `map-frame.ts` | doors/elevators | scene build, use prompt | tick, frame, boot |
-| movement/collision | `movements.ts`, `hitscan.ts`, `look.ts`, `gamepad-map.ts` | owned step, fire, LOS | predicted step, shot, input | tick/frame |
-| nav | `nav/grid.ts`, `funnel.ts`, `regions.ts`, `legs.ts`, `route.ts`, `follow.ts` | bot replan | not used | per replan |
-| bots | `bots/*` | brain/sense/arbiter | not used | per tick |
-
-The host is the authority for movement, doors, health, and pickups; the client
-predicts only the camera and its own visual step; the bot-client and the host's bots import the frozen planner `goap.ts`
-(`src/shared/bots/goap.ts`, kernel-independent; both sides import the one file).
-
-| Convention | Shared | Consumer copy |
-|---|---|---|
-| Door yaw quarter-turn | `doors.ts doorYawRadians` | **Yes**: `client/arena-scene.ts yawToRadians` (identical body) |
-| Door use volume | `doors.ts doorUseVolume` | No copy; host `server/doors.ts` and `pickDoorForUse` use it |
-| Capsule overlap | `pickups.ts capsuleOverlapsAabb` | No copy; host `server/game.ts`, pickups use it |
-| Movement intent | `look.ts moveIntent` | No copy; client `boot.ts`, host `game.ts` |
-| Eye height | `look.ts EYE_HEIGHT` | No copy; client/server/bot import it |
-| Pickup id encoding | `pickups.ts pickupBoxSource` | No copy; host `server/pickups.ts` |
-| Snapshot revival | `wire.ts revive` | No copy; client `net.ts` |
-| Door leaf box | `doors.ts doorLeafBox` | No copy; host `DoorBlockers` uses it |
-
-The one real duplicate is door yaw; the two bodies are byte-identical today, and nothing fails if one drifts. The test pins for these pairs are in §11; the `X` rows in §13 carry the boundary contracts these single sources feed.
+The client predicts only the camera and its own visual step; every other value
+comes from a host frame (§13).

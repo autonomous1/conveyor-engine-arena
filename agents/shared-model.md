@@ -8,7 +8,7 @@ that names `shared-kb` §13 still means this §13.
 
 ## 11. Invariant index
 
-Existing `@invariant`s in shared and the consumer that relies on each:
+Existing `@invariant`s and the consumer that relies on each:
 
 - `buildWorldState` — a held key sets both `hasKey` and `holding`; absent facts
  are omitted (`bots/state.ts`).
@@ -21,6 +21,13 @@ Existing `@invariant`s in shared and the consumer that relies on each:
 - `canonicalJson` — keys sorted, arrays kept, undefined omitted
  (`scene-graph.ts`).
 - `DoorBlockers` — one obstacle per door (`server/doors.ts`).
+- `SpatialNode` — static-only: a node has no door/pawn kind (`spatial-dag.ts`).
+- `unlock` — the key stays held; one key opens every leaf that names it
+ (`bots/actions.ts`).
+- `hasLineOfSightDag` — the DAG holds no door or pawn triangles; a shut door
+ must be in `dynamic` to block (`hitscan.ts`).
+- `sweepIndexed` — the same closest hit as `sweepSegment`
+ (`hitscan.ts`).
 
 
 Single-source test pins (from §9):

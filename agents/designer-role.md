@@ -23,7 +23,13 @@ Before drafting any task, read:
 
 - `agents/decisions.md` (D1–D11 and the superseding entries; the rationale for the pipeline)
 - `agents/README-dsh.md` (template, state table, open loops, common failures)
-- `agents/operator-notes.md` — the **Standing rules** (`[designer]`/`[all]`): the two flows, the designer-initiated spike, the timebox, and the 11-90 rule that every bot-developer prompt goes through the bot-task-template.
+
+**Standing rules.** Two flows: feature/bugfix → designer → coder → bot-developer;
+discovery/spike → bot-developer → designer → coder. A designer-initiated spike
+may skip the coder only as an `agents/bot-task-template.md` file with the goal,
+the hypothesis, the telemetry, and the boundaries. Timebox a task design; if the
+root cause is unknown or too complex to model statically, write the spike
+instead of a task.
 
 The two copies have diverged: `agents/decisions.md` and `agents/README-dsh.md` are current; `plan/dsh-tasks/` holds older copies (its README still says `docs/decisions.md` and five always-gates). Read the `agents/` copies; treat the `plan/dsh-tasks/` ones as history.
 

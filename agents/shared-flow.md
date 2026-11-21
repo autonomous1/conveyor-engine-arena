@@ -11,7 +11,7 @@ The shared state and the cross-layer contract are §11–§13, in
 needs; `agents/shared-kb.md` is the index.
 
 Baseline (`984e20a`, 2026-11-14): 1,618 boxes, 98 doors, 4 cabs, 156 pickups,
-16 agents; 630 tests. Task 19's host numbers (`sweepSegment` 753 µs,
+16 agents; 630 tests at that commit, 748 today (746 pass, 2 skipped). Task 19's host numbers (`sweepSegment` 753 µs,
 `floorIndexFor` rebuild 0.89 ms, `DoorBlockers.sync` 33 µs, `hasLineOfSight`
 3.8 µs, F1–F10/H1–H11) are cited, not re-derived.
 

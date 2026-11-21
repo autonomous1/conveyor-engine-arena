@@ -48,6 +48,8 @@ Existing `@invariant`s that protect this layer (from the codemap):
  are omitted (`src/shared/bots/state.ts`).
 - `createRoadCache` — one net per gate signature
  (`src/shared/nav/route.ts`).
+- `resolvedScopes` — extras never remove a default scope
+ (`src/server/auth/tokens.ts`).
 
 Missing, found by this review (report findings, not tags): the grenade body
 count has no invariant/limit; `releasePickupObstacle` relies on the length
@@ -86,6 +88,8 @@ stay in the sections linked below and in the codemap. `S`/`B`/`X`: see
 | S | bot sense/decisions/labels | `botSense`, `botBrain`, `botLabels` | §8, `bot-sense.ts`, `bot-brain.ts`, `bot-label.ts` | bot id → row / `Slot` / label | `update` | per tick |
 | S | hp, loadout, inventory, audit | `health`, `kit`, `pickupHost`, `audit` | §9, `health.ts`, `pickups.ts`, `audit.ts` | pawn id → vital / ammo+weapon / keys | tick + frames | per session |
 | S | snapshot jobs | `snapStore` | §10, `snapshot-store.ts` | requesterId/id → `SnapJob` | `begin`/`take` | TTL 3 s (`arena-host.ts`) or `take` |
+| B | tick metrics | `metrics` (`game.ts`) | `TickMetrics` (`tick-metrics.ts`) | phase → ms samples (window 200); totals, lag, last report | `beginTick`/`endPhase`/`endTick` | rolling window; reset by `beginTick` |
+| B | token revocation | `createRevocationList` (`auth/tokens.ts`) | `Set<string>` + mtime | jti → revoked | `has` → `reload` | 5 s mtime throttle (`REVOCATION_RELOAD_MS`); missing file = empty |
 
 ### 13.3 Per-client
 
@@ -98,6 +102,9 @@ stay in the sections linked below and in the codemap. `S`/`B`/`X`: see
 | B | roster signature | `lastRoster` | `let` string | — | tick callback | replaced on change |
 | B | deny throttles | `teleportDenyLog`, `qaSnapshotDenyLog` | `RateLimitedLog` (`rate-limited-log.ts`) | clientId → last ms | `shouldLog` | 60 s window; cleared on stop |
 | B | per-connection handlers | `socketFromConn` | arrays + `self` | — | `attach` | per connection |
+
+The roster frame is `playerRoster` (`players.ts`), a pure function over
+`engine.connected` and the owned pawn; `lastRoster` holds its signature.
 
 ### 13.4 Per-pawn/entity
 
@@ -229,30 +236,11 @@ discovery.
 
 ## 15. Layer map and single sources
 
-Replicated from `agents/shared-flow.md` §1/§9; the test pins are `agents/shared-model.md` §11.
-
-| Group | Files | Host consumer | Client consumer | Cadence |
-|---|---|---|---|---|
-| wire/protocol | `wire.ts`, `bot-protocol.ts`, `fire-debug.ts`, `spawn-frame.ts` | frames out | frames in | per snapshot/frame |
-| data model | `arena-view.ts`, `scene-graph.ts`, `pickups.ts`, `health.ts`, `audit.ts` | boot + tick | boot + snapshot | boot, tick, event |
-| geometry | `doors.ts`, `elevators.ts`, `building-profile.ts`, `svg-bounds.ts`, `map-frame.ts` | doors/elevators | scene build, use prompt | tick, frame, boot |
-| movement/collision | `movements.ts`, `hitscan.ts`, `look.ts`, `gamepad-map.ts` | owned step, fire, LOS | predicted step, shot, input | tick/frame |
-| nav | `nav/grid.ts`, `funnel.ts`, `regions.ts`, `legs.ts`, `route.ts`, `follow.ts` | bot replan | not used | per replan |
-| bots | `bots/*` | brain/sense/arbiter | not used | per tick |
+The group table is `agents/shared-flow.md` §1; the single-source table is §9;
+the test pins are `agents/shared-model.md` §11. Do not replicate either here —
+a second copy is the drift hazard the single-source table exists to prevent.
 
 The host is the authority for movement, doors, health, and pickups; the client
-predicts only the camera and its own visual step; the bot-client and the host's bots import the frozen planner `goap.ts`
+predicts only the camera and its own visual step; the bot-client and the host's
+bots import the frozen planner `goap.ts`
 (`src/shared/bots/goap.ts`, kernel-independent; both sides import the one file).
-
-| Convention | Shared | Consumer copy |
-|---|---|---|
-| Door yaw quarter-turn | `doors.ts doorYawRadians` | **Yes**: `client/arena-scene.ts yawToRadians` (identical body) |
-| Door use volume | `doors.ts doorUseVolume` | No copy; host `server/doors.ts` and `pickDoorForUse` use it |
-| Capsule overlap | `pickups.ts capsuleOverlapsAabb` | No copy; host `server/game.ts`, pickups use it |
-| Movement intent | `look.ts moveIntent` | No copy; client `boot.ts`, host `game.ts` |
-| Eye height | `look.ts EYE_HEIGHT` | No copy; client/server/bot import it |
-| Pickup id encoding | `pickups.ts pickupBoxSource` | No copy; host `server/pickups.ts` |
-| Snapshot revival | `wire.ts revive` | No copy; client `net.ts` |
-| Door leaf box | `doors.ts doorLeafBox` | No copy; host `DoorBlockers` uses it |
-
-The one real duplicate is door yaw; the two bodies are byte-identical today, and nothing fails if one drifts. The test pins for these pairs are in §11; the `X` rows in §13 carry the boundary contracts these single sources feed.

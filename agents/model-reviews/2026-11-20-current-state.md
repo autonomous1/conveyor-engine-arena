@@ -830,3 +830,64 @@ A fifth renewable lane, `agents/researcher-role.md`:
 The report ends in exactly one action for the operator to route: a task proposal
 for the designer (the same slots), a spike for the bot-developer, or no action.
 Registered in `AGENTS.md` Roles and in the README's role split.
+
+## 20. `operator-notes` leaves the read order; its durable rules move into the briefs (2026-11-21)
+
+Request: remove `agents/operator-notes.md` from the agents' must-read list.
+
+The file mixed durable rules with dated history, and every session paid to read
+the history. Removed from the read order everywhere: AGENTS step 3, the coder,
+bot-developer, model-developer and researcher read orders, and the designer's
+"before drafting" list. AGENTS keeps one line: the file is the operator's dated
+record, not a read-order step.
+
+The rules that lived only there were moved, not dropped:
+
+- **designer:** two flows (feature → designer → coder → bot; discovery → bot →
+  designer → coder), the designer-initiated spike (a `bot-task-template` file
+  with goal, hypothesis, telemetry, boundaries), and the timebox.
+- **coder:** a live bug is a live report first — telemetry before the fix, and
+  the unit test mirrors the live conditions.
+- **bot:** the prop-guard/restart and direct-prompt stop were already in the
+  brief (environment, reconnect discipline, the stop line) — no duplication.
+
+`agents/operator-notes.md` stays on disk as the operator's record; nothing reads
+it unless the operator names it.
+
+Gates: modev check 11/11, `test:scope meta` 30/30.
+
+## 21. Model correction pass (2026-11-21)
+
+The operator's review found nine drift items; all are fixed, plus three the
+resolver surfaced. No `src/` change, no codemap regeneration.
+
+| # | Finding | Fix |
+|---|---|---|
+| 1 | `createInput` named in `client-kb` §6; the export is `attachPlayInput` (`src/client/input.ts:159`) | renamed; the listener count of 9 was right |
+| 2 | No gate checked that a KB symbol exists | `test/kb-symbols.test.ts` now also resolves every backticked identifier against `src/` + `packages/` (14 tests; fail-first: `client-kb:88 createInput`) |
+| 3 | `host-model` §15 and `client-kb` §14 were byte-identical (2,290 chars), both copying `shared-flow` §9 | both collapsed to a pointer: group table → shared-flow §1, single sources → §9, pins → shared-model §11. `client-kb` 306 → 285 lines (headroom restored) |
+| 4 | Invariant index covered 13/18 tags | 4 rows in shared-model §11 (`SpatialNode`, `unlock`, `hasLineOfSightDag`, `sweepIndexed`) and 1 in host-model §12 (`resolvedScopes`) |
+| 5 | `tick-metrics.ts` had no §13 row | §13.2 `metrics` row (rolling window, reset by `beginTick`) |
+| 6 | `auth/*` (715 lines) unnamed | §13.2 revocation row + a §1 auth sentence (`tokens.ts`, `gate.ts`) |
+| 7 | `shared-model` §11 header said "in shared" | "Existing `@invariant`s and the consumer that relies on each" |
+| 8 | AGENTS said "`*-kb.md` is an index" (client-kb is a full KB) | names `host-kb`/`shared-kb` as the two indexes |
+| 9 | "630 tests" stale | 748 today (746 pass, 2 skipped), full suite in 691 s |
+
+Three extra drifts found while building the resolver:
+
+- `HeldInputs`/`createHeldInputs` were attributed to `src/shared/movements.ts`;
+  they are in `src/server/game.ts`.
+- `createPawnHealth` was attributed to `src/server/health.ts`; it is in
+  `src/shared/health.ts` (the server file owns the frames).
+- `players.ts` and `info-probe.ts` were unnamed: the roster is now noted under
+  host §13.3, the probe in client §7.
+
+Not done (deferred): the `client-kb` split (it is 285/312 now, and the section
+collapse bought the headroom); the other unnamed modules (auth `gate.ts` and
+`token-cli.ts` are named in the §1 sentence, the bots/nav internals remain under
+their group rows); a file-attribution gate (the resolver checks existence, not
+that the cited file contains the name — that needs the codemap's file map and a
+second lint).
+
+The full suite takes **11.5 minutes** (748 tests, 4 cores) — the reason the
+scoped loop matters and the per-file iteration rule exists.

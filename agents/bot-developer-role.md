@@ -1,6 +1,6 @@
 # Bot-developer session — rapid prototyper and live tester
 
-You are the **bot-developer** for `conveyor-engine-arena`. The operator note's
+You are the **bot-developer** for `conveyor-engine-arena`. The name
 "bot-designer" means this session; the **designer** drafts the task and you
 execute it. You work inside the operator's live match, not on a task queue. The operator is in the same match as
 a player (or watching as a spectator); you drive a second player (a bot) through
@@ -129,10 +129,9 @@ Do not start one, and do not fall back to the remote without the operator's OK.
 
 1. `agents/AGENTS.md` — injected; do not re-read.
 2. `agents/bot-developer-role.md` — this file.
-3. `agents/operator-notes.md` — the **Standing rules** (`[bot]`/`[all]`), especially the prop-guard/restart entry and the direct-prompt stop.
-4. The task's **Knowledge base** sections (`agents/host-model.md` §…, `agents/host-flow.md` §…, `agents/client-kb.md` §…, `agents/shared-flow.md` §2–§3 and `agents/shared-model.md` §11; the state model is §13 in `host-model`/`client-kb`/`shared-model`) — the map of the state and contracts the run depends on. Query them: `node packages/modev/cli.mjs query section <layer> <§N>`; the file is the fallback.
-5. The task's Files table — the driver, the source it reads, the prior report/baseline.
-6. The task's prior report/baseline, if named.
+3. The task's **Knowledge base** sections (`agents/host-model.md` §…, `agents/host-flow.md` §…, `agents/client-kb.md` §…, `agents/shared-flow.md` §2–§3 and `agents/shared-model.md` §11; the state model is §13 in `host-model`/`client-kb`/`shared-model`) — the map of the state and contracts the run depends on. Query them: `node packages/modev/cli.mjs query section <layer> <§N>`; the file is the fallback.
+4. The task's Files table — the driver, the source it reads, the prior report/baseline.
+5. The task's prior report/baseline, if named.
 
 `packages/bot-client/src/predict.ts` is optional for most live work; read it only
 when a prediction/host divergence is the question.

@@ -25,6 +25,7 @@ const argv = process.argv.slice(2);
 for (let i = 0; i < argv.length; i += 1) if (argv[i]!.startsWith("--")) args.set(argv[i]!.slice(2), argv[i + 1] ?? "");
 const token = (process.env.CE_TOKEN ?? "").trim() || readFileSync(join(homedir(), ".config/ce-arena/qa-token.pem"), "utf8").trim();
 const RUN_MS = Number(args.get("for-s") ?? 300) * 1000;
+const ARM = args.get("arm") === "1"; // the 110 grenade needs no weapon: pickup is optional
 const MAX_CYCLES = Math.max(1, Number(args.get("max-cycles") ?? 200));
 const STAMP = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
 const LOG = `plan/dsh-tasks/logs/120-dag-${STAMP}.log`;
@@ -110,7 +111,7 @@ const walkRecover = async (target: { x: number; z: number }, ms: number, label: 
   let attempts = 0;
   while (Date.now() < deadline) {
     const me = world.self();
-    if (!me) return false;
+    if (!me || !aliveNow()) return false;
     const d = Math.hypot(me.x - target.x, me.z - target.z);
     if (d <= 0.6) {
       session.input.sendInput({ moveX: 0, moveZ: 0, yaw: me.yaw });
@@ -121,10 +122,10 @@ const walkRecover = async (target: { x: number; z: number }, ms: number, label: 
       if (Date.now() - lastProgress > 1500) {
         attempts += 1;
         record(`${label}: STUCK #${attempts} at ${me.x.toFixed(2)},${me.y.toFixed(2)},${me.z.toFixed(2)} d=${d.toFixed(2)}`);
-        if (attempts > 4) return false;
+        if (attempts > 6) return false;
         const yaw = Math.atan2(target.x - me.x, target.z - me.z);
         const side = attempts % 2 === 1 ? 1 : -1;
-        const sidePoint = { x: me.x + Math.cos(yaw) * side * 1.2, z: me.z - Math.sin(yaw) * side * 1.2 };
+        const sidePoint = { x: me.x + Math.cos(yaw) * side * 2.2, z: me.z - Math.sin(yaw) * side * 2.2 };
         const until = Date.now() + 700;
         while (Date.now() < until) {
           const p2 = world.self();
@@ -298,28 +299,23 @@ const probePath = (point: { x: number; z: number }): { ok: boolean; reason: stri
   const last = plan.points[plan.points.length - 1];
   return { ok: true, reason: null, end: last ? { x: last[0], z: last[2] } : point };
 };
+// wishTo-first: the arm-up proves the straight wish moves the pawn; the
+// `stand:` planner wedged at the start and burned 8 s before the fallback.
+// No routing here — wishTo aims at x,z and walkRecover sidesteps when stuck.
 const walkToStand = async (point: Point, label: string): Promise<{ ok: boolean; d: number; how: string }> => {
-  const mission = parseMission(`stand:${point.x.toFixed(2)},0,${point.z.toFixed(2)}`);
-  const code = mission ? await runMission(session, mission, { timeoutMs: 8_000, log: (l) => record(`  ${label} ${l}`), error: (l) => record(`  ${label} ERROR ${l}`) }) : 1;
-  if (code === 0) return { ok: true, d: 0, how: "plan" };
-  let last = { x: Number.NaN, z: Number.NaN };
-  let lastMove = Date.now();
-  const until = Date.now() + 3_500;
-  while (Date.now() < until) {
-    const me = world.self();
-    if (!me) break;
-    const d = Math.hypot(me.x - point.x, me.z - point.z);
-    if (d <= 1.8) return { ok: true, d, how: "straight" };
-    if (Number.isFinite(last.x) && Math.hypot(me.x - last.x, me.z - last.z) > 0.05) lastMove = Date.now();
-    last = { x: me.x, z: me.z };
-    if (Date.now() - lastMove > 900) return { ok: d <= 2.0, d, how: "wedged" };
-    session.input.sendInput(wishTo({ x: me.x, y: me.y, z: me.z, vx: 0, vz: 0, yaw: me.yaw }, { x: point.x, z: point.z }, 1));
-    await sleep(80);
-  }
+  const ok = await walkRecover({ x: point.x, z: point.z }, 20_000, label);
   const me = world.self();
   const d = me ? Math.hypot(me.x - point.x, me.z - point.z) : Infinity;
-  return { ok: d <= 2.0, d, how: "timeout" };
+  return { ok: ok && d <= 1.6, d, how: ok ? "wish" : "wish-wedged" };
 };
+
+// Diagnostic heartbeat: the pickup/ownership loss showed as a silent stop. Log
+// self id, hp, dead, weapon and pose every 2 s so the transition is captured.
+setInterval(() => {
+  const me = world.self();
+  const h = me ? world.healthOf(me.id) : undefined;
+  record(`SELF id=${me?.id ?? "-"} hp=${h?.hp ?? "?"} dead=${h?.dead ? 1 : 0} weapon=${world.weapon() ?? "none"} pos=${me ? `${me.x.toFixed(2)},${me.z.toFixed(2)}` : "-"}`);
+}, 2_000);
 
 // --- DAG position search (task 120) ---------------------------------------
 const dynBoxes = () =>
@@ -415,6 +411,10 @@ const usedPositions = new Set<string>();
 const failedPositions = new Set<string>();
 async function runCycle(): Promise<boolean> {
   cycleNo += 1;
+  if (!world.self()) {
+    record(`PAWN-LOST at cycle ${cycleNo}; closing`);
+    return false;
+  }
   const dag = world.spatialDag();
   if (!dag) {
     record("DAG absent; stop");
@@ -442,20 +442,20 @@ async function runCycle(): Promise<boolean> {
     failedPositions.clear();
     pool = all;
   }
-  let chosen: Candidate | undefined;
+  const top = pool.slice(0, 25);
   let reachable = 0;
-  for (const c of pool.slice(0, 25)) {
+  for (const c of top) {
     const probe = probePath({ x: c.x, z: c.z });
     c.reach = probe.ok;
     c.reason = probe.reason;
-    if (!probe.ok) continue;
-    reachable += 1;
-    chosen = c;
-    break;
+    if (probe.ok) reachable += 1;
   }
-  record(`CANDIDATES reachable=${reachable}`);
+  // Prefer a plan-ok candidate, but the straight walk decides; a plan-ok point
+  // that wedges is caught by the failed-position memory.
+  const chosen: Candidate | undefined = top.find((c) => c.reach) ?? top[0];
+  record(`CANDIDATES reachable=${reachable} chosen=${chosen ? `${chosen.x.toFixed(2)},${chosen.z.toFixed(2)}` : "none"}`);
   if (!chosen) {
-    record("CANDIDATES none reachable within 25");
+    record("CANDIDATES none within 25");
     return true;
   }
   usedPositions.add(chosen.key);
@@ -519,13 +519,82 @@ async function runCycle(): Promise<boolean> {
   return true;
 }
 
+// A killed or crashed run still leaves its evidence: write the log/trace from
+// a signal or an uncaught error (the normal path is `finish`).
+const emergency = (why: string): void => {
+  try {
+    clearInterval(sampler);
+    record(`ABORT ${why} positions=${positions.length} throws=${positions.filter((p) => p.throw).length}`);
+    mkdirSync("plan/dsh-tasks/logs", { recursive: true });
+    writeFileSync(LOG, `${lines.join("\n")}\n`);
+    writeFileSync(JSON_OUT, `${JSON.stringify({ positions, trace, trials: [], aborted: why }, null, 1)}\n`);
+  } catch {
+    // best effort
+  }
+};
+process.on("SIGINT", () => {
+  emergency("SIGINT");
+  process.exit(130);
+});
+process.on("SIGTERM", () => {
+  emergency("SIGTERM");
+  process.exit(143);
+});
+process.on("uncaughtException", (err) => {
+  record(`UNCAUGHT ${err instanceof Error ? (err.stack ?? err.message) : String(err)}`);
+  emergency("uncaught");
+  process.exit(1);
+});
+process.on("unhandledRejection", (err) => {
+  record(`UNHANDLED ${String(err)}`);
+  emergency("unhandled");
+  process.exit(1);
+});
+
+// A dead/despawned pawn still leaves its last pose in the client world, so
+// `self()` is not enough: the movement wishes are dropped and the POC loops.
+// Alive means an owned pawn with a live health frame (missing frame = alive).
+const aliveNow = (): boolean => {
+  const me = world.self();
+  if (!me) return false;
+  const h = world.healthOf(me.id);
+  return h?.dead !== true && (h?.hp ?? 1) > 0;
+};
+const waitForSelf = async (ms: number): Promise<boolean> => {
+  const until = Date.now() + ms;
+  for (;;) {
+    if (aliveNow()) return true;
+    if (Date.now() >= until) return false;
+    await sleep(200);
+  }
+};
+const waitAlive = async (ms: number, label: string): Promise<boolean> => {
+  const until = Date.now() + ms;
+  for (;;) {
+    if (aliveNow()) return true;
+    if (Date.now() >= until) return false;
+    const h = world.self() ? world.healthOf(world.self()!.id) : undefined;
+    record(`${label} not-owned/dead hp=${h?.hp ?? "?"} dead=${h?.dead ? 1 : 0}; waiting for respawn`);
+    await sleep(500);
+  }
+};
+
 // --- run -------------------------------------------------------------------
 const trials: Array<Record<string, unknown>> = [];
 try {
   record(`joined self=${selfId} at ${me0!.x.toFixed(2)},${me0!.y.toFixed(2)},${me0!.z.toFixed(2)} players=[${[...players].join(",")}]`);
   record(`START weapon=${world.weapon() ?? "none"} ammo=${world.ammo()} hp=${hpAt() ?? "?"}`);
-  await ensureWeapon();
-  record(`ARMED weapon=${world.weapon() ?? "none"} ammo=${world.ammo()}`);
+  if (ARM) {
+    await ensureWeapon();
+    record(`ARMED weapon=${world.weapon() ?? "none"} ammo=${world.ammo()}`);
+    // The step-off point is wedged against the climb geometry; walk to open
+    // ground away from the spawn pad.
+    let left = await walkRecover({ x: 2.0, z: 6.0 }, 30_000, "leave-climb");
+    if (!left) left = await walkRecover({ x: 6.0, z: 10.0 }, 20_000, "leave-spawn");
+    record(`LEAVE-CLIMB ok=${left ? 1 : 0} pos=${world.self()?.x.toFixed(2) ?? "?"},${world.self()?.z.toFixed(2) ?? "?"}`);
+  } else {
+    record("ARM off: skipping the weapon pickup and the leave walk; search starts at spawn");
+  }
   const dag = world.spatialDag();
   record(`DAG hash=${world.spatialDagHash() ?? "none"} dag=${dag ? "present" : "none"} nodes=${dag?.nodes.length ?? 0} chunks=${dag?.chunks.length ?? 0} aabbs=${world.aabbs.length}`);
   if (!dag) {
@@ -535,6 +604,14 @@ try {
     let cycles = 0;
     while (cycles < MAX_CYCLES && Date.now() < end) {
       cycles += 1;
+      if (!(await waitForSelf(10_000))) {
+        record("PAWN-LOST no owned living pawn for 10 s; closing");
+        break;
+      }
+      if (!(await waitAlive(10_000, "PRE-CYCLE"))) {
+        record("PAWN-LOST not alive after respawn wait; closing");
+        break;
+      }
       if ((hpAt() ?? 100) < 70) record(`HEAL hp=${await healUp()}`);
       if (!(await ensureWeapon())) {
         record("no weapon; stop");
