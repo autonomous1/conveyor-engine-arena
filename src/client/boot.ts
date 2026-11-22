@@ -28,7 +28,7 @@ import { doorInReach, doorLeafBox } from "../shared/doors.js";
 import { advanceGrenadeClock, type GrenadePose } from "../shared/grenade.js";
 import { advanceFireClock, createRayBoxList, LASER_MS, TRACE_RANGE, traceIndexed, type TraceCapsule } from "../shared/hitscan.js";
 import { createAabbDebug } from "./aabb-debug.js";
-import { loadKey } from "./auth-key.js";
+import { decodeClaims, hasSpectate, loadKey } from "./auth-key.js";
 import { applyDoorSwing, attachKtx2Loader, createArenaScene, loadArenaVisuals, tickDoorSwing } from "./arena-scene.js";
 import { createElevatorRooms } from "./elevator-room.js";
 import { createEchoDedupe, createSfx } from "./audio.js";
@@ -48,6 +48,7 @@ import type { QaCaptureFrame } from "../shared/bot-protocol.js";
 import { connectLive, type LaserNotice, type OpenSocket } from "./net.js";
 import { createViewModel } from "./viewmodel.js";
 import { createOptionsDialog } from "./options.js";
+import { followCamera, type FollowPose } from "./follow-camera.js";
 import { createSceneMap, loadMapBakeBounds } from "./scene-map.js";
 import { createBotLabelLayer, type BotLabelLayer } from "./bot-label.js";
 import { createPawnLayer } from "./presentation.js";
@@ -65,9 +66,14 @@ const OWN_GRENADE_RADIUS = 2.5;
 export async function boot(
   view: ArenaView,
   open: () => OpenSocket,
-  opts?: { auth?: boolean; onAuthRejected?: (reason: string) => void; qa?: boolean; solo?: boolean },
+  opts?: { auth?: boolean; onAuthRejected?: (reason: string) => void; qa?: boolean; solo?: boolean; observe?: boolean },
 ): Promise<void> {
   const qa = opts?.qa === true;
+  // The decoded claims are an unverified UI hint: the host still verifies the
+  // token, and an unseated hello is not a seat.
+  const authKey = loadKey();
+  const claims = authKey ? decodeClaims(authKey) : undefined;
+  const observerAllowed = qa || (claims !== undefined && !("error" in claims) && hasSpectate(claims));
   const playerIds = new Set<number>();
   // Solo runs the host in this tab, so the kernel can predict the owned pawn.
   const predictOwned = opts?.solo === true;
@@ -94,8 +100,17 @@ export async function boot(
       modelChoices: view.modelChoices ?? [],
       onModel: (id) => pushModel(id),
       onBotLabels: (on) => botLabels?.setEnabled(on),
+      observerAllowed,
+      // The link's spectate flag is fixed at creation, so the mode is a session
+      // mode: persist the switch and reload into a fresh hello.
+      onObserve: () => location.reload(),
     },
   );
+  const observeParam = opts?.observe === true;
+  if (observeParam && !observerAllowed) console.info("observer: the key has no spectate scope");
+  // QA has its own path (`__qa.follow`); this product mode must not touch it.
+  const observer = !qa && observerAllowed && (observeParam || options.observe);
+  if (observer) arena.cameraLocked = true;
   const fireDebug = createFireDebugLog(() => options.fireDebug);
   const visuals = await loadArenaVisuals(view, arena);
   /** Open state per door, from the file then from host frames. A shut leaf stops the predicted beam like the host shot. */
@@ -115,6 +130,7 @@ export async function boot(
   const pickupIds = new Set((view.pickups ?? []).map((pickup) => pickup.id));
   for (const id of pickupIds) visuals.placements.setVisible(id, false);
   const viewmodel = createViewModel(arena.camera, arena.scene, arena.renderer);
+  if (observer) viewmodel.clear();
   function dropBox(id: string) {
     dropPickupAabb(view.aabbs, id);
     collisionDebug.remove(id);
@@ -128,6 +144,8 @@ export async function boot(
     }
   }
   function showWeapon(weaponId: string | undefined) {
+    // The observer has no hands and no loadout of its own.
+    if (observer) return;
     if (!weaponId) {
       viewmodel.clear();
       return;
@@ -138,7 +156,7 @@ export async function boot(
   const pawns = createPawnLayer(arena.content, visuals.templates, view.pawnHeight);
   const input = attachPlayInput(arena.renderer.domElement, undefined, () => {
     fireDebug.keydown();
-  }, () => options.invertY, () => options.open, !qa);
+  }, () => options.invertY, () => options.open, !qa && !observer);
   const probe = createInfoProbe({
     doors: view.doors ?? [],
     pickups: view.pickups ?? [],
@@ -162,9 +180,11 @@ export async function boot(
     } else if (ev === "down") {
       options.moveFocus(1);
     } else if (ev === "left") {
-      options.adjustFocused(-1);
+      if (observer && !options.open) cycleFollow(-1);
+      else options.adjustFocused(-1);
     } else if (ev === "right") {
-      options.adjustFocused(1);
+      if (observer && !options.open) cycleFollow(1);
+      else options.adjustFocused(1);
     }
     options.repaint();
     input.setMenuOpen(options.open);
@@ -396,19 +416,48 @@ export async function boot(
   let followId: number | undefined;
   let followBack = 3;
   let followUp = 1.6;
-  const placeFollow = () => {
+  /** Previous observer pose; undefined snaps. QA passes undefined every call. */
+  let followPrev: FollowPose | undefined;
+  let followLost = false;
+  let bracketLeft = false;
+  let bracketRight = false;
+  /** Every player and bot in the frame, ascending. The cycler wraps this. */
+  const followTargets = (entities: readonly { id: unknown }[]): number[] => {
+    const ids: number[] = [];
+    for (const entity of entities) {
+      const id = Number(entity.id);
+      if (Number.isFinite(id)) ids.push(id);
+    }
+    return ids.sort((a, b) => a - b);
+  };
+  const placeFollow = (snap: boolean, dt: number): void => {
     if (followId === undefined) return;
     const sample = client.renderSnapshot();
     const entity = sample.entities.find((item) => Number(item.id) === followId);
-    if (!entity) return;
-    const yaw = yawFromQuat(entity.rotation);
-    arena.camera.position.set(
-      entity.position.x - Math.sin(yaw) * followBack,
-      entity.position.y + followUp,
-      entity.position.z - Math.cos(yaw) * followBack,
+    if (!entity) {
+      followLost = true;
+      return;
+    }
+    followLost = false;
+    const pose = followCamera(
+      { x: entity.position.x, y: entity.position.y, z: entity.position.z, yaw: yawFromQuat(entity.rotation) },
+      snap ? undefined : followPrev,
+      { back: followBack, up: followUp },
+      dt,
     );
+    if (!pose) return;
+    followPrev = pose;
+    arena.camera.position.set(pose.x, pose.y, pose.z);
     arena.camera.up.set(0, 1, 0);
-    arena.camera.lookAt(entity.position.x, entity.position.y + 1.6, entity.position.z);
+    arena.camera.lookAt(pose.lookX, pose.lookY, pose.lookZ);
+  };
+  const cycleFollow = (delta: number): void => {
+    const ids = followTargets(client.renderSnapshot().entities);
+    if (ids.length === 0) return;
+    const at = followId === undefined ? -1 : ids.indexOf(followId);
+    followId = ids[(at + delta + ids.length) % ids.length]!;
+    followPrev = undefined;
+    followLost = false;
   };
 
   const snapshotSend: { current: (id: string, png: string) => void } = { current: () => {} };
@@ -550,7 +599,7 @@ export async function boot(
     model: () => options.modelChoice || undefined,
     open,
     auth: opts?.auth,
-    spectate: qa,
+    spectate: qa || observer,
     onAuthRejected: opts?.onAuthRejected,
     onQaCapture: answerQaCapture,
   });
@@ -659,6 +708,20 @@ export async function boot(
     input.update(dt);
     const sample = input.sample();
     const render = client.renderSnapshot();
+    if (observer) {
+      const ids = followTargets(render.entities);
+      if (followId === undefined && ids.length > 0) followId = ids[0]!;
+      const left = input.keys.has("BracketLeft");
+      const right = input.keys.has("BracketRight");
+      if (left !== bracketLeft) {
+        bracketLeft = left;
+        if (left) cycleFollow(-1);
+      }
+      if (right !== bracketRight) {
+        bracketRight = right;
+        if (right) cycleFollow(1);
+      }
+    }
     const ownedId = client.ownedEntity;
     const owned = ownedId === undefined ? undefined : render.entities.find((entity) => entity.id === ownedId);
     wantInfo = sample.info;
@@ -669,7 +732,7 @@ export async function boot(
       input.setYaw(yawFromQuat(owned.rotation));
       aimedPawn = ownedId;
     }
-    if (owned && ownedId !== undefined) {
+    if (owned && ownedId !== undefined && !observer) {
       const pawn = { x: owned.position.x, y: owned.position.y, z: owned.position.z };
       let shotFrom: { x: number; y: number; z: number } | undefined;
       let shotTo: { x: number; y: number; z: number } | undefined;
@@ -824,14 +887,16 @@ export async function boot(
     beamSheets.despawn?.fx.update(frozen ? 0 : dt);
     pawns.apply(render, frozen ? 0 : dt, (id) => client.authoritative(id)?.action, ownedId, !frozen, fadeOf);
     botLabels?.sync(render.entities);
-    sendAcc += dt;
-    if (sendAcc >= sendDt) {
-      sendAcc = Math.min(sendAcc - sendDt, sendDt);
-      const move = moveIntent(sample.yaw, sample.forward, sample.strafe);
-      // Solo predicts this input; multiplayer sends the only client move. The
-      // host integrates it with the same noclip step when the switch is on.
-      const fly = view.noclip === true && options.showNoclip;
-      link.sendInput(move.moveX, move.moveZ, sample.yaw, fly ? encodeMoveButtons(true, sample.ascend) : 0);
+    if (!observer) {
+      sendAcc += dt;
+      if (sendAcc >= sendDt) {
+        sendAcc = Math.min(sendAcc - sendDt, sendDt);
+        const move = moveIntent(sample.yaw, sample.forward, sample.strafe);
+        // Solo predicts this input; multiplayer sends the only client move. The
+        // host integrates it with the same noclip step when the switch is on.
+        const fly = view.noclip === true && options.showNoclip;
+        link.sendInput(move.moveX, move.moveZ, sample.yaw, fly ? encodeMoveButtons(true, sample.ascend) : 0);
+      }
     }
     if (!debugShot && debugPawnWatch && options.fireDebug && client.ownedEntity !== debugPawn) {
       const camera = arena.camera.position;
@@ -852,7 +917,7 @@ export async function boot(
       now,
       owned ? { x: owned.position.x, y: owned.position.y, z: owned.position.z } : undefined,
     );
-    const look = input.locked ? "look locked" : "click to look";
+    const look = observer ? "observer" : input.locked ? "look locked" : "click to look";
     const mine = ownedId === undefined ? undefined : pawnVital.get(ownedId);
     const hpLabel = localHealthLabel(mine);
     const hpText = hpLabel === "" ? "" : ` · ${hpLabel}`;
@@ -864,13 +929,15 @@ export async function boot(
     sceneMap.setPlayers(render.entities
       .filter((entity) => entity.id !== ownedId && entity.visible && playerIds.has(entity.id))
       .map((entity) => ({ id: entity.id, x: entity.position.x, z: entity.position.z })));
+    const observeText = observer ? `observing ${followId ?? "none"}${followLost ? " (lost)" : ""} · ` : "";
     hud.setStatus(presentFaultHud(
-      `${statusText} · ${look}${hpText} · meshes ${pawns.count} models ${pawns.count - pawns.fallbacks} fallback ${pawns.fallbacks + visuals.fallbacks}${liftText}`,
+      `${observeText}${statusText} · ${look}${hpText} · meshes ${pawns.count} models ${pawns.count - pawns.fallbacks} fallback ${pawns.fallbacks + visuals.fallbacks}${liftText}`,
       consoleHint,
     ));
     hud.setProfile(input.profile);
     hud.setPad(input.padStatus, input.profile);
-    if (followId !== undefined) placeFollow();
+    // QA always snaps (a still frame); the observer damps.
+    if (followId !== undefined) placeFollow(qa, dt);
     arena.renderer.render(arena.scene, arena.camera);
     const info = arena.renderer.info;
     const calls = info.render.calls;
@@ -920,7 +987,8 @@ export async function boot(
         followId = entityId;
         followBack = opts.back;
         followUp = opts.up;
-        placeFollow();
+        followPrev = undefined;
+        placeFollow(true, 0);
       },
       clearFollow() {
         followId = undefined;

@@ -4,8 +4,10 @@ import {
   AUTH_KEY,
   clearKey,
   decodeClaims,
+  hasSpectate,
   loadKey,
   saveKey,
+  type DecodedClaims,
 } from "../src/client/auth-key.ts";
 
 class MemoryStorage implements Storage {
@@ -56,6 +58,21 @@ test("decodeClaims reads a shaped key and rejects a bad one", () => {
   assert.deepEqual(decodeClaims(jwt({ sub: "", role: "player", exp }), now), { error: "no-sub" });
   assert.deepEqual(decodeClaims(jwt({ sub: "tim", role: "god", exp }), now), { error: "bad-role" });
   assert.deepEqual(decodeClaims(jwt({ sub: "tim", role: "player", exp: Math.floor(now / 1000) }), now), { error: "expired" });
+});
+
+test("decodeClaims keeps an optional scope, and hasSpectate reads it", () => {
+  const plain = decodeClaims(jwt({ sub: "tim", role: "player", exp }), now);
+  assert.deepEqual(plain, { sub: "tim", role: "player", exp });
+  const scoped = decodeClaims(jwt({ sub: "tim", role: "admin", exp, scope: ["play", "spectate"] }), now);
+  assert.deepEqual(scoped, { sub: "tim", role: "admin", exp, scope: ["play", "spectate"] });
+  // A scope that is not a string array is not copied.
+  assert.deepEqual(decodeClaims(jwt({ sub: "tim", role: "player", exp, scope: [1, 2] }), now), { sub: "tim", role: "player", exp });
+
+  // The gate is a UI hint: qa/admin-shaped scopes pass, a play-only token does not.
+  assert.equal(hasSpectate(scoped as DecodedClaims), true);
+  assert.equal(hasSpectate({ sub: "tim", role: "qa", exp, scope: ["play", "spectate"] }), true);
+  assert.equal(hasSpectate({ sub: "tim", role: "player", exp, scope: ["play"] }), false);
+  assert.equal(hasSpectate({ sub: "tim", role: "player", exp }), false);
 });
 
 test("saveKey, loadKey, and clearKey", () => {

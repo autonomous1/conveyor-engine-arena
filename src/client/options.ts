@@ -2,7 +2,9 @@
  * Options dialog. F2 or the Options button toggles the panel.
  * The button is not the canvas click, so it does not request pointer lock.
  * Escape is not handled here; the browser still unlocks the pointer.
- * Show collision, Fire debug, Scene map, Invert look Y, and Bot labels stay in localStorage and are not part of the input message.
+ * Show collision, Fire debug, Scene map, Invert look Y, Bot labels, and Observer mode stay in
+ * localStorage and are not part of the input message. Observer mode is shown only when the
+ * token's unverified `scope` includes `spectate`; the boot reloads the page to apply it.
  * Noclip is localStorage too. The client sends it on the existing input `buttons` field, and only when the host set `view.noclip`.
  * The model select is sessionStorage. It is sent on hello and again when the choice changes.
  * Host fire counters are painted here. They are not part of the crosshair HUD.
@@ -11,7 +13,7 @@
 
 // ARCHITECTURE: The options dialog: persisted toggles, model choice, focus
 //   navigation, and host fire counters.
-// Wiring: boot.ts creates it once and reads `open`/`fireDebug` each frame.
+// Wiring: boot.ts creates it once and reads `open`/`fireDebug`/`observe` each frame.
 import { emptyAudit, formatAudit, type AuditCounters } from "../shared/audit.ts";
 
 /**
@@ -42,6 +44,10 @@ export const BOT_LABELS_STORAGE_KEY = "arena.botLabels.v1";
  * MODEL CHOICE STORAGE KEY.
  */
 export const MODEL_CHOICE_STORAGE_KEY = "arena.modelChoice.v1";
+/**
+ * OBSERVE STORAGE KEY.
+ */
+export const OBSERVE_STORAGE_KEY = "ce-arena-observe";
 
 /**
  * Focus Row type.
@@ -73,6 +79,8 @@ export type OptionsModel = {
   readonly invertY: boolean;
   /** Goal and hp over unowned host bots. Default off. The host still has to send frames. */
   readonly botLabels: boolean;
+  /** Observer mode. False when the token has no `spectate` scope, even if storage says on. */
+  readonly observe: boolean;
   readonly focusIndex: number;
   toggleDialog(): void;
   toggleShowCollision(): void;
@@ -81,6 +89,7 @@ export type OptionsModel = {
   toggleNoclip(): void;
   toggleInvertY(): void;
   toggleBotLabels(): void;
+  toggleObserve(): void;
   /** Wrap within the focusable rows. */
   moveFocus(delta: number): void;
   activateFocused(): void;
@@ -247,6 +256,30 @@ export function saveBotLabels(storage: KeyValueStorage | null | undefined, on: b
 }
 
 /**
+ * Loads Observe.
+ */
+export function loadObserve(storage: KeyValueStorage | null | undefined): boolean {
+  if (!storage) return false;
+  try {
+    return storage.getItem(OBSERVE_STORAGE_KEY) === "on";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Saves Observe.
+ */
+export function saveObserve(storage: KeyValueStorage | null | undefined, on: boolean): void {
+  if (!storage) return;
+  try {
+    storage.setItem(OBSERVE_STORAGE_KEY, on ? "on" : "off");
+  } catch {
+    // The in-memory switch still applies for this session.
+  }
+}
+
+/**
  * @post First id in `choices`, or the saved id when it is still in the list.
  */
 export function loadModelChoice(storage: KeyValueStorage | null | undefined, choices: readonly string[]): string {
@@ -284,6 +317,7 @@ export function createOptionsModel(
   onNoclip: (on: boolean) => void = () => {},
   noclipAllowed = false,
   onBotLabels: (on: boolean) => void = () => {},
+  observerAllowed = false,
 ): OptionsModel {
   let open = false;
   let showCollision = loadShowCollision(storage);
@@ -292,6 +326,7 @@ export function createOptionsModel(
   let noclipOn = loadNoclip(storage);
   let invertY = loadInvertY(storage);
   let botLabels = loadBotLabels(storage);
+  let observeOn = loadObserve(storage);
   let focusIndex = 0;
   const focusRows: FocusRow[] = [];
   onShowCollision(showCollision);
@@ -329,6 +364,11 @@ export function createOptionsModel(
     saveBotLabels(storage, botLabels);
     onBotLabels(botLabels);
   };
+  const toggleObserve = () => {
+    if (!observerAllowed) return;
+    observeOn = !observeOn;
+    saveObserve(storage, observeOn);
+  };
   const idle = { activate() {}, adjust(_delta: number) {} };
   focusRows.push(
     { activate: toggleShowCollision, adjust: idle.adjust },
@@ -337,6 +377,7 @@ export function createOptionsModel(
     { activate: toggleInvertY, adjust: idle.adjust },
     { activate: toggleBotLabels, adjust: idle.adjust },
   );
+  if (observerAllowed) focusRows.push({ activate: toggleObserve, adjust: idle.adjust });
   if (noclipAllowed) focusRows.push({ activate: toggleNoclip, adjust: idle.adjust });
   return {
     get open() {
@@ -360,6 +401,9 @@ export function createOptionsModel(
     get botLabels() {
       return botLabels;
     },
+    get observe() {
+      return observerAllowed && observeOn;
+    },
     get focusIndex() {
       return focusIndex;
     },
@@ -372,6 +416,7 @@ export function createOptionsModel(
     toggleNoclip,
     toggleInvertY,
     toggleBotLabels,
+    toggleObserve,
     moveFocus(delta: number) {
       const count = focusRows.length;
       if (count <= 0 || !Number.isFinite(delta) || delta === 0) return;
@@ -432,6 +477,10 @@ export function createOptionsDialog(
     noclipAllowed?: boolean;
     onNoclip?: (on: boolean) => void;
     onBotLabels?: (on: boolean) => void;
+    /** Show the Observer mode row. The boot's `spectate` claims gate. */
+    observerAllowed?: boolean;
+    /** Called after the observer switch flips; the boot reloads the page. */
+    onObserve?: (on: boolean) => void;
     modelChoices?: readonly string[];
     onModel?: (id: string) => void;
     /** Session store. `undefined` uses `sessionStorage`. `null` does not persist. */
@@ -439,6 +488,7 @@ export function createOptionsDialog(
   } = {},
 ): OptionsDialog {
   const noclipAllowed = extras.noclipAllowed === true;
+  const observerAllowed = extras.observerAllowed === true;
   const model = createOptionsModel(
     storage,
     onShowCollision,
@@ -447,6 +497,7 @@ export function createOptionsDialog(
     extras.onNoclip ?? (() => {}),
     noclipAllowed,
     extras.onBotLabels ?? (() => {}),
+    observerAllowed,
   );
   let audit = emptyAudit();
 
@@ -514,6 +565,14 @@ export function createOptionsDialog(
   botSwitch.setAttribute("role", "switch");
   botSwitch.style.cssText = `${switchStyle};margin-top:8px`;
 
+  const observeSwitch = document.createElement("button");
+  observeSwitch.id = "observer-mode";
+  observeSwitch.type = "button";
+  observeSwitch.setAttribute("role", "switch");
+  observeSwitch.style.cssText = `${switchStyle};margin-top:8px`;
+  observeSwitch.hidden = !observerAllowed;
+  observeSwitch.disabled = !observerAllowed;
+
   const noclipSwitch = document.createElement("button");
   noclipSwitch.id = "noclip";
   noclipSwitch.type = "button";
@@ -571,11 +630,12 @@ export function createOptionsDialog(
   help.id = "control-help";
   help.textContent = "I or Y inspects the crosshair.";
   help.style.cssText = "margin:10px 0 0;color:#c5ccd8;font:12px/1.4 ui-sans-serif,system-ui;";
-  panel.append(title, collisionSwitch, fireSwitch, mapSwitch, invertSwitch, botSwitch, noclipSwitch);
+  panel.append(title, collisionSwitch, fireSwitch, mapSwitch, invertSwitch, botSwitch, observeSwitch, noclipSwitch);
   if (modelLabel) panel.append(modelLabel);
   panel.append(auditView, help);
 
   const focusEls: HTMLElement[] = [collisionSwitch, fireSwitch, mapSwitch, invertSwitch, botSwitch];
+  if (observerAllowed) focusEls.push(observeSwitch);
   if (noclipAllowed) focusEls.push(noclipSwitch);
   if (modelLabel && modelSelect) {
     const select = modelSelect;
@@ -605,7 +665,10 @@ export function createOptionsDialog(
     paintSwitch(mapSwitch, model.showSceneMap, "Scene map");
     paintSwitch(invertSwitch, model.invertY, "Invert look Y");
     paintSwitch(botSwitch, model.botLabels, "Bot labels");
+    paintSwitch(observeSwitch, model.observe, "Observer mode");
     paintSwitch(noclipSwitch, model.showNoclip, "Noclip");
+    observeSwitch.hidden = !observerAllowed;
+    observeSwitch.disabled = !observerAllowed;
     noclipSwitch.hidden = !noclipAllowed;
     noclipSwitch.disabled = !noclipAllowed;
     focusEls.forEach((el, index) => {
@@ -643,6 +706,10 @@ export function createOptionsDialog(
   onSwitch(mapSwitch, () => model.toggleShowSceneMap());
   onSwitch(invertSwitch, () => model.toggleInvertY());
   onSwitch(botSwitch, () => model.toggleBotLabels());
+  onSwitch(observeSwitch, () => {
+    model.toggleObserve();
+    extras.onObserve?.(model.observe);
+  });
   if (noclipAllowed) onSwitch(noclipSwitch, () => model.toggleNoclip());
 
   const onKeyDown = (ev: KeyboardEvent) => {

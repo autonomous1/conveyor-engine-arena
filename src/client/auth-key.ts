@@ -23,7 +23,13 @@ export type AuthRole = (typeof ROLES)[number];
 /**
  * Decoded Claims type.
  */
-export type DecodedClaims = { sub: string; role: AuthRole; exp: number };
+export type DecodedClaims = {
+  sub: string;
+  role: AuthRole;
+  exp: number;
+  /** Unverified copy of the payload's `scope`, when it is a string array. UI hint only. */
+  scope?: readonly string[];
+};
 /**
  * Decode Error type.
  */
@@ -63,7 +69,22 @@ export function decodeClaims(key: string, nowMs = Date.now()): DecodeResult {
   if (!isRole(rec.role)) return { error: "bad-role" };
   if (typeof rec.exp !== "number" || !Number.isFinite(rec.exp)) return { error: "malformed" };
   if (rec.exp * 1000 <= nowMs) return { error: "expired" };
-  return { sub: rec.sub, role: rec.role, exp: rec.exp };
+  const scope = scopeOf(rec.scope);
+  return { sub: rec.sub, role: rec.role, exp: rec.exp, ...(scope ? { scope } : {}) };
+}
+
+/**
+ * True when the decoded payload carries the `spectate` scope.
+ * @why The decode does not verify the signature, so this only hides a control;
+ *      the host still verifies the token and owns every authority decision.
+ */
+export function hasSpectate(claims: DecodedClaims): boolean {
+  return claims.scope?.includes("spectate") === true;
+}
+
+function scopeOf(value: unknown): string[] | undefined {
+  if (!Array.isArray(value) || !value.every((item) => typeof item === "string")) return undefined;
+  return value as string[];
 }
 
 /**

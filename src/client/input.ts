@@ -103,6 +103,8 @@ export type PlayInput = {
   toggleProfile(): void;
   setMenuOpen(open: boolean): void;
   onPadMenu(handler: (ev: PadMenuEvent) => void): void;
+  /** Held keys, including the observer brackets. Read-only; no listener of its own. */
+  readonly keys: ReadonlySet<string>;
   readonly locked: boolean;
   readonly profile: GamepadProfileName;
   readonly padStatus: PadStatus | null;
@@ -306,6 +308,13 @@ export function attachPlayInput(
       digitQueued = ev.code;
       return;
     }
+    if (ev.code === "BracketLeft" || ev.code === "BracketRight") {
+      // The observer's target cycler reads these from `keys`; no separate listener.
+      if (ev.repeat) return;
+      if (down) keys.add(ev.code);
+      else keys.delete(ev.code);
+      return;
+    }
     if (ev.code === "Space" || ev.code === "ControlLeft" || ev.code === "ControlRight") {
       if (ev.repeat) return;
       ev.preventDefault();
@@ -391,6 +400,7 @@ export function attachPlayInput(
   dom.addEventListener("click", onClick);
 
   return {
+    keys,
     get locked() {
       return locked;
     },

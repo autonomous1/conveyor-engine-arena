@@ -70,3 +70,33 @@ test("focus wraps, the scene-map row persists, and invert Y defaults off", () =>
   assert.equal(again.invertY, false);
   assert.equal(storage.getItem(INVERT_Y_STORAGE_KEY), "off");
 });
+
+test("the observer row appears only when allowed, and it persists", () => {
+  const storage = memory();
+  const viewer = createOptionsModel(storage, () => {}, () => {}, () => {}, () => {}, false, () => {}, true);
+  assert.equal(viewer.observe, false);
+  viewer.resetFocus();
+  viewer.moveFocus(5);
+  assert.equal(viewer.focusIndex, 5);
+  viewer.activateFocused();
+  assert.equal(viewer.observe, true);
+  assert.equal(storage.getItem("ce-arena-observe"), "on");
+
+  const again = createOptionsModel(storage, () => {}, () => {}, () => {}, () => {}, false, () => {}, true);
+  assert.equal(again.observe, true);
+  again.resetFocus();
+  again.moveFocus(5);
+  again.activateFocused();
+  assert.equal(again.observe, false);
+  assert.equal(storage.getItem("ce-arena-observe"), "off");
+
+  // A session without the scope: no row, and the toggle is a no-op.
+  const player = createOptionsModel(storage, () => {}, () => {}, () => {}, () => {}, false, () => {}, false);
+  assert.equal(player.observe, false);
+  assert.equal(player.focusIndex, 0);
+  player.moveFocus(-1);
+  assert.equal(player.focusIndex, 4);
+  player.toggleObserve();
+  assert.equal(player.observe, false);
+  assert.equal(storage.getItem("ce-arena-observe"), "off");
+});
