@@ -43,7 +43,7 @@ The two copies have diverged: `agents/decisions.md` and `agents/README-dsh.md` a
 **Resources**
 
 - `node packages/modev/cli.mjs` — the query surface over the codemap and the KBs: `query symbol|file|section|entity`, `find`, `drift`. Never read `agents/codemap.md` as a document.
-- `agents/host-flow.md`, `agents/host-model.md`, `agents/shared-flow.md`, `agents/shared-model.md`, `agents/client-kb.md` — the layer map (`*-kb.md` is the split's index page).
+- `agents/host-flow.md`, `agents/host-model.md`, `agents/shared-flow.md`, `agents/shared-model.md`, `agents/client-kb.md`, `agents/bot-kb.md` — the layer map (`*-kb.md` is the split's index page).
 - Four-slot module headers — the module's architecture statement (`ARCHITECTURE` / `Wiring` / `Order` / `Invariants`).
 - Closed tag vocabulary — the facts types cannot carry: `@invariant` (test-paired, `contract-grep`), `@pre`/`@post`, `@why`, `@when`, `@see`, `@internal`.
 - Six always-gates — `test/scopes.json`: contract-grep, module-headers, codemap-tags, codemap-calls, manifest-data, jsdoc-exports.

@@ -1011,3 +1011,28 @@ Next formalization, already researched: tasks 137 (mailbox) and 139 (command
 handlers) move `command-host.ts`'s interfaces into `packages/bot-client/src`.
 
 Gates: modev check green, `drift` clean.
+
+## 27. The bot lane gets a KB (2026-11-22)
+
+`agents/bot-kb.md` (202 lines, under the 312 cap): §1 connect, §2 the world
+model, §3 the brain (plan budgets, pursuit, combat policy), §4 missions, §5 the
+mailbox and command surface, §6 the driver lane, §7 determinism, §8 single
+sources, §11 the two lane invariants, §12 the layer map, §13 the state model
+(session, world, command host, mailbox), §14 the open gaps.
+
+Tooling: modev learns the **bot** layer — `parse-kb.mjs` recognises `bot-*`
+files and the section-ref scanner adds `bot` to its layers — so
+`query section bot 13` resolves. `test/kb-symbols.test.ts` now covers the new KB
+(16 tests).
+
+Roles wired: the designer's resources, the coder's KB spec, the bot-developer's
+read order (`bot-kb` §13), the bot-task-template's Knowledge base example, and
+the AGENTS index note.
+
+The identifier gate caught one thing on the first run: `msgReject` was backticked
+as if it existed; it is a proposed frame, so it is now prose. No bot-client tests
+were added (the operator's call); the KB gates are its coverage. The lane is 11
+modules / ~4,550 lines with `commands.ts`/`mailbox.ts` extracted — this is the map
+the bot-developer was missing (§25).
+
+Gates: modev check green, kb-symbols 16/16, `drift` clean.

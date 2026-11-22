@@ -6,10 +6,10 @@
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 
-const LAYERS = ["host", "client", "shared"];
-const KB_FILE = /^(host|client|shared)-(?:kb|flow|model)\.md$/;
+const LAYERS = ["host", "client", "shared", "bot"];
+const KB_FILE = /^(host|client|shared|bot)-(?:kb|flow|model)\.md$/;
 const REF = /§(\d+(?:\.\d+)?)(?:\s*[–-]\s*§?(\d+(?:\.\d+)?))?/g;
-const OWNER = /(host|client|shared)(?:-kb)?\b/g;
+const OWNER = /(host|client|shared|bot)(?:-kb)?\b/g;
 
 function sections(text) {
   const out = new Set();

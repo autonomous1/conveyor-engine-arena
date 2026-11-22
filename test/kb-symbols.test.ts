@@ -15,6 +15,7 @@ const KBS = [
   "shared-flow.md",
   "shared-model.md",
   "client-kb.md",
+  "bot-kb.md",
 ] as const;
 const pathLine = /[A-Za-z0-9_./-]+\.(?:ts|json|md):\d+/;
 const bareLine = /`:\d+(?:-\d+)?`/;

@@ -9,7 +9,7 @@
 // lint enforces the same rule); index files (`*-kb.md`) declare no sections.
 import { readdirSync, readFileSync } from "node:fs";
 
-const KB_FILE = /^(host|client|shared)-(?:kb|flow|model)\.md$/;
+const KB_FILE = /^(host|client|shared|bot)-(?:kb|flow|model)\.md$/;
 const HEADING = /^(#{2,6})\s+(.+?)\s*$/;
 const NUMBERED = /^(\d+(?:\.\d+)?)\.?\s+(.+)$/;
 

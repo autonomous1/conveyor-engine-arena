@@ -139,8 +139,9 @@ Do not start one, and do not fall back to the remote without the operator's OK.
 2. `agents/bot-developer-role.md` — this file.
 3. `packages/bot-client/tests/POCS.md` — the POC ledger — and `packages/bot-client/tests/README.md` — the drivers. Before a new run, find the prior prototype for this behaviour: a `proven` row means extend that script and its report, not start a new one.
 4. The task's **Knowledge base** sections (`agents/host-model.md` §…, `agents/host-flow.md` §…, `agents/client-kb.md` §…, `agents/shared-flow.md` §2–§3 and `agents/shared-model.md` §11; the state model is §13 in `host-model`/`client-kb`/`shared-model`) — the map of the state and contracts the run depends on. Query them: `node packages/modev/cli.mjs query section <layer> <§N>`; the file is the fallback. The slot is the entry point, **not the limit**: query any further section the run needs (the behaviour you are diagnosing, the frame you are parsing), and query rather than read a whole file.
-5. The task's Files table — the driver, the source it reads, the prior report/baseline.
-6. The task's prior report/baseline, if named.
+5. `agents/bot-kb.md` — your own layer: connect, world, brain, missions, mailbox/commands, the drivers, and the state model §13. Query a section rather than reading a whole file.
+6. The task's Files table — the driver, the source it reads, the prior report/baseline.
+7. The task's prior report/baseline, if named.
 
 `packages/bot-client/src/predict.ts` is optional for most live work; read it only
 when a prediction/host divergence is the question.

@@ -133,6 +133,8 @@ codemap cannot express. The KBs are curated, not generated:
 - `agents/shared-model.md` — the invariants §11 and the cross-layer contract §13.
 - `agents/client-kb.md` — boot, RAF, snapshot intake, scene, input, HUD, audio,
   effects, diagnostics, frame budget.
+- `agents/bot-kb.md` — the bot lane: connect, world model, brain, missions,
+  mailbox/commands, drivers, and its state model §13.
 
 Method:
 
