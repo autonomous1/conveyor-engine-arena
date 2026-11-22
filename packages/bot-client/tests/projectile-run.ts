@@ -1,7 +1,7 @@
 // Task 94 spike: throw grenades at wander NPCs at 5/10/20 m with a low-arc
 // ballistic pitch, with and without velocity lead, then read the hp frames.
-// Movement is planner-driven (`stand:` mission) so a moved NPC is tracked, and
-// a throw is refused unless the eye has line of sight to the predicted point.
+// Movement is wishTo-driven (`walk` method) so a moved NPC is tracked, and a
+// throw is refused unless the eye has line of sight to the predicted point.
 // Run: CE_TOKEN=… node --import ./scripts/ts-ext-register.mjs \
 //   packages/bot-client/tests/projectile-run.ts --url ws://127.0.0.1:4173 --bands 5,10,20
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -234,16 +234,52 @@ const eyeNow = () => {
   return me ? { x: me.x, y: me.y + EYE_HEIGHT, z: me.z } : undefined;
 };
 
-// --- movement: planner first, straight fallback only for the last metre ----
-const standWalk = async (point: { x: number; z: number }, timeoutMs: number, label: string): Promise<boolean> => {
-  const mission = parseMission(`stand:${point.x.toFixed(2)},0,${point.z.toFixed(2)}`);
-  if (!mission) return false;
-  const code = await runMission(session, mission, {
-    timeoutMs,
-    log: (l) => record(`  ${label} ${l}`),
-    error: (l) => record(`  ${label} ERROR ${l}`),
-  });
-  return code === 0;
+// --- movement: a point destination is a wishTo walk (task 132) ------------
+// Stuck-aware walker: sidesteps/reverses when the capsule stops making progress.
+const walkWithRecovery = async (target: { x: number; z: number }, ms: number, label: string): Promise<boolean> => {
+  const deadline = Date.now() + ms;
+  let lastX = Number.NaN;
+  let lastZ = Number.NaN;
+  let lastProgress = Date.now();
+  let attempts = 0;
+  while (Date.now() < deadline) {
+    const me = world.self();
+    if (!me) return false;
+    const d = Math.hypot(me.x - target.x, me.z - target.z);
+    if (d <= 0.6) {
+      session.input.sendInput({ moveX: 0, moveZ: 0, yaw: me.yaw });
+      await sleep(120);
+      return true;
+    }
+    if (Number.isFinite(lastX) && Math.hypot(me.x - lastX, me.z - lastZ) < 0.15) {
+      if (Date.now() - lastProgress > 1500) {
+        attempts += 1;
+        record(`${label}: STUCK #${attempts} at ${me.x.toFixed(2)},${me.y.toFixed(2)},${me.z.toFixed(2)} d=${d.toFixed(2)}`);
+        if (attempts > 4) return false;
+        const yaw = Math.atan2(target.x - me.x, target.z - me.z);
+        const side = attempts % 2 === 1 ? 1 : -1;
+        const sidePoint = { x: me.x + Math.cos(yaw) * side * 1.2, z: me.z - Math.sin(yaw) * side * 1.2 };
+        const until = Date.now() + 700;
+        while (Date.now() < until) {
+          const p2 = world.self();
+          if (!p2) break;
+          session.input.sendInput(wishTo({ x: p2.x, y: p2.y, z: p2.z, vx: 0, vz: 0, yaw: p2.yaw }, sidePoint, 1));
+          await sleep(50);
+        }
+        lastX = Number.NaN;
+        lastProgress = Date.now();
+        continue;
+      }
+    } else {
+      lastX = me.x;
+      lastZ = me.z;
+      lastProgress = Date.now();
+    }
+    session.input.sendInput(wishTo({ x: me.x, y: me.y, z: me.z, vx: 0, vz: 0, yaw: me.yaw }, target, 1));
+    await sleep(50);
+  }
+  record(`${label}: timeout`);
+  return false;
 };
 // --- trial trace + reachability probe (task 112) ---------------------------
 const planCache = createNavCache();
@@ -430,7 +466,8 @@ async function reachBand(band: number, deadline: number): Promise<number> {
     record(`  move band=${band}: target=${targetId} d=${d.toFixed(2)} to (${cand.x.toFixed(2)},${cand.z.toFixed(2)}) los=${hasLosNow()}${pathOk === null ? "" : ` path=${pathOk ? 1 : 0}`}`);
     sampleTarget();
     lastNoPlan = null;
-    const ok = await standWalk(cand, Math.min(8000, Math.max(1000, deadline - Date.now())), `band${band}`);
+    planNow = "wish";
+    const ok = await walkWithRecovery(cand, Math.min(8000, Math.max(1000, deadline - Date.now())), `band${band}`);
     const end = world.self();
     const endT = targetId === undefined ? undefined : poseOf(targetId);
     let fallback = "none";

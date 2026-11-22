@@ -387,17 +387,36 @@ const findCover = (attackers: NpcRow[], radii: readonly number[] = [3, 5, 8, 11]
   }
   return undefined;
 };
-const walkTo = async (point: Point, timeoutMs: number, label: string): Promise<number> => {
-  const mission = parseMission(`stand:${point.x.toFixed(2)},0,${point.z.toFixed(2)}`);
-  if (!mission) return 1;
-  return runMission(session, mission, {
-    timeoutMs,
-    log: (l) => record(`  ${label} ${l}`),
-    error: (l) => record(`  ${label} ERROR ${l}`),
-  });
+// Point movement is a stateless wishTo walk (the `walk` method); the planner's
+// `stand:` is retired from this driver.
+const walkToStand = async (point: Point, label: string): Promise<{ ok: boolean; d: number; how: string }> => {
+  const deadline = Date.now() + 8_000;
+  let last = { x: Number.NaN, z: Number.NaN };
+  let lastMove = Date.now();
+  while (Date.now() < deadline) {
+    const me = world.self();
+    if (!me) break;
+    const d = Math.hypot(me.x - point.x, me.z - point.z);
+    if (d <= 0.6) {
+      session.input.sendInput({ moveX: 0, moveZ: 0, yaw: me.yaw });
+      await sleep(120);
+      return { ok: true, d, how: "wish" };
+    }
+    if (Number.isFinite(last.x) && Math.hypot(me.x - last.x, me.z - last.z) > 0.05) lastMove = Date.now();
+    last = { x: me.x, z: me.z };
+    if (Date.now() - lastMove > 900) {
+      record(`  ${label}: wish-wedged at ${me.x.toFixed(2)},${me.z.toFixed(2)} d=${d.toFixed(2)}`);
+      return { ok: d <= 1.8, d, how: "wish-wedged" };
+    }
+    session.input.sendInput(wishTo({ x: me.x, y: me.y, z: me.z, vx: 0, vz: 0, yaw: me.yaw }, { x: point.x, z: point.z }, 1));
+    await sleep(80);
+  }
+  const me = world.self();
+  const d = me ? Math.hypot(me.x - point.x, me.z - point.z) : Infinity;
+  return { ok: d <= 1.8, d, how: "wish-wedged" };
 };
-// v2: pre-check the cover point with the same planPath the brain's `stand:`
-// uses, without moving. A no-plan here is the 112 dependency.
+// v2: pre-check the cover point with the same planPath the brain uses, without
+// moving. A no-plan here is the 112 dependency.
 const planCache = createNavCache();
 const probePath = (point: { x: number; z: number }): { ok: boolean; reason: string | null; end?: { x: number; z: number } } => {
   const graph = world.sceneGraph();
@@ -429,9 +448,6 @@ const probePath = (point: { x: number; z: number }): { ok: boolean; reason: stri
   const last = plan.points[plan.points.length - 1];
   return { ok: true, reason: null, end: last ? { x: last[0], z: last[2] } : point };
 };
-// v2c: the requested stand can be inside a prop (the crate). `stand:` then
-// never reports arrival; walk it with the planner, then drive the last metre
-// straight and accept the closest reachable point within ~1.6 m.
 // 118b: the crate stand is fixed; wait for a pair to wander into the band
 // instead of failing the trial at the moment of arrival.
 type PairHit = { c: NonNullable<ReturnType<typeof findCluster>>; p: { id: number; x: number; y: number; z: number }; d: number };
@@ -449,27 +465,6 @@ const waitPair = async (ref: { x: number; z: number }, min: number, max: number,
     if (Date.now() >= until) return undefined;
     await sleep(500);
   }
-};
-const walkToStand = async (point: Point, label: string): Promise<{ ok: boolean; d: number; how: string }> => {
-  const code = await walkTo(point, 8_000, label);
-  if (code === 0) return { ok: true, d: 0, how: "plan" };
-  let last = { x: Number.NaN, z: Number.NaN };
-  let lastMove = Date.now();
-  const until = Date.now() + 3_500;
-  while (Date.now() < until) {
-    const me = world.self();
-    if (!me) break;
-    const d = Math.hypot(me.x - point.x, me.z - point.z);
-    if (d <= 1.6) return { ok: true, d, how: "straight" };
-    if (Number.isFinite(last.x) && Math.hypot(me.x - last.x, me.z - last.z) > 0.05) lastMove = Date.now();
-    last = { x: me.x, z: me.z };
-    if (Date.now() - lastMove > 900) return { ok: d <= 1.8, d, how: "wedged" };
-    session.input.sendInput(wishTo({ x: me.x, y: me.y, z: me.z, vx: 0, vz: 0, yaw: me.yaw }, { x: point.x, z: point.z }, 1));
-    await sleep(80);
-  }
-  const me = world.self();
-  const d = me ? Math.hypot(me.x - point.x, me.z - point.z) : Infinity;
-  return { ok: d <= 1.8, d, how: "timeout" };
 };
 const aliveOk = (): boolean => {
   const me = world.self();
@@ -575,7 +570,7 @@ async function runTrial(modeName: string): Promise<void> {
     record(`PAIR pair=${cluster.a.id},${cluster.b.id} aimPawn=${aimPawn.id} stand=${stand.x.toFixed(2)},${stand.z.toFixed(2)} d=${d.toFixed(2)} band=${controlBand ? CONTROL_BAND : `${BAND}-${BAND_MAX}`}`);
   }
   // Cover pre-check (cover only): a blocked point within 3 m, walkable with the
-  // same planPath the brain's `stand:` uses. A no-plan here is the 112 dependency.
+  // same planPath the brain uses. A no-plan here is the 112 dependency.
   let coverPre: Point | undefined;
   let coverPreLos = "visible";
   let coverPreCode: number | null = null;

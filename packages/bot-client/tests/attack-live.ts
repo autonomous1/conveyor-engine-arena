@@ -60,17 +60,6 @@ const walkToPoint = async (target: { x: number; z: number }, ms: number, label: 
   return false;
 };
 
-const standWalk = async (point: { x: number; z: number }, timeoutMs: number, label: string): Promise<boolean> => {
-  const mission = parseMission(`stand:${point.x.toFixed(2)},0,${point.z.toFixed(2)}`);
-  if (!mission) return false;
-  const code = await runMission(session, mission, {
-    timeoutMs,
-    log: (l) => record(`  ${label} ${l}`),
-    error: (l) => record(`  ${label} ERROR ${l}`),
-  });
-  return code === 0;
-};
-
 const losNow = (targetId: number): boolean => {
   const me = world.self();
   const tg = world.others().find((p) => p.id === targetId);
@@ -101,45 +90,14 @@ try {
 
   // 1. Arm up: approach the alien weapon from 10 m east, then walk west up the steps.
   if ((!world.weapon() || world.ammo() <= 0) && weaponPresent) {
-    const walkTo = async (target: { x: number; z: number }, ms: number, label: string): Promise<boolean> => {
-      const deadline = Date.now() + ms;
-      let last = Infinity;
-      let lastProgress = Date.now();
-      while (Date.now() < deadline) {
-        const me = world.self();
-        if (!me) return false;
-        if (world.weapon() && world.ammo() > 0) return true;
-        const d = Math.hypot(me.x - target.x, me.z - target.z);
-        if (d <= 0.5) {
-          session.input.sendInput({ moveX: 0, moveZ: 0, yaw: me.yaw });
-          await sleep(100);
-          return true;
-        }
-        if (d < last - 0.2) {
-          last = d;
-          lastProgress = Date.now();
-        }
-        if (Date.now() - lastProgress > 3000) {
-          record(`arm-up ${label}: no progress at ${me.x.toFixed(2)},${me.y.toFixed(2)},${me.z.toFixed(2)} d=${d.toFixed(2)}`);
-          return false;
-        }
-        session.input.sendInput(wishTo({ x: me.x, y: me.y, z: me.z, vx: 0, vz: 0, yaw: me.yaw }, target, 1));
-        await sleep(50);
-      }
-      record(`arm-up ${label}: timeout`);
-      return false;
-    };
-    record("arm-up: east approach to 10 m east of the weapon (planner)");
+    record("arm-up: east approach to 10 m east of the weapon (wishTo)");
     const east = { x: -13.90, z: 16.50 };
-    const eastOk = await standWalk(east, 45_000, "east");
-    if (!eastOk) {
-      record("east: LAST RESORT straight walk");
-      await walkTo(east, 30_000, "east");
-    }
+    const eastOk = await walkToPoint(east, 45_000, "east");
+    record(`east wishTo ok=${eastOk}`);
     record(`at east point self=${world.self()?.x.toFixed(2)},${world.self()?.y.toFixed(2)},${world.self()?.z.toFixed(2)} weapon=${world.weapon() ?? "none"} ammo=${world.ammo()}`);
     if (!world.weapon() || world.ammo() <= 0) {
       record("arm-up: climbing the steps west toward the weapon");
-      const climbed = await walkTo({ x: -23.90, z: 16.50 }, 60_000, "climb");
+      const climbed = await walkToPoint({ x: -23.90, z: 16.50 }, 60_000, "climb");
       record(`arm-up climb done=${climbed} self=${world.self()?.x.toFixed(2)},${world.self()?.y.toFixed(2)},${world.self()?.z.toFixed(2)} weapon=${world.weapon() ?? "none"} ammo=${world.ammo()}`);
     }
     record(`arm-up result weapon=${world.weapon() ?? "none"} ammo=${world.ammo()}`);
@@ -189,10 +147,10 @@ try {
     }
   }
 
-  // 1c. Back to the spawn point, through the planner (no straight-line fallback).
-  let atCenter = await standWalk(SPAWN, 45_000, "spawn");
-  if (!atCenter) atCenter = await standWalk(SPAWN, 20_000, "spawn-retry");
-  if (!atCenter) record("NO ROUTE to the spawn point (not sliding)");
+  // 1c. Back to the spawn point by wishTo (no planner).
+  let atCenter = await walkToPoint(SPAWN, 45_000, "spawn");
+  if (!atCenter) atCenter = await walkToPoint(SPAWN, 20_000, "spawn-retry");
+  if (!atCenter) record("did not reach the spawn point (not sliding)");
   record(`back at the spawn point: ${atCenter} self=${world.self()?.x.toFixed(2)},${world.self()?.z.toFixed(2)}`);
 
   // 2. Target: explicit id, else the nearest non-player pawn.
@@ -211,7 +169,7 @@ try {
   } else {
     const t = world.others().find((p) => p.id === targetId);
     record(`target id=${targetId} at ${t?.x.toFixed(2)},${t?.y.toFixed(2)},${t?.z.toFixed(2)} d=${t ? Math.hypot(t.x - selfNow.x, t.z - selfNow.z).toFixed(1) : "?"} hp=${JSON.stringify(world.healthOf?.(targetId))}`);
-    // Pre-position through the planner; re-plan when the target changes place or drifts >3 m.
+    // Pre-position by wishTo; re-plan when the target changes place or drifts >3 m.
     const preDeadline = Date.now() + 25_000;
     let planPoint: { x: number; z: number } | undefined;
     let planPlace: string | undefined;
@@ -227,8 +185,8 @@ try {
         planPoint = { x: tg.x, z: tg.z };
         planPlace = place;
         record(`pursuit plan: id=${targetId} place=${place} d=${d.toFixed(1)}`);
-        const ok = await standWalk(planPoint, 8_000, "pursuit");
-        if (!ok) record(`pursuit: planner could not reach ${planPoint.x.toFixed(1)},${planPoint.z.toFixed(1)}`);
+        const ok = await walkToPoint(planPoint, 8_000, "pursuit");
+        if (!ok) record(`pursuit: wishTo could not reach ${planPoint.x.toFixed(1)},${planPoint.z.toFixed(1)}`);
       } else {
         await sleep(150);
       }

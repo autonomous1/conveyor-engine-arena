@@ -337,14 +337,37 @@ const gotoHandler = async (a: Record<string, unknown>): Promise<Result> => {
   return runMissionTask(`reach:${place}`, "goto");
 };
 
+// Task 132: a point destination is a wishTo walk, not a `stand:` plan. The
+// planner's `stand:` is retired from this driver; `goto:<place>` is the step
+// when a door is in the way.
 const standHandler = async (a: Record<string, unknown>): Promise<Result> => {
   const x = Number(a.x);
   const y = Number(a.y);
   const z = Number(a.z);
   if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return { ok: false, code: 1, why: "bad-args" };
-  const yaw = a.yaw === undefined ? "" : `,${Number(a.yaw)}`;
-  if (a.yaw !== undefined && !Number.isFinite(Number(a.yaw))) return { ok: false, code: 1, why: "bad-args" };
-  return runMissionTask(`stand:${x},${y},${z}${yaw}`, "stand");
+  const yawArg = a.yaw === undefined ? undefined : Number(a.yaw);
+  if (a.yaw !== undefined && !Number.isFinite(yawArg)) return { ok: false, code: 1, why: "bad-args" };
+  const me = world.self();
+  if (!me) return { ok: false, code: 1, why: "no-self" };
+  // wishTo is planar: never walk to a point on another floor.
+  if (Math.abs(me.y - y) > 0.75) return { ok: false, code: 1, why: "wrong-floor" };
+  if (abortRequested) return { ok: false, code: 4, why: "aborted" };
+  record(`STAND start x=${x} z=${z} yaw=${yawArg ?? "keep"}`);
+  const ok = await walkWithRecovery({ x, z }, 90_000, "stand");
+  if (abortRequested) return { ok: false, code: 4, why: "aborted" };
+  if (!ok) {
+    const at = world.self();
+    record(`STAND stuck at=${at ? `${at.x.toFixed(2)},${at.z.toFixed(2)}` : "?"} target=${x},${z}`);
+    return { ok: false, code: 3, why: `stuck:${x},${z}` };
+  }
+  const done = world.self();
+  const finalYaw = yawArg ?? done?.yaw ?? 0;
+  session.input.sendInput({ moveX: 0, moveZ: 0, yaw: finalYaw });
+  await sleep(300);
+  const settled = world.self();
+  const d = settled ? Math.hypot(settled.x - x, settled.z - z) : Infinity;
+  record(`STAND done at=${settled ? `${settled.x.toFixed(2)},${settled.z.toFixed(2)}` : "?"} yaw=${settled?.yaw ?? finalYaw} d=${d.toFixed(2)}`);
+  return { ok: true, code: 0, data: { x, z, yaw: finalYaw } };
 };
 
 const RELOAD_TIMEOUT_MS = 90_000;

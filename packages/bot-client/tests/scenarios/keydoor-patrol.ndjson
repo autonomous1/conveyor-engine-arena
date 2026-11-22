@@ -1,5 +1,6 @@
 {"send":{"t":"cmd","id":"kp1","name":"walk","args":{"points":[{"x":-13.9,"z":16.5},{"x":-7.1,"z":27.6}]}},"await":"done","timeoutMs":180000,"expect":{"ok":true}}
 {"send":{"t":"cmd","id":"kp2","name":"getkey","args":{}},"await":"done","timeoutMs":240000,"expect":{"ok":true}}
-{"send":{"t":"cmd","id":"kp3","name":"stand","args":{"x":-25.5,"y":0,"z":27.2}},"await":"done","timeoutMs":300000,"expect":{"ok":true}}
-{"send":{"t":"cmd","id":"kp4","name":"patrol","args":{"places":["brutalist-building-1-cbake.floor-1.hall","brutalist-building-1-cbake-0.floor-1.hall"],"minutes":0.5}},"await":"done","timeoutMs":120000,"expect":{"ok":true}}
-{"send":{"t":"cmd","id":"kp5","name":"status"},"await":"status","timeoutMs":10000}
+{"send":{"t":"cmd","id":"kp3","name":"goto","args":{"place":"brutalist-building-1-cbake.floor-1.hall"}},"await":"done","timeoutMs":300000,"expect":{"ok":true}}
+{"send":{"t":"cmd","id":"kp4","name":"stand","args":{"x":-29,"y":0,"z":27,"yaw":1.5708}},"await":"done","timeoutMs":120000,"expect":{"ok":true}}
+{"send":{"t":"cmd","id":"kp5","name":"patrol","args":{"places":["brutalist-building-1-cbake.floor-1.hall","brutalist-building-1-cbake-0.floor-1.hall"],"minutes":0.5}},"await":"done","timeoutMs":120000,"expect":{"ok":true}}
+{"send":{"t":"cmd","id":"kp6","name":"status"},"await":"status","timeoutMs":10000}

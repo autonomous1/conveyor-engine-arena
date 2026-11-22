@@ -23,6 +23,7 @@ add a second row for the same behaviour.
 | 10 | Two-bot claims / race: distinct keys, shared start | `race-claims.ts`, `race-tworace.ts` | run logs | proven |
 | 11 | Visibility diagnosis: why the bot cannot see a pawn | `probe-*.ts` | `reports/live-2026-11-18-bot-visibility-analysis.md` | proven |
 | 12 | Command status truth: per-task `elapsed` window + `hp`/`dead` respawn rule (`130`) | `packages/bot-client/tests/command-host.ts` | `reports/130-status-and-elapsed.md` | proven |
+| 13 | Point stand by `wishTo`, not the `stand:` planner (`132`); kp4 `d=0.01`, 623 ms | `packages/bot-client/tests/command-host.ts` (+ the six swept drivers) | `reports/132-no-direct-point-stands.md` | proven |
 
 ## Adding a row
 

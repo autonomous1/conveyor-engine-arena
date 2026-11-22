@@ -127,19 +127,6 @@ const walkWithRecovery = async (target: { x: number; z: number }, ms: number, la
   return false;
 };
 
-// A -> B through the route planner: the brain's `stand:` walker (planRoute/planLegs
-// or the whole-place outside grid). The straight walker is only a logged last resort.
-const standWalk = async (point: { x: number; z: number }, timeoutMs: number, label: string): Promise<boolean> => {
-  const mission = parseMission(`stand:${point.x.toFixed(2)},0,${point.z.toFixed(2)}`);
-  if (!mission) return false;
-  const code = await runMission(session, mission, {
-    timeoutMs,
-    log: (l) => record(`  ${label} ${l}`),
-    error: (l) => record(`  ${label} ERROR ${l}`),
-  });
-  return code === 0;
-};
-
 // Hitscan opportunity: a valid pawn inside the fire band with a clear line of sight.
 // This is the "computer vision sees a shot, take it" rule — checked every tick while
 // moving, so the bot fires as soon as a target presents a shot instead of running
@@ -451,15 +438,15 @@ const monitorMission = (label: string): (() => void) => {
 
 const goCentre = async (): Promise<void> => {
   const stop = monitorMission("centre");
-  let ok = await standWalk(SPAWN, 30_000, "spawn");
+  let ok = await walkWithRecovery(SPAWN, 30_000, "spawn");
   if (!ok) {
-    record("spawn: planner retry");
-    ok = await standWalk(SPAWN, 20_000, "spawn-retry");
+    record("spawn: wishTo retry");
+    ok = await walkWithRecovery(SPAWN, 20_000, "spawn-retry");
   }
   stop();
   const me = world.self();
-  record(`spawn planner ok=${ok} self=${me?.x.toFixed(2)},${me?.y.toFixed(2)},${me?.z.toFixed(2)}`);
-  if (!ok) record("NO ROUTE to the spawn point (not sliding; the loop will try the next step)");
+  record(`spawn walk ok=${ok} self=${me?.x.toFixed(2)},${me?.y.toFixed(2)},${me?.z.toFixed(2)}`);
+  if (!ok) record("did not reach the spawn point (not sliding; the loop will try the next step)");
   record(`spawn done self=${me?.x.toFixed(2)},${me?.y.toFixed(2)},${me?.z.toFixed(2)} stalls=${missionStalls}`);
 };
 
@@ -596,7 +583,7 @@ try {
       record("no target outside the 35 m spawn ring; scanning");
       const angle = Math.random() * Math.PI * 2;
       const scan = { x: SPAWN.x + Math.cos(angle) * (NO_FIRE_RING_M + 8), z: SPAWN.z + Math.sin(angle) * (NO_FIRE_RING_M + 8) };
-      await standWalk(scan, 20_000, "scan");
+      await walkWithRecovery(scan, 20_000, "scan");
       continue;
     }
     const tg = world.others().find((p) => p.id === targetId);
