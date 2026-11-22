@@ -33,6 +33,20 @@ const RIDE_SUMMON_MS = 30_000;
 const RIDE_WAIT_MS = 60_000;
 const RIDE_NEAR_M = 0.6;
 const REPLAN_MS = 5_000;
+/**
+ * Budget for a periodic `safety` replan: the same state, warm route nets.
+ */
+const PLAN_BUDGET_MS = 250;
+/**
+ * Budget for a plan after the state changed: the mission's first plan, and the
+ * first plan after a finished action, a door/pickup change, or a `stuck`.
+ * `goap.plan` calls `h(start)` before its first `expired()` check, so a new
+ * state's cold route compile is charged here; the 5-step patrol reach measures
+ * 832–2000 ms cold (task 134), and the live stuck replan spent 291 ms compiling
+ * before `expanded=0` (task 136). `safety` alone keeps the 250 ms.
+ * @why A cap, not a delay: a goal that plans in 20 ms still returns in 20 ms.
+ */
+const COLD_PLAN_BUDGET_MS = 4_000;
 /** Pursuit re-plan cadence (5 Hz), the intercept drift that forces one, and the lead cap. */
 const PURSUE_REPLAN_MS = 200;
 const PURSUE_DRIFT_M = 1;
@@ -1045,7 +1059,10 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
       await delay(0);
       if (Date.now() >= deadline) return 3;
       if (reason !== "initial") log(`replan ${reason} t=${secs()}s`);
-      const planDeadline = Math.min(deadline, Date.now() + (opts.planMs ?? 250));
+      // The cold cap follows the state change: `safety` is the only periodic
+      // same-state refresh, so only it stays on the warm budget.
+      const budgetMs = opts.planMs ?? (reason === "safety" ? PLAN_BUDGET_MS : COLD_PLAN_BUDGET_MS);
+      const planDeadline = Math.min(deadline, Date.now() + budgetMs);
       const planOpts: PlanOptions = {
         minCost: groundedCtx.minActionS,
         heuristic: estimateSeconds(goal, groundedCtx, placements, stand),
