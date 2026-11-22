@@ -22,6 +22,7 @@ add a second row for the same behaviour.
 | 9 | Elevator ride through the room-door prop | `packages/bot-client/tests/elevator-ride.ts` | `agents/host-model.md` §14 | proven |
 | 10 | Two-bot claims / race: distinct keys, shared start | `race-claims.ts`, `race-tworace.ts` | run logs | proven |
 | 11 | Visibility diagnosis: why the bot cannot see a pawn | `probe-*.ts` | `reports/live-2026-11-18-bot-visibility-analysis.md` | proven |
+| 12 | Command status truth: per-task `elapsed` window + `hp`/`dead` respawn rule (`130`) | `packages/bot-client/tests/command-host.ts` | `reports/130-status-and-elapsed.md` | proven |
 
 ## Adding a row
 
