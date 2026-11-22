@@ -436,6 +436,30 @@ const monitorMission = (label: string): (() => void) => {
   return () => clearInterval(timer);
 };
 
+// A scan point 43 m out is a route, not a straight line: validate it with the
+// planner and follow the plan; a no-plan point is discarded. The raw wishTo
+// wedged under the east steps for 20 s (2026-11-22 5-minute run).
+const scanToRing = async (end: number): Promise<void> => {
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    if (Date.now() >= end) return;
+    const me = poseNow();
+    const graph = world.sceneGraph();
+    if (!me || !graph) return;
+    const angle = Math.random() * Math.PI * 2;
+    const point = { x: SPAWN.x + Math.cos(angle) * (NO_FIRE_RING_M + 8), z: SPAWN.z + Math.sin(angle) * (NO_FIRE_RING_M + 8) };
+    const plan = planPath(graph, me, { x: point.x, y: me.y, z: point.z }, gateNow, { view: viewNow(), cache: navCache });
+    if (!plan.ok) {
+      record(`scan: no plan to ${point.x.toFixed(1)},${point.z.toFixed(1)} (${plan.reason}); another`);
+      continue;
+    }
+    record(`scan: routed ${plan.points.length} points to ${point.x.toFixed(1)},${point.z.toFixed(1)}`);
+    const res = await followPlan(plan.points, Math.min(Date.now() + 20_000, end));
+    const at = poseNow();
+    record(`scan: ${res} self=${at?.x.toFixed(2)},${at?.z.toFixed(2)}`);
+    if (res === "done") return;
+  }
+};
+
 const goCentre = async (): Promise<void> => {
   const stop = monitorMission("centre");
   let ok = await walkWithRecovery(SPAWN, 30_000, "spawn");
@@ -599,9 +623,7 @@ try {
     let targetId = opportunity(NO_FIRE_RING_M) ?? pickTarget();
     if (targetId === undefined) {
       record("no target outside the 35 m spawn ring; scanning");
-      const angle = Math.random() * Math.PI * 2;
-      const scan = { x: SPAWN.x + Math.cos(angle) * (NO_FIRE_RING_M + 8), z: SPAWN.z + Math.sin(angle) * (NO_FIRE_RING_M + 8) };
-      await walkWithRecovery(scan, 20_000, "scan");
+      await scanToRing(end);
       continue;
     }
     const tg = world.others().find((p) => p.id === targetId);
@@ -687,13 +709,14 @@ try {
         const followed = await followPlan(plan.points, Math.min(pursueEnd, Date.now() + 100));
         if (followed !== "timeout") record(`pursuit follow: ${followed} self=${world.self()?.x.toFixed(1)},${world.self()?.z.toFixed(1)}`);
         // The slice is shorter than followPlan's 1.2 s stuck detector, so watch the
-        // pose across slices: no movement over four slices is a wedge.
+        // pose across slices: no movement over twelve slices (1.2 s, the follower's
+        // own window) is a wedge — a wall slide is not mistaken for a stall.
         if (followed === "timeout" && beforePose) {
           const after = poseNow();
           const moved = after ? Math.hypot(after.x - beforePose.x, after.z - beforePose.z) : 0;
           if (moved < 0.15) {
             stuckSlices += 1;
-            if (stuckSlices >= 4) {
+            if (stuckSlices >= 12) {
               record(`pursuit: NO-PROGRESS at ${after?.x.toFixed(1)},${after?.z.toFixed(1)}; blacklisting target ${targetId} and backing off`);
               targetBlacklist.set(targetId, Date.now() + 30_000);
               targetId = undefined;
