@@ -558,10 +558,27 @@ try {
   if (me0) SPAWN = { x: me0.x, z: me0.z };
   record(`joined self=${me0?.id} at ${SPAWN.x.toFixed(2)},${SPAWN.z.toFixed(2)} (spawn point) pickups=${world.pickups().length} weapon=${world.weapon() ?? "none"} ammo=${world.ammo()}`);
 
-  if (!armed()) await armUp();
-  if (world.weapon() && world.ammo() <= 0) await reload();
+  // Loadout check: a session that inherits the previous kit must not re-run the
+  // arm-up or the ammo crate; only an unarmed/empty pawn does.
+  const loadWeapon = world.weapon() ?? "none";
+  const loadAmmo = world.ammo();
+  record(`loadout check: weapon=${loadWeapon} ammo=${loadAmmo} armed=${armed() ? 1 : 0}`);
+  if (armed()) {
+    record("loadout: already armed (weapon + ammo); skipping arm/reload");
+  } else {
+    if (loadWeapon === "none" || loadAmmo <= 0) await armUp();
+    if (world.weapon() && world.ammo() <= 0) await reload();
+  }
   record(`armed weapon=${world.weapon() ?? "none"} ammo=${world.ammo()}`);
   await goCentre();
+  // Health check: at the spawn, below 100 hp means health crates before the run.
+  const hpStart = world.health()?.hp ?? null;
+  record(`health check: hp=${hpStart ?? "?"} dead=${world.health()?.dead ?? "?"}`);
+  if (hpStart !== null && hpStart < 100) {
+    record(`health: ${hpStart} < 100 at start; acquiring health crates`);
+    await heal();
+    record(`health: after crates hp=${world.health()?.hp ?? "?"}`);
+  }
 
   const end = t0 + RUN_MS;
   while (Date.now() < end) {
@@ -570,6 +587,7 @@ try {
     if (deadNow && !wasDead) deaths += 1;
     wasDead = deadNow;
     if ((world.health()?.hp ?? 100) <= 50) {
+      record(`health: hp=${world.health()?.hp ?? "?"} <= 50; acquiring health crates`);
       await heal();
       continue;
     }
@@ -655,25 +673,14 @@ try {
         record(`pursuit plan: id=${targetId} place=${place} d=${d.toFixed(1)} intercept=${pred.x.toFixed(2)},${pred.z.toFixed(2)} vt=${vt.x.toFixed(2)},${vt.z.toFixed(2)} planMs=${pursuits > 1 ? lastPlanGap : 0}`);
         const plan = planPath(graphNow, p, { x: pred.x, y: t2.y, z: pred.z }, gateNow, { view: viewNow(), cache: navCache });
         if (!plan.ok) {
+          // No path to this target: discard it at once and let the outer loop pick
+          // another. A door detour for an unreachable target only burns the window
+          // (the 2026-11-22 5-minute run: one indoor pawn, 24 door nudges, 0 shots).
           record(`pursuit no plan: ${plan.reason}`);
-          const door = doorOnRoute(place);
-          if (door) {
-            record(`pursuit: door ${door.id} on the route to ${place}`);
-            const crossed = await enterDoor(door.id);
-            if (!crossed) {
-              doorBlacklist.set(door.id, Date.now() + 30_000);
-              targetBlacklist.set(targetId, Date.now() + 30_000);
-              record(`pursuit: door ${door.id} unusable; blacklisting it and target ${targetId} for 30s`);
-            }
-          } else {
-            targetBlacklist.set(targetId, Date.now() + 30_000);
-            record(`pursuit: no door found for ${place}; blacklisting target ${targetId} for 30s`);
-          }
-          const meNow = poseNow();
-          const hereNow = meNow ? (world.placeOf({ x: meNow.x, y: meNow.y, z: meNow.z })?.id ?? "outside") : "outside";
-          if (hereNow !== "outside") await exitBuilding();
-          await sleep(200);
-          continue;
+          targetBlacklist.set(targetId, Date.now() + 60_000);
+          record(`pursuit: no path to target ${targetId} (${plan.reason}); blacklisted 60s, selecting another`);
+          targetId = undefined;
+          break;
         }
         // A 100 ms slice of the walk; the next plan starts from the live pose.
         const beforePose = poseNow();
