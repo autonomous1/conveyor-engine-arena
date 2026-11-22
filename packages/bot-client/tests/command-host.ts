@@ -67,6 +67,8 @@ const START_ISO = new Date(t0).toISOString();
 /** First known hp after the welcome; set once the seat is ours. Null when unknown. */
 let hpStart: number | null = null;
 const secs = (): number => Math.round((Date.now() - t0) / 100) / 10;
+/** Task 130: a handler's own window, not the process uptime (`secs`). */
+const taskElapsed = (start: number): string => ((Date.now() - start) / 1000).toFixed(1);
 const lines: string[] = [];
 const record = (line: string): void => {
   const row = `t=${secs().toFixed(1)}s ${line}`;
@@ -117,6 +119,7 @@ function buildStatus(id: string): Record<string, unknown> {
     self: selfId,
     place: me ? (world.placeOf(me)?.id ?? "?") : "-",
     hp: h?.hp ?? null,
+    dead: h ? h.dead : null,
     weapon: world.weapon() ?? "none",
     ammo: world.ammo(),
     pos: me ? [round2(me.x), round2(me.y), round2(me.z)] : null,
@@ -383,6 +386,7 @@ const reloadHandler = async (a: Record<string, unknown>): Promise<Result> => {
 };
 
 const huntHandler = async (a: Record<string, unknown>): Promise<Result> => {
+  const startedAt = Date.now();
   const minutes = a.minutes === undefined ? 2 : Number(a.minutes);
   if (!Number.isFinite(minutes) || minutes < 0.5 || minutes > 10) return { ok: false, code: 1, why: "bad-args" };
   const weapon = a.weapon === undefined ? "laser" : String(a.weapon);
@@ -398,7 +402,7 @@ const huntHandler = async (a: Record<string, unknown>): Promise<Result> => {
   record(`HUNT start minutes=${minutes} weapon=laser ammo=${world.ammo()} hp=${world.healthOf(selfId)?.hp ?? null}`);
   while (Date.now() < deadline) {
     if (world.healthOf(selfId)?.dead === true) {
-      record(`HUNT end kills=${kills} shots=${shots} minutes=${minutes} elapsed=${secs()}s`);
+      record(`HUNT end kills=${kills} shots=${shots} minutes=${minutes} elapsed=${taskElapsed(startedAt)}s`);
       return { ok: false, code: 1, why: "died" };
     }
     const me = world.self();
@@ -432,13 +436,13 @@ const huntHandler = async (a: Record<string, unknown>): Promise<Result> => {
     if (world.healthOf(tgt.id)?.dead === true) { kills += 1; outcome = "dead"; }
     record(`HUNT result id=${tgt.id} outcome=${outcome} shots=${targetShots} kills=${kills} code=${code}`);
     if (outcome === "died" || world.healthOf(selfId)?.dead === true) {
-      record(`HUNT end kills=${kills} shots=${shots} minutes=${minutes} elapsed=${secs()}s`);
+      record(`HUNT end kills=${kills} shots=${shots} minutes=${minutes} elapsed=${taskElapsed(startedAt)}s`);
       return { ok: false, code: 1, why: "died" };
     }
     if (outcome === "no_ammo") {
       consecutiveNoAmmo += 1;
       if (consecutiveNoAmmo >= 2 && world.ammo() === 0) {
-        record(`HUNT end kills=${kills} shots=${shots} minutes=${minutes} elapsed=${secs()}s`);
+        record(`HUNT end kills=${kills} shots=${shots} minutes=${minutes} elapsed=${taskElapsed(startedAt)}s`);
         return { ok: false, code: 1, why: "no-ammo" };
       }
     } else {
@@ -446,12 +450,13 @@ const huntHandler = async (a: Record<string, unknown>): Promise<Result> => {
     }
     await sleep(200);
   }
-  record(`HUNT end kills=${kills} shots=${shots} minutes=${minutes} elapsed=${secs()}s`);
+  record(`HUNT end kills=${kills} shots=${shots} minutes=${minutes} elapsed=${taskElapsed(startedAt)}s`);
   if (!sawTarget) return { ok: false, code: 1, why: "no-target" };
   return { ok: true, code: 0, data: { minutes, kills, shots, hp: world.healthOf(selfId)?.hp ?? null } };
 };
 
 const patrolHandler = async (a: Record<string, unknown>): Promise<Result> => {
+  const startedAt = Date.now();
   const raw = Array.isArray(a.places) ? a.places : [];
   if (raw.length < 2 || raw.some((p) => typeof p !== "string" || (p as string).trim().length === 0)) {
     return { ok: false, code: 1, why: "bad-args" };
@@ -490,7 +495,7 @@ const patrolHandler = async (a: Record<string, unknown>): Promise<Result> => {
   } finally {
     clearInterval(sampler);
   }
-  record(`PATROL end places=[${visited.join(",")}] minutes=${minutes} elapsed=${secs()}s code=${code}`);
+  record(`PATROL end places=[${visited.join(",")}] minutes=${minutes} elapsed=${taskElapsed(startedAt)}s code=${code}`);
   if (died || world.healthOf(selfId)?.dead === true) return { ok: false, code: 1, why: "died" };
   if (code === 3) return { ok: true, code: 0, data: { minutes, places: visited } };
   if (code === 2) return { ok: false, code: 2, why: `no-plan:${lastNoPlan ?? "unknown"}` };
@@ -542,10 +547,34 @@ const getkeyHandler = async (): Promise<Result> => {
   return retrieveHandler({ pickup: key.id });
 };
 
+// The point planner's `stand` wedges on the wall between the south pad and the key
+// (steps=1, stuck forever); the arm handler's raw walker does not. Expose it so the
+// test can route by waypoints: {"points":[{"x":-13.9,"z":16.5},{"x":-7.1,"z":27.6}]}.
+const walkHandler = async (a: Record<string, unknown>): Promise<Result> => {
+  const raw = Array.isArray(a.points)
+    ? a.points
+    : a.x !== undefined || a.z !== undefined ? [{ x: a.x, z: a.z }] : [];
+  const points = raw
+    .map((p) => ({ x: Number((p as Record<string, unknown>).x), z: Number((p as Record<string, unknown>).z) }))
+    .filter((p) => Number.isFinite(p.x) && Number.isFinite(p.z));
+  if (points.length === 0) return { ok: false, code: 1, why: "bad-args" };
+  for (let i = 0; i < points.length; i += 1) {
+    if (abortRequested) return { ok: false, code: 4, why: "aborted" };
+    const p = points[i]!;
+    record(`WALK leg=${i + 1}/${points.length} to=${p.x},${p.z}`);
+    const ok = await walkWithRecovery(p, 60_000, `walk${i + 1}`);
+    const me = world.self();
+    record(`WALK leg=${i + 1} ok=${ok} at=${me ? `${me.x.toFixed(1)},${me.y.toFixed(1)},${me.z.toFixed(1)}` : "?"} hp=${world.healthOf(selfId)?.hp ?? null}`);
+    if (!ok) return { ok: false, code: 3, why: `stuck:${p.x},${p.z}` };
+  }
+  return { ok: true, code: 0, data: { points } };
+};
+
 const HANDLERS: Record<string, (a: Record<string, unknown>) => Promise<Result>> = {
   arm: armHandler,
   goto: gotoHandler,
   stand: standHandler,
+  walk: walkHandler,
   reload: reloadHandler,
   hunt: huntHandler,
   patrol: patrolHandler,
@@ -856,6 +885,7 @@ function finish(code: number): never {
   clearInterval(timer);
   clearInterval(sender);
   clearInterval(traceTimer);
+  clearInterval(deathTimer);
   try {
     writeStatus(snapshot());
   } catch {
@@ -931,6 +961,21 @@ const traceTimer = setInterval(() => {
     appendFileSync(TRACE, `${JSON.stringify(row)}\n`);
   } catch {
     // best effort
+  }
+}, SAMPLE_MS);
+// Task 130: the death/respawn sampler — the live proof of the packed `dead`.
+let lastDead: boolean | null = null;
+const deathTimer = setInterval(() => {
+  if (stop) return;
+  const h = world.healthOf(selfId);
+  if (!h) return;
+  if (lastDead === null) {
+    lastDead = h.dead;
+    return;
+  }
+  if (h.dead !== lastDead) {
+    record(`${h.dead ? "DEATH-SAMPLE" : "RESPAWN-SAMPLE"} hp=${h.hp} dead=${h.dead} t=${secs().toFixed(1)}s`);
+    lastDead = h.dead;
   }
 }, SAMPLE_MS);
 const timer = setInterval(() => {
