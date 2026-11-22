@@ -7,6 +7,10 @@
 //   stands a bot presses.
 // Wiring: server/game.ts's wander loop uses the follower; server/bot-brain.ts
 //   plans door stands.
+// Order: per-walk state — `createFollower` after the grid exists, then one
+//   `step` per host tick.
+// Invariants: `stuck` latches for the life of the walk; `passSign` is held
+//   until the blocking pawn is behind.
 import {
   DOOR_GAP_DEPTH_M,
   DOOR_USE_OUTWARD_M,
@@ -271,6 +275,16 @@ export function createFollower(pathIn: readonly PathPoint[], grid: Grid, opts: F
     return { forward: scale * (1 - taken), strafe: sign * push };
   }
 
+  /**
+   * Steer the wish around a blocked probe cell, and never to a standstill.
+   * @post When both the slide and the straight probe are blocked, the wish is
+   *       the pure-pursuit `straight` — the host's collision resolves the
+   *       contact — so the walk keeps moving and `step` still reports `stuck`
+   *       after `STUCK_TICKS` without progress.
+   * @why A 0.25 m probe grid cannot hold the 0.073 m corridor a 1.073 m doorway
+   *      leaves at a 0.5 m radius, so "blocked" is not a reason to stop; the
+   *      zero wish froze the bot at the open hall leaf for 90 s (task 133).
+   */
   function fitWish(pose: Pose, yaw: number, forward: number, strafe: number, rightBlocked: boolean): FollowInput {
     const command = (f: number, s: number): FollowInput => {
       const wish = moveIntent(yaw, f, s);
@@ -288,7 +302,7 @@ export function createFollower(pathIn: readonly PathPoint[], grid: Grid, opts: F
     const straight = command(forward, 0);
     if (!blockedAhead(slide)) return slide;
     if (!blockedAhead(straight)) return straight;
-    return command(0, 0);
+    return straight;
   }
 
   function noteProgress(pose: Pose, tick: number): void {
