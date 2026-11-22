@@ -39,3 +39,4 @@ After a run works repeatedly:
    can promote it in one pass — the script is the executable spec.
 3. When the designer drafts the task, set the row to `proposed`; when the coder's
    report lands, set `landed` and add the task number.
+| 14 | Freeze spike: which layer freezes the 140 patrol `pickup:key` (the client send / the host admission / the pickup path) | `packages/bot-client/tests/probe-patrol-freeze.ts` | `reports/live-2026-11-22-patrol-freeze-spike.md` | proposed: the host spawn-pad/capsule at the `parity` spawn; the coder's reproduction |
