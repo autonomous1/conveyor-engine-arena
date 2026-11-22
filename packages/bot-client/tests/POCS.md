@@ -17,7 +17,7 @@ add a second row for the same behaviour.
 | 4 | Command surface: `cmd` registry, mission commands, recorder, abort | `packages/bot-client/tests/command-host.ts` | `reports/123-command-host.md`, `125-mission-commands.md`, `126-relay-recorder.md` | proven |
 | 5 | Link/mailbox transport: one persistent seat, inbox/outbox/status, `msg` to a pawn | `packages/bot-client/tests/live-link.ts` | `reports/122-live-link-msg.md` | proven |
 | 6 | Interior-door wedge and the place-goal gap (spike) | spike script + trace | `reports/128-interior-door-spike.md` | proven |
-| 7 | Attack loop: arm, reload, camp the centre, one target at a time | `packages/bot-client/tests/attack-run.ts` | `reports/live-2026-11-18-attack-live.md` | proven |
+| 7 | Attack loop: arm, reload, camp the centre, one target at a time; no-path → select another target; loadout/health checks (`22 kills / 92 shots / 0 deaths` in 300 s) | `packages/bot-client/tests/attack-run.ts` | `reports/live-2026-11-18-attack-live.md`, `reports/live-2026-11-22-attack-5min.md` | proven |
 | 8 | Door approach and press: stand side, locked/key, press once | `door-stand.ts`, `door-far.ts`, `through-doors.ts` | `reports/live-2026-11-15-door-stand.md` | proven |
 | 9 | Elevator ride through the room-door prop | `packages/bot-client/tests/elevator-ride.ts` | `agents/host-model.md` §14 | proven |
 | 10 | Two-bot claims / race: distinct keys, shared start | `race-claims.ts`, `race-tworace.ts` | run logs | proven |
