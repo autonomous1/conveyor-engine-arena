@@ -36,10 +36,14 @@ the order**, observed in real time, with the operator watching the same pawn.
 
 | Context | Owns | Writes |
 |---|---|---|
-| **Designer** | task specs, reviews, KBs | `plan/dsh-tasks/proposed/` |
+| **Designer** | task specs, reviews, KB edits | `plan/dsh-tasks/proposed/` |
 | **Coder** | task execution, source changes, tests | `src/`, `test/`, the refinements of your prototypes, reports |
 | **Bot-developer (you)** | live play, rapid prototypes, diagnosis, live testing | `packages/bot-client/tests/**` (the tracked drivers and the task's script), `plan/dsh-tasks/live/**` (raw captures only), the live journal; `packages/bot-client/src/**` only when the task's Files table names it and the operator approves (source is the coder's otherwise) |
 | **Operator** | the host, the match, the orders, the judgment | — |
+
+Ownership is edit rights: **every lane reads the KBs** through `modev`; only the
+designer and the model developer edit them. Reading them is expected of you —
+you cannot interpret a trace without the map that explains it.
 
 When a fix belongs in `src/` or `test/`, you do **not** patch it. You produce the
 prototype, the evidence, and a precise candidate task, and hand it to the
@@ -134,7 +138,7 @@ Do not start one, and do not fall back to the remote without the operator's OK.
 1. `agents/AGENTS.md` — injected; do not re-read.
 2. `agents/bot-developer-role.md` — this file.
 3. `packages/bot-client/tests/POCS.md` — the POC ledger — and `packages/bot-client/tests/README.md` — the drivers. Before a new run, find the prior prototype for this behaviour: a `proven` row means extend that script and its report, not start a new one.
-4. The task's **Knowledge base** sections (`agents/host-model.md` §…, `agents/host-flow.md` §…, `agents/client-kb.md` §…, `agents/shared-flow.md` §2–§3 and `agents/shared-model.md` §11; the state model is §13 in `host-model`/`client-kb`/`shared-model`) — the map of the state and contracts the run depends on. Query them: `node packages/modev/cli.mjs query section <layer> <§N>`; the file is the fallback.
+4. The task's **Knowledge base** sections (`agents/host-model.md` §…, `agents/host-flow.md` §…, `agents/client-kb.md` §…, `agents/shared-flow.md` §2–§3 and `agents/shared-model.md` §11; the state model is §13 in `host-model`/`client-kb`/`shared-model`) — the map of the state and contracts the run depends on. Query them: `node packages/modev/cli.mjs query section <layer> <§N>`; the file is the fallback. The slot is the entry point, **not the limit**: query any further section the run needs (the behaviour you are diagnosing, the frame you are parsing), and query rather than read a whole file.
 5. The task's Files table — the driver, the source it reads, the prior report/baseline.
 6. The task's prior report/baseline, if named.
 
@@ -266,6 +270,14 @@ and for the attack `acquire`/`fire range=… los=…`/`dead`/`lost`/`no_ammo`/
 **The host:** 20 Hz; the snapshots carry `lastProcessedInput`. The operator's
 host is the source of truth; do not start a second one.
 
+**The source tree.** You read `src/` (host + shared) and `packages/bot-client/src/`
+(your own lane); the KB is the map over both. When an observation does not fit the
+model, query the section that owns the behaviour — the host tick (`host-flow` §2),
+doors (§4), collision (§5), the client frame (`client-kb` §2) — then open the
+symbol's file with `query symbol`. Five minutes with the map beats an hour of
+guessing at a trace. You do not edit the KB: a wrong section is a report line for
+the model developer.
+
 ---
 
 ## Diagnosis: three layers, always separate
@@ -312,7 +324,10 @@ hypothesis. Then reproduce with the same place/goal/start; record the pose every
 
 ## Permissions and boundaries
 
-- **Read** `src/`, `test/`, `packages/`, `agents/`, `plan/`.
+- **Read** `src/`, `test/`, `packages/`, `agents/` (the KBs, `decisions.md`,
+  `README-dsh.md` — query sections with `modev`), `plan/`.
+- **Do not edit `agents/`** — the KBs are the designer's and the model
+  developer's; a stale or wrong section is a report line.
 - **Write** the drivers and the task's script under
   `packages/bot-client/tests/**` (including the `POCS.md` row), the logs under
   `plan/dsh-tasks/logs/**`, the journal under `plan/dsh-tasks/reports/**`;
@@ -357,16 +372,19 @@ hypothesis. Then reproduce with the same place/goal/start; record the pose every
 1. The operator's token works; the URL is `ws://127.0.0.1:4173`; the bot is
    seated (`world.self()` defined, `role()` set, `scope()` includes
    `scene-graph`). The token is `~/.config/ce-arena/qa-token.pem` (`--role qa`).
-2. `sceneGraph()` is non-nil. If nil: the token lacks the scope — ask the
+2. The model query works: `node packages/modev/cli.mjs query section host-flow 2`
+   returns the tick, and `query symbol runMission` finds the brain entry. If
+   either misses, say so and stop.
+3. `sceneGraph()` is non-nil. If nil: the token lacks the scope — ask the
    operator to remint; do not debug the brain.
-3. Check the seat count (the operator + the bot + the third); report the bot's
+4. Check the seat count (the operator + the bot + the third); report the bot's
    place/health and the operator's pawn in `others()`; after `close()`, confirm
    the seat is free.
-4. Check `weapon()`/`ammo()` and the pose (the kit/pose reuse quirk).
-5. Ask whether task 81 has landed. If yes, the first order is the lift check in
+5. Check `weapon()`/`ammo()` and the pose (the kit/pose reuse quirk).
+6. Ask whether task 81 has landed. If yes, the first order is the lift check in
    `packages/bot-client/tests/elevator-ride.ts` (the working approach and its
    coordinates are recorded in `host-model.md` §14); if no, the operator's order.
-6. Post the Trial Plan and wait for the operator's `GO`; run it; journal it; only
+7. Post the Trial Plan and wait for the operator's `GO`; run it; journal it; only
    then propose a change or a hand-off.
 
 If the host, the bot, or the graph is missing, say which and stop — do not guess

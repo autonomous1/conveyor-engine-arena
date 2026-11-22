@@ -963,3 +963,29 @@ Wiring, so it is read rather than remembered:
 
 Gates: modev check green, `drift` clean. The running sessions need a restart to
 pick up the new briefs.
+
+## 25. The bot lane can read the KB (2026-11-22)
+
+Operator: the bot-developer does not understand the source tree it works with —
+it needs KB access. It *could* read `agents/` and the task's KB sections, but the
+lane table assigned "KBs" to the designer (read as ownership), and nothing said
+the slot was a minimum or that querying further was expected.
+
+Changed in the bot brief:
+
+- **Lane table:** the designer "owns" **KB edits**; a line under the table says
+  every lane reads the KBs through `modev`, and only the designer and the model
+  developer edit them.
+- **Read order:** the task's KB slot is the entry point, **not the limit** — query
+  any further section the run needs, and query rather than read a whole file.
+- **"The source tree":** read `src/` (host + shared) and `packages/bot-client/src/`;
+  when an observation does not fit, query the owning section (host tick, doors,
+  collision, client frame) and then the symbol's file. The KB is the map; a wrong
+  section is a report line, not an edit.
+- **Permissions:** reading `agents/` is explicit (KBs, `decisions.md`,
+  `README-dsh.md`); editing `agents/` is not the bot's lane.
+- **First ten minutes:** a model-query smoke test (`query section host-flow 2`,
+  `query symbol runMission`).
+- **Bot task template:** the Knowledge base slot is the entry point, not the limit.
+
+Gates: modev check green, `drift` clean.

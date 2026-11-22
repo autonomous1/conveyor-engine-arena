@@ -13,7 +13,7 @@ Read `~/dev/conveyor-engine-arena/agents/bot-developer-role.md` first. Then this
 
 <The one hypothesis the run resolves, and the decision it informs. Make it falsifiable: “does X happen when Y”, “before A / after B”. If there is no decision, there is no task.>
 
-**Knowledge base:** <the KB file(s) and section(s) this run depends on, with the reason: `agents/host-flow.md` §…, `agents/host-model.md` §…, `agents/client-kb.md` §…, `agents/shared-flow.md` §2–§3 and `agents/shared-model.md` §11. Name one half, not both. Query them with `node packages/modev/cli.mjs query section <layer> <§N>` before the run; do not edit the KB; the report's mechanism fit may cite them. If this slot is missing or names no section, stop.>
+**Knowledge base:** <the KB file(s) and section(s) this run depends on, with the reason: `agents/host-flow.md` §…, `agents/host-model.md` §…, `agents/client-kb.md` §…, `agents/shared-flow.md` §2–§3 and `agents/shared-model.md` §11. Name one half, not both. Query them with `node packages/modev/cli.mjs query section <layer> <§N>` before the run; the slot is the entry point, not the limit — query any further section the run needs. Do not edit the KB; the report's mechanism fit may cite them. If this slot is missing or names no section, stop.>
 
 ## Setup
 
