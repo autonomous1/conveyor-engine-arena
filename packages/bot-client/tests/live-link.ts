@@ -4,6 +4,8 @@
 //   <dir>/inbox.ndjson   commands, one JSON per line (appended by the driver session)
 //   <dir>/outbox.ndjson  acks, replies, received messages (appended by this process)
 //   <dir>/status.json    live snapshot, rewritten every 250 ms
+// The mailbox is `../src/mailbox.ts` (tasks 137/138); this driver's outbox rows
+// keep their `{t, at, …}` envelope, which the library writes verbatim.
 //
 // Transport (task 122): the host `msg` frame. Out: `session.messages.say(text, to)`
 // (`to` is a pawn id, 0 = broadcast). In: `world.messages()`, the last 64 rows.
@@ -22,10 +24,11 @@
 // Drive it (append one JSON line per command; `to` is `*` or a pawn id):
 //   {"cmd":"ping"}  {"cmd":"status"}
 //   {"cmd":"say","to":"*","text":"hello"}   {"cmd":"quit"}
-import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { connectBot } from "../src/connection.ts";
+import { openMailbox } from "../src/mailbox.ts";
 import { openNodeSocket } from "../src/node-socket.ts";
 
 const args = new Map<string, string>();
@@ -36,9 +39,6 @@ const STAMP = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
 const LABEL = args.get("label") ?? "link";
 const DIR = args.get("dir") ?? "plan/dsh-tasks/live";
 const NAME = args.get("name") ?? `bot-${LABEL}-${STAMP.slice(11, 19).replace(/:/g, "")}`;
-const INBOX = join(DIR, "inbox.ndjson");
-const OUTBOX = join(DIR, "outbox.ndjson");
-const STATUS = join(DIR, "status.json");
 const LOG = `plan/dsh-tasks/logs/${LABEL}-${STAMP}.log`;
 const SAMPLE_MS = 250;
 const SEND_MS = 250;
@@ -47,9 +47,11 @@ const MAX_TEXT = 256;
 // whole queue in one tick (the 5th of a burst is dropped host-side). Default 0.
 const UNPACED = args.get("unpaced") === "1";
 
-mkdirSync(DIR, { recursive: true });
 mkdirSync("plan/dsh-tasks/logs", { recursive: true });
 const t0 = Date.now();
+// The mailbox owns the six files and the inbox offset (tasks 137/138). `out`
+// stays the driver's: this driver's outbox rows are enveloped `{t, at, …}`.
+const mailbox = openMailbox({ dir: DIR, startedAt: t0, startAtEnd: true });
 const secs = (): number => Math.round((Date.now() - t0) / 100) / 10;
 const lines: string[] = [];
 const record = (line: string): void => {
@@ -58,12 +60,10 @@ const record = (line: string): void => {
   console.log(row);
 };
 const out = (event: Record<string, unknown>): void => {
-  appendFileSync(OUTBOX, `${JSON.stringify({ t: secs(), at: new Date().toISOString(), ...event })}\n`);
+  mailbox.out({ t: secs(), at: new Date().toISOString(), ...event });
 };
 const writeStatus = (body: Record<string, unknown>): void => {
-  const tmp = `${STATUS}.tmp`;
-  writeFileSync(tmp, `${JSON.stringify({ at: new Date().toISOString(), t: secs(), ...body }, null, 1)}\n`);
-  renameSync(tmp, STATUS);
+  mailbox.status(body);
 };
 
 const session = await connectBot({
@@ -163,13 +163,7 @@ function writeHeartbeat(): void {
 }
 
 // --- inbox commands -------------------------------------------------------
-let processed = 0;
-const readInbox = (): string[] => {
-  if (!existsSync(INBOX)) return [];
-  return readFileSync(INBOX, "utf8").split("\n").filter((l) => l.trim().length > 0);
-};
-processed = readInbox().length; // ignore commands from an earlier run
-record(`inbox=${INBOX} skipping ${processed} old command(s)`);
+record(`inbox=${mailbox.files.inbox} startAtEnd=true`);
 
 function handleCommand(raw: string): void {
   let cmd: Record<string, unknown>;
@@ -238,10 +232,7 @@ const sender = setInterval(() => {
 const timer = setInterval(() => {
   if (stop) return;
   try {
-    const all = readInbox();
-    if (all.length < processed) processed = 0; // inbox was truncated/rewritten
-    for (let i = processed; i < all.length; i += 1) handleCommand(all[i]!);
-    processed = all.length;
+    for (const raw of mailbox.poll()) handleCommand(raw);
     pollMessages();
     writeHeartbeat();
   } catch (err) {
@@ -256,4 +247,4 @@ process.on("uncaughtException", (err) => {
   finish(1);
 });
 
-record(`READY self=${selfId} messagesSupported=${world.messagesSupported()} inbox=${INBOX} outbox=${OUTBOX} status=${STATUS}`);
+record(`READY self=${selfId} messagesSupported=${world.messagesSupported()} inbox=${mailbox.files.inbox} outbox=${mailbox.files.outbox} status=${mailbox.files.status}`);
