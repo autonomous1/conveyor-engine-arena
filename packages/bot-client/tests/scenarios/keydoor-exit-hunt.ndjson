@@ -1,0 +1,8 @@
+{"send":{"t":"cmd","id":"m1","name":"walk","args":{"points":[{"x":-13.9,"z":16.5},{"x":-7.1,"z":27.6}]}},"await":"done","timeoutMs":180000,"expect":{"ok":true}}
+{"send":{"t":"cmd","id":"m2","name":"getkey","args":{}},"await":"done","timeoutMs":240000,"expect":{"ok":true}}
+{"send":{"t":"cmd","id":"m3","name":"goto","args":{"place":"brutalist-building-1-cbake.floor-1.hall"}},"await":"done","timeoutMs":300000,"expect":{"ok":true}}
+{"send":{"t":"cmd","id":"m4","name":"goto","args":{"place":"outside"}},"await":"done","timeoutMs":300000,"expect":{"ok":true}}
+{"send":{"t":"cmd","id":"m5","name":"arm","args":{}},"await":"done","timeoutMs":180000,"expect":{"ok":true}}
+{"send":{"t":"cmd","id":"m6","name":"reload","args":{}},"await":"done","timeoutMs":120000,"expect":{"ok":true}}
+{"send":{"t":"cmd","id":"m7","name":"hunt","args":{"minutes":2}},"await":"done","timeoutMs":180000,"expect":{"ok":true}}
+{"send":{"t":"cmd","id":"m8","name":"status"},"await":"status","timeoutMs":10000}
