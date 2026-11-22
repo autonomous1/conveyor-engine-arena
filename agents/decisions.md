@@ -264,3 +264,31 @@ client keeps a 64-row ring, and `parseMsg` drops rows past `MAX_MSG_ROWS` (64).
 - **Not a chat:** no persistence, no ordering across senders, no ack. A dropped
   row is counted (`stats().dropped`) and logged; a `msgReject` frame is a
   follow-up, not this design.
+
+## D13 — The prototype lane is pair programming; the coder is not in the inner loop
+
+The first full cycle (2026-11-22: tasks 120–136) validated the two-flow pipeline.
+The bot-developer and the operator iterate together on a live bot through the
+client interface; the coder joins only once the prototype works repeatedly and
+its runs table shows it.
+
+**Why the coder is not in the loop:** every inner iteration would need a task
+file, types and tests for a harness that may be thrown away. The cost is far
+higher than the iteration's value. The bot-developer's script is the executable
+spec; the operator supplies the host, the orders, and the judgment. The coder's
+work starts at the formalization boundary: the prototype plus its measurements
+become a designer task, and the coder re-expresses the behaviour in `src/` with
+headers, tags, and tests.
+
+**What the cycle found:** several production bugs, not just harness bugs — the
+open hall leaf froze the follower for 90 s (133), the patrol's first plan did not
+fit its budget (134/136), the interior-door wedge and the place-goal gap (128),
+and the planner's door-token estimate (131). The prototype lane is therefore also
+a discovery lane for the main tree; the coder's task is the audit point where a
+prototype's shortcuts are either justified or removed.
+
+**What made the loop cheap:** a persistent command surface (`command-host.ts`,
+`live-link.ts`), the host-mediated `msg` frame, and the POC ledger that records
+what was proven. **In practice:** a prototype is not merged, it is *read*. The
+designer drafts from the script plus the report, the coder productionizes, and
+the ledger row moves `proven` → `proposed` → `landed`.

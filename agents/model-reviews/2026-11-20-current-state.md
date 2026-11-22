@@ -989,3 +989,25 @@ Changed in the bot brief:
 - **Bot task template:** the Knowledge base slot is the entry point, not the limit.
 
 Gates: modev check green, `drift` clean.
+
+## 26. The prototype lane's first full cycle (2026-11-22)
+
+The rapid prototype → iterate → formalize loop completed its first cycle
+(tasks 120–136): the bot-developer and the operator paired on the command host,
+found production bugs, and the coder formalized the working behaviour.
+
+Recorded:
+
+- **D13** — the prototype lane is pair programming; the coder is not in the
+  inner loop because a task/types/tests per harness iteration costs more than the
+  iteration is worth. The prototype is the spec; the coder's formalization is the
+  audit point where the prototype's shortcuts are justified or removed.
+- **POC ledger rows 14–17** — follower standstill (133), patrol budget (134),
+  cold replan (136), observer camera (135) marked `landed`.
+- The cycle's production findings: the open-leaf freeze, the two planning-budget
+  bugs, the interior-door wedge, the door-token estimate.
+
+Next formalization, already researched: tasks 137 (mailbox) and 139 (command
+handlers) move `command-host.ts`'s interfaces into `packages/bot-client/src`.
+
+Gates: modev check green, `drift` clean.

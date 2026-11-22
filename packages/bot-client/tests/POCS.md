@@ -24,6 +24,10 @@ add a second row for the same behaviour.
 | 11 | Visibility diagnosis: why the bot cannot see a pawn | `probe-*.ts` | `reports/live-2026-11-18-bot-visibility-analysis.md` | proven |
 | 12 | Command status truth: per-task `elapsed` window + `hp`/`dead` respawn rule (`130`) | `packages/bot-client/tests/command-host.ts` | `reports/130-status-and-elapsed.md` | proven |
 | 13 | Point stand by `wishTo`, not the `stand:` planner (`132`); kp4 `d=0.01`, 623 ms | `packages/bot-client/tests/command-host.ts` (+ the six swept drivers) | `reports/132-no-direct-point-stands.md` | proven |
+| 14 | Follower never stands still at a blocked probe (`133`) | `src/shared/nav/follow.ts` | `reports/133-goto-open-leaf.md` | landed |
+| 15 | Patrol within budget: warm the plan or raise the first budget (`134`) | `packages/bot-client/src/brain.ts` | `reports/134-patrol-plan-budget.md` | landed |
+| 16 | The first replan after a plan gets the cold budget (`136`) | `packages/bot-client/src/brain.ts` | `reports/136-cold-replan-budget.md` | landed |
+| 17 | Observer follow camera, for any spectate-scoped key (`135`) | `src/client/follow-camera.ts` | `reports/135-observer-follow-camera.md` | landed |
 
 ## Adding a row
 
