@@ -30,6 +30,8 @@ export type FollowCameraOptions = {
   back?: number;
   /** Meters above the target's feet. Default 1.6. */
   up?: number;
+  /** Meters to the target's right (over-the-shoulder). Default 0 (centred). */
+  right?: number;
   /** Exponential rate per second. Default 8. */
   damping?: number;
   /** Snap when the ideal is farther than this from `prev`. Default 10 m. */
@@ -42,16 +44,17 @@ export type FollowCameraOptions = {
 const DT_MAX = 0.05;
 
 /**
- * Place a third-person follow camera behind and above `target`.
+ * Place a third-person follow camera behind, above, and optionally right of `target`.
  * @post A missing target returns `prev` unchanged; a missing `prev` or an
  *       ideal more than `snapM` away snaps to the ideal. Otherwise the
  *       position moves by `1 - exp(-damping * dt)` of the gap, and the look
  *       point is the target's eye.
  * @pre `dt` is clamped to `[0, 0.05]`; a frame spike still damps one short step.
  * @why Damp the offset position, not the yaw-derived ideal: a pawn that turns
- *      90° must not whip the camera 90° in one frame.
- * @invariant Once converged the position is within `back + up` of the target
- *       (test: follow_camera_converges_within_the_offset).
+ *      90° must not whip the camera 90° in one frame. The lateral `right`
+ *      offset is added to the same ideal, so it damps with the rest.
+ * @invariant Once converged the position is within `back + up + right` of the
+ *       target (test: follow_camera_converges_within_the_offset).
  */
 export function followCamera(
   target: FollowTarget | undefined,
@@ -63,9 +66,11 @@ export function followCamera(
   const back = opts.back ?? 3;
   const up = opts.up ?? 1.6;
   const eye = opts.eye ?? EYE_HEIGHT;
-  const idealX = target.x - Math.sin(target.yaw) * back;
+  // The right vector is (cos yaw, 0, -sin yaw): yaw 0 faces +Z, so right is +X.
+  const right = opts.right ?? 0;
+  const idealX = target.x - Math.sin(target.yaw) * back + Math.cos(target.yaw) * right;
   const idealY = target.y + up;
-  const idealZ = target.z - Math.cos(target.yaw) * back;
+  const idealZ = target.z - Math.cos(target.yaw) * back - Math.sin(target.yaw) * right;
   const look = { lookX: target.x, lookY: target.y + eye, lookZ: target.z };
   if (!prev) return { x: idealX, y: idealY, z: idealZ, ...look };
   const jump = Math.hypot(idealX - prev.x, idealY - prev.y, idealZ - prev.z);

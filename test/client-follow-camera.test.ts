@@ -31,6 +31,36 @@ test("follow_camera_converges_within_the_offset", () => {
   }
   assert.ok(Math.abs(pose.x - 10) < 0.2, `x ${pose.x}`);
   assert.ok(Math.abs(pose.z + 3) < 0.2, `z ${pose.z}`);
+  // The lateral offset is part of the ideal, so it converges with the rest.
+  const opts = { back: 3, up: 1.9, right: 0.8 };
+  const sideStart = followCamera(TARGET, undefined, opts, STEP);
+  assert.ok(sideStart);
+  let side = sideStart;
+  for (let i = 0; i < 60; i += 1) {
+    const next = followCamera(moved, side, opts, STEP);
+    assert.ok(next);
+    side = next;
+  }
+  assert.ok(Math.abs(side.x - 10.8) < 0.2, `right x ${side.x}`);
+  assert.ok(Math.abs(side.y - 1.9) < 0.2, `right y ${side.y}`);
+  assert.ok(Math.abs(side.z + 3) < 0.2, `right z ${side.z}`);
+  const distance = Math.hypot(side.x - 10, side.y, side.z);
+  assert.ok(distance <= 3 + 1.9 + 0.8, `distance ${distance}`);
+});
+
+test("follow_camera_places_right_of_the_rear", () => {
+  // yaw 0 faces +Z; the right-hand side is +X.
+  const pose = followCamera(TARGET, undefined, { back: 3, up: 1.9, right: 0.8 }, STEP);
+  assert.ok(pose);
+  assert.ok(Math.abs(pose.x - 0.8) < 1e-9, `x ${pose.x}`);
+  assert.ok(Math.abs(pose.y - 1.9) < 1e-9, `y ${pose.y}`);
+  assert.ok(Math.abs(pose.z + 3) < 1e-9, `z ${pose.z}`);
+  assert.ok(Math.abs(pose.lookY - 1.6) < 1e-9, `lookY ${pose.lookY}`);
+  // yaw π/2 faces +X; the right-hand side is −Z.
+  const side = followCamera({ ...TARGET, yaw: Math.PI / 2 }, undefined, { back: 3, up: 1.9, right: 0.8 }, STEP);
+  assert.ok(side);
+  assert.ok(Math.abs(side.x + 3) < 1e-9, `side x ${side.x}`);
+  assert.ok(Math.abs(side.z + 0.8) < 1e-9, `side z ${side.z}`);
 });
 
 test("follow_camera_is_frame_rate_independent", () => {

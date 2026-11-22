@@ -413,6 +413,10 @@ export async function boot(
     resolveSnap = resolve;
   });
   let frozen = false;
+  /** The observer's over-the-shoulder framing: a little right and slightly higher than the QA still. */
+  const OBSERVER_BACK = 3;
+  const OBSERVER_UP = 1.9;
+  const OBSERVER_RIGHT = 0.8;
   let followId: number | undefined;
   let followBack = 3;
   let followUp = 1.6;
@@ -442,7 +446,9 @@ export async function boot(
     const pose = followCamera(
       { x: entity.position.x, y: entity.position.y, z: entity.position.z, yaw: yawFromQuat(entity.rotation) },
       snap ? undefined : followPrev,
-      { back: followBack, up: followUp },
+      observer
+        ? { back: OBSERVER_BACK, up: OBSERVER_UP, right: OBSERVER_RIGHT }
+        : { back: followBack, up: followUp },
       dt,
     );
     if (!pose) return;
