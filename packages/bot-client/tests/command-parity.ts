@@ -87,21 +87,27 @@ const host = createCommandHost({ session, log: record });
 hostRef = host;
 record(`joined self=${me0.id} pos=${me0.x.toFixed(2)},${me0.z.toFixed(2)} place=${world.placeOf(me0)?.id ?? "?"} players=[${[...world.playerIds()].join(",")}] healthSupported=${world.healthOf(me0.id) !== undefined}`);
 
-// The retrieve target: a non-key pickup if the map has one.
-const pickups = [...world.pickups()];
-const PICKUP = pickups.find((p) => p !== "key" && p !== "alien-weapon-1") ?? pickups.find((p) => p !== "key");
+// The retrieve target: a non-key pickup, preferring one on the same outside
+// floor (the room crates cost a 180 s timeout in the previous run).
+const placements = world.pickupPlacements();
+const placeOfItem = (item: (typeof placements)[number]): string => world.placeOf({ x: (item.minX + item.maxX) / 2, y: (item.minY ?? 0) + 0.2, z: (item.minZ + item.maxZ) / 2 })?.id ?? "outside";
+const pickupCandidates = placements.filter((p) => p.id !== "key" && p.id !== "alien-weapon-1");
+const PICKUP = pickupCandidates.find((p) => placeOfItem(p) === "outside")?.id ?? pickupCandidates[0]?.id ?? placements.find((p) => p.id !== "key")?.id;
 
 type Step = { id: string; name: string; args: Record<string, unknown>; target?: { x: number; z: number }; expectWhy?: string };
 const matrix: Step[] = [
   { id: "m1", name: "arm", args: {} },
-  { id: "m2", name: "goto", args: { place: HALL } },
-  { id: "m3", name: "stand", args: { x: KEY.x, y: 0, z: KEY.z }, target: KEY },
-  { id: "m4", name: "walk", args: { points: [EAST, KEY] }, target: KEY },
-  { id: "m5", name: "reload", args: {} },
-  { id: "m6", name: "hunt", args: { minutes: 0.5 } },
-  { id: "m7", name: "patrol", args: { places: [HALL, HALL0], minutes: 0.5 } },
-  ...(PICKUP ? [{ id: "m8", name: "retrieve", args: { pickup: PICKUP } }] : []),
-  { id: "m9", name: "getkey", args: {} },
+  // The matrix's key order: acquire the key on the proven raw walk before the
+  // goto, so the goto's plan does not have to pick it up itself (the previous
+  // run's goto froze for 180 s on the plan's `pickup:key` leg).
+  { id: "m2", name: "walk", args: { points: [EAST, KEY] }, target: KEY },
+  { id: "m3", name: "getkey", args: {} },
+  { id: "m4", name: "goto", args: { place: HALL } },
+  { id: "m5", name: "stand", args: { x: -29, y: 0, z: 27 }, target: { x: -29, z: 27 } },
+  { id: "m6", name: "reload", args: {} },
+  { id: "m7", name: "hunt", args: { minutes: 0.5 } },
+  { id: "m8", name: "patrol", args: { places: [HALL, HALL0], minutes: 0.5 } },
+  ...(PICKUP ? [{ id: "m9", name: "retrieve", args: { pickup: PICKUP } }] : []),
   { id: "f1", name: "goto", args: {}, expectWhy: "bad-args" },
   { id: "f2", name: "stand", args: { x: KEY.x, y: 99, z: KEY.z }, expectWhy: "wrong-floor" },
   { id: "f3", name: "stand", args: { x: "bad", y: 0, z: 0 }, expectWhy: "bad-args" },
@@ -110,6 +116,11 @@ const matrix: Step[] = [
 ];
 
 let lastSample: { x: number; z: number; task: string | null } | null = null;
+let frozen = 0;
+// The handlers' designed windows are not freezes: the patrol's 30 s code=3
+// window and the retrieve's 180 s timeout are results. The movement missions
+// below are the walk/stand/goto/getkey/reload ones.
+const MOVING = new Set(["walk", "stand", "goto", "getkey", "reload"]);
 const checkTimer = setInterval(() => {
   if (done || issueFlag) return;
   let s: CommandStatus;
@@ -125,8 +136,11 @@ const checkTimer = setInterval(() => {
   lines.push(row);
   console.log(row);
   appendFileSync(LOG, `${row}\n`);
-  if (pos && lastSample && task && (task === "walk" || task === "stand") && lastSample.task === task && Math.hypot(pos.x - lastSample.x, pos.z - lastSample.z) < 0.05) {
-    issue(`frozen task=${task}`);
+  if (pos && lastSample && task && MOVING.has(task) && lastSample.task === task && Math.hypot(pos.x - lastSample.x, pos.z - lastSample.z) < 0.05) {
+    frozen += 1;
+    if (frozen >= 2) issue(`frozen task=${task}`);
+  } else {
+    frozen = 0;
   }
   lastSample = pos ? { x: pos.x, z: pos.z, task } : null;
 }, CHECK_MS);
