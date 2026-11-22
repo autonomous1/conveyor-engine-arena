@@ -1,0 +1,3 @@
+{"send":{"t":"cmd","id":"dw1","name":"walk","args":{"points":[{"x":-23.3,"z":27.4}]}},"await":"done","timeoutMs":60000,"expect":{"ok":true}}
+{"send":{"t":"cmd","id":"dw2","name":"walk","args":{"points":[{"x":-19.0,"z":27.4}]}},"await":"done","timeoutMs":90000,"expect":{"ok":true}}
+{"send":{"t":"cmd","id":"dw3","name":"status"},"await":"status","timeoutMs":10000}
