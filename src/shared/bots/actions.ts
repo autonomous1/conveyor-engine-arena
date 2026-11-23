@@ -447,8 +447,12 @@ function walkToStand(graph: SceneGraph, place: string, stand: Point): number {
 /**
  * Seconds still to pay.
  * An open walk pays the current place's own strict route, so the direct
- * `goTo` is popped next. A locked walk names the alternative doors once; any
- * other door is unreachable and `plan` drops that state.
+ * `goTo` is popped next. A locked walk names the alternative doors once; a
+ * `door:` token at the start of the walk for an already-open leaf is a place on
+ * the walk, not a dead end.
+ * @invariant Finite whenever a walk to the goal exists, including a start at
+ *            `door:<id>` for an already-open leaf; Infinity only when the goal
+ *            is genuinely unreachable. (test: estimateSeconds_is_finite_at_an_open_door_token)
  * @post Finite at every state on a ride path — the start, either stop, the
  *       goal place — in both directions; Infinity only when neither a walk
  *       nor a ride can reach the goal.
@@ -471,6 +475,10 @@ export function estimateSeconds(
   let altDoors: Array<{ door: string; key?: string }> = [];
   let altMetres = Infinity;
   let altSet: Set<string> | undefined;
+  // The root `plan` asks about first: the state the brain rebuilds from its
+  // snapshot after an action. Only there can a `door:` token be a doorway the
+  // pawn just unlocked instead of a token the search itself chose.
+  let startAt: string | undefined;
   const spotsOf = (at: string, s: WorldState): readonly string[] => {
     if (ctx.graph.placeById.has(at)) return [at];
     if (at.startsWith(DOOR_AT_PREFIX)) {
@@ -506,6 +514,25 @@ export function estimateSeconds(
     }
     mode = "none";
   };
+  /**
+   * Seconds for the pending unlocks plus the pickup in hand.
+   * @why A missing key is another stop, so it adds one `ACT_S`; `hasKeys` tells
+   *      the caller whether the alternative route's metres are already paid.
+   */
+  const lockedExtra = (s: WorldState, pending: typeof altDoors): { seconds: number; hasKeys: boolean } => {
+    let seconds = pickupS + pending.length * ACT_S;
+    let hasKeys = true;
+    const seen = new Set<string>();
+    for (const door of pending) {
+      if (!door.key || seen.has(door.key)) continue;
+      seen.add(door.key);
+      if (s[hasKeyFact(door.key)] !== true) {
+        hasKeys = false;
+        seconds += ACT_S;
+      }
+    }
+    return { seconds, hasKeys };
+  };
   const onFoot = (s: WorldState): number => {
     if (!place) return 0;
     if (holding && s[holdingFact(holding)] === true) return 0;
@@ -528,8 +555,24 @@ export function estimateSeconds(
     }
     if (mode === "open" && directS !== undefined) return directS;
     if (mode !== "locked" || !altSet) return Infinity;
-    if (at.startsWith(DOOR_AT_PREFIX) && !altSet.has(at.slice(DOOR_AT_PREFIX.length))) return Infinity;
     const pending = altDoors.filter((door) => s[doorOpenFact(door.door)] !== true);
+    const toll = lockedExtra(s, pending);
+    if (at.startsWith(DOOR_AT_PREFIX) && !altSet.has(at.slice(DOOR_AT_PREFIX.length))) {
+      // The leaf is already open (the unlock just landed): at the replan root
+      // the token is a place on the walk, not a dead end. A mid-plan token is
+      // one the search chose for an open leaf; the old pruning there is what
+      // keeps the hall-centre walk on the planned (locked) leaf.
+      if (at !== startAt) return Infinity;
+      // The pending-door action count is a lower bound; a finite strict route
+      // from a side place is better.
+      let best = toll.seconds;
+      for (const spot of spotsOf(at, s)) {
+        if (spot === place) return pickupS;
+        const metres = ctx.routeCost(spot, place, s);
+        if (metres > 0 && Number.isFinite(metres)) best = Math.min(best, metres / WALK_MPS + pickupS);
+      }
+      return best;
+    }
     if (pending.length === 0) {
       const spots = spotsOf(at, s);
       if (spots.length === 0) return Infinity;
@@ -542,17 +585,8 @@ export function estimateSeconds(
       if (!(best > 0 && Number.isFinite(best))) return Infinity;
       return best / WALK_MPS + pickupS;
     }
-    let extra = pickupS + pending.length * ACT_S;
-    let hasKeys = true;
-    const seen = new Set<string>();
-    for (const door of pending) {
-      if (!door.key || seen.has(door.key)) continue;
-      seen.add(door.key);
-      if (s[hasKeyFact(door.key)] !== true) {
-        hasKeys = false;
-        extra += ACT_S;
-      }
-    }
+    let extra = toll.seconds;
+    const hasKeys = toll.hasKeys;
     const stood = at.startsWith(DOOR_AT_PREFIX) ? at.slice(DOOR_AT_PREFIX.length) : "";
     const here = pending.some((door) => door.door === stood);
     // Metres stay on the bound until the key is in hand and the pawn is at the leaf.
@@ -581,6 +615,7 @@ export function estimateSeconds(
     return Number.isFinite(best) ? best / WALK_MPS : undefined;
   };
   return (s) => {
+    startAt ??= String(s.at);
     const base = onFoot(s);
     const ride = rideBound(String(s.at), s);
     if (ride === undefined) return base;

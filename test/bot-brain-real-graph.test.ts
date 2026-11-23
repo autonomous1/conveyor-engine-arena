@@ -154,6 +154,8 @@ const HALL_0_DOOR = "brutalist-building-1-cbake-0.door-1-1-9-22-0";
 const WEDGE = { x: -21.83, z: 27.12 };
 /** The 132 kp4 stand: kp5's end state, inside the base hall with the key held. */
 const HALL_POSE = { x: -28.99, y: 0, z: 27.0, yaw: 0 };
+/** The 158 run-4 pose: in the inner `-4` leaf's doorway after the unlock landed. */
+const INNER_DOORWAY = { x: -36.07, y: 0, z: 15.15 };
 
 type MovingPawn = { x: number; y: number; z: number; vx: number; vz: number; yaw: number };
 
@@ -678,6 +680,76 @@ function baseHallSession(doors: readonly HallDoor[]) {
   };
 }
 
+/**
+ * The 158 run-4 moving session: the base hall, the outer `-0` leaf open and the
+ * inner `-4` leaf shut+locked. `use()` opens the inner leaf in the shared
+ * `doors` array, so only the mission's own unlock opens it; shut leaves are the
+ * colliders and the 20 Hz step is the real `integrate`.
+ */
+function doorwaySession(stopped?: () => boolean) {
+  const doors = baseHallDoors();
+  const bodies = new Map(doors.map((door) => [door.id, door]));
+  const pawn: MovingPawn = { ...HALL_POSE, vx: 0, vz: 0, yaw: 0 };
+  const radius = loaded.view.pawnRadius;
+  const height = loaded.view.pawnHeight;
+  const hits = (x: number, z: number): boolean => {
+    const shut = doors.filter((door) => !door.open).map((door) => doorLeafBox(door));
+    return [...loaded.view.aabbs, ...shut].some((box) => {
+      const lo = box.minY ?? -Infinity;
+      const hi = box.maxY ?? Infinity;
+      if (hi <= 0 || lo >= height) return false;
+      const dx = x - Math.min(box.maxX, Math.max(box.minX, x));
+      const dz = z - Math.min(box.maxZ, Math.max(box.minZ, z));
+      return dx * dx + dz * dz <= (radius + 1e-3) ** 2;
+    });
+  };
+  const session = {
+    spectate: false,
+    close() {},
+    input: {
+      sendInput: (input: { moveX: number; moveZ: number; yaw: number }) => integrate(pawn, input, hits),
+      use: () => {
+        const leaf = doors.find((door) => door.id === HALL_1_INNER_DOOR);
+        if (!leaf) return false;
+        leaf.open = true;
+        leaf.locked = false;
+        return true;
+      },
+      fire: () => false,
+      grenade: () => false,
+      resetSeq() {},
+      callElevator() {},
+    },
+    claims: { acquire() {}, release() {} },
+    messages: { say: () => true },
+    world: {
+      aabbs: loaded.view.aabbs,
+      pawnRadius: radius,
+      pawnHeight: height,
+      self: () => (stopped?.() ? undefined : pawn),
+      others: () => [],
+      cabs: () => [],
+      door: (id: string) => doors.find((door) => door.id === id),
+      doors: () => doors,
+      doorBody: (id: string) => bodies.get(id),
+      pickups: () => pickups.map((item) => item.id),
+      pickupPlacements: () => pickups,
+      keys: () => ["key"],
+      weapon: () => undefined,
+      ammo: () => 0,
+      scope: () => ["scene-graph"],
+      sceneGraph: () => graph,
+      sceneGraphHash: () => "real",
+      regions: () => loaded.regions,
+      placeOf: (pos: { x: number; y: number; z: number }) => {
+        const place = placeAt(graph!, pos.x, pos.y, pos.z);
+        return { id: place.id, kind: place.kind };
+      },
+    },
+  };
+  return { doors, pawn, session };
+}
+
 test("the base-hall patrol reach plans inside the brain's default budget", async () => {
   const doors = baseHallDoors();
   const session = baseHallSession(doors);
@@ -733,6 +805,103 @@ test("the first stuck replan after the first plan gets the cold budget", async (
   const second = plans[1]!;
   assert.ok(!second.includes("steps=0"), `the first replan was cut at the budget\n${logs.join("\n")}`);
   assert.ok(second.includes("steps=5"), `the first replan is not the 5-step plan: ${second}\n${logs.join("\n")}`);
+});
+
+test("estimateSeconds_is_finite_at_an_open_door_token", () => {
+  // The 158 run-4 replan state: the inner `-4` unlock just landed, so the brain
+  // rebuilds `at` as `door:<inner>` (no `doorSide` fact). The token is a place
+  // on the walk, not a dead end; the planner must start from it and name the
+  // three remaining steps (the `-0` leaf, its unlock, then HALL0).
+  const goal = reach(HALL_0);
+  const doors = loaded.view.doors.map((door) =>
+    door.id === HALL_1_DOOR || door.id === HALL_1_INNER_DOOR ? { ...door, open: true, locked: false } : door,
+  );
+  const state = buildWorldState({
+    at: `door:${HALL_1_INNER_DOOR}`,
+    pickups: pickups.map((item) => item.id),
+    heldKeys: ["key"],
+    doors,
+  });
+  const ctx = createBotContext(graph!, pickups, { position: () => INNER_DOORWAY });
+  const actions = groundActions(graph!, pickups, [goal]);
+  const heuristic = estimateSeconds(goal, ctx, pickups);
+  const plan = chooseGoal(state, [goal], actions, ctx, {
+    minCost: ctx.minActionS,
+    heuristic,
+    deadlineMs: Date.now() + 5_000,
+    now: () => Date.now(),
+  });
+  assert.ok(
+    Number.isFinite(heuristic(state)),
+    `the door-token heuristic is not finite: ${heuristic(state)} (plan: ${plan ? "yes" : "undefined"})`,
+  );
+  assert.ok(plan, "no plan from the open door token");
+  assert.equal(plan.steps.length, 3, plan.steps.join(" "));
+  assert.match(plan.steps[0]!, /^goToDoor:brutalist-building-1-cbake-0\.door-/, plan.steps.join(" "));
+  assert.equal(plan.steps.at(-1), `goTo:${HALL_0}`, plan.steps.join(" "));
+});
+
+test("the post-unlock replan at the inner door keeps the walk", async () => {
+  // The 158 run-4 live sequence: the mission walks to the inner `-4` leaf and
+  // opens it itself (`use` flips the shared door row). The next replan builds
+  // `at = door:<inner>`; it must plan the three remaining steps instead of
+  // `no plan: unsatisfiable`. The fake sim need not finish the walk to HALL0 —
+  // that is the live trial's job. It stops once the post-unlock replan is
+  // logged: the brain's next periodic `safety` refresh is a 250 ms same-state
+  // budget (read-only `brain.ts`) and is not what this test pins.
+  let unlocked = false;
+  let stopped = false;
+  const { doors, session } = doorwaySession(() => stopped);
+  const goal = reach(HALL_0);
+  const logs: string[] = [];
+  const code = await runMission(session as never, { kind: "goal", goal }, {
+    timeoutMs: 10_000,
+    predictOwned: false,
+    log: (line) => {
+      logs.push(line);
+      if (line.startsWith(`start unlock:${HALL_1_INNER_DOOR}`)) unlocked = true;
+      else if (unlocked && line.startsWith("plan done")) stopped = true;
+    },
+  });
+  // The brain replans on the door change (`replan door`), so the boundary is
+  // the unlock's start, not its finish: `use()` opens the leaf mid-action.
+  const unlockAt = logs.findIndex((line) => line.startsWith(`start unlock:${HALL_1_INNER_DOOR}`));
+  assert.ok(unlockAt >= 0, `the mission never reached the inner unlock (code ${code})\n${logs.join("\n")}`);
+  const leaf = doors.find((door) => door.id === HALL_1_INNER_DOOR);
+  assert.ok(leaf?.open, `the mission never opened the inner leaf (code ${code})\n${logs.join("\n")}`);
+  const after = logs.slice(unlockAt + 1);
+  assert.equal(
+    after.filter((line) => line.startsWith("no plan")).length,
+    0,
+    `the post-unlock replan failed (code ${code})\n${after.join("\n")}`,
+  );
+  const plans = after.filter((line) => line.startsWith("plan done"));
+  assert.ok(plans.length > 0, `no replan after the unlock\n${after.join("\n")}`);
+  const replanned = plans[0]!;
+  assert.ok(!replanned.includes("steps=0"), `the post-unlock replan was cut: ${replanned}\n${after.join("\n")}`);
+  assert.ok(replanned.includes("steps=3"), `the post-unlock replan is not the 3-step walk: ${replanned}\n${after.join("\n")}`);
+  // The head the brain actually starts is the `-0` leaf; the planner is the
+  // same call the direct test makes, so pin its tail there.
+  const started = after.slice(after.indexOf(replanned) + 1).find((line) => line.startsWith("start "));
+  assert.ok(started, `the post-unlock plan never started\n${after.join("\n")}`);
+  const firstStep = started.slice("start ".length).split(" ")[0]!;
+  assert.match(firstStep, /^goToDoor:brutalist-building-1-cbake-0\.door-/, after.join("\n"));
+  const state = buildWorldState({
+    at: `door:${HALL_1_INNER_DOOR}`,
+    pickups: pickups.map((item) => item.id),
+    heldKeys: ["key"],
+    doors,
+  });
+  const ctx = createBotContext(graph!, pickups, { position: () => INNER_DOORWAY });
+  const plan = chooseGoal(state, [goal], groundActions(graph!, pickups, [goal]), ctx, {
+    minCost: ctx.minActionS,
+    heuristic: estimateSeconds(goal, ctx, pickups),
+    deadlineMs: Date.now() + 5_000,
+    now: () => Date.now(),
+  });
+  assert.ok(plan, "the same post-unlock state does not plan");
+  assert.equal(firstStep, plan.steps[0], `the started step is not the replan's first: ${started}\n${plan.steps.join(" ")}`);
+  assert.equal(plan.steps.at(-1), `goTo:${HALL_0}`, plan.steps.join(" "));
 });
 
 test("a huge expand budget still returns before the mission timeout", async () => {
