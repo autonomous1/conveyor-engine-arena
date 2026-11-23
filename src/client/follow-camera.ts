@@ -6,7 +6,8 @@
 // Wiring: boot.ts's frame loop calls `followCamera` for the observer and for
 //   `__qa.follow`; main.ts passes `parseObserve(location.search)` to boot.
 // Order: no state. Each call takes the previous pose and the frame `dt`.
-// Invariants: a missing target returns the previous pose unchanged.
+// Invariants: a missing target returns the previous pose unchanged; the look
+//   damps with the position and converges on the target's eye.
 import { EYE_HEIGHT } from "../shared/look.js";
 
 /** The damped camera's look point and position, in world meters. */
@@ -46,15 +47,20 @@ const DT_MAX = 0.05;
 /**
  * Place a third-person follow camera behind, above, and optionally right of `target`.
  * @post A missing target returns `prev` unchanged; a missing `prev` or an
- *       ideal more than `snapM` away snaps to the ideal. Otherwise the
- *       position moves by `1 - exp(-damping * dt)` of the gap, and the look
- *       point is the target's eye.
+ *       ideal more than `snapM` away snaps to the ideal and the exact eye.
+ *       Otherwise the position and the look both move by
+ *       `1 - exp(-damping * dt)` of their gaps, so the look converges on the
+ *       target's eye.
  * @pre `dt` is clamped to `[0, 0.05]`; a frame spike still damps one short step.
  * @why Damp the offset position, not the yaw-derived ideal: a pawn that turns
  *      90° must not whip the camera 90° in one frame. The lateral `right`
- *      offset is added to the same ideal, so it damps with the rest.
+ *      offset is added to the same ideal, so it damps with the rest. The look
+ *      is damped too: with the camera off the target's axis, an undamped look
+ *      turns the view on every position correction.
  * @invariant Once converged the position is within `back + up + right` of the
  *       target (test: follow_camera_converges_within_the_offset).
+ * @invariant Once converged the look point is the target's eye
+ *       (test: follow_camera_damps_the_look).
  */
 export function followCamera(
   target: FollowTarget | undefined,
@@ -81,7 +87,9 @@ export function followCamera(
     x: prev.x + (idealX - prev.x) * alpha,
     y: prev.y + (idealY - prev.y) * alpha,
     z: prev.z + (idealZ - prev.z) * alpha,
-    ...look,
+    lookX: prev.lookX + (look.lookX - prev.lookX) * alpha,
+    lookY: prev.lookY + (look.lookY - prev.lookY) * alpha,
+    lookZ: prev.lookZ + (look.lookZ - prev.lookZ) * alpha,
   };
 }
 

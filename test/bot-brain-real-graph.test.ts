@@ -27,8 +27,11 @@ const { buildWorldState } = await import("../src/shared/bots/state.ts");
 const { doorLeafBox } = await import("../src/shared/doors.ts");
 const { approachVelocity, MOVE_DT, wishPlanar } = await import("../src/shared/movements.ts");
 const { isElevatorShaft, placeAt } = await import("../src/shared/scene-graph.ts");
+const { capsuleOverlapsAabb } = await import("../src/shared/pickups.ts");
 const { loadArena } = await import("../src/server/world-loader.ts");
 const { runMission } = await import("../packages/bot-client/src/brain.ts");
+const { parseMission } = await import("../packages/bot-client/src/missions.ts");
+const { createCommandHost } = await import("../packages/bot-client/src/commands.ts");
 
 const HALL = "brutalist-building-2-cbake.floor-1.hall";
 const SPAWN = { x: 0.5407, y: 0, z: -1.7784 };
@@ -181,6 +184,297 @@ function integrate(pawn: MovingPawn, input: { moveX: number; moveZ: number; yaw:
   pawn.yaw = input.yaw;
 }
 
+const SNAPPED = { x: -23.31, y: 2.0, z: 16.42 };
+const RAW_STAND = "stand:-23.90,0,16.50";
+
+/** The 152 probe session: a pawn at a stand point over the real arena AABBs. */
+function standProbe(pawn: MovingPawn) {
+  const radius = loaded.view.pawnRadius;
+  const height = loaded.view.pawnHeight;
+  const obstacles = loaded.view.aabbs;
+  const hits = (x: number, z: number): boolean =>
+    obstacles.some((box) => {
+      const lo = box.minY ?? -Infinity;
+      const hi = box.maxY ?? Infinity;
+      if (hi <= 0 || lo >= height) return false;
+      const dx = x - Math.min(box.maxX, Math.max(box.minX, x));
+      const dz = z - Math.min(box.maxZ, Math.max(box.minZ, z));
+      return dx * dx + dz * dz <= (radius + 1e-3) ** 2;
+    });
+  const doors = loaded.view.doors;
+  return {
+    pawn,
+    session: {
+      spectate: false,
+      close() {},
+      input: {
+        sendInput: (input: { moveX: number; moveZ: number; yaw: number }) => integrate(pawn, input, hits),
+        use: () => false,
+        fire: () => false,
+        grenade: () => false,
+        resetSeq() {},
+        callElevator() {},
+      },
+      claims: { acquire() {}, release() {} },
+      messages: { say: () => true },
+      world: {
+        aabbs: obstacles,
+        pawnRadius: radius,
+        pawnHeight: height,
+        self: () => pawn,
+        others: () => [],
+        cabs: () => [],
+        door: (id: string) => doors.find((door) => door.id === id),
+        doors: () => doors,
+        doorBody: (id: string) => doors.find((door) => door.id === id),
+        pickups: () => pickups.map((item) => item.id),
+        pickupPlacements: () => pickups,
+        keys: () => [],
+        weapon: () => "alien-weapon-enh",
+        ammo: () => 0,
+        scope: () => ["scene-graph"],
+        sceneGraph: () => graph,
+        sceneGraphHash: () => "real",
+        regions: () => loaded.regions,
+        placeOf: (pos: { x: number; y: number; z: number }) => {
+          const place = placeAt(graph!, pos.x, pos.y, pos.z);
+          return { id: place.id, kind: place.kind };
+        },
+      },
+    },
+  };
+}
+
+test("the stand fact and the walk agree on the plan's snapped point", async () => {
+  // The 152 probe: the raw stand is 0.60 m from the plan's snapped cell on the
+  // crate top. The action finishes at the snap; the fact must latch there too.
+  const { pawn, session } = standProbe({ ...SNAPPED, vx: 0, vz: 0, yaw: 0 });
+  const logs: string[] = [];
+  const started = Date.now();
+  const code = await runMission(session as never, parseMission(RAW_STAND)!, {
+    timeoutMs: 5_000,
+    planMs: 2_000,
+    predictOwned: false,
+    log: (line) => logs.push(line),
+  });
+  const wall = Date.now() - started;
+  assert.equal(code, 0, `code ${code} after ${wall} ms\n${logs.join("\n")}`);
+  const finishes = logs.filter((line) => line.startsWith("finish standAt")).length;
+  assert.equal(finishes, 1, `finish count ${finishes}\n${logs.join("\n")}`);
+  assert.equal(
+    logs.filter((line) => line.startsWith("replan standAt") && line.includes("finished")).length,
+    0,
+    logs.join("\n"),
+  );
+  assert.ok(Math.hypot(pawn.x - SNAPPED.x, pawn.z - SNAPPED.z) <= 0.35, `pawn at ${pawn.x.toFixed(2)},${pawn.z.toFixed(2)}`);
+});
+
+test("a stand above the plan's floor fails instead of finishing", async () => {
+  // The live 151 pose: the pawn is at the snapped goal's XZ but 4 m above the
+  // plan's floor (y=6 vs y=2). The action must fail, not finish at the wrong y,
+  // and the brain's fail streak must return the mission well before the timeout.
+  const { session } = standProbe({ x: SNAPPED.x, y: 6.0, z: SNAPPED.z, vx: 0, vz: 0, yaw: 0 });
+  const logs: string[] = [];
+  const started = Date.now();
+  const code = await runMission(session as never, parseMission(RAW_STAND)!, {
+    timeoutMs: 5_000,
+    planMs: 2_000,
+    predictOwned: false,
+    log: (line) => logs.push(line),
+  });
+  const wall = Date.now() - started;
+  assert.equal(code, 2, `code ${code} after ${wall} ms\n${logs.join("\n")}`);
+  assert.ok(wall < 2_500, `returned after ${wall} ms, not at the fail streak\n${logs.join("\n")}`);
+  const finishes = logs.filter((line) => line.startsWith("finish standAt")).length;
+  assert.ok(finishes <= 2, `finish count ${finishes}\n${logs.join("\n")}`);
+  assert.equal(
+    logs.filter((line) => line.startsWith("replan standAt") && line.includes("finished")).length,
+    0,
+    logs.join("\n"),
+  );
+});
+
+const ARM_SPAWN = { x: -6.85, y: 0, z: 2.31 };
+
+/** The 155 session: the arm-up spawn, the weapon on the map, a pawn that never moves. */
+function armSession() {
+  const pawn: MovingPawn = { ...ARM_SPAWN, vx: 0, vz: 0, yaw: 0 };
+  const doors = loaded.view.doors;
+  return {
+    spectate: false,
+    close() {},
+    input: {
+      sendInput() {},
+      use: () => false,
+      fire: () => false,
+      grenade: () => false,
+      resetSeq() {},
+      callElevator() {},
+    },
+    claims: { acquire() {}, release() {} },
+    messages: { say: () => true },
+    world: {
+      aabbs: loaded.view.aabbs,
+      pawnRadius: loaded.view.pawnRadius,
+      pawnHeight: loaded.view.pawnHeight,
+      self: () => pawn,
+      others: () => [],
+      cabs: () => [],
+      door: (id: string) => doors.find((door) => door.id === id),
+      doors: () => doors,
+      doorBody: (id: string) => doors.find((door) => door.id === id),
+      pickups: () => pickups.map((item) => item.id),
+      pickupPlacements: () => pickups,
+      keys: () => [],
+      weapon: () => undefined,
+      ammo: () => 0,
+      playerIds: () => [1],
+      scope: () => ["scene-graph"],
+      sceneGraph: () => graph,
+      sceneGraphHash: () => "real",
+      regions: () => loaded.regions,
+      placeOf: (pos: { x: number; y: number; z: number }) => {
+        const place = placeAt(graph!, pos.x, pos.y, pos.z);
+        return { id: place.id, kind: place.kind };
+      },
+    },
+  };
+}
+
+async function waitUntil(predicate: () => boolean, ms: number): Promise<boolean> {
+  const deadline = Date.now() + ms;
+  while (Date.now() < deadline) {
+    if (predicate()) return true;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  return predicate();
+}
+
+test("the arm command plans its point walks instead of a raw wishTo", async () => {
+  // The 132 `stand` command stays wishTo; the arm's east/climb/step-off must run
+  // the 151 POC's plan-based `stand:` mission (the 152 goal fix makes it latch).
+  // This pins the wiring, not the walk: 154's live run is the end-to-end proof.
+  const logs: string[] = [];
+  const host = createCommandHost({ session: armSession() as never, log: (line) => logs.push(line) });
+  const done = host.dispatch({ id: "t1", name: "arm" });
+  const planned = await waitUntil(
+    () => logs.some((line) => line.includes("plan done")) && logs.some((line) => line.includes("start standAt")),
+    5_000,
+  );
+  host.abort();
+  await done;
+  assert.ok(planned, `the arm never planned a stand\n${logs.join("\n")}`);
+  assert.ok(
+    logs.some((line) => /arm east plan done/.test(line)),
+    `no east plan line\n${logs.join("\n")}`,
+  );
+  assert.ok(
+    logs.some((line) => /arm east start standAt:point:-13\.900,0\.000,16\.500/.test(line)),
+    `no east standAt start\n${logs.join("\n")}`,
+  );
+  assert.ok(
+    !logs.some((line) => /arm (east|climb|step-off): (STUCK|timeout)/.test(line)),
+    `raw wishTo lines in the arm log\n${logs.join("\n")}`,
+  );
+});
+
+test("a crate-top pickup stays on the crate instead of stepping off", async () => {
+  // The 154 pose: the pawn on the weapon crate's top. The pickup must walk the
+  // top to the weapon, not plan a ground route around the crate (the 154 fall
+  // was x -23.20 / z 17.15 -> x -24.15 / z 17.45 at y 0).
+  const PICKUP_POSE = { x: -23.2, y: 2.0, z: 17.15 };
+  const weapon = pickups.find((item) => item.id === "alien-weapon-1");
+  assert.ok(weapon, "alien-weapon-1 is not on the map");
+  const radius = loaded.view.pawnRadius;
+  const height = loaded.view.pawnHeight;
+  const doors = loaded.view.doors;
+  // The pickup volume is a trigger, not a wall: the brain's nav view omits it
+  // (`pickupBoxSource`), so a pawn can stand in it to take the item.
+  const obstacles = loaded.view.aabbs.filter((box) => box.source !== `${weapon.id}-box`);
+  const pawn: MovingPawn = { ...PICKUP_POSE, vx: 0, vz: 0, yaw: 0 };
+  // The mini-host: a 0.25 m riser is climbed, a taller face is a wall, and the
+  // feet follow the floor (the 154 pawn stood on the top when the pickup began).
+  const STEP = 0.3;
+  const floorUnder = (x: number, z: number, feet: number): number => {
+    let top = 0;
+    for (const box of obstacles) {
+      const hi = box.maxY ?? Infinity;
+      if (!Number.isFinite(hi) || hi > feet + STEP + 1e-3) continue;
+      const dx = x - Math.min(box.maxX, Math.max(box.minX, x));
+      const dz = z - Math.min(box.maxZ, Math.max(box.minZ, z));
+      if (dx * dx + dz * dz <= (radius + 1e-3) ** 2 && hi > top) top = hi;
+    }
+    return top;
+  };
+  const hits = (x: number, z: number): boolean =>
+    obstacles.some((box) => {
+      const lo = box.minY ?? -Infinity;
+      const hi = box.maxY ?? Infinity;
+      if (hi <= pawn.y + 1e-3) return false; // the floor under the feet
+      if (hi <= pawn.y + STEP + 1e-3) return false; // a climbable riser, not a wall
+      if (lo >= pawn.y + height) return false; // above the head
+      const dx = x - Math.min(box.maxX, Math.max(box.minX, x));
+      const dz = z - Math.min(box.maxZ, Math.max(box.minZ, z));
+      return dx * dx + dz * dz <= (radius + 1e-3) ** 2;
+    });
+  let taken = false;
+  const samples: Array<[number, number, number]> = [];
+  const session = {
+    spectate: false,
+    close() {},
+    input: {
+      sendInput: (input: { moveX: number; moveZ: number; yaw: number }) => {
+        integrate(pawn, input, hits);
+        pawn.y = floorUnder(pawn.x, pawn.z, pawn.y);
+        samples.push([pawn.x, pawn.y, pawn.z]);
+        if (!taken && capsuleOverlapsAabb(pawn.x, pawn.y, pawn.z, radius, height, weapon)) taken = true;
+      },
+      use: () => false,
+      fire: () => false,
+      grenade: () => false,
+      resetSeq() {},
+      callElevator() {},
+    },
+    claims: { acquire() {}, release() {} },
+    messages: { say: () => true },
+    world: {
+      aabbs: obstacles,
+      pawnRadius: radius,
+      pawnHeight: height,
+      self: () => pawn,
+      others: () => [],
+      cabs: () => [],
+      door: (id: string) => doors.find((door) => door.id === id),
+      doors: () => doors,
+      doorBody: (id: string) => doors.find((door) => door.id === id),
+      pickups: () => (taken ? pickups.filter((item) => item.id !== weapon.id).map((item) => item.id) : pickups.map((item) => item.id)),
+      pickupPlacements: () => pickups,
+      keys: () => [],
+      weapon: () => undefined,
+      ammo: () => 0,
+      scope: () => ["scene-graph"],
+      sceneGraph: () => graph,
+      sceneGraphHash: () => "real",
+      regions: () => loaded.regions,
+      placeOf: (pos: { x: number; y: number; z: number }) => {
+        const place = placeAt(graph!, pos.x, pos.y, pos.z);
+        return { id: place.id, kind: place.kind };
+      },
+    },
+  };
+  const logs: string[] = [];
+  const code = await runMission(session as never, parseMission("retrieve:alien-weapon-1@outside")!, {
+    timeoutMs: 20_000,
+    planMs: 2_000,
+    predictOwned: false,
+    log: (line) => logs.push(line),
+  });
+  const off = samples.filter(([x, y, z]) => y < 1.5 || x > -22.5 || x < -25.8 || z > 17.6 || z < 14.6);
+  assert.equal(off.length, 0, `the walk left the crate top\n${logs.join("\n")}\noff: ${off.slice(0, 6).map((s) => s.map((n) => n.toFixed(2)).join(",")).join(" ")}`);
+  assert.ok(taken, `the weapon was never taken; last=${samples.at(-1)?.map((n) => n.toFixed(2)).join(",")}\n${logs.join("\n")}`);
+  assert.equal(code, 0, `code ${code}\n${logs.join("\n")}`);
+});
+
 test("an open hall door does not wedge the goTo executor at the leaf", async () => {
   const doors = loaded.view.doors.map((door) => (door.id === HALL_1_DOOR ? { ...door, open: true, locked: false } : door));
   const bodies = new Map(doors.map((door) => [door.id, door]));
@@ -248,6 +542,92 @@ test("an open hall door does not wedge the goTo executor at the leaf", async () 
   assert.equal(code, 0, `code ${code} after ${wall} ms\n${logs.join("\n")}`);
   assert.ok(wall < 20_000, `took ${wall} ms, goal not reached`);
   assert.equal(placeAt(graph!, pawn.x, pawn.y, pawn.z).id, HALL_1);
+});
+
+test("a path mission routes around a low box instead of the straight line", async () => {
+  // Task 149 probe fixture: a 0.9 m box below the 1.6 m eye line (so the 3D
+  // sight line is clear) straddles the straight segment. The plan-based stand
+  // mission behind `path:` must detour around the box's footprint.
+  const box = { id: "probe-low-wall", minX: -8.2, maxX: -5.4, minY: 0, maxY: 0.9, minZ: 4.4, maxZ: 5.6 };
+  const START = { x: -6.85, y: 0, z: 2.31 };
+  const TARGET = { x: -6.85, y: 0, z: 8.0 };
+  const doors = loaded.view.doors;
+  const radius = loaded.view.pawnRadius;
+  const height = loaded.view.pawnHeight;
+  const obstacles = [...loaded.view.aabbs, box];
+  const hits = (x: number, z: number): boolean =>
+    obstacles.some((item) => {
+      const lo = item.minY ?? -Infinity;
+      const hi = item.maxY ?? Infinity;
+      if (hi <= 0 || lo >= height) return false;
+      const dx = x - Math.min(item.maxX, Math.max(item.minX, x));
+      const dz = z - Math.min(item.maxZ, Math.max(item.minZ, z));
+      return dx * dx + dz * dz <= (radius + 1e-3) ** 2;
+    });
+  const pawn: MovingPawn = { ...START, vx: 0, vz: 0, yaw: 0 };
+  const samples: Array<[number, number]> = [];
+  const session = {
+    spectate: false,
+    close() {},
+    input: {
+      sendInput: (input: { moveX: number; moveZ: number; yaw: number }) => {
+        integrate(pawn, input, hits);
+        samples.push([pawn.x, pawn.z]);
+      },
+      use: () => false,
+      fire: () => false,
+      grenade: () => false,
+      resetSeq() {},
+      callElevator() {},
+    },
+    claims: { acquire() {}, release() {} },
+    messages: { say: () => true },
+    world: {
+      aabbs: obstacles,
+      pawnRadius: radius,
+      pawnHeight: height,
+      self: () => pawn,
+      others: () => [],
+      cabs: () => [],
+      door: (id: string) => doors.find((door) => door.id === id),
+      doors: () => doors,
+      doorBody: (id: string) => doors.find((door) => door.id === id),
+      pickups: () => pickups.map((item) => item.id),
+      pickupPlacements: () => pickups,
+      keys: () => [],
+      weapon: () => undefined,
+      ammo: () => 0,
+      scope: () => ["scene-graph"],
+      sceneGraph: () => graph,
+      sceneGraphHash: () => "real",
+      regions: () => loaded.regions,
+      placeOf: (pos: { x: number; y: number; z: number }) => {
+        const place = placeAt(graph!, pos.x, pos.y, pos.z);
+        return { id: place.id, kind: place.kind };
+      },
+    },
+  };
+  const mission = parseMission("path:-6.85,0,8");
+  assert.ok(mission, "path: is not a mission");
+  assert.equal(mission.kind, "stand");
+  const logs: string[] = [];
+  const code = await runMission(session as never, mission, {
+    timeoutMs: 20_000,
+    planMs: 2_000,
+    predictOwned: false,
+    log: (line) => logs.push(line),
+  });
+  assert.equal(code, 0, `code ${code}\n${logs.join("\n")}`);
+  const d = Math.hypot(pawn.x - TARGET.x, pawn.z - TARGET.z);
+  assert.ok(d <= 0.4, `ended ${d.toFixed(2)} m from the target\n${logs.join("\n")}`);
+  assert.equal(logs.filter((line) => line.startsWith("replan stuck")).length, 0, logs.join("\n"));
+  // The straight segment is blocked by the box ...
+  assert.equal(hits(TARGET.x, (box.minZ + box.maxZ) / 2), true, "the straight segment is not blocked");
+  // ... and the walk is outside the box's footprint where it crosses its z-band.
+  const atBand = samples.filter(([, z]) => z > box.minZ && z < box.maxZ);
+  assert.ok(atBand.length > 0, `the walk never crossed the box's z-band\n${samples.join(" ")}`);
+  const minX = Math.min(...atBand.map(([x]) => x));
+  assert.ok(minX < box.minX, `the route crosses the box: xMin ${minX.toFixed(2)} vs box ${box.minX}`);
 });
 
 type HallDoor = (typeof loaded.view.doors)[number];

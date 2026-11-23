@@ -1,7 +1,8 @@
 // Task 140: command parity through the extracted interface. One bot, one
-// session; the nine-command matrix plus the deliberate failures run through
-// `createCommandHost`/`parseCommand` from src/commands.ts (no mailbox, no
-// scenario); one NDJSON row per command and a packed status before/after.
+// session; the eleven-command matrix (149 added `path`) plus the deliberate
+// failures run through `createCommandHost`/`parseCommand` from src/commands.ts
+// (no mailbox, no scenario); one NDJSON row per command and a packed status
+// before/after.
 // Run: CE_TOKEN=… node --import ./scripts/ts-ext-register.mjs \
 //   packages/bot-client/tests/command-parity.ts --url ws://127.0.0.1:4173 \
 //   --label 140-parity --name parity
@@ -108,15 +109,25 @@ const matrix: Step[] = [
   { id: "m7", name: "hunt", args: { minutes: 0.5 } },
   { id: "m8", name: "patrol", args: { places: [HALL, HALL0], minutes: 0.5 } },
   ...(PICKUP ? [{ id: "m9", name: "retrieve", args: { pickup: PICKUP } }] : []),
+  // Task 149's planned point walk (the `stand:` mission; 132 keeps `stand` on wishTo).
+  { id: "m10", name: "path", args: { x: EAST.x, y: 0, z: EAST.z }, target: EAST },
+  // A short live grenade band; the handler picks its own target and never blocks
+  // the matrix for long (the 5-minute soak is projectile-run.ts).
+  { id: "m11", name: "projectile", args: { bands: [5], throws: 1, seconds: 20 } },
   { id: "f1", name: "goto", args: {}, expectWhy: "bad-args" },
   { id: "f2", name: "stand", args: { x: KEY.x, y: 99, z: KEY.z }, expectWhy: "wrong-floor" },
   { id: "f3", name: "stand", args: { x: "bad", y: 0, z: 0 }, expectWhy: "bad-args" },
   { id: "f4", name: "hunt", args: { minutes: 0.2 }, expectWhy: "bad-args" },
   { id: "f5", name: "nope", args: {}, expectWhy: "unknown-task" },
+  { id: "f6", name: "path", args: { x: "bad", y: 0, z: 0 }, expectWhy: "bad-args" },
+  { id: "f7", name: "projectile", args: { bands: [0] }, expectWhy: "bad-args" },
 ];
 
 let lastSample: { x: number; z: number; task: string | null } | null = null;
 let frozen = 0;
+// The 147 signature: the client sends but the snapshot stream dies, so `snap`
+// and `processed` are flat for >= 5 s (the CHECK cadence) while `stale` stays 0.
+let lastNet: { snap: number; processed: number } | null = null;
 // The handlers' designed windows are not freezes: the patrol's 30 s code=3
 // window and the retrieve's 180 s timeout are results. The movement missions
 // below are the walk/stand/goto/getkey/reload ones.
@@ -132,7 +143,8 @@ const checkTimer = setInterval(() => {
   }
   const pos = s.pos ? { x: s.pos[0], z: s.pos[2] } : null;
   const task = s.task;
-  const row = `CHECK t=${secs().toFixed(1)}s task=${task ?? "-"} pos=${pos ? `${pos.x.toFixed(2)},${pos.z.toFixed(2)}` : "-"} place=${s.place} hp=${s.hp ?? "-"} dead=${s.dead ? 1 : 0}`;
+  const net = { snap: session.net.snapshots(), processed: session.net.processedInput(), stale: session.net.stale() };
+  const row = `CHECK t=${secs().toFixed(1)}s task=${task ?? "-"} pos=${pos ? `${pos.x.toFixed(2)},${pos.z.toFixed(2)}` : "-"} place=${s.place} hp=${s.hp ?? "-"} dead=${s.dead ? 1 : 0} snap=${net.snap} processed=${net.processed} stale=${net.stale}`;
   lines.push(row);
   console.log(row);
   appendFileSync(LOG, `${row}\n`);
@@ -143,6 +155,11 @@ const checkTimer = setInterval(() => {
     frozen = 0;
   }
   lastSample = pos ? { x: pos.x, z: pos.z, task } : null;
+  if (lastNet && net.snap === lastNet.snap && net.processed === lastNet.processed) {
+    issue(`FREEZE stale=5s snap=${net.snap} processed=${net.processed} staleFrames=${net.stale} task=${task ?? "-"} pos=${pos ? `${pos.x.toFixed(2)},${pos.z.toFixed(2)}` : "-"}`);
+  } else {
+    lastNet = { snap: net.snap, processed: net.processed };
+  }
 }, CHECK_MS);
 
 let okCount = 0;

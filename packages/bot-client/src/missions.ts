@@ -1,7 +1,7 @@
 /**
  * CLI mission text. Patrol is a loop of `reach` goals; there is no patrol goal in the planner.
  */
-// ARCHITECTURE: Mission text grammar: reach, retrieve, patrol, stand, and idle.
+// ARCHITECTURE: Mission text grammar: reach, retrieve, patrol, stand (and the `path:` point alias), and idle.
 // Wiring: runMission enters through parseMission; the CLI parses before connecting.
 import type { Goal } from "../../../src/shared/bots/goap.js";
 import { idle, reach, retrieve, standAt } from "../../../src/shared/bots/goals.js";
@@ -17,7 +17,8 @@ export type Mission =
   | { kind: "attack"; target: number };
 
 /**
- * `retrieve:<pickup>@<place>`, `reach:<place>`, `patrol:<place,place,…>`, `stand:…`, or `idle`.
+ * `retrieve:<pickup>@<place>`, `reach:<place>`, `patrol:<place,place,…>`,
+ * `stand:<x>,<y>,<z>[,yaw]` (or its `path:` point alias), or `idle`.
  */
 export function parseMission(text: string): Mission | undefined {
   if (text === "idle") return { kind: "goal", goal: idle() };
@@ -44,6 +45,12 @@ export function parseMission(text: string): Mission | undefined {
   }
   if (text.startsWith("stand:")) {
     const parts = text.slice("stand:".length).split(",").map((part) => Number(part));
+    if ((parts.length !== 3 && parts.length !== 4) || parts.some((value) => !Number.isFinite(value))) return undefined;
+    const [x, y, z, yaw] = parts as [number, number, number, number?, ...number[]];
+    return { kind: "stand", target: yaw === undefined ? { kind: "point", x, y, z } : { kind: "point", x, y, z, yaw } };
+  }
+  if (text.startsWith("path:")) {
+    const parts = text.slice("path:".length).split(",").map((part) => Number(part));
     if ((parts.length !== 3 && parts.length !== 4) || parts.some((value) => !Number.isFinite(value))) return undefined;
     const [x, y, z, yaw] = parts as [number, number, number, number?, ...number[]];
     return { kind: "stand", target: yaw === undefined ? { kind: "point", x, y, z } : { kind: "point", x, y, z, yaw } };

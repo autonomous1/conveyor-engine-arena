@@ -1,5 +1,5 @@
 /**
- * The bot command layer: ten typed handlers over a connected BotSession.
+ * The bot command layer: eleven typed handlers over a connected BotSession.
  * Node-only: no CLI, no token, no filesystem.
  */
 // ARCHITECTURE: The bot's command surface: parse, dispatch, status, and the
@@ -25,8 +25,8 @@ const TASK_TIMEOUT_MS = 180_000;
 /** The packed status is capped for the host's text frame. */
 const MAX_TEXT = 256;
 
-/** The ten handler names. `status` and `abort` are host methods, not handlers. */
-export type CommandName = "arm" | "goto" | "stand" | "walk" | "reload" | "hunt" | "patrol" | "retrieve" | "getkey" | "projectile";
+/** The eleven handler names. `status` and `abort` are host methods, not handlers. */
+export type CommandName = "arm" | "goto" | "stand" | "path" | "walk" | "reload" | "hunt" | "patrol" | "retrieve" | "getkey" | "projectile";
 
 /**
  * Command Args type: the normalized arguments of each handler.
@@ -35,6 +35,7 @@ export type CommandArgs = {
   arm: {};
   goto: { place: string };
   stand: { x: number; y: number; z: number; yaw?: number };
+  path: { x: number; y: number; z: number; yaw?: number };
   walk: { points: Array<{ x: number; z: number }> };
   reload: { crate?: string };
   hunt: { minutes: number; weapon: "laser" };
@@ -118,7 +119,7 @@ export type CommandHost = {
 
 /**
  * Parse and validate one command.
- * @post The ten handler names return a normalized `Command`; an unknown name
+ * @post The eleven handler names return a normalized `Command`; an unknown name
  *       returns `{error:"unknown-task"}`; bad arguments return the handler's
  *       own string (`bad-args`/`unsupported-weapon`).
  */
@@ -142,6 +143,15 @@ export function parseCommand(raw: { name: string; args?: Record<string, unknown>
       const yaw = a.yaw === undefined ? undefined : Number(a.yaw);
       if (a.yaw !== undefined && !Number.isFinite(yaw)) return { error: "bad-args" };
       return { name: "stand", x, y, z, ...(yaw !== undefined ? { yaw } : {}) };
+    }
+    case "path": {
+      const x = Number(a.x);
+      const y = Number(a.y);
+      const z = Number(a.z);
+      if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return { error: "bad-args" };
+      const yaw = a.yaw === undefined ? undefined : Number(a.yaw);
+      if (a.yaw !== undefined && !Number.isFinite(yaw)) return { error: "bad-args" };
+      return { name: "path", x, y, z, ...(yaw !== undefined ? { yaw } : {}) };
     }
     case "walk": {
       const rawPoints = Array.isArray(a.points)
@@ -317,6 +327,32 @@ const walkWithRecovery = async (target: { x: number; z: number }, ms: number, la
   return false;
 };
 
+// Task 155: the arm's point walks plan (the 151 POC); the `stand` command keeps its 132 wishTo.
+const standAtPoint = async (point: { x: number; z: number }, ms: number, label: string): Promise<boolean> => {
+  const mission = parseMission(`stand:${point.x.toFixed(2)},0,${point.z.toFixed(2)}`);
+  if (!mission) return false;
+  let noPlan: string | null = null;
+  try {
+    const code = await runMission(session, mission, {
+      timeoutMs: ms,
+      onTick: abortTick,
+      log: (line) => {
+        record(`  ${label} ${line}`);
+        const m = /no plan: ([a-z-]+)/.exec(line);
+        if (m) noPlan = m[1]!;
+      },
+      error: (line) => record(`  ${label} ERROR ${line}`),
+    });
+    if (code === 0) return true;
+    record(`  ${label} failed code=${code}${noPlan ? ` why=no-plan:${noPlan}` : ""}`);
+    return false;
+  } catch (err) {
+    if (err instanceof AbortMission) return false;
+    record(`  ${label} ERROR ${err instanceof Error ? err.message : String(err)}`);
+    return false;
+  }
+};
+
 const armHandler = async (): Promise<CommandResult> => {
   if ((world.weapon() ?? "") !== "") return { ok: true, code: 0, note: "already-armed" };
   if (![...world.pickups()].includes("alien-weapon-1")) {
@@ -324,12 +360,42 @@ const armHandler = async (): Promise<CommandResult> => {
     return { ok: false, code: 1, why: "not-armed" };
   }
   record("arm: east approach");
-  await walkWithRecovery({ x: -13.9, z: 16.5 }, 60_000, "arm east");
+  await standAtPoint({ x: -13.9, z: 16.5 }, 60_000, "arm east");
   record("arm: climb");
-  const climbed = await walkWithRecovery({ x: -23.9, z: 16.5 }, 60_000, "arm climb");
+  const climbed = await standAtPoint({ x: -23.9, z: 16.5 }, 60_000, "arm climb");
   record(`arm climb=${climbed} weapon=${world.weapon() ?? "none"} ammo=${world.ammo()}`);
+  // The 152 stand goal resolves to the snapped free cell, ~0.5 m short of the
+  // weapon's pickup box; a stand can latch the fact there and never take the
+  // item (task 153). The weapon is a pickup, so ask the pickup mission for it.
+  if ((world.weapon() ?? "") === "" && [...world.pickups()].includes("alien-weapon-1")) {
+    record("arm: retrieve the weapon");
+    const weapon = world.pickupPlacements().find((p) => p.id === "alien-weapon-1");
+    const belowBox = (): boolean => {
+      const self = world.self();
+      return !!weapon && !!self && self.y + world.pawnHeight < (weapon.minY ?? 0);
+    };
+    for (let attempt = 0; attempt < 2 && (world.weapon() ?? "") === ""; attempt += 1) {
+      const mission = parseMission("retrieve:alien-weapon-1@outside");
+      let code = 1;
+      if (mission) {
+        code = await runMission(session, mission, {
+          timeoutMs: 10_000,
+          onTick: abortTick,
+          log: (line) => record(`  weapon ${line}`),
+          error: (line) => record(`  weapon ERROR ${line}`),
+        });
+      }
+      record(`arm retrieve code=${code} weapon=${world.weapon() ?? "none"} ammo=${world.ammo()}`);
+      // A failed pickup off the crate top gets one re-climb, then a retry;
+      // do not press under the weapon for the whole mission timeout.
+      if ((world.weapon() ?? "") === "" && attempt === 0 && belowBox()) {
+        record("arm: re-climb for the weapon");
+        await standAtPoint({ x: -23.9, z: 16.5 }, 30_000, "arm re-climb");
+      }
+    }
+  }
   const me = world.self();
-  if (me && me.y > 0.6) await walkWithRecovery({ x: -14.0, z: 16.5 }, 30_000, "arm step-off");
+  if (me && me.y > 0.6) await standAtPoint({ x: -14.0, z: 16.5 }, 30_000, "arm step-off");
   return (world.weapon() ?? "") !== "" ? { ok: true, code: 0 } : { ok: false, code: 1, why: "not-armed" };
 };
 
@@ -397,12 +463,29 @@ const standHandler = async (a: Record<string, unknown>): Promise<CommandResult> 
   return { ok: true, code: 0, data: { x, z, yaw: finalYaw } };
 };
 
+// Task 149: the planned twin of `stand`; 132 keeps `stand` on wishTo.
+const pathHandler = async (a: Record<string, unknown>): Promise<CommandResult> => {
+  const x = Number(a.x);
+  const y = Number(a.y);
+  const z = Number(a.z);
+  if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return { ok: false, code: 1, why: "bad-args" };
+  const yawArg = a.yaw === undefined ? undefined : Number(a.yaw);
+  if (a.yaw !== undefined && !Number.isFinite(yawArg)) return { ok: false, code: 1, why: "bad-args" };
+  if (abortRequested) return { ok: false, code: 4, why: "aborted" };
+  record(`PATH start x=${x} y=${y} z=${z} yaw=${yawArg ?? "keep"}`);
+  const missionText = `stand:${x},${y},${z}${yawArg === undefined ? "" : `,${yawArg}`}`;
+  const result = await runMissionTask(missionText, "path");
+  const done = world.self();
+  record(`PATH ${result.ok ? "done" : "fail"} why=${result.ok ? "-" : result.why} at=${done ? `${done.x.toFixed(2)},${done.y.toFixed(2)},${done.z.toFixed(2)}` : "?"}`);
+  return result.ok ? { ...result, data: { x, y, z, ...(yawArg !== undefined ? { yaw: yawArg } : {}) } } : result;
+};
+
 const RELOAD_TIMEOUT_MS = 90_000;
-const reloadHandler = async (a: Record<string, unknown>): Promise<CommandResult> => {
-  if (world.ammo() > 0) return { ok: true, code: 0, note: "already-loaded", data: { ammo: world.ammo() } };
-  type Placement = { id: string; kind?: string; minX: number; maxX: number; minZ: number; maxZ: number; minY?: number; maxY?: number };
+type Placement = { id: string; kind?: string; minX: number; maxX: number; minZ: number; maxZ: number; minY?: number; maxY?: number };
+
+// Task 156: the hunt's mid-run cycle (the 108 driver's heal/reload).
+const reloadCycle = async (pin?: string): Promise<{ ok: boolean; code: number; why?: string; ammo: number; crate?: string }> => {
   const avail = new Set(world.pickups());
-  const pin = typeof a.crate === "string" && a.crate.length > 0 ? a.crate : undefined;
   const me = world.self();
   const crates = (world.pickupPlacements() as readonly Placement[])
     .filter((p) => p.kind === "ammo" && avail.has(p.id))
@@ -410,10 +493,10 @@ const reloadHandler = async (a: Record<string, unknown>): Promise<CommandResult>
     .map((p) => ({ p, d: me ? Math.hypot((p.minX + p.maxX) / 2 - me.x, (p.minZ + p.maxZ) / 2 - me.z) : 0 }))
     .sort((u, v) => (pin ? (u.p.id === pin ? -1 : v.p.id === pin ? 1 : 0) : u.d - v.d) || (u.p.id < v.p.id ? -1 : u.p.id > v.p.id ? 1 : 0));
   const crate = crates[0]?.p;
-  if (!crate) return { ok: false, code: 1, why: "no-crate" };
+  if (!crate) return { ok: false, code: 1, why: "no-crate", ammo: world.ammo() };
   record(`RELOAD start ammo=${world.ammo()} crate=${crate.id}`);
   const mission = parseMission(`retrieve:${crate.id}@outside`);
-  if (!mission) return { ok: false, code: 1, why: "bad-args" };
+  if (!mission) return { ok: false, code: 1, why: "bad-args", ammo: world.ammo(), crate: crate.id };
   let lastNoPlan: string | null = null;
   const code = await runMission(session, mission, {
     timeoutMs: RELOAD_TIMEOUT_MS,
@@ -428,11 +511,58 @@ const reloadHandler = async (a: Record<string, unknown>): Promise<CommandResult>
   const ammo = world.ammo();
   if (code === 0 && ammo > 0) {
     record(`RELOAD done crate=${crate.id} ammo=${ammo} code=${code}`);
-    return { ok: true, code: 0, data: { ammo, crate: crate.id } };
+    return { ok: true, code: 0, ammo, crate: crate.id };
   }
   const why = code === 0 ? "no-ammo" : code === 2 ? `no-plan:${lastNoPlan ?? "unknown"}` : code === 3 ? "timeout" : `code:${code}`;
   record(`RELOAD fail crate=${crate.id} why=${why}`);
-  return { ok: false, code: code === 0 ? 1 : code, why };
+  return { ok: false, code: code === 0 ? 1 : code, why, ammo, crate: crate.id };
+};
+
+const healCycle = async (): Promise<boolean> => {
+  const deadline = Date.now() + 120_000;
+  const failed = new Map<string, number>();
+  let attempts = 0;
+  record(`HEAL start hp=${world.health()?.hp ?? "?"}`);
+  while (Date.now() < deadline) {
+    if ((world.health()?.hp ?? 0) >= 100) { record("HEAL done hp=100"); return true; }
+    if (attempts >= 8) { record("HEAL fail attempts=8"); return false; }
+    const me = world.self();
+    if (!me) return false;
+    const avail = new Set(world.pickups());
+    const crates = (world.pickupPlacements() as readonly Placement[])
+      .filter((p) => p.kind === "health" && avail.has(p.id) && (failed.get(p.id) ?? 0) < Date.now())
+      .map((p) => {
+        const x = (p.minX + p.maxX) / 2;
+        const z = (p.minZ + p.maxZ) / 2;
+        const outside = (world.placeOf({ x, y: 0.3, z })?.id ?? "") === "outside";
+        return { p, d: Math.hypot(x - me.x, z - me.z), outside };
+      })
+      .sort((a, b) => (a.outside === b.outside ? a.d - b.d : a.outside ? -1 : 1));
+    const crate = crates[0]?.p;
+    if (!crate) { await sleep(1000); continue; }
+    const mission = parseMission(`retrieve:${crate.id}@outside`);
+    const hpBefore = world.health()?.hp ?? 0;
+    if (mission) await runMission(session, mission, { timeoutMs: 60_000, onTick: abortTick, log: (l) => record(`  heal ${l}`), error: (l) => record(`  heal ERROR ${l}`) });
+    const hpAfter = world.health()?.hp ?? 0;
+    if (hpAfter >= 100) { record("HEAL done hp=100"); return true; }
+    if (hpAfter <= hpBefore) {
+      attempts += 1;
+      failed.set(crate.id, Date.now() + 60_000);
+      record(`HEAL crate=${crate.id} no-hp ${hpBefore}->${hpAfter}; blacklisted 60s`);
+    }
+    await sleep(400);
+  }
+  const hp = world.health()?.hp ?? 0;
+  record(`HEAL fail hp=${hp}`);
+  return hp >= 100;
+};
+
+const reloadHandler = async (a: Record<string, unknown>): Promise<CommandResult> => {
+  if (world.ammo() > 0) return { ok: true, code: 0, note: "already-loaded", data: { ammo: world.ammo() } };
+  const pin = typeof a.crate === "string" && a.crate.length > 0 ? a.crate : undefined;
+  const r = await reloadCycle(pin);
+  if (r.ok) return { ok: true, code: 0, data: { ammo: r.ammo, crate: r.crate } };
+  return { ok: false, code: r.code, why: r.why ?? "no-crate" };
 };
 
 const huntHandler = async (a: Record<string, unknown>): Promise<CommandResult> => {
@@ -443,12 +573,12 @@ const huntHandler = async (a: Record<string, unknown>): Promise<CommandResult> =
   if (weapon === "grenade") return { ok: false, code: 1, why: "unsupported-weapon" };
   if (weapon !== "laser") return { ok: false, code: 1, why: "bad-args" };
   if ((world.weapon() ?? "") === "") return { ok: false, code: 1, why: "not-armed" };
-  if (world.ammo() <= 0) return { ok: false, code: 1, why: "no-ammo" };
   const deadline = Date.now() + minutes * 60_000;
   let kills = 0;
   let shots = 0;
+  let reloads = 0;
+  let heals = 0;
   let sawTarget = false;
-  let consecutiveNoAmmo = 0;
   record(`HUNT start minutes=${minutes} weapon=laser ammo=${world.ammo()} hp=${world.healthOf(selfId)?.hp ?? null}`);
   while (Date.now() < deadline) {
     if (world.healthOf(selfId)?.dead === true) {
@@ -457,6 +587,19 @@ const huntHandler = async (a: Record<string, unknown>): Promise<CommandResult> =
     }
     const me = world.self();
     if (!me) return { ok: false, code: 1, why: "lost-self" };
+    // The 108 cycle: heal at <= 50 hp, reload at 0 ammo, then engage. A dry
+    // hunt that cannot reload ends no-ammo; a failed heal does not end it.
+    if ((world.health()?.hp ?? 0) <= 50) {
+      heals += 1;
+      if (!(await healCycle())) record(`HUNT heal failed hp=${world.health()?.hp ?? "?"}; continuing`);
+    }
+    if (world.ammo() <= 0) {
+      reloads += 1;
+      if (!(await reloadCycle()).ok) {
+        record(`HUNT end kills=${kills} shots=${shots} minutes=${minutes} elapsed=${taskElapsed(startedAt)}s`);
+        return { ok: false, code: 1, why: "no-ammo" };
+      }
+    }
     const npcs = world.others()
       .filter((p) => !players.has(p.id) && world.healthOf(p.id)?.dead !== true && (world.placeOf(p)?.id ?? "") === "outside")
       .map((p) => ({ p, d: Math.hypot(p.x - me.x, p.z - me.z) }))
@@ -489,20 +632,11 @@ const huntHandler = async (a: Record<string, unknown>): Promise<CommandResult> =
       record(`HUNT end kills=${kills} shots=${shots} minutes=${minutes} elapsed=${taskElapsed(startedAt)}s`);
       return { ok: false, code: 1, why: "died" };
     }
-    if (outcome === "no_ammo") {
-      consecutiveNoAmmo += 1;
-      if (consecutiveNoAmmo >= 2 && world.ammo() === 0) {
-        record(`HUNT end kills=${kills} shots=${shots} minutes=${minutes} elapsed=${taskElapsed(startedAt)}s`);
-        return { ok: false, code: 1, why: "no-ammo" };
-      }
-    } else {
-      consecutiveNoAmmo = 0;
-    }
     await sleep(200);
   }
   record(`HUNT end kills=${kills} shots=${shots} minutes=${minutes} elapsed=${taskElapsed(startedAt)}s`);
   if (!sawTarget) return { ok: false, code: 1, why: "no-target" };
-  return { ok: true, code: 0, data: { minutes, kills, shots, hp: world.healthOf(selfId)?.hp ?? null } };
+  return { ok: true, code: 0, data: { minutes, kills, shots, reloads, heals, hp: world.healthOf(selfId)?.hp ?? null } };
 };
 
 const patrolHandler = async (a: Record<string, unknown>): Promise<CommandResult> => {
@@ -1367,6 +1501,7 @@ const HANDLERS: Record<string, (a: Record<string, unknown>) => Promise<CommandRe
   arm: armHandler,
   goto: gotoHandler,
   stand: standHandler,
+  path: pathHandler,
   walk: walkHandler,
   reload: reloadHandler,
   hunt: huntHandler,

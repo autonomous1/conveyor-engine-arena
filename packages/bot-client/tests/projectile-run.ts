@@ -1,7 +1,10 @@
 // Task 94 spike: throw grenades at wander NPCs at 5/10/20 m with a low-arc
 // ballistic pitch, with and without velocity lead, then read the hp frames.
-// Movement is wishTo-driven (`walk` method) so a moved NPC is tracked, and a
-// throw is refused unless the eye has line of sight to the predicted point.
+// Task 150: the approach is plan-only. `planTo` (planPath) gates the candidate;
+// the walk is the product's `stand:` mission (walkToPoint -> planPath -> grid
+// follower). There is no straight `wishTo` walker and no fallback: a failed plan
+// rejects the candidate. A freeze (snap/processed flat for 5 s) ends the run with
+// a FREEZE line instead of walking blind.
 // Run: CE_TOKEN=… node --import ./scripts/ts-ext-register.mjs \
 //   packages/bot-client/tests/projectile-run.ts --url ws://127.0.0.1:4173 --bands 5,10,20
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -15,7 +18,6 @@ import { GRENADE_BLAST_MIN_PERCENT, GRENADE_BLAST_RADIUS, GRENADE_GRAVITY, GRENA
 import { MAX_HP } from "../../../src/shared/health.ts";
 import { createNavCache } from "../../../src/shared/nav/legs.ts";
 import { planPath } from "../../../src/shared/nav/path.ts";
-import { wishTo } from "../../../src/shared/nav/follow.ts";
 
 // Task 110: the expected blast curve, re-derived from the constants rather than
 // calling the host's `grenadeBlastDamage` — a stale host build must show up as
@@ -33,11 +35,9 @@ const token = (process.env.CE_TOKEN ?? "").trim() || readFileSync("/home/tim/.co
 const BANDS = (args.get("bands") ?? "5,10,20").split(",").map(Number).filter((n) => Number.isFinite(n) && n > 0);
 const THROWS = Number(args.get("throws") ?? 4);
 const RUN_MS = Number(args.get("for-s") ?? 300) * 1000;
-// Task 112 trial config: A = --fallback none, B = --filter path,
-// C = --route place. The defaults reproduce the 110 control exactly.
+// Task 112 trial config: C = --route place. Task 150 removed the
+// `--filter`/`--fallback` flags: the approach is always plan-only.
 const TRIAL = args.get("trial") ?? "control";
-const FALLBACK = args.get("fallback") ?? "straight";
-const FILTER = args.get("filter") ?? "none";
 const ROUTE = args.get("route") ?? "point";
 const SAMPLER_MS = 50;
 const STAMP = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
@@ -51,7 +51,7 @@ const rows: Array<Record<string, unknown>> = [];
 let noSend = 0;
 // The trace/attempt state is declared before `record` because the plan-line
 // parser inside `record` feeds the trace's `plan` column.
-type TraceRow = { t: number; x: number; z: number; y: number; yaw: number; place: string; band: number | null; d: number | null; los: boolean; stand: string | null; plan: string; cmd: string; slide: boolean; stuck: boolean };
+type TraceRow = { t: number; x: number; z: number; y: number; yaw: number; place: string; band: number | null; d: number | null; los: boolean; stand: string | null; plan: string; cmd: string; slide: boolean; stuck: boolean; snap: number; processed: number };
 type AttemptRow = { t: number; band: number; offset: number; point: string; place: string; los: boolean; pathOk: boolean | null; pathReason: string | null; code: number | null; reason: string | null; fallback: string; slide: number; stuck: number; bandReached: number | null; timeToBand: number | null; dt: number };
 const trace: TraceRow[] = [];
 const attempts: AttemptRow[] = [];
@@ -115,9 +115,9 @@ const finish = (code: number): never => {
   const hits = rows.filter((r) => r.hit === true).length;
   const kills = rows.filter((r) => r.kill === true).length;
   const metrics = summarize();
-  record(`EXIT rows=${rows.length} fired=${fired} hits=${hits} kills=${kills} attempts=${attempts.length} elapsed=${secs()}s`);
+  record(`PROJECTILE end rows=${rows.length} fired=${fired} hits=${hits} kills=${kills} attempts=${attempts.length} elapsed=${secs()}s`);
   writeFileSync(LOG, `${lines.join("\n")}\n`);
-  writeFileSync(JSON_OUT, `${JSON.stringify({ trial: { name: TRIAL, fallback: FALLBACK, filter: FILTER, route: ROUTE }, metrics, attempts, trace, throws: rows }, null, 1)}\n`);
+  writeFileSync(JSON_OUT, `${JSON.stringify({ trial: { name: TRIAL, route: ROUTE }, metrics, attempts, trace, throws: rows }, null, 1)}\n`);
   session.close();
   process.exit(code);
 };
@@ -234,52 +234,21 @@ const eyeNow = () => {
   return me ? { x: me.x, y: me.y + EYE_HEIGHT, z: me.z } : undefined;
 };
 
-// --- movement: a point destination is a wishTo walk (task 132) ------------
-// Stuck-aware walker: sidesteps/reverses when the capsule stops making progress.
-const walkWithRecovery = async (target: { x: number; z: number }, ms: number, label: string): Promise<boolean> => {
-  const deadline = Date.now() + ms;
-  let lastX = Number.NaN;
-  let lastZ = Number.NaN;
-  let lastProgress = Date.now();
-  let attempts = 0;
-  while (Date.now() < deadline) {
-    const me = world.self();
-    if (!me) return false;
-    const d = Math.hypot(me.x - target.x, me.z - target.z);
-    if (d <= 0.6) {
-      session.input.sendInput({ moveX: 0, moveZ: 0, yaw: me.yaw });
-      await sleep(120);
-      return true;
-    }
-    if (Number.isFinite(lastX) && Math.hypot(me.x - lastX, me.z - lastZ) < 0.15) {
-      if (Date.now() - lastProgress > 1500) {
-        attempts += 1;
-        record(`${label}: STUCK #${attempts} at ${me.x.toFixed(2)},${me.y.toFixed(2)},${me.z.toFixed(2)} d=${d.toFixed(2)}`);
-        if (attempts > 4) return false;
-        const yaw = Math.atan2(target.x - me.x, target.z - me.z);
-        const side = attempts % 2 === 1 ? 1 : -1;
-        const sidePoint = { x: me.x + Math.cos(yaw) * side * 1.2, z: me.z - Math.sin(yaw) * side * 1.2 };
-        const until = Date.now() + 700;
-        while (Date.now() < until) {
-          const p2 = world.self();
-          if (!p2) break;
-          session.input.sendInput(wishTo({ x: p2.x, y: p2.y, z: p2.z, vx: 0, vz: 0, yaw: p2.yaw }, sidePoint, 1));
-          await sleep(50);
-        }
-        lastX = Number.NaN;
-        lastProgress = Date.now();
-        continue;
-      }
-    } else {
-      lastX = me.x;
-      lastZ = me.z;
-      lastProgress = Date.now();
-    }
-    session.input.sendInput(wishTo({ x: me.x, y: me.y, z: me.z, vx: 0, vz: 0, yaw: me.yaw }, target, 1));
-    await sleep(50);
-  }
-  record(`${label}: timeout`);
-  return false;
+// The approach is plan-only: the product's point stand (`stand:x,y,z`) plans the
+// route and follows it with the grid follower. The straight `wishTo` walker that
+// wedged on 2026-11-22 is removed (task 150); a candidate that does not plan is
+// rejected, never walked.
+const standAtPoint = async (point: { x: number; z: number }, ms: number): Promise<boolean> => {
+  const mission = parseMission(`stand:${point.x.toFixed(2)},0,${point.z.toFixed(2)}`);
+  if (!mission) return false;
+  const code = await runMission(session, mission, {
+    timeoutMs: ms,
+    log: (l) => {
+      if (/(plan done|no plan|replan|start )/.test(l)) record(`  stand ${l}`);
+    },
+    error: (l) => record(`  stand ERROR ${l}`),
+  });
+  return code === 0;
 };
 // --- trial trace + reachability probe (task 112) ---------------------------
 const planCache = createNavCache();
@@ -289,8 +258,25 @@ const planCache = createNavCache();
 const traceStart = (): void => {
   let prev: { x: number; z: number; t: number } | null = null;
   let stuckStart: number | null = null;
+  // Task 147 freeze guard: the client sends but the snapshot stream dies, so
+  // every world-derived value (pose, target, d) freezes while `t` advances. If
+  // `snap` and `processed` are both unchanged for 5 s, end the run as a detected
+  // freeze — never as minutes of blind stuck samples.
+  let lastSnap = -1;
+  let lastProc = -1;
+  let lastNetChange = Date.now();
   const timer = setInterval(() => {
     const me = world.self();
+    const snapNow = session.net.snapshots();
+    const procNow = session.net.processedInput();
+    if (snapNow !== lastSnap || procNow !== lastProc) {
+      lastSnap = snapNow;
+      lastProc = procNow;
+      lastNetChange = Date.now();
+    } else if (Date.now() - lastNetChange >= 5000) {
+      record(`FREEZE stale=${((Date.now() - lastNetChange) / 1000).toFixed(0)}s snap=${snapNow} processed=${procNow} pose=${me ? `${me.x.toFixed(2)},${me.z.toFixed(2)}` : "?"} place=${me ? (world.placeOf(me)?.id ?? "?") : "?"} target=${targetId ?? "-"}`);
+      finish(4);
+    }
     if (!me) {
       prev = null;
       stuckStart = null;
@@ -326,6 +312,10 @@ const traceStart = (): void => {
       cmd: `${lastCmd.moveX.toFixed(2)},${lastCmd.moveZ.toFixed(2)}`,
       slide,
       stuck,
+      // The host's admitted input and the applied-snapshot count: a freeze shows
+      // as `snap`/`processed` flat while `t` advances (task 147's signature).
+      snap: session.net.snapshots(),
+      processed: session.net.processedInput(),
     });
     prev = { x: me.x, z: me.z, t: now };
   }, SAMPLER_MS);
@@ -341,12 +331,13 @@ const spanStats = (from: number): { slide: number; stuck: number } => {
   return { slide: (slide * SAMPLER_MS) / 1000, stuck: (stuck * SAMPLER_MS) / 1000 };
 };
 // Same planPath the brain's `stand:` uses (navView + doorGate rebuilt here so
-// the probe sees the same grid). `--filter path` rejects a candidate before the
-// walk instead of discovering the block after the 2 s straight fallback.
-const probePath = (point: { x: number; z: number }): { ok: boolean; reason: string | null } => {
+// the probe sees the same grid). The default (`--filter path`) rejects a
+// candidate before the walk AND hands the walker the planned polyline, so the
+// bot follows the route around a building instead of the straight line into it.
+const planTo = (point: { x: number; z: number }): { ok: boolean; reason: string | null; points: readonly (readonly [number, number, number])[] } => {
   const graph = world.sceneGraph();
   const me = world.self();
-  if (!graph || !me) return { ok: false, reason: "no-graph" };
+  if (!graph || !me) return { ok: false, reason: "no-graph", points: [] };
   const live = new Map(world.doors().map((d) => [d.id, d] as const));
   const doors = world
     .doors()
@@ -369,7 +360,7 @@ const probePath = (point: { x: number; z: number }): { ok: boolean; reason: stri
     cache: planCache,
     regions: world.regions(),
   });
-  return plan.ok ? { ok: true, reason: null } : { ok: false, reason: plan.reason };
+  return plan.ok ? { ok: true, reason: null, points: plan.points } : { ok: false, reason: plan.reason, points: [] };
 };
 // C: the place route (`reach:<place>`) the point-only `stand:` never takes.
 const walkPlace = async (place: string, timeoutMs: number, label: string): Promise<boolean> => {
@@ -445,51 +436,37 @@ async function reachBand(band: number, deadline: number): Promise<number> {
       }
       attempts.push({ t: secs(), band, offset: cand.offset, point: `${cand.x.toFixed(2)},${cand.z.toFixed(2)}`, place, los: true, pathOk: null, pathReason: null, code: null, reason: "place-noop", fallback: "place-noop", slide: 0, stuck: 0, bandReached: null, timeToBand: null, dt: 0 });
     }
-    // B: reject an unreachable candidate before the walk.
-    let pathOk: boolean | null = null;
-    let pathReason: string | null = null;
-    if (FILTER === "path") {
-      const probe = probePath(cand);
-      pathOk = probe.ok;
-      pathReason = probe.reason;
-      if (!probe.ok) {
-        record(`  ATTEMPT band=${band} point=${cand.x.toFixed(2)},${cand.z.toFixed(2)} place=${place} los=1 path=0 reason=${probe.reason}; next offset`);
-        attempts.push({ t: secs(), band, offset: cand.offset, point: `${cand.x.toFixed(2)},${cand.z.toFixed(2)}`, place, los: true, pathOk, pathReason, code: null, reason: null, fallback: "none", slide: 0, stuck: 0, bandReached: null, timeToBand: null, dt: 0 });
-        tried.add(cand.offset);
-        continue;
-      }
+    // Plan-only (task 150): the candidate must plan or it is rejected; the walk
+    // itself is the product's `stand:` mission (brain plan + grid follower).
+    const probe = planTo(cand);
+    const pathOk = probe.ok;
+    const pathReason = probe.reason;
+    if (!probe.ok) {
+      record(`  ATTEMPT band=${band} point=${cand.x.toFixed(2)},${cand.z.toFixed(2)} place=${place} los=1 path=0 reason=${probe.reason}; next offset`);
+      attempts.push({ t: secs(), band, offset: cand.offset, point: `${cand.x.toFixed(2)},${cand.z.toFixed(2)}`, place, los: true, pathOk, pathReason, code: null, reason: null, fallback: "none", slide: 0, stuck: 0, bandReached: null, timeToBand: null, dt: 0 });
+      tried.add(cand.offset);
+      continue;
     }
     const from = trace.length;
     const started = Date.now();
     bandNow = band;
     standNow = `${cand.x.toFixed(2)},${cand.z.toFixed(2)}`;
-    record(`  move band=${band}: target=${targetId} d=${d.toFixed(2)} to (${cand.x.toFixed(2)},${cand.z.toFixed(2)}) los=${hasLosNow()}${pathOk === null ? "" : ` path=${pathOk ? 1 : 0}`}`);
+    record(`  move band=${band}: target=${targetId} d=${d.toFixed(2)} to (${cand.x.toFixed(2)},${cand.z.toFixed(2)}) los=${hasLosNow()} path=1`);
     sampleTarget();
     lastNoPlan = null;
-    planNow = "wish";
-    const ok = await walkWithRecovery(cand, Math.min(8000, Math.max(1000, deadline - Date.now())), `band${band}`);
+    planNow = "plan";
+    const budget = Math.min(15_000, Math.max(2000, deadline - Date.now()));
+    const ok = await standAtPoint(cand, budget);
     const end = world.self();
     const endT = targetId === undefined ? undefined : poseOf(targetId);
-    let fallback = "none";
-    if (!ok && FALLBACK === "straight") {
-      fallback = "straight";
-      const until = Date.now() + 2000;
-      while (Date.now() < until) {
-        const m2 = world.self();
-        if (!m2) break;
-        const d2 = Math.hypot(cand.x - m2.x, cand.z - m2.z);
-        if (d2 <= 0.6) break;
-        session.input.sendInput(wishTo({ x: m2.x, y: m2.y, z: m2.z, vx: 0, vz: 0, yaw: m2.yaw }, { x: cand.x, z: cand.z }, 1));
-        await sleep(80);
-      }
-    }
+    const fallback = "plan";
     const stats = spanStats(from);
     const endD = end && endT ? Math.hypot(endT.x - end.x, endT.z - end.z) : null;
     const reached = endD !== null && Math.abs(endD - band) <= 1.2 && hasLosNow() ? endD : null;
     const reason = lastNoPlan ? lastNoPlan.replace(/^no plan:\s*/, "") : ok ? null : "walk-failed";
     record(`  band move ${ok ? "done" : "failed"} d=${endD === null ? "?" : endD.toFixed(2)} los=${hasLosNow()} fallback=${fallback} slide=${stats.slide.toFixed(1)}s stuck=${stats.stuck.toFixed(1)}s`);
     attempts.push({ t: secs(), band, offset: cand.offset, point: `${cand.x.toFixed(2)},${cand.z.toFixed(2)}`, place, los: true, pathOk, pathReason, code: ok ? 0 : reason === "walk-failed" ? 3 : 2, reason, fallback, ...stats, bandReached: reached, timeToBand: reached === null ? null : (Date.now() - started) / 1000, dt: (Date.now() - started) / 1000 });
-    if (!ok && FALLBACK !== "straight") tried.add(cand.offset);
+    if (!ok) tried.add(cand.offset);
   }
   const m = world.self();
   const t = targetId === undefined ? undefined : poseOf(targetId);
@@ -764,6 +741,11 @@ try {
         }
         const d = await reachBand(band, Math.min(end, Date.now() + 20_000));
         record(`positioned band=${band} d=${d.toFixed(2)} target=${targetId}`);
+        if (!(Math.abs(d - band) <= 1.2 && hasLosNow())) {
+          record(`NO-FIRE band=${band} model=${model}: approach did not reach the band (d=${d.toFixed(2)})`);
+          await sleep(300);
+          continue;
+        }
         await throwOne(band, model);
         sampleTarget();
         await sleep(1100);

@@ -74,12 +74,40 @@ test("follow_camera_is_frame_rate_independent", () => {
   assert.ok(two);
   const gap = Math.hypot(one.x - two.x, one.y - two.y, one.z - two.z);
   assert.ok(gap < 1e-3, `gap ${gap}`);
+  // The damped look is frame-rate independent too.
+  const lookGap = Math.hypot(one.lookX - two.lookX, one.lookY - two.lookY, one.lookZ - two.lookZ);
+  assert.ok(lookGap < 1e-3, `look gap ${lookGap}`);
 });
 
 test("follow_camera_keeps_the_last_pose_when_the_target_is_missing", () => {
   const prev = followCamera(TARGET, undefined, {}, STEP);
   assert.ok(prev);
   assert.equal(followCamera(undefined, prev, {}, STEP), prev);
+});
+
+test("follow_camera_damps_the_look", () => {
+  const start = followCamera(TARGET, undefined, {}, STEP);
+  assert.ok(start);
+  // A snap returns the exact eye.
+  assert.equal(start.lookX, 0);
+  assert.equal(start.lookZ, 0);
+  // A 1 m lateral step of the target must not jump the look in one frame: it
+  // moves by the same damped fraction as the position.
+  const moved = { ...TARGET, x: 1 };
+  const next = followCamera(moved, start, {}, STEP);
+  assert.ok(next);
+  const alpha = 1 - Math.exp(-8 * STEP);
+  assert.ok(next.lookX < 0.5, `lookX ${next.lookX}`);
+  assert.ok(Math.abs(next.lookX - alpha) < 1e-9, `lookX ${next.lookX} alpha ${alpha}`);
+  // After 1 s at 60 Hz the damped look is the target's eye.
+  let pose = start;
+  for (let i = 0; i < 60; i += 1) {
+    const step = followCamera(moved, pose, {}, STEP);
+    assert.ok(step);
+    pose = step;
+  }
+  assert.ok(Math.abs(pose.lookX - 1) < 0.2, `converged lookX ${pose.lookX}`);
+  assert.ok(Math.abs(pose.lookY - 1.6) < 1e-9, `lookY ${pose.lookY}`);
 });
 
 test("follow_camera_yaw_wraps", () => {

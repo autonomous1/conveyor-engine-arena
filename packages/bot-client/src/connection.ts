@@ -76,6 +76,15 @@ export type BotSession = {
   };
   messages: { say(text: string, to?: number): boolean };
   spectate: boolean;
+  /**
+   * The kernel client's metrics, read-only: `processedInput` is the snapshot's
+   * `lastProcessedInput` (the host's admitted seq for this client), `snapshots`
+   * how many snapshots this session has applied, `stale` how many arrived at or
+   * below the last applied seq (a stale flood means frames arrive but never
+   * advance), `frames` every message frame the socket delivered (snapshot or
+   * arena text), so "nothing arrives" and "frames arrive but are dropped" differ.
+   */
+  net: { processedInput(): number; snapshots(): number; stale(): number; frames(): number };
   close(): void;
 };
 
@@ -122,6 +131,7 @@ export async function connectBot(o: ConnectBotOptions): Promise<BotSession> {
   let current: SocketLike | undefined;
   let stopped = false;
   let ready = false;
+  let frames = 0;
   let cancelSleep: (() => void) | undefined;
 
   const claims = {
@@ -235,6 +245,7 @@ export async function connectBot(o: ConnectBotOptions): Promise<BotSession> {
     });
     ws.addEventListener("message", (ev) => {
       if (ws !== current) return;
+      frames += 1;
       const text = frameText(ev.data);
       let msg: Record<string, unknown>;
       try {
@@ -335,6 +346,12 @@ export async function connectBot(o: ConnectBotOptions): Promise<BotSession> {
     claims,
     messages,
     spectate: o.spectate === true,
+    net: {
+      processedInput: () => client.metrics.lastAckInput,
+      snapshots: () => client.metrics.snapshotReceive,
+      stale: () => client.metrics.staleSnapshots,
+      frames: () => frames,
+    },
     close() {
       stopped = true;
       cancelSleep?.();

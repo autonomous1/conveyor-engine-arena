@@ -4,7 +4,8 @@
  */
 // ARCHITECTURE: The bot executor: goal claim, GOAP plan, route, walk, use, ride, and pickup state machine.
 // Wiring: runMission/runBrain from the CLI and live tests; it drives BotSession input/world.
-// Invariants: A pursue plan is rebuilt on >=1 m target drift or 200 ms; the straight line is the fallback.
+// Invariants: A pursue plan is rebuilt on >=1 m target drift or 200 ms; the straight line is the fallback;
+//   the stand fact and the stand walk measure one plan-resolved goal, y included.
 import type { BotCtx } from "../../../src/shared/bots/actions.js";
 import { createBotContext, estimateSeconds, groundActions } from "../../../src/shared/bots/actions.js";
 import type { Fact, Goal, Plan, PlanOptions, WorldState } from "../../../src/shared/bots/goap.js";
@@ -33,6 +34,12 @@ const RIDE_SUMMON_MS = 30_000;
 const RIDE_WAIT_MS = 60_000;
 const RIDE_NEAR_M = 0.6;
 const REPLAN_MS = 5_000;
+/** A pawn this far above its place's base stands on a raised surface (a crate top). */
+const RAISED_EPS = 0.05;
+/** XZ distance and yaw tolerance for the stand fact and the stand action's done check. */
+const STAND_TOLERANCE = 0.35;
+/** Y tolerance for the stand goal: the follower's `WAYPOINT_Y` (nav/follow.ts) — a 0.5 m step passes, a 4 m gap fails. */
+const STAND_GOAL_Y = 0.6;
 /**
  * Budget for a periodic `safety` replan: the same state, warm route nets.
  */
@@ -546,6 +553,14 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
     }
   }
 
+  /**
+   * @why `planPath` may snap the goal up to 1 m to a free cell with that floor's
+   *      y; the STAND fact and `beginStand` must measure the plan's point, or the
+   *      action finishes where the fact can never latch (the 151 climb loop).
+   *      Reset by each `beginStand`, which re-plans from the current pose.
+   */
+  let resolvedStand: { x: number; y: number; z: number; yaw: number } | undefined;
+
   const predictor = createMotionPredictor(opts.predictOwned !== false);
   const cache = createNavCache();
   const collected = new Set<string>();
@@ -607,8 +622,9 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
   const worldState = (): WorldState => {
     const state: Record<string, Fact> = { ...buildWorldState(snapshot(false)) };
     const self = session.world.self();
-    if (stand && self && Math.hypot(self.x - stand.x, self.z - stand.z) <= 0.35 &&
-        Math.abs(angleDiff(self.yaw, stand.yaw)) <= 0.35) state[STAND] = stand.key;
+    if (stand && resolvedStand && self && Math.hypot(self.x - resolvedStand.x, self.z - resolvedStand.z) <= STAND_TOLERANCE &&
+        Math.abs(self.y - resolvedStand.y) <= STAND_GOAL_Y &&
+        Math.abs(angleDiff(self.yaw, resolvedStand.yaw)) <= STAND_TOLERANCE) state[STAND] = stand.key;
     return state;
   };
 
@@ -690,10 +706,27 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
     };
   };
 
+  /** Keep the fact and the walk on the plan's last point; `planPath` may snap it. */
+  const resolveStandGoal = (walked: Walk): void => {
+    if (!stand) return;
+    const last = walked.points[walked.points.length - 1];
+    resolvedStand = last
+      ? { x: last[0], y: last[1], z: last[2], yaw: stand.yaw }
+      : { x: stand.x, y: stand.y, z: stand.z, yaw: stand.yaw };
+  };
+
   const beginStand = (id: string, key: string, pose: Pose): Running | undefined => {
     if (!stand || stand.key !== key) return undefined;
     const walked = walkToPoint(pose, stand, new Set());
     if (!walked) return undefined;
+    resolveStandGoal(walked);
+    const goal = resolvedStand;
+    if (!goal) return undefined;
+    // At the goal's XZ but off its floor: no walk can finish here. Fail the
+    // start so the brain's fail streak returns the mission instead of spinning.
+    const here0 = session.world.self();
+    if (here0 && Math.hypot(here0.x - goal.x, here0.z - goal.z) <= STAND_TOLERANCE &&
+        Math.abs(here0.y - goal.y) > STAND_GOAL_Y) return undefined;
     const follow = makeFollow(walked);
     let stopped = false;
     return {
@@ -702,10 +735,11 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
       started: Date.now(),
       tick(current, nowTick) {
         const self = session.world.self();
-        if (self && Math.hypot(self.x - stand.x, self.z - stand.z) <= 0.25) {
+        if (self && Math.hypot(self.x - goal.x, self.z - goal.z) <= STAND_TOLERANCE) {
+          if (Math.abs(self.y - goal.y) > STAND_GOAL_Y) return "failed";
           if (!stopped) {
             stopped = true;
-            send({ moveX: 0, moveZ: 0, yaw: stand.yaw });
+            send({ moveX: 0, moveZ: 0, yaw: goal.yaw });
           }
           return "done";
         }
@@ -715,7 +749,7 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
         if (step.status === "arrived") {
           if (!stopped) {
             stopped = true;
-            send({ moveX: 0, moveZ: 0, yaw: stand.yaw });
+            send({ moveX: 0, moveZ: 0, yaw: goal.yaw });
           }
           return "done";
         }
@@ -914,6 +948,13 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
     const omit = new Set([pickupBoxSource(pickupId), pickupId]);
     const walked = walkToPoint(pose, center, omit);
     if (!walked) return undefined;
+    const last = walked.points[walked.points.length - 1];
+    // @why A plan ending below the item's box (or with the feet above its top)
+    //      can never take it; fail now instead of pressing under it for 30 s.
+    if (last && (last[1] + session.world.pawnHeight < item.minY || last[1] > item.maxY)) {
+      log(`pickup: no floor for ${pickupId} (plan ends y=${last[1].toFixed(2)}, item y=${item.minY.toFixed(2)}..${item.maxY.toFixed(2)})`);
+      return undefined;
+    }
     const follow = makeFollow(walked);
     let waitStart = 0;
     return {
@@ -980,7 +1021,18 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
   ): Walk | undefined => {
     const graph = session.world.sceneGraph();
     if (!graph) return undefined;
-    const plan = planPath(graph, pose, target, gate, {
+    // On a raised surface the last stretch is planned on the pawn's own floor:
+    // `planPath` builds its destination grid at the place's base, so a crate-top
+    // target (the outside base is 0) would be snapped to the ground and the
+    // walk would go down the crate (task 154's pickup fall). Snap the target on
+    // the feet-floor grid first; planPath then keeps the local path up there.
+    let goal = target;
+    if (pose.y > floorBase(graph, pose) + RAISED_EPS && target.y >= pose.y - RAISED_EPS) {
+      const grid = gridFor(session, graph, [[pose.x, pose.y, pose.z], [target.x, target.y, target.z]], omit, pose.y);
+      const snapped = nearestFreeCell(grid, target.x, target.z, 1, pose.y);
+      if (snapped) goal = { x: snapped.x, y: pose.y, z: snapped.z };
+    }
+    const plan = planPath(graph, pose, goal, gate, {
       view: navView(session, omit),
       cache,
       regions: bakedRegions(session),
@@ -1404,8 +1456,39 @@ function gridFor(
 }
 
 function placeY(graph: SceneGraph, pose: Pose): number {
+  // @why The grid must start on the pawn's feet, not the place's base: a
+  //      crate-top pickup solved from the outside base (0) walks off the crate.
+  return Math.max(floorBase(graph, pose), pose.y);
+}
+
+function floorBase(graph: SceneGraph, pose: Pose): number {
   const place = placeAt(graph, pose.x, pose.y, pose.z);
   return place.kind === "outside" ? 0 : place.y;
+}
+
+/**
+ * The nearest free grid cell within `metres` of (x, z), for a feet-floor plan.
+ * Cells on the given floor win over nearer cells on a step above/below, so a
+ * crate-top pickup does not target the top of a higher step it cannot climb.
+ */
+function nearestFreeCell(grid: Grid, x: number, z: number, metres: number, floorY?: number): { x: number; z: number } | undefined {
+  const reach = Math.ceil(metres / grid.cell);
+  const ci = Math.floor((x - grid.minX) / grid.cell);
+  const cj = Math.floor((z - grid.minZ) / grid.cell);
+  let best: { x: number; z: number; d: number; rank: number } | undefined;
+  for (let j = cj - reach; j <= cj + reach; j += 1) {
+    for (let i = ci - reach; i <= ci + reach; i += 1) {
+      if (i < 0 || j < 0 || i >= grid.w || j >= grid.h) continue;
+      if ((grid.blocked[j * grid.w + i] ?? 1) !== 0) continue;
+      const px = grid.minX + (i + 0.5) * grid.cell;
+      const pz = grid.minZ + (j + 0.5) * grid.cell;
+      const d = Math.hypot(px - x, pz - z);
+      if (d > metres) continue;
+      const rank = floorY === undefined || Math.abs((grid.floor[j * grid.w + i] ?? 0) - floorY) <= RAISED_EPS ? 0 : 1;
+      if (!best || rank < best.rank || (rank === best.rank && d < best.d)) best = { x: px, z: pz, d, rank };
+    }
+  }
+  return best ? { x: best.x, z: best.z } : undefined;
 }
 
 function triple(point: Triple | { x: number; y: number; z: number }): Triple {

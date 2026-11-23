@@ -57,76 +57,6 @@ const losNow = (targetId: number): boolean => {
     world.aabbs,
   );
 };
-const walkToPoint = async (target: { x: number; z: number }, ms: number, label: string): Promise<boolean> => {
-  const deadline = Date.now() + ms;
-  let last = Infinity;
-  let lastProgress = Date.now();
-  while (Date.now() < deadline) {
-    const me = world.self();
-    if (!me) return false;
-    const d = Math.hypot(me.x - target.x, me.z - target.z);
-    if (d <= 0.6) {
-      session.input.sendInput({ moveX: 0, moveZ: 0, yaw: me.yaw });
-      await sleep(120);
-      return true;
-    }
-    if (d < last - 0.2) { last = d; lastProgress = Date.now(); }
-    if (Date.now() - lastProgress > 3000) {
-      record(`${label}: no progress at ${me.x.toFixed(2)},${me.y.toFixed(2)},${me.z.toFixed(2)} d=${d.toFixed(2)}`);
-      return false;
-    }
-    session.input.sendInput(wishTo({ x: me.x, y: me.y, z: me.z, vx: 0, vz: 0, yaw: me.yaw }, target, 1));
-    await sleep(50);
-  }
-  return false;
-};
-// Stuck-aware walker: sidesteps/reverses when the capsule stops making progress.
-const walkWithRecovery = async (target: { x: number; z: number }, ms: number, label: string): Promise<boolean> => {
-  const deadline = Date.now() + ms;
-  let lastX = Number.NaN;
-  let lastZ = Number.NaN;
-  let lastProgress = Date.now();
-  let attempts = 0;
-  while (Date.now() < deadline) {
-    const me = world.self();
-    if (!me) return false;
-    const d = Math.hypot(me.x - target.x, me.z - target.z);
-    if (d <= 0.6) {
-      session.input.sendInput({ moveX: 0, moveZ: 0, yaw: me.yaw });
-      await sleep(120);
-      return true;
-    }
-    if (Number.isFinite(lastX) && Math.hypot(me.x - lastX, me.z - lastZ) < 0.15) {
-      if (Date.now() - lastProgress > 1500) {
-        attempts += 1;
-        record(`${label}: STUCK #${attempts} at ${me.x.toFixed(2)},${me.y.toFixed(2)},${me.z.toFixed(2)} d=${d.toFixed(2)}`);
-        if (attempts > 4) return false;
-        const yaw = Math.atan2(target.x - me.x, target.z - me.z);
-        const side = attempts % 2 === 1 ? 1 : -1;
-        const sidePoint = { x: me.x + Math.cos(yaw) * side * 1.2, z: me.z - Math.sin(yaw) * side * 1.2 };
-        const until = Date.now() + 700;
-        while (Date.now() < until) {
-          const p2 = world.self();
-          if (!p2) break;
-          session.input.sendInput(wishTo({ x: p2.x, y: p2.y, z: p2.z, vx: 0, vz: 0, yaw: p2.yaw }, sidePoint, 1));
-          await sleep(50);
-        }
-        lastX = Number.NaN;
-        lastProgress = Date.now();
-        continue;
-      }
-    } else {
-      lastX = me.x;
-      lastZ = me.z;
-      lastProgress = Date.now();
-    }
-    session.input.sendInput(wishTo({ x: me.x, y: me.y, z: me.z, vx: 0, vz: 0, yaw: me.yaw }, target, 1));
-    await sleep(50);
-  }
-  record(`${label}: timeout`);
-  return false;
-};
-
 // Hitscan opportunity: a valid pawn inside the fire band with a clear line of sight.
 // This is the "computer vision sees a shot, take it" rule — checked every tick while
 // moving, so the bot fires as soon as a target presents a shot instead of running
@@ -372,17 +302,44 @@ const exitBuilding = async (): Promise<boolean> => {
 
 const armed = () => (world.weapon() ?? "") !== "" && world.ammo() > 0;
 
+// Task 151: a point walk is the product's own `stand:` mission (planPath -> the
+// grid follower), not a wishTo at the point. The per-tick steering below
+// (followPlan/avoidPawns, the door axis, the pursuit) stays wishTo.
+const standAtPoint = async (point: { x: number; z: number }, ms: number, label: string): Promise<boolean> => {
+  const mission = parseMission(`stand:${point.x.toFixed(2)},0,${point.z.toFixed(2)}`);
+  if (!mission) return false;
+  const code = await runMission(session, mission, {
+    timeoutMs: ms,
+    log: (l) => {
+      if (/(plan done|no plan|replan|start )/.test(l)) record(`  ${label} ${l}`);
+    },
+    error: (l) => record(`  ${label} ERROR ${l}`),
+  });
+  return code === 0;
+};
+
 const armUp = async (): Promise<boolean> => {
   if (![...world.pickups()].includes("alien-weapon-1")) {
     record("arm-up: alien-weapon-1 is not on the map");
     return false;
   }
   record("arm-up: east approach");
-  await walkWithRecovery({ x: -13.90, z: 16.50 }, 60_000, "east");
+  await standAtPoint({ x: -13.90, z: 16.50 }, 60_000, "east");
   record("arm-up: climb");
-  const climbed = await walkWithRecovery({ x: -23.90, z: 16.50 }, 60_000, "climb");
+  const climbed = await standAtPoint({ x: -23.90, z: 16.50 }, 60_000, "climb");
   record(`arm-up climb=${climbed} weapon=${world.weapon() ?? "none"} ammo=${world.ammo()}`);
-  if (world.self() && world.self()!.y > 0.6) await walkWithRecovery({ x: -14.00, z: 16.50 }, 30_000, "step-off");
+  // The 152 stand goal resolves to the snapped free cell, 0.5 m short of the
+  // weapon's pickup box; a stand can latch the fact there and never take the
+  // item (task 153). The weapon is a pickup, so ask the pickup mission for it.
+  if (!armed() && [...world.pickups()].includes("alien-weapon-1")) {
+    record("arm-up: retrieve the weapon");
+    const mission = parseMission("retrieve:alien-weapon-1@outside");
+    const code = mission
+      ? await runMission(session, mission, { timeoutMs: 30_000, log: (l) => record(`  weapon ${l}`), error: (l) => record(`  weapon ERROR ${l}`) })
+      : 1;
+    record(`arm-up retrieve code=${code} weapon=${world.weapon() ?? "none"} ammo=${world.ammo()}`);
+  }
+  if (world.self() && world.self()!.y > 0.6) await standAtPoint({ x: -14.00, z: 16.50 }, 30_000, "step-off");
   return armed();
 };
 
@@ -462,10 +419,10 @@ const scanToRing = async (end: number): Promise<void> => {
 
 const goCentre = async (): Promise<void> => {
   const stop = monitorMission("centre");
-  let ok = await walkWithRecovery(SPAWN, 30_000, "spawn");
+  let ok = await standAtPoint(SPAWN, 30_000, "spawn");
   if (!ok) {
-    record("spawn: wishTo retry");
-    ok = await walkWithRecovery(SPAWN, 20_000, "spawn-retry");
+    record("spawn: plan retry");
+    ok = await standAtPoint(SPAWN, 20_000, "spawn-retry");
   }
   stop();
   const me = world.self();
