@@ -18,3 +18,4 @@ dist/web/qa-snaps/*.png
 .env.*
 .vscode
 conveyor-engine-arena.code-workspace
+.modev/

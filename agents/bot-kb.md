@@ -5,9 +5,9 @@ brain, the mailbox and command surface, and the live drivers. This is the layer
 above `agents/codemap.md`: the map, not the index. Every claim names the file and
 symbol; the codemap owns `:line`.
 
-Scale (2026-11-22): 11 modules, ~4,550 lines; 17 tracked drivers and 8 NDJSON
-scenarios under `tests/`. The drivers are live probes; the unit tests are
-`test/bot-*.test.ts`, not the drivers.
+Scale (2026-11-23): 11 modules, ~4.7k lines; 8 NDJSON scenarios under `tests/`.
+The drivers under `tests/` are rapid prototypes, not model content, and the unit
+tests are `test/bot-*.test.ts`, not the drivers.
 
 The lane's state — containers, keys, lifetimes — is §13.
 
@@ -92,7 +92,7 @@ patrol loop, or a stand target; execution is `brain.ts`.
 `transcript.ndjson`, and `notes.md`. A row is returned at most once until the
 inbox is truncated; `NOTE_MAX` bounds the note text.
 
-`createCommandHost` (`commands.ts`) is the production interface: ten typed
+`createCommandHost` (`commands.ts`) is the production interface: eleven typed
 handlers (`CommandName`), `dispatch`, `status`, `abort`, and the
 `CommandResult`/`CommandArtifact`/`CommandStatus` shapes. One dispatch at a time;
 `TASK_TIMEOUT_MS` (180 s) clamps a task; the packed status is trimmed to
@@ -104,11 +104,10 @@ handlers — those are `commands.ts`.
 
 ## 6. The driver lane
 
-`tests/*.ts` are tracked live drivers, not the test suite; `tests/scenarios/*.ndjson`
-replay command chains over the `msg` loopback; `tests/POCS.md` is the ledger of
-proven behaviours. The core drivers: `command-host` (mailbox or `msg` commands),
-`live-link` (file mailbox), `attack-run` (5-minute loop), `elevator-ride`, the
-`door-*` probes, `race-*`, and `probe-*`.
+`tests/*.ts` are rapid prototype drivers: git-tracked, but not tracked in this
+model — no count, no per-driver list. `tests/scenarios/*.ndjson` replay command
+chains over the `msg` loopback; `tests/POCS.md` is the ledger of proven
+behaviours.
 
 ## 7. Determinism
 

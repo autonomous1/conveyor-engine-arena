@@ -50,10 +50,12 @@ not close a finding by "noting it." When a turn needs the operator, end with
    maintaining.
 4. `agents/README-dsh.md` — the pipeline state and the open loops.
 5. The KBs (`host-flow.md`, `host-model.md`, `shared-flow.md`, `shared-model.md`,
-   `client-kb.md`; the `*-kb.md` files are indexes) — query the section for a
-   reader (`modev query section`); read the file in full before editing it; the
-   model is cross-file.
-6. The task templates and the role briefs — read the template before editing it, the
+   `client-kb.md`, `bot-kb.md`; the `*-kb.md` files are indexes) — query the
+   section for a reader (`modev query section`); read the file in full before
+   editing it; the model is cross-file.
+6. The POC ledger (`packages/bot-client/tests/POCS.md`) and the reports a task or
+   run cites — the graph's edges, and the evidence a finding rests on.
+7. The task templates and the role briefs — read the template before editing it, the
    brief before editing it.
 
 `Prohibitions: agents/AGENTS.md` (memory/skills, sibling repos, the kernel boundary).
@@ -75,7 +77,7 @@ section past the read window does not exist for the agent reading it. That means
 - **Split** is the fix, not "read more." `*-flow.md` (§1–§10) and `*-model.md`
   (§11–§15) each fit, and the model's read-order line becomes "the KB section named
   in the task's Knowledge base slot" — which now resolves to a small file. Host and
-  shared are split; client is still one file (306 lines, the next candidate).
+  shared are split; client is still one file (285 lines, the next candidate).
 - A task's **Knowledge base** slot names one section per layer, not the whole KB.
 
 For a reader, `node packages/modev/cli.mjs query section <layer> <§N>` returns the
@@ -84,49 +86,37 @@ whole-file read to reach the tail.
 
 ---
 
-## Current state (verified 2026-11-20, tree `c7669eb`)
+## Current state (verified 2026-11-22)
 
-The brief's earlier "known issues" list was written against an older tree; this
-is that list re-checked. *Verified* means the claim was true and needed no edit.
-Re-verify before working — the tree moves.
+*Verified* means the claim was checked against the tree; re-verify before working.
 
-- **Split the long KBs — done (2026-11-20, operator-approved).** `host-kb` 444 →
-  `host-flow` 196 + `host-model` 258 + an 18-line index; `shared-kb` 340 →
-  `shared-flow` 170 + `shared-model` 182 + an 18-line index. Section numbers are
-  unchanged, so `host-kb §13` still resolves through the index; every new file is
-  under 312 lines (78% of a 400-line window — the constant in
-  `packages/modev/lints/kb-length.mjs`; move it if the real window differs).
-  `client-kb` (306) is the next candidate and was not split.
-- **Alignment — verified true.** `AGENTS.md` names `host-model`/`client-kb`/
-  `shared-model` §13; `shared-model`'s state model is §13 (§12 is the layer map).
-- **Pointer mismatch — verified true.** Host §15 and client §14 point the test
-  pins at `shared-model` §11, and §11 carries them.
-- **Gate count — fixed.** `test/scopes.json` has six `always` gates; the
-  designer role said six, `agents/README-dsh.md` said five, now six.
-- **Trailing fragments — fixed.** `host-flow` §2 `(game.ts, called)` → "called
-  each tick after the owned set"; `client-kb` §14 `kernel-independent;)` → the
-  shared sentence. The "the local sketch" fragment was in `shared-flow` §1, not
-  host §15; deleted.
-- **Entity table — present, pointers fixed.** `shared-model` §13.6 has the five
-  rows and the requested columns; three cells named the wrong §13 subsection
-  (Claim → host §13.2, Door/Cab → client §13.2) and are corrected.
-- **`shared-model` §13.3 heading — verified true.** "Authority containers
-  (host-owned; shared factories)".
-- **`goap.ts` import vs copy — import.** `packages/bot-client/src/brain.ts`
-  imports `../../../src/shared/bots/goap.ts`; there is no copy, so no `§9` row
-  and no drift test. "copied verbatim" is false for this tree; every KB that
-  names it says "both sides import the one file".
-- **Template slot count — was stale.** `decisions.md` D7 said five; the template
-  carries nine plus the preamble. Superseding entry added.
-- **`packages/modev` — lints + query CLI (2026-11-20).** `check.mjs` and three
-  lints (`kb-length`, `kb-section-refs`, `kb-count-claims`), plus `cli.mjs`:
-  `query symbol|section|entity`, `find`, `drift`, `stats` — exact lookups over
-  the codemap and bounded KB sections, so a session reads one entry (~100
-  tokens) instead of the map (~96k). `npm run modev:check` = lints + 8 CLI
-  tests; CI runs it before `npm test`. `drift` is the advisory update report
-  (a `§` ref, a `src/` path, a §13.6 test pin). `test/kb-symbols.test.ts` covers
-  all seven KB files. Wired into `AGENTS.md`, the three roles and both templates
-  (2026-11-20); `modev stats` shows whether a session queried or grepped.
+**The arena model.** The KB split is done: `host-flow`/`host-model`,
+`shared-flow`/`shared-model`, `client-kb` (285 lines after the §14 collapse) and
+`bot-kb` (202, added 2026-11-22); every file is under the 312-line cap. `modev` is
+the read interface — `query symbol|file|section|entity`, `find`, `drift`,
+`stats`; session-tagged log; per-result stale warning; the `bot` layer is known to
+the parser and the section-ref scanner. `npm run modev:check` = lints +
+self-check + 11 tests; CI runs it before `npm test`. `test/kb-symbols.test.ts`
+covers the eight KB files (no-line + identifier existence, 16 tests). The reports
+are the handoff: the POC ledger (18 rows, 7 landed), `live-*.md`,
+`agents/research/`, `agents/model-reviews/`. The full suite is ~757 tests.
+
+**The extraction (2026-11-22).** `agents/` + `packages/modev` are being extracted
+into a standalone package at `~/dev/agent-alley` (npm `agent-alley`) — a dev
+dependency for `conveyor-engine-arena`, `blueprint-scene` and
+`conveyor-engine-packages`.
+
+- Moved and adapted: `src/{cli,check,self-check}.mjs`, `src/lib/*`,
+  `src/lints/*`, the codemap generator (`src/codemap.ts`), `test/cli.test.mjs` +
+  fixtures; `bin modev`; root from `cwd`; cache `<root>/.modev`; optional
+  `test/scopes.json`. 31 tests, `modev check` green.
+- Not moved: the KBs, decisions, journals and research (repo content, not
+  package); the role briefs/templates wait for the profile pass; the config file,
+  `init` and `kb scaffold` do not exist yet.
+- Adoption order: blueprint-scene (30 src files) → conveyor-engine-packages
+  (8 roots) → the arena drops `packages/modev`.
+- The next session starts in `agent-alley`; its handoff is
+  `~/dev/agent-alley/HANDOFF.md`.
 
 ---
 
@@ -137,6 +127,8 @@ Re-verify before working — the tree moves.
 - You do not run live prototypes or connect to the host — that is the bot-developer.
 - You do not change the kernel (`conveyor-engine-*`) — if a kernel change seems
   needed, stop and describe it in a finding.
+- You do not edit a host repo's `src/` or `test/` from `agent-alley`; in
+  `agent-alley` you own the package, in a host repo you own `agents/` only.
 - You do not hand-edit `agents/codemap.md` — regenerate with `npm run codemap`.
 - You do not close a finding by "noting it" — every finding ends in a concrete action
   (a KB edit, a decision entry, a task proposal).
@@ -161,19 +153,21 @@ deliverable, not the chat.
 4. **Task proposals** — the slot-by-slot draft, ready for the designer; one per
    finding that needs code.
 5. **Open loops** — model work that survives this session.
-6. **`modev` status** — what landed in `packages/modev`, what is pending, the
-   `modev:check` result.
+6. **`modev` status** — what landed in the package, what is pending, the check
+   result.
 
-If `packages/modev` is in the repo, run `npm --prefix packages/modev run check` at the
-end and paste the result. A red check is a finding for the next session; do not
-silence it.
+Run the package's own gate at the end and paste the result: in the arena
+`npm --prefix packages/modev run verify`; in `agent-alley` `npm run verify`. A red
+check is a finding for the next session; do not silence it.
 
 ---
 
 ## First ten minutes (default start)
 
-1. Confirm the three repos are reachable and that `agents/` exists in each.
-2. Read `agents/decisions.md` in full.
+1. **Which repo am I in?** In `agent-alley` (the package): read its
+   `HANDOFF.md` first — the arena is the content source. In a host repo: confirm
+   `agents/` exists and that the host(s) named by the task are reachable.
+2. Read `agents/decisions.md` in full (the arena's, while the model lives there).
 3. Read each KB's header and `§13` — enough to see whether the 78% rule is currently
    violated. Report which KBs need splitting before any edit.
 4. Run `npm run codemap:check`. If it is stale, regenerate, diff, and record the

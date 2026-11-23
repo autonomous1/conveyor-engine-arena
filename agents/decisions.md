@@ -292,3 +292,44 @@ prototype's shortcuts are either justified or removed.
 what was proven. **In practice:** a prototype is not merged, it is *read*. The
 designer drafts from the script plus the report, the coder productionizes, and
 the ledger row moves `proven` → `proposed` → `landed`.
+
+## D14 — Drivers are git-tracked prototypes, not model content (2026-11-23)
+
+The bot lane's scripts under `packages/bot-client/tests/` stay in git — the POCS row
+cites the script and a reader can run it — but **the KB does not inventory them**:
+no driver count, no per-driver list. The ledger row and the run report are the
+durable record; the driver set changes with every probe and is not part of the
+model.
+
+**Why:** a count in the KB drifts with each prototype (64 when this was written) and
+tells a reader nothing the ledger does not. `tests/README.md` may list the drivers —
+it is a driver index, not the model.
+
+**In practice:** `bot-kb` §1 keeps the module/line scale and the scenario count, not
+a driver count; §6 says the drivers are prototypes and points at `POCS.md`. Git
+tracking is unchanged.
+
+*Corrected the same day:* an earlier revision of this entry untracked the drivers
+from git. That read "tracked" as git tracking; the operator meant the KB inventory.
+The git change was reverted (`git reset` — it was never pushed) and the rule above
+is the one that holds.
+
+## D15 — A prototype hand-off is a migration, verified live (2026-11-23)
+
+A rapid prototype that works live encodes fixes the prose does not: orders, guards
+and thresholds discovered in the loop. When the coder re-implements from the task
+text, those fixes are silently dropped and the unit tests — written against the
+port — still pass. Task 154 is the case: the product `arm` handler passed its tests
+and failed live by walking off the crate, while the driver's arm works.
+
+**Why:** the prototype's value is in the details that never make the summary — the
+"why" behind each step. A port that re-derives from prose is a second design, not a
+migration.
+
+**In practice:** a POC-derived task names the driver in the Architecture note
+(`**Rapid prototype solution:**`), carries a **Migration analysis** (driver step →
+source behaviour), and its acceptance includes a **prototype-parity** run of the
+driver's scenario against the product path by the bot-developer. The coder reports
+any divergence (dropped step, changed constant, swapped order) and justifies it;
+the live run, not the unit test, is the gate. When the port fails where the driver
+works, that divergence is a finding for the designer.

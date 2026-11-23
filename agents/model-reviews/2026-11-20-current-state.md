@@ -1036,3 +1036,33 @@ modules / ~4,550 lines with `commands.ts`/`mailbox.ts` extracted — this is the
 the bot-developer was missing (§25).
 
 Gates: modev check green, kb-symbols 16/16, `drift` clean.
+
+## 28. Extraction to agent-alley — first pass (2026-11-22)
+
+`agents/` + `packages/modev` are being extracted into a standalone package at
+`~/dev/agent-alley` (npm `agent-alley`), a dev dependency for the arena,
+`blueprint-scene` and `conveyor-engine-packages`. The split is: **portable
+tooling ships; repo content does not.**
+
+Moved and adapted: `src/{cli,check,self-check}.mjs`, `src/lib/*`,
+`src/lints/*`, the codemap generator (`src/codemap.ts`, the arena's 632-line
+superset of blueprint-scene's 510-line fork), `test/cli.test.mjs` + fixtures.
+Adaptations: root from `cwd` (`--root`/`MODEV_ROOT`), cache `<root>/.modev` or
+`MODEV_CACHE`, `kb-count-claims` skips without `test/scopes.json`, tests use an
+isolated cache. `package.json` gains `bin modev`, the check/self-check/test/
+verify/codemap scripts, `typescript` as a dependency, and a narrow `files` list.
+
+Verified in the new repo: `npm run verify` green (check, self-check, 11 tests);
+`node src/cli.mjs --root ~/dev/conveyor-engine-arena query symbol connectBot`
+answers from the arena's codemap.
+
+Not moved: the KBs, decisions, journals, research and POC ledger (repo content);
+the role briefs and templates wait for the profile pass; the config file,
+`init` and `kb scaffold` do not exist yet. Adoption order: blueprint-scene →
+conveyor-engine-packages → the arena drops `packages/modev`.
+
+The model-developer brief was refreshed for the two-repo lane: current state
+2026-11-22 (bot-kb, `modev` commands, the gates, the POC ledger), the extraction
+boundary ("in `agent-alley` you own the package; in a host repo, `agents/`
+only"), the bot-kb + ledger in the read order, and the package's own verify
+command. The next session's handoff is `~/dev/agent-alley/HANDOFF.md`.

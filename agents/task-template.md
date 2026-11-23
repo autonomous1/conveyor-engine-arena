@@ -15,6 +15,8 @@ Read `agents/AGENTS.md` first. Then this file. Then the KB sections named in **K
 
 **Architecture note:** <cite the specific `ARCHITECTURE` paragraph, `@invariant`, decision entry, or the **prototype/report** this task productionizes (a bot POC row, a research report). If it can't cite one, the task is speculative — stop and reconsider.>
 
+**Rapid prototype solution:** <when this task productionizes a working driver, its path — the coder ports it and does not re-derive. Delete the line for a fresh task.>
+
 **Knowledge base:** <the KB file(s) and section(s) this task touches, with the reason. E.g. `agents/host-model.md` §13 (the host state model) and `agents/host-flow.md` §5 (doors); `agents/client-kb.md` §13 (the client state model); `agents/shared-flow.md` §2–§3 (wire/protocol, data model) and `agents/shared-model.md` §11 (invariants). Name one half, not both: the section decides the file. Query the named section with `node packages/modev/cli.mjs query section <layer> <§N>` before the source; open the file only if the query fails. The KB is the map, not a field dump; a stale claim is a report note, not an edit. If this slot is missing or names no section, stop.>
 
 **Files to touch:** <paths with a one-line purpose each. This bounds the executor's codemap scope; nothing outside this list is in scope.>
@@ -37,6 +39,17 @@ Read `agents/AGENTS.md` first. Then this file. Then the KB sections named in **K
 2. <step>
 3. <step>
 
+### Migration analysis
+
+<Prototype-derived tasks only. One row per prototype step: the driver's operation,
+the constant or guard it relies on (and the failure that put it there), and the
+source behaviour that must reproduce it. A dropped step, a changed constant or a
+swapped order is a divergence — justify it here or keep the driver's shape.>
+
+| driver step (operation) | relies on (const / guard / order) | source behaviour that must match |
+|---|---|---|
+| <…> | <…> | <…> |
+
 ### Implementation note
 
 <Concrete code the executor can paste and adjust. Full module if new; exact diff blocks if editing. If the scaffold has a bug, the executor fixes it and notes the fix — the scaffold is a starting point, not a spec.>
@@ -52,6 +65,7 @@ Read `agents/AGENTS.md` first. Then this file. Then the KB sections named in **K
 <- `npm run typecheck` passes; the **scoped** run from Test scope passes; **N scoped tests, 0 fail**. The scoped runner builds `dist` only when a selected test imports it; do not run the full `npm test` — it is the merge gate (CI on push/PR and every two hours), not the per-task loop.>
 <- Standalone scoped run of the new/edited test file passes; both test names appear in the report.>
 <- **Fail-first is demonstrated** — report includes the failing run before the fix and the passing run after, both verbatim.>
+<- **Prototype parity** (prototype-derived tasks only): after the port, the bot-developer runs the driver's scenario against the product path and both outputs are pasted. A unit test is not parity.>
 <- `npm run codemap:check` passes.>
 <- Codemap delta captured via `mkdir -p plan/dsh-tasks/logs && cp agents/codemap.md /tmp/codemap-prev.md && npm run codemap && git diff --no-index /tmp/codemap-prev.md agents/codemap.md > plan/dsh-tasks/logs/<task>-codemap.diff` contains only the expected added lines (and their `:line` shifts). Paste the summary and the log path; the full diff stays in `logs/`.>
 <- Every touched module that exports more than one symbol has its four-slot header (new or updated), and every new/changed export carries its JSDoc tags; `test/module-headers.test.ts` and `test/contract-grep.test.ts` pass in the scoped run; the codemap diff shows the header/tag lines and no unexplained comment churn.>

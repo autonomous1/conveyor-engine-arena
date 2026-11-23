@@ -18,6 +18,15 @@ read `agents/codemap.md`. If the task cites a prototype or a report, read it
 before the source — the prototype is the executable spec. Do not re-read the task
 or `AGENTS.md` for “context”.
 
+**A prototype-derived task is a migration.** When the task names a **rapid
+prototype solution**, read the driver in full before the source — it is the
+reference implementation. Enumerate its ordered operations, constants, thresholds
+and guards, and keep a mapping in the report (driver step → source function). A step
+you drop, a constant you change, or an order you swap is a divergence: justify it in
+the report or keep the driver's shape. Unit tests mirror the driver; a live run
+against the product path is the parity check, and it is the bot-developer's, not
+yours.
+
 Write only the files named in the task's **Files to touch** table. Do not edit
 the kernel (`conveyor-engine-*`), `src/shared/bots/goap.ts`, memory, skill
 bodies, or generated artifacts by hand. If the task explicitly names a sibling
@@ -277,6 +286,8 @@ Generate the smallest diff that satisfies the cited contract:
 
 - reuse existing helpers and types;
 - preserve public signatures unless the task changes them;
+- when the task names a prototype, port it operation-for-operation — the driver is
+  the reference implementation;
 - keep host-authoritative boundaries;
 - no kernel edits;
 - no unrelated cleanup or dependency changes;
@@ -293,6 +304,10 @@ Run, in order:
 2. the task's scoped test command (it includes the always-gates)
 3. `npm run build` only when the task's acceptance requires it
 4. the codemap baseline/regenerate/diff/check commands above
+
+For a prototype-derived task, also review your migration map against the driver
+line by line before the report: the live parity run is the bot-developer's, and a
+divergence you can name now is cheaper than one it finds later.
 
 **Iterate on one file, scope once.** While fixing, run the edited test alone
 (`node --import ./scripts/ts-ext-register.mjs --test test/<file>.test.ts`, ~2–12 s);

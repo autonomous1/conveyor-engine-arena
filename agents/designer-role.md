@@ -38,6 +38,23 @@ wanted, draft the coder task from it in one pass: cite the script and its report
 in the Architecture note and the Files table, and set the row to `proposed`.
 Do not re-design what the prototype already measured.
 
+**A proven POC is a migration, not a fresh design.** A prototype that works live
+carries fixes the prose does not: an order, a guard, a threshold that exists
+because of a failure already seen. The coder must be told that a working prototype
+exists and must port it, not re-derive it. Every POC-derived task therefore carries:
+
+- `**Rapid prototype solution:** <the driver path>` as the first line of the
+  **Architecture note**;
+- a **Migration analysis** section: one row per prototype step — the driver's
+  operation, the constant/guard it relies on, and the source behaviour that must
+  reproduce it;
+- a **prototype-parity acceptance**: after the port, the bot-developer runs the
+  driver's scenario against the product path and pastes both outputs.
+
+A unit test proves the port matches the test, not the prototype. Task 154 is the
+case: the product `arm` handler passed its tests and walked off the crate live,
+while the driver's arm works.
+
 The two copies have diverged: `agents/decisions.md` and `agents/README-dsh.md` are current; `plan/dsh-tasks/` holds older copies (its README still says `docs/decisions.md` and five always-gates). Read the `agents/` copies; treat the `plan/dsh-tasks/` ones as history.
 
 **Resources**
@@ -85,7 +102,7 @@ The two copies have diverged: `agents/decisions.md` and `agents/README-dsh.md` a
 
 ## Bot-developer runs
 
-14. Bot tasks use `agents/bot-task-template.md`; they are runs, not code changes. The **Files** table names the run's script under `packages/bot-client/tests/` (tracked, reviewable) — never `plan/dsh-tasks/live/`, which is gitignored. When a run returns, its **POC package** (script + runs table + failure modes) is the executable spec for the coder task you draft — do not re-derive the behaviour from the prose. One bot, operator as spectator, clean close, seat check, no grenades unless asked. Target rules: wander bots within 35 m of the spawn point; buildings are valid; outside 35 m ignored. Pick up health at hp ≤ 50 before re-engaging.
+14. Bot tasks use `agents/bot-task-template.md`; they are runs, not code changes. The **Files** table names the run's script under `packages/bot-client/tests/` (tracked, reviewable) — never `plan/dsh-tasks/live/`, which is gitignored. When a run returns, its **POC package** (script + runs table + failure modes) is the executable spec for the coder task you draft — analyze the driver operation by operation, and do not re-derive the behaviour from the prose or from the driver's summary. One bot, operator as spectator, clean close, seat check, no grenades unless asked. Target rules: wander bots within 35 m of the spawn point; buildings are valid; outside 35 m ignored. Pick up health at hp ≤ 50 before re-engaging.
 
 ## Method: deriving system architecture from these sources
 

@@ -37,7 +37,7 @@ Read `~/dev/conveyor-engine-arena/agents/bot-developer-role.md` first. Then this
 
 ## Report
 
-<The report must contain: the timeline (t, actor, event, detail); the metrics table; the findings (numbered, each with a log/trace line); the mechanism fit (which explanation the evidence supports and which it does not); the **POC hand-off** (script path, what production must preserve, the failure modes, the open questions) addressed to the designer; the recommendation (the next coder task or “no change”). The report is the deliverable, not the chat.>
+<The report must contain: the timeline (t, actor, event, detail); the metrics table; the findings (numbered, each with a log/trace line); the mechanism fit (which explanation the evidence supports and which it does not); the **POC hand-off** (script path, the migration analysis — ordered operations, constants/guards and the live-loop fix each encodes — what production must preserve, the failure modes, the open questions) addressed to the designer; the recommendation (the next coder task or “no change”). The report is the deliverable, not the chat.>
 
 ## Safety and abort
 

@@ -80,6 +80,10 @@ Rules of the craft:
 - **The prototype is the spec.** The designer drafts from the script and the
   coder can run it; the desired behaviour is what the runs measured, not what the
   prose claims.
+- **The driver is the reference implementation.** A port that re-derives from prose
+  loses the fixes. Hand over the ordered operations, the constants and the guards
+  each one encodes; when the port lands, re-run the same scenario against the
+  product path — the driver is the control.
 - **The operator's method.** Rapid prototype → observe → fix → hand off to the
   coder for the refined implementation. That is the division of labour.
 - **The driver home.** Every script a task asks for goes in
@@ -315,8 +319,10 @@ hypothesis. Then reproduce with the same place/goal/start; record the pose every
    the smallest test.
 6. **Changes made** — diff summary, rebuild, re-test, before/after.
 7. **POC hand-off** — the script path + the behaviour + the **exact evidence
-   lines** + the runs table + the failure modes + what production must preserve +
-   open questions, addressed to the designer, **plus a task proposal** (the
+   lines** + the runs table + the failure modes + the **migration analysis** (the
+   ordered operations, the constants and guards, and the live-loop fix each one
+   encodes) + what production must preserve + open questions, addressed to the
+   designer, **plus a task proposal** (the
    template's slots) and the row in `packages/bot-client/tests/POCS.md`. This is
    the package the designer turns into the coder task; it must stand without your
    history.
