@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createCommandHost, parseCommand } from "../packages/bot-client/src/commands.ts";
 
-const NAMES = ["arm", "goto", "stand", "path", "walk", "reload", "hunt", "patrol", "retrieve", "getkey", "projectile"];
+const NAMES = ["arm", "goto", "stand", "path", "gotoAt", "walk", "reload", "hunt", "patrol", "retrieve", "getkey", "projectile"];
 
 type WorldOptions = {
   placeOf?: (pos: { x: number; y: number; z: number }) => { id: string; kind: string };
@@ -87,6 +87,7 @@ test("parse_command_accepts_every_handler", () => {
     { name: "goto", args: { place: "hall" } },
     { name: "stand", args: { x: 1, y: 0, z: 2, yaw: 1.5 } },
     { name: "path", args: { x: 1, y: 0, z: 2, yaw: 1.5 } },
+    { name: "gotoAt", args: { x: 1, z: 2 } },
     { name: "walk", args: { points: [{ x: 1, z: 2 }, { x: 3, z: 4 }] } },
     { name: "reload", args: { crate: "ammo-1" } },
     { name: "hunt", args: { minutes: 1 } },
@@ -119,6 +120,7 @@ test("parse_command_preserves_every_bad_args_why", () => {
     { name: "goto", args: {}, why: "bad-args" },
     { name: "stand", args: { x: "nope", y: 0, z: 0 }, why: "bad-args" },
     { name: "path", args: { x: "nope", y: 0, z: 0 }, why: "bad-args" },
+    { name: "gotoAt", args: { x: "nope", z: 0 }, why: "bad-args" },
     { name: "walk", args: { points: [] }, why: "bad-args" },
     { name: "hunt", args: { minutes: 0.2 }, why: "bad-args" },
     { name: "hunt", args: { minutes: 11 }, why: "bad-args" },
@@ -166,6 +168,7 @@ test("command_names_match_the_registry", () => {
     goto: { place: "hall" },
     stand: { x: 0, y: 0, z: 0 },
     path: { x: 0, y: 0, z: 0 },
+    gotoAt: { x: 0, z: 0 },
     walk: { x: 0, z: 0 },
     reload: {},
     hunt: {},
@@ -180,6 +183,30 @@ test("command_names_match_the_registry", () => {
   // arm and getkey take no arguments, so an empty request parses.
   assert.deepEqual(parseCommand({ name: "arm" }), { name: "arm" });
   assert.deepEqual(parseCommand({ name: "getkey" }), { name: "getkey" });
+});
+
+test("stand_abort_interrupts_the_walk", { timeout: 5000 }, async () => {
+  const { session } = fakeSession();
+  const host = createCommandHost({ session, log: () => {} });
+  const running = host.dispatch({ id: "s1", name: "stand", args: { x: 50, y: 0, z: 50 } });
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  host.abort();
+  const result = await running;
+  assert.equal(result.ok, false);
+  assert.equal(result.code, 4);
+  assert.equal(result.why, "aborted");
+});
+
+test("goto_at_parses_the_point_and_uses_the_pawn_floor", { timeout: 10_000 }, async () => {
+  assert.deepEqual(parseCommand({ name: "gotoAt", args: { x: 1, z: 2 } }), { name: "gotoAt", x: 1, z: 2 });
+  const { session } = fakeSession();
+  const logs: string[] = [];
+  const host = createCommandHost({ session, log: (line) => logs.push(line) });
+  const result = await host.dispatch({ id: "g1", name: "gotoAt", args: { x: 1, z: 2 } });
+  assert.ok(logs.includes("GOTOAT start x=1 z=2 y=0"), logs.join("\n"));
+  assert.ok(logs.some((line) => line.startsWith("GOTOAT done") && line.includes("code=2")), logs.join("\n"));
+  assert.equal(result.ok, false);
+  assert.match(String(result.why), /^no-plan:/);
 });
 
 test("dispatch_rejects_unknown_command_before_touching_the_session", async () => {

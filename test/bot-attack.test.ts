@@ -3,6 +3,8 @@ import { test } from "node:test";
 import { parseMission } from "../packages/bot-client/src/missions.ts";
 import { runAttack } from "../packages/bot-client/src/brain.ts";
 import { createBotWorld } from "../packages/bot-client/src/world.ts";
+import { loadArena } from "../src/server/world-loader.ts";
+import { sceneGraphPayload } from "../src/shared/scene-graph.ts";
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -41,6 +43,93 @@ function session() {
   };
   (world as { spatialDag?: () => unknown }).spatialDag = () => ({ hash: "test", nodes: [], chunks: [], byId: new Map() });
   return { world, input, fired, sent, events, session: { world, input, claims: { acquire() {}, release() {} } } as never };
+}
+
+/** A graph-backed retreat world: one outside place, a moving (or pinned) pawn. */
+function retreatSession(opts: { move?: boolean; targetX?: number; playerX?: number; hp?: number } = {}) {
+  const move = opts.move === true;
+  const targetX = opts.targetX ?? 14;
+  const world = createBotWorld({ aabbs: [], doors: [], playerSpawns: [], pawnRadius: 0.45, pawnHeight: 1.8 } as never);
+  world.noteOwned(1);
+  const me = { x: 0, y: 0, z: 0, yaw: 0 };
+  const spawns: Array<{ entity: number; view: { position: { x: number; y: number; z: number }; rotation: { y: number; w: number } } }> = [
+    { entity: 1, view: { position: { x: 0, y: 0, z: 0 }, rotation: { y: 0, w: 1 } } },
+    { entity: 7, view: { position: { x: targetX, y: 0, z: 0 }, rotation: { y: 0, w: 1 } } },
+  ];
+  if (opts.playerX !== undefined) {
+    spawns.push({ entity: 8, view: { position: { x: opts.playerX, y: 0, z: 0 }, rotation: { y: 0, w: 1 } } });
+  }
+  world.applySnapshot({ spawns });
+  if (opts.playerX !== undefined) world.applyPlayers([8]);
+  world.loadSceneGraph({
+    formatVersion: 1,
+    units: "meters",
+    places: [{
+      id: "outside",
+      kind: "outside",
+      y: 0,
+      polygon: [[-100, -100], [5, -100], [5, 100], [-100, 100]],
+      bounds: { minX: -100, maxX: 5, minZ: -100, maxZ: 100 },
+    }],
+    portals: [],
+  } as never, "test-graph");
+  world.applyLoadout({ weapon: "alien-weapon-1", ammo: 30 });
+  world.applyHealth({ entity: 1, hp: opts.hp ?? 20, dead: false });
+  (world as { spatialDag?: () => unknown }).spatialDag = () => ({ hash: "test", nodes: [], chunks: [], byId: new Map() });
+  const sent: Array<{ moveX: number; moveZ: number; yaw: number }> = [];
+  const fired: Array<{ yaw: number; pitch: number }> = [];
+  const input = {
+    sendInput(command: { moveX: number; moveZ: number; yaw: number }) {
+      sent.push(command);
+      if (!move) return;
+      me.x += command.moveX * 0.25;
+      me.z += command.moveZ * 0.25;
+      world.applySnapshot({ spawns: [{ entity: 1, view: { position: { x: me.x, y: 0, z: me.z }, rotation: { y: Math.sin(command.yaw / 2), w: Math.cos(command.yaw / 2) } } }] });
+    },
+    fire(yaw: number, pitch: number) { fired.push({ yaw, pitch }); return true; },
+    grenade() { return true; },
+  };
+  return { world, input, sent, fired, session: { world, input, claims: { acquire() {}, release() {} } } as never };
+}
+
+const realArena = loadArena();
+const realBox = realArena.view.aabbs.find((item) => item.maxX - item.minX > 2)!;
+/** The bot-cover fixture point: nearestCover returns here (one plan, LOS on arrival). */
+const COVER_POINT = { x: (realBox.minX + realBox.maxX) / 2, y: 0, z: realBox.minZ - 2 };
+
+/** The real arena + DAG: an NPC attacker 2 m away and a player 1 m away. */
+function realRetreatSession(opts: { move?: boolean } = {}) {
+  const move = opts.move === true;
+  const world = createBotWorld(realArena.view as never);
+  world.noteOwned(1);
+  const me = { x: COVER_POINT.x, y: COVER_POINT.y, z: COVER_POINT.z, yaw: 0 };
+  const npc = { x: me.x, z: me.z + 2 };
+  const player = { x: me.x, z: me.z + 1 };
+  world.applySnapshot({
+    spawns: [
+      { entity: 1, view: { position: { x: me.x, y: me.y, z: me.z }, rotation: { y: 0, w: 1 } } },
+      { entity: 7, view: { position: { x: npc.x, y: 0, z: npc.z }, rotation: { y: 0, w: 1 } } },
+      { entity: 8, view: { position: { x: player.x, y: 0, z: player.z }, rotation: { y: 0, w: 1 } } },
+    ],
+  });
+  world.applyPlayers([8]);
+  world.loadSceneGraph(sceneGraphPayload(realArena.sceneGraph!), "real");
+  world.applyLoadout({ weapon: "alien-weapon-1", ammo: 30 });
+  world.applyHealth({ entity: 1, hp: 20, dead: false });
+  (world as { spatialDag?: () => unknown }).spatialDag = () => realArena.spatialDag;
+  const sent: Array<{ moveX: number; moveZ: number; yaw: number }> = [];
+  const input = {
+    sendInput(command: { moveX: number; moveZ: number; yaw: number }) {
+      sent.push(command);
+      if (!move) return;
+      me.x += command.moveX * 0.25;
+      me.z += command.moveZ * 0.25;
+      world.applySnapshot({ spawns: [{ entity: 1, view: { position: { x: me.x, y: me.y, z: me.z }, rotation: { y: Math.sin(command.yaw / 2), w: Math.cos(command.yaw / 2) } } }] });
+    },
+    fire() { return true; },
+    grenade() { return true; },
+  };
+  return { world, input, sent, npc, session: { world, input, claims: { acquire() {}, release() {} } } as never };
 }
 
 test("attack_mission_parses_positive_ids_only", () => {
@@ -164,15 +253,96 @@ test("attack_steps_back_inside_the_band", { timeout: 10_000 }, async () => {
 });
 
 test("attack_retreats_below_25_hp", { timeout: 10_000 }, async () => {
-  const { world, session: fake, fired, sent } = session();
-  world.applyLoadout({ weapon: "alien-weapon-1", ammo: 30 });
-  world.applyHealth({ entity: 1, hp: 20, dead: false });
+  const { session: fake, fired, sent } = retreatSession({ move: true, targetX: 14 });
   const logs: string[] = [];
-  const code = await runAttack(fake, 7, { timeoutMs: 400, log: (line) => logs.push(line) });
+  const code = await runAttack(fake, 7, { timeoutMs: 2000, log: (line) => logs.push(line) });
   assert.equal(code, 2);
-  assert.ok(logs.some((line) => line.includes("attack: retreat")), logs.join("\n"));
+  assert.ok(logs.some((line) => line.includes("attack: retreat hp=20")), logs.join("\n"));
+  const plans = logs.filter((line) => line.includes("attack: retreat plan kind="));
+  assert.equal(plans.length, 1, `retreat plans ${plans.length}\n${logs.join("\n")}`);
   assert.equal(fired.length, 0, `fired while retreating\n${logs.join("\n")}`);
-  assert.ok(sent.some((command) => command.moveX < 0), `no retreat move\n${JSON.stringify(sent)}`);
+  assert.ok(sent.length > 0, "no retreat input");
+});
+
+test("attack_retreat_plans_one_point_and_does_not_replan_on_a_timer", { timeout: 10_000 }, async () => {
+  const { session: fake } = retreatSession({ move: true, targetX: 14 });
+  const logs: string[] = [];
+  await runAttack(fake, 7, { timeoutMs: 1500, log: (line) => logs.push(line) });
+  const plans = logs.filter((line) => line.includes("attack: retreat plan kind="));
+  assert.equal(plans.length, 1, `plans ${plans.length}\n${logs.join("\n")}`);
+  assert.ok(!logs.some((line) => line.includes("attack: retreat replan reason=stuck")), logs.join("\n"));
+});
+
+test("attack_retreat_replans_when_the_follower_is_stuck", { timeout: 12_000 }, async () => {
+  const { session: fake } = retreatSession({ move: false, targetX: 14 });
+  const logs: string[] = [];
+  await runAttack(fake, 7, { timeoutMs: 6000, log: (line) => logs.push(line) });
+  assert.ok(logs.some((line) => line.includes("attack: retreat replan reason=stuck")), logs.join("\n"));
+  assert.ok(logs.filter((line) => line.includes("attack: retreat plan kind=")).length >= 2, logs.join("\n"));
+});
+
+test("attack_retreat_does_not_count_a_player_as_a_threat", { timeout: 10_000 }, async () => {
+  const fake = retreatSession({ move: true, targetX: 14, playerX: 2 });
+  const logs: string[] = [];
+  await runAttack(fake.session, 7, { timeoutMs: 1500, log: (line) => logs.push(line) });
+  assert.ok(logs.some((line) => line.includes("attack: retreat hp=20 threats=0")), logs.join("\n"));
+  const plan = logs.find((line) => line.includes("attack: retreat plan kind="));
+  assert.ok(plan, logs.join("\n"));
+  const to = /to=(-?[\d.]+),(-?[\d.]+)/.exec(plan!);
+  assert.ok(to && Number(to[1]) < 0, `the plan is not away from the NPC: ${plan}`);
+
+  const calm = retreatSession({ move: true, targetX: 14, playerX: 2, hp: 100 });
+  const calmLogs: string[] = [];
+  await runAttack(calm.session, 7, { timeoutMs: 500, log: (line) => calmLogs.push(line) });
+  assert.ok(!calmLogs.some((line) => line.includes("attack: retreat")), calmLogs.join("\n"));
+});
+
+test("attack_retreat_holds_without_a_plan", { timeout: 10_000 }, async () => {
+  const { session: fake, sent } = session();
+  fake.world.applyLoadout({ weapon: "alien-weapon-1", ammo: 30 });
+  fake.world.applyHealth({ entity: 1, hp: 20, dead: false });
+  const logs: string[] = [];
+  const code = await runAttack(fake, 7, { timeoutMs: 1000, log: (line) => logs.push(line) });
+  assert.equal(code, 2);
+  assert.ok(logs.some((line) => line.includes("attack: retreat no-plan hold")), logs.join("\n"));
+  assert.equal(sent.length, 0, `the hold sent ${JSON.stringify(sent)}`);
+});
+
+test("attack_retreat_cover_attacker_is_the_enemy_npc", { timeout: 10_000 }, async () => {
+  const fake = realRetreatSession({ move: false });
+  const logs: string[] = [];
+  await runAttack(fake.session, 7, { timeoutMs: 1000, log: (line) => logs.push(line) });
+  assert.ok(fake.world.playerIds().has(8), "the player id is missing");
+  const line = logs.find((entry) => entry.includes("attack: retreat cover attacker="));
+  assert.ok(line, logs.join("\n"));
+  const attacker = /attacker=(-?[\d.]+),(-?[\d.]+)/.exec(line!);
+  assert.ok(attacker, line);
+  assert.equal(Number(attacker![1]).toFixed(2), fake.npc.x.toFixed(2));
+  assert.equal(Number(attacker![2]).toFixed(2), fake.npc.z.toFixed(2));
+});
+
+test("attack_retreat_verifies_cover_los_on_arrival", { timeout: 12_000 }, async () => {
+  const fake = realRetreatSession({ move: true });
+  const logs: string[] = [];
+  await runAttack(fake.session, 7, { timeoutMs: 4000, log: (line) => logs.push(line) });
+  const reached = logs.find((entry) => entry.includes("attack: retreat cover reached los="));
+  assert.ok(reached, logs.join("\n"));
+  if (reached!.endsWith("los=no")) {
+    const at = logs.indexOf(reached!);
+    assert.ok(!logs.slice(at + 1).some((entry) => entry.includes("attack: retreat plan")), logs.join("\n"));
+  }
+});
+
+test("attack_abort_stops_the_retreat", { timeout: 12_000 }, async () => {
+  const { session: fake, sent } = session();
+  fake.world.applyLoadout({ weapon: "alien-weapon-1", ammo: 30 });
+  fake.world.applyHealth({ entity: 1, hp: 20, dead: false });
+  const logs: string[] = [];
+  await assert.rejects(
+    runAttack(fake, 7, { timeoutMs: 10_000, log: (line) => logs.push(line), onTick: () => { throw new Error("stop"); } }),
+    /stop/,
+  );
+  assert.equal(sent.length, 0, logs.join("\n"));
 });
 
 /** A bot at (0,0) and a target 25 m east, with one box blocking the straight line. */
