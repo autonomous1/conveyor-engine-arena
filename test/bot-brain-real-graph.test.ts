@@ -164,8 +164,13 @@ type MovingPawn = { x: number; y: number; z: number; vx: number; vz: number; yaw
  * a wall gives a pawn. An open leaf is parked out of the world, so only the shut
  * leaves are colliders.
  */
-function integrate(pawn: MovingPawn, input: { moveX: number; moveZ: number; yaw: number }, hits: (x: number, z: number) => boolean): void {
-  const wish = wishPlanar(input.moveX, input.moveZ);
+function integrate(
+  pawn: MovingPawn,
+  input: { moveX: number; moveZ: number; yaw: number },
+  hits: (x: number, z: number) => boolean,
+  speed?: number,
+): void {
+  const wish = wishPlanar(input.moveX, input.moveZ, speed);
   const vel = approachVelocity({ x: pawn.vx, z: pawn.vz }, wish);
   let nx = pawn.x + vel.x * MOVE_DT;
   let nz = pawn.z + vel.z * MOVE_DT;
@@ -686,8 +691,10 @@ function baseHallSession(doors: readonly HallDoor[]) {
  * `doors` array, so only the mission's own unlock opens it; shut leaves are the
  * colliders and the 20 Hz step is the real `integrate`.
  */
-function doorwaySession(stopped?: () => boolean) {
-  const doors = baseHallDoors();
+function doorwaySession(stopped?: () => boolean, speed?: number | ((doors: HallDoor[]) => number)) {
+  // Copy every row: `use()` mutates the leaf, and the test file's door objects
+  // are shared across tests (`loaded.view.doors`).
+  const doors = baseHallDoors().map((door) => ({ ...door }));
   const bodies = new Map(doors.map((door) => [door.id, door]));
   const pawn: MovingPawn = { ...HALL_POSE, vx: 0, vz: 0, yaw: 0 };
   const radius = loaded.view.pawnRadius;
@@ -707,7 +714,8 @@ function doorwaySession(stopped?: () => boolean) {
     spectate: false,
     close() {},
     input: {
-      sendInput: (input: { moveX: number; moveZ: number; yaw: number }) => integrate(pawn, input, hits),
+      sendInput: (input: { moveX: number; moveZ: number; yaw: number }) =>
+        integrate(pawn, input, hits, typeof speed === "function" ? speed(doors) : speed),
       use: () => {
         const leaf = doors.find((door) => door.id === HALL_1_INNER_DOOR);
         if (!leaf) return false;
@@ -902,6 +910,51 @@ test("the post-unlock replan at the inner door keeps the walk", async () => {
   assert.ok(plan, "the same post-unlock state does not plan");
   assert.equal(firstStep, plan.steps[0], `the started step is not the replan's first: ${started}\n${plan.steps.join(" ")}`);
   assert.equal(plan.steps.at(-1), `goTo:${HALL_0}`, plan.steps.join(" "));
+});
+
+test("the safety replan while walking keeps the patrol plan", async () => {
+  // The 161 live shape: the patrol walks the building-`-0` door-0 leg and the
+  // 5 s `safety` tick fires mid-walk. On the stale `door:<inner>` token the
+  // planner is 20 m and ~100 ms behind the pawn — it either cuts at the 250 ms
+  // warm budget (`steps=0`) or returns the 4-step `goTo:outside` detour. The
+  // slow host step (`wishPlanar` speed) keeps the real 5 s tick mid-walk, not
+  // at a door press.
+  const { doors, session } = doorwaySession(
+    undefined,
+    (rows) => (rows.find((door) => door.id === HALL_1_INNER_DOOR)?.open ? 2.5 : 5),
+  );
+  const goal = reach(HALL_0);
+  const logs: string[] = [];
+  const code = await runMission(session as never, { kind: "goal", goal }, {
+    timeoutMs: 22_000,
+    predictOwned: false,
+    log: (line) => logs.push(line),
+  });
+  const unlockAt = logs.findIndex((line) => line.startsWith(`start unlock:${HALL_1_INNER_DOOR}`));
+  assert.ok(unlockAt >= 0, `the mission never reached the inner unlock (code ${code})\n${logs.join("\n")}`);
+  const leaf = doors.find((door) => door.id === HALL_1_INNER_DOOR);
+  assert.ok(leaf?.open, `the mission never opened the inner leaf (code ${code})\n${logs.join("\n")}`);
+  const afterUnlock = logs.slice(unlockAt + 1);
+  const safetyAt = afterUnlock.findIndex((line) => line.startsWith("replan safety"));
+  assert.ok(safetyAt >= 0, `no safety replan after the unlock (code ${code})\n${logs.join("\n")}`);
+  const afterSafety = afterUnlock.slice(safetyAt + 1);
+  assert.equal(
+    afterSafety.filter((line) => line.startsWith("no plan")).length,
+    0,
+    `the safety replan failed (code ${code})\n${afterSafety.join("\n")}`,
+  );
+  const plans = afterSafety.filter((line) => line.startsWith("plan done"));
+  assert.ok(plans.length > 0, `no plan after the safety replan\n${afterSafety.join("\n")}`);
+  const replanned = plans[0]!;
+  assert.ok(replanned.includes("steps=3"), `the safety replan is not the 3-step walk: ${replanned}\n${afterSafety.join("\n")}`);
+  const started = afterSafety.slice(afterSafety.indexOf(replanned) + 1).find((line) => line.startsWith("start "));
+  assert.ok(started, `the safety plan never started\n${afterSafety.join("\n")}`);
+  const firstStep = started.slice("start ".length).split(" ")[0]!;
+  assert.match(
+    firstStep,
+    /^goToDoor:brutalist-building-1-cbake-0\.door-/,
+    `the safety plan starts ${firstStep}, not the -0 leg\n${afterSafety.join("\n")}`,
+  );
 });
 
 test("a huge expand budget still returns before the mission timeout", async () => {

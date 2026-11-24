@@ -230,10 +230,17 @@ export async function connectBot(o: ConnectBotOptions): Promise<BotSession> {
     ws.addEventListener("open", () => {
       ws.send(JSON.stringify(helloFrame(view, o, reconnectToken, model)));
     });
-    ws.addEventListener("error", () => {
+    ws.addEventListener("error", (ev) => {
       // The close event carries 4401 / 4403. An error with no close still hits the timer.
+      const e = ev as unknown as { message?: unknown; error?: { message?: unknown } };
+      const msg = typeof e.message === "string" ? e.message : typeof e.error?.message === "string" ? e.error.message : "unknown";
+      o.onLog?.(`socket error ${msg}`);
     });
     ws.addEventListener("close", (ev) => {
+      // Task 161: log every close before any early return, so a suppressed close
+      // is still evidence. The control flow below is unchanged.
+      const logged = closeInfo(ev);
+      o.onLog?.(`close code=${logged.code ?? "none"} reason=${logged.reason || "-"} rs=${ws.readyState} welcome=${gotWelcome ? 1 : 0} current=${ws === current ? 1 : 0}`);
       if (ws !== current && current !== undefined) return;
       if (gotWelcome) {
         finish();

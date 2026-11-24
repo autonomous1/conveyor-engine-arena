@@ -33,6 +33,8 @@ export type BotInput = {
   grenade(yaw?: number, pitch?: number): boolean;
   /** A new welcome starts the input sequence at 1, matching the browser client. */
   resetSeq(): void;
+  /** QA-only, operator-authorized: move this session's own pawn (the host checks the token scope). */
+  teleport(x: number, y: number, z: number, yaw?: number): boolean;
 };
 
 /**
@@ -92,6 +94,9 @@ export function createBotInput(link: InputLink): BotInput {
     },
     callElevator(id, stop) {
       return sendOwned(JSON.stringify({ v: 1, t: "elevator", id, stop }), () => {});
+    },
+    teleport(x, y, z, yaw = 0) {
+      return sendOwned(JSON.stringify({ v: 1, t: "teleport", x, y, z, yaw }), () => {});
     },
     fire(yaw = aimYaw, pitch = 0) {
       const seq = fireSeq;

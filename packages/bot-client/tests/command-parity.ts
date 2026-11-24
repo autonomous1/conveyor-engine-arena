@@ -11,7 +11,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { connectBot } from "../src/connection.ts";
 import { openNodeSocket } from "../src/node-socket.ts";
-import { createCommandHost, parseCommand, type CommandResult, type CommandStatus } from "../src/commands.ts";
+import { createCommandHost, parseCommand, type CommandResult, type CommandStatus } from "./commands-prototype.ts";
 
 const args = new Map<string, string>();
 const argv = process.argv.slice(2);

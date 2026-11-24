@@ -1,0 +1,499 @@
+{
+  "_comment": "Task 158 trial table. One object per trial; the harness reads it and hardcodes no command behaviour beyond these fields. `title` is the menu label shared by --list and the ask-user question. Constants verified in command-parity.ts (the 140 matrix) and the 146 spawn probe.",
+  "constants": {
+    "spawnPad": {
+      "x": -6.848,
+      "z": 2.307
+    },
+    "EAST": {
+      "x": -13.9,
+      "z": 16.5
+    },
+    "KEY": {
+      "x": -7.1,
+      "z": 27.6
+    },
+    "HALL": "brutalist-building-1-cbake.floor-1.hall",
+    "HALL0": "brutalist-building-1-cbake-0.floor-1.hall"
+  },
+  "trials": [
+    {
+      "id": "arm-1",
+      "name": "arm",
+      "args": {},
+      "moving": true,
+      "timeoutMs": 120000,
+      "expect": {
+        "ok": [
+          true
+        ]
+      },
+      "design": [
+        {
+          "kind": "weaponNot",
+          "value": "none"
+        }
+      ],
+      "armGate": true,
+      "requires": [
+        "alien-weapon-1"
+      ],
+      "title": "arm from the pad, fresh host — run 1 of 3"
+    },
+    {
+      "id": "arm-2",
+      "name": "arm",
+      "args": {},
+      "moving": true,
+      "timeoutMs": 120000,
+      "expect": {
+        "ok": [
+          true
+        ]
+      },
+      "design": [
+        {
+          "kind": "weaponNot",
+          "value": "none"
+        }
+      ],
+      "armGate": true,
+      "requires": [
+        "alien-weapon-1"
+      ],
+      "title": "arm from the pad, fresh host — run 2 of 3"
+    },
+    {
+      "id": "arm-3",
+      "name": "arm",
+      "args": {},
+      "moving": true,
+      "timeoutMs": 120000,
+      "expect": {
+        "ok": [
+          true
+        ]
+      },
+      "design": [
+        {
+          "kind": "weaponNot",
+          "value": "none"
+        }
+      ],
+      "armGate": true,
+      "requires": [
+        "alien-weapon-1"
+      ],
+      "title": "arm from the pad, fresh host — run 3 of 3"
+    },
+    {
+      "id": "goto",
+      "name": "goto",
+      "args": {
+        "place": "brutalist-building-1-cbake.floor-1.hall"
+      },
+      "pre": [
+        {
+          "name": "walk",
+          "args": {
+            "points": [
+              {
+                "x": -13.9,
+                "z": 16.5
+              },
+              {
+                "x": -7.1,
+                "z": 27.6
+              }
+            ]
+          }
+        },
+        {
+          "name": "getkey",
+          "args": {}
+        }
+      ],
+      "moving": true,
+      "timeoutMs": 180000,
+      "expect": {
+        "ok": [
+          true
+        ]
+      },
+      "design": [
+        {
+          "kind": "place",
+          "place": "brutalist-building-1-cbake.floor-1.hall"
+        }
+      ],
+      "requires": [
+        "key"
+      ],
+      "title": "goto the hall, key pre-acquired"
+    },
+    {
+      "id": "stand",
+      "name": "stand",
+      "args": {
+        "x": -13.9,
+        "y": 0,
+        "z": 16.5
+      },
+      "moving": true,
+      "timeoutMs": 120000,
+      "expect": {
+        "ok": [
+          true
+        ]
+      },
+      "design": [
+        {
+          "kind": "dist",
+          "point": "EAST",
+          "max": 0.75
+        }
+      ],
+      "progress": true,
+      "title": "stand at EAST"
+    },
+    {
+      "id": "path",
+      "name": "path",
+      "args": {
+        "x": -13.9,
+        "y": 0,
+        "z": 16.5
+      },
+      "moving": true,
+      "timeoutMs": 120000,
+      "expect": {
+        "ok": [
+          true
+        ]
+      },
+      "design": [
+        {
+          "kind": "dist",
+          "point": "EAST",
+          "max": 0.75
+        }
+      ],
+      "progress": true,
+      "title": "path to EAST (149's first live run)"
+    },
+    {
+      "id": "walk",
+      "name": "walk",
+      "args": {
+        "points": [
+          {
+            "x": -13.9,
+            "z": 16.5
+          },
+          {
+            "x": -7.1,
+            "z": 27.6
+          }
+        ]
+      },
+      "moving": true,
+      "timeoutMs": 150000,
+      "expect": {
+        "ok": [
+          true
+        ]
+      },
+      "design": [
+        {
+          "kind": "dist",
+          "point": "KEY",
+          "max": 0.75
+        }
+      ],
+      "title": "walk EAST → KEY"
+    },
+    {
+      "id": "reload",
+      "name": "reload",
+      "args": {},
+      "pre": [
+        {
+          "name": "arm",
+          "args": {}
+        }
+      ],
+      "moving": true,
+      "timeoutMs": 150000,
+      "expect": {
+        "ok": [
+          true
+        ]
+      },
+      "design": [
+        {
+          "kind": "dataGte",
+          "field": "ammo",
+          "min": 1
+        },
+        {
+          "kind": "dataHas",
+          "field": "crate"
+        }
+      ],
+      "requires": [
+        "alien-weapon-1"
+      ],
+      "title": "arm, then reload"
+    },
+    {
+      "id": "hunt",
+      "name": "hunt",
+      "args": {
+        "minutes": 0.5
+      },
+      "pre": [
+        {
+          "name": "arm",
+          "args": {}
+        },
+        {
+          "name": "reload",
+          "args": {}
+        }
+      ],
+      "moving": false,
+      "timeoutMs": 240000,
+      "expect": {
+        "ok": [
+          true
+        ]
+      },
+      "design": [
+        {
+          "kind": "dataGte",
+          "field": "kills",
+          "min": 1
+        }
+      ],
+      "allowDeath": false,
+      "requires": [
+        "alien-weapon-1"
+      ],
+      "title": "arm + reload, hunt 0.5 min"
+    },
+    {
+      "id": "patrol",
+      "name": "patrol",
+      "args": {
+        "places": [
+          "brutalist-building-1-cbake.floor-1.hall",
+          "brutalist-building-1-cbake-0.floor-1.hall"
+        ],
+        "minutes": 1
+      },
+      "pre": [
+        {
+          "name": "walk",
+          "args": {
+            "points": [
+              {
+                "x": -13.9,
+                "z": 16.5
+              },
+              {
+                "x": -7.1,
+                "z": 27.6
+              }
+            ]
+          }
+        },
+        {
+          "name": "getkey",
+          "args": {}
+        }
+      ],
+      "moving": false,
+      "timeoutMs": 240000,
+      "expect": {
+        "ok": [
+          true
+        ]
+      },
+      "design": [
+        {
+          "kind": "dataContainsAll",
+          "field": "places",
+          "values": [
+            "brutalist-building-1-cbake.floor-1.hall",
+            "brutalist-building-1-cbake-0.floor-1.hall"
+          ]
+        }
+      ],
+      "requires": [
+        "key"
+      ],
+      "title": "key, then patrol HALL → HALL0"
+    },
+    {
+      "id": "retrieve",
+      "name": "retrieve",
+      "args": {
+        "pickup": "@outside-ammo"
+      },
+      "moving": true,
+      "timeoutMs": 120000,
+      "expect": {
+        "ok": [
+          true
+        ]
+      },
+      "design": [
+        {
+          "kind": "goneOrHeld",
+          "pickup": "@outside-ammo"
+        }
+      ],
+      "title": "retrieve @outside-ammo"
+    },
+    {
+      "id": "getkey",
+      "name": "getkey",
+      "args": {},
+      "pre": [
+        {
+          "name": "walk",
+          "args": {
+            "points": [
+              {
+                "x": -13.9,
+                "z": 16.5
+              },
+              {
+                "x": -7.1,
+                "z": 27.6
+              }
+            ]
+          }
+        }
+      ],
+      "moving": true,
+      "timeoutMs": 90000,
+      "expect": {
+        "ok": [
+          true
+        ]
+      },
+      "design": [
+        {
+          "kind": "keysContains",
+          "value": "key"
+        }
+      ],
+      "requires": [
+        "key"
+      ],
+      "title": "collect the key"
+    },
+    {
+      "id": "projectile",
+      "name": "projectile",
+      "args": {
+        "bands": [
+          5
+        ],
+        "throws": 1,
+        "seconds": 20
+      },
+      "moving": false,
+      "timeoutMs": 90000,
+      "expect": {
+        "ok": [
+          true
+        ]
+      },
+      "design": [
+        {
+          "kind": "artifactRows",
+          "min": 1
+        }
+      ],
+      "allowDeath": true,
+      "title": "grenade, band 5, one throw"
+    },
+    {
+      "id": "abort",
+      "name": "hunt",
+      "args": {
+        "minutes": 0.5
+      },
+      "pre": [
+        {
+          "name": "arm",
+          "args": {}
+        },
+        {
+          "name": "reload",
+          "args": {}
+        }
+      ],
+      "abortAtMs": 3000,
+      "moving": false,
+      "timeoutMs": 60000,
+      "expect": {
+        "ok": [
+          false
+        ],
+        "code": [
+          4
+        ],
+        "why": [
+          "aborted"
+        ]
+      },
+      "design": [
+        {
+          "kind": "statusTaskNull"
+        }
+      ],
+      "requires": [
+        "alien-weapon-1"
+      ],
+      "abortWithinMs": 5000,
+      "title": "hunt, abort at 3 s"
+    },
+    {
+      "id": "n01-plan",
+      "name": "goto",
+      "args": {
+        "place": "no-such-place-158"
+      },
+      "moving": true,
+      "timeoutMs": 60000,
+      "expect": {
+        "ok": [
+          false
+        ],
+        "whyPrefix": [
+          "no-plan:"
+        ]
+      },
+      "negative": "plan",
+      "title": "control: goto a place that does not exist — must fail"
+    },
+    {
+      "id": "n02-wall",
+      "name": "stand",
+      "argsFrom": "wallBox",
+      "moving": true,
+      "timeoutMs": 60000,
+      "expect": {
+        "ok": [
+          false
+        ]
+      },
+      "negative": "stallOrPen",
+      "progress": true,
+      "title": "control: stand inside a wall — must fail"
+    }
+  ]
+}

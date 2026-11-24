@@ -620,7 +620,10 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
   };
 
   const worldState = (): WorldState => {
-    const state: Record<string, Fact> = { ...buildWorldState(snapshot(false)) };
+    // `at` is where the pawn is while an action moves; the door token is only
+    // for the moment an action ended on that spot. A stale token is 20 m and
+    // ~100 ms wrong, and a safety replan cannot afford it (162).
+    const state: Record<string, Fact> = { ...buildWorldState(snapshot(exec?.moving === true)) };
     const self = session.world.self();
     if (stand && resolvedStand && self && Math.hypot(self.x - resolvedStand.x, self.z - resolvedStand.z) <= STAND_TOLERANCE &&
         Math.abs(self.y - resolvedStand.y) <= STAND_GOAL_Y &&
@@ -1126,6 +1129,16 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
       log("plan start");
       const planStarted = Date.now();
       plan = chooseGoal(state, [goal], actions, groundedCtx, planOpts);
+      // A periodic replan gets 250 ms; if that is not enough for a state that
+      // exists, retry once at the cold budget before declaring `unsatisfiable`
+      // (136).
+      if (!plan && reason === "safety") {
+        plan = chooseGoal(state, [goal], actions, groundedCtx, {
+          ...planOpts,
+          deadlineMs: Math.min(deadline, Date.now() + COLD_PLAN_BUDGET_MS),
+          now: () => Date.now(),
+        });
+      }
       const planMs = Date.now() - planStarted;
       log(`plan done ${planMs}ms steps=${plan?.steps.length ?? 0} expanded=${plan?.expanded ?? 0}`);
       exec = undefined;
