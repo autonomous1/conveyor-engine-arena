@@ -26,3 +26,17 @@ npm run probe -- --tree proto command-suite.ts --test patrol --port 4175
 
 `probe/tree.ts` is the self-check: it prints the resolved `connection.ts` URL and
 exits non-zero if the wrong tree loaded.
+
+## Ad-hoc coordinate (task 168)
+
+`--goto-at x,y,z` runs **one** ad-hoc coordinate through 167's `gotoAt` command
+on the suite's own fresh host, without a trial-table row and without a menu
+entry. Three comma-separated finite numbers are required; `y` is parsed, logged
+(`MENU choice=goto-at … y_ignored=1`), and then ignored — the handler plans
+`stand:x,<pawn y>,z`, so the pawn's own floor always supplies the height. The
+trial asserts arrival within 0.75 m of the given `x,z`, with the usual 250 ms
+trace and row. Artifacts are named `168-goto-at-<x>_<z>-<stamp>.{log,ndjson,
+trace.ndjson,summary.md}` unless `--label` overrides the base. Exit: 0 PASS/WARN,
+1 FAIL, 2 cannot start / bad arguments / bad mode / SKIP (including any
+`--goto-at` with `--test` or `--suite`). The trial table and `--list` are
+unchanged by the flag.

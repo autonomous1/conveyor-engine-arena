@@ -17,6 +17,10 @@
 //     node --import ./scripts/ts-ext-register.mjs packages/bot-client/probe/command-suite.ts \
 //     --port 4175 --passes 3 --negatives --label 158-suite --name s158
 //
+// Ad-hoc point (task 168): `--goto-at x,y,z` dispatches 167's `gotoAt` for one
+// coordinate; `y` is parsed and ignored (the pawn's own floor supplies it), the
+// trial table is untouched, and the artifacts are named `168-goto-at-…`.
+//
 // Iteration: `--only arm-1 --passes 1 --no-build`.
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -25,7 +29,8 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { connectBot, type BotSession } from "../src/connection.ts";
 import { openNodeSocket } from "../src/node-socket.ts";
-import { createCommandHost, type CommandHost, type CommandResult } from "./commands-prototype.ts";
+import { loadSurface, type SurfaceModule } from "./surface.ts";
+import type { CommandHost, CommandResult } from "./commands-prototype.ts";
 import { capsuleOverlapsAabb } from "../../../src/shared/pickups.ts";
 
 // --- argv -----------------------------------------------------------------
@@ -41,36 +46,53 @@ for (let i = 0; i < argv.length; i += 1) {
     i += 1;
   }
 }
-const MODE: "list" | "test" | "suite" | "none" =
-  args.has("list") ? "list" : args.has("test") ? "test" : args.has("suite") ? "suite" : "none";
+/** `--goto-at x,y,z`: one ad-hoc coordinate; y is parsed and ignored. */
+const GOTO_AT = args.get("goto-at") ?? "";
+/** The artifact base names the point by x,z: y is not part of the coordinate. */
+const GOTO_AT_BASE = ((): string => {
+  const parts = GOTO_AT.split(",");
+  const xz = parts.length === 3 ? `${parts[0]}_${parts[2]}` : GOTO_AT;
+  return xz.replace(/[^0-9a-z.-]/gi, "_");
+})();
+const MODE: "list" | "test" | "goto" | "suite" | "none" =
+  args.has("list") ? "list" : args.has("test") ? "test" : GOTO_AT.length > 0 ? "goto" : args.has("suite") ? "suite" : "none";
 const TEST_ID = args.get("test") ?? "";
-/** `--attach ws://…`: use the operator's running host; never spawn or kill one. */
-const ATTACH = args.get("attach") ?? "";
+/**
+ * `--attach ws://…`: use the operator's running host; never spawn or kill one.
+ * `--port` also adopts an already-answering listener (see `main`): the operator
+ * started it, so the suite uses it and never builds, spawns, or kills it.
+ */
+let ATTACH = args.get("attach") ?? "";
 const PORT = Number(args.get("port") ?? 4175);
 const PASSES = Number(args.get("passes") ?? 3);
 /** Wall-clock cap for a suite (a full fresh-host run is ~15 min; a stall must not burn hours). */
 const MAX_MIN = Number(args.get("max-min") ?? 16);
 const NAME = args.get("name") ?? "s158";
-const BUILD = args.get("build") === "1" ? true : args.get("build") === "0" || args.has("no-build") || ATTACH.length > 0 ? false : true;
+let BUILD = args.get("build") === "1" ? true : args.get("build") === "0" || args.has("no-build") || ATTACH.length > 0 ? false : true;
 const ROOT = process.cwd();
 const TRIALS_FILE = "packages/bot-client/probe/command-suite.trials.json";
 const STAMP = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
 const LOG_DIR = "plan/dsh-tasks/logs";
-const SURFACE_REL = "packages/bot-client/probe/commands-prototype.ts";
 /** Each mode owns its artifact basename so one test never overwrites another. */
 const LABEL = args.get("label");
+/** `--surface proto|probe`: the command module the suite dispatches (default probe). */
+const SURFACE_NAME = args.get("surface") ?? "probe";
+/** The selected command module; `main` assigns it before any trial runs. */
+let selectedSurface: SurfaceModule | undefined;
 const BASE = LABEL
   ? `${LABEL}-${STAMP}`
-  : MODE === "test" ? `158-test-${TEST_ID}-${STAMP}` : MODE === "list" ? `158-list-${STAMP}` : `158-suite-${STAMP}`;
+  : MODE === "test" ? `158-test-${TEST_ID}-${STAMP}`
+  : MODE === "goto" ? `168-goto-at-${GOTO_AT_BASE}-${STAMP}`
+  : MODE === "list" ? `158-list-${STAMP}` : `158-suite-${STAMP}`;
 const LOG = `${LOG_DIR}/${BASE}.log`;
 const NDJSON = `${LOG_DIR}/${BASE}.ndjson`;
 const TRACE = `${LOG_DIR}/${BASE}.trace.ndjson`;
 const SUMMARY = `${LOG_DIR}/${BASE}.summary.md`;
 const USAGE =
-  "usage: command-suite.ts --list | --test <id> | --suite [--port n] [--no-build]\n" +
-  "  one test = one process: one host, one bot, one verdict; --suite = 3 passes of the 14 positives + both controls";
+  "usage: command-suite.ts --list | --test <id> | --goto-at x,y,z | --suite [--port n] [--no-build] [--surface proto|probe]\n" +
+  "  one test = one process: one host, one bot, one verdict; --goto-at = one ad-hoc coordinate (y parsed and ignored); --suite = 3 passes of the 15 positives + both controls; --surface = the command module (default probe)";
 /** Per-trial host log so one trial never overwrites another's host output. */
-const hostLogPath = (tag: string): string => `${LOG_DIR}/158-host-${tag.replace(/[/#]/g, "-")}-${STAMP}.log`;
+const hostLogPath = (tag: string): string => `${LOG_DIR}/${MODE === "goto" ? "168" : "158"}-host-${tag.replace(/[/#]/g, "-")}-${STAMP}.log`;
 const SAMPLE_MS = 250;
 /** A precondition is a normal dispatch, but the suite cannot spend 180 s on a hang. */
 const PRE_TIMEOUT_MS = Number(args.get("pre-timeout") ?? 90_000);
@@ -109,7 +131,7 @@ type DesignCheck =
   | { kind: "weaponNot"; value: string }
   | { kind: "keysContains"; value: string }
   | { kind: "place"; place: string }
-  | { kind: "dist"; point: string; max: number }
+  | { kind: "dist"; point?: string; at?: Point; max: number }
   | { kind: "dataGte"; field: string; min: number }
   | { kind: "dataContainsAll"; field: string; values: string[] }
   | { kind: "dataHas"; field: string }
@@ -207,8 +229,12 @@ function trackSocket(url: string): ReturnType<typeof openNodeSocket> {
     const at = text.indexOf("{");
     if (at < 0) return;
     try {
-      const msg = JSON.parse(text.slice(at)) as { type?: string; t?: string; envelope?: { seq?: number } };
+      const msg = JSON.parse(text.slice(at)) as { type?: string; t?: string; code?: unknown; category?: unknown; reason?: unknown; envelope?: { seq?: number } };
       sock.lastFrame = typeof msg.type === "string" ? msg.type : typeof msg.t === "string" ? msg.t : "";
+      if (msg.type === "error" || msg.type === "reject") {
+        // The client closes on these without logging them; keep the host's reason.
+        record(`SOCKET frame type=${msg.type} code=${String(msg.code ?? "-")} category=${String(msg.category ?? "-")} reason=${String(msg.reason ?? "-")}`);
+      }
       if (msg.type === "snapshot" && typeof msg.envelope?.seq === "number") sock.lastSeq = msg.envelope.seq;
     } catch {
       // not JSON: an arena text frame we do not need here
@@ -600,7 +626,7 @@ async function oneTrial(pass: number, def: TrialDef, attempt: number, shared?: B
     }
     if (def.argsFrom === "wallBox" && resolved.wallBox === undefined) return invalid("no wall box");
 
-    hostRef = createCommandHost({
+    hostRef = selectedSurface!.createCommandHost({
       session,
       log: (line) => {
         trialLines.push(line);
@@ -999,10 +1025,10 @@ function evalDesignChecks(checks: DesignCheck[], ctx: DesignCtx): string[] {
         if ((after.place as string | undefined) !== c.place) out.push(`place=${String(after.place)} != ${c.place}`);
         break;
       case "dist": {
-        const point = (C as unknown as Record<string, Point>)[c.point];
-        if (!point || !pos) { out.push(`dist-${c.point}=no-pos`); break; }
+        const point = c.at ?? (c.point ? (C as unknown as Record<string, Point>)[c.point] : undefined);
+        if (!point || !pos) { out.push(`dist-${c.point ?? "adhoc"}=no-pos`); break; }
         const d = Math.hypot(pos[0] - point.x, pos[2] - point.z);
-        if (d > c.max) out.push(`dist-${c.point}=${round2(d)}>${c.max}`);
+        if (d > c.max) out.push(`dist-${c.point ?? "adhoc"}=${round2(d)}>${c.max}`);
         break;
       }
       case "dataGte": {
@@ -1056,42 +1082,83 @@ async function main(): Promise<void> {
     process.exit(2);
   }
   mkdirSync(LOG_DIR, { recursive: true });
+  // Validate the surface name before `--list` too: a bad flag never gets to
+  // print a menu and exit 0.
+  if (SURFACE_NAME !== "proto" && SURFACE_NAME !== "probe") {
+    console.error(USAGE);
+    abortSuite(2, `unknown surface: ${SURFACE_NAME} (proto|probe)`);
+  }
   if (MODE === "list") {
     printMenu();
     process.exit(0);
   }
   if (MODE === "test" && !TEST_ID) abortSuite(2, "--test needs a test id");
   if (MODE === "test" && !TRIALS.some((t) => t.id === TEST_ID)) abortSuite(2, `unknown test id: ${TEST_ID} (see --list)`);
+  // `--goto-at` is one ad-hoc trial: it owns no table row and no menu entry.
+  // The guard tests GOTO_AT itself, not MODE: `--test` outranks `--goto-at` in
+  // the mode order, so a MODE === "goto" check would miss the conflict.
+  if (GOTO_AT.length > 0 && (args.has("test") || args.has("suite"))) {
+    console.error(USAGE);
+    abortSuite(2, "--goto-at is one trial; it conflicts with --test/--suite");
+  }
+  let gx = Number.NaN;
+  let gy = Number.NaN;
+  let gz = Number.NaN;
+  if (MODE === "goto") {
+    const parts = GOTO_AT.split(",");
+    if (parts.length !== 3 || parts.some((p) => p.trim() === "")) {
+      console.error(USAGE);
+      abortSuite(2, "--goto-at needs x,y,z (three numbers; y is ignored)");
+    }
+    [gx, gy, gz] = parts.map(Number) as [number, number, number];
+    if (![gx, gy, gz].every(Number.isFinite)) {
+      console.error(USAGE);
+      abortSuite(2, "--goto-at needs x,y,z (three numbers; y is ignored)");
+    }
+  }
   if (!existsSync("package.json") || !existsSync(TRIALS_FILE)) abortSuite(2, "not the repo root");
-  if (!existsSync(SURFACE_REL)) abortSuite(2, `surface missing: ${SURFACE_REL}`);
-  // Surface guard (D16): the subject must be the prototype, never src/commands.ts.
-  const surfaceHash = sha256File(SURFACE_REL);
+  // Load the selected command module lazily; the menu never needs it and the
+  // module is a flag choice, independent of the plumbing tree.
+  const { path: surfacePath, mod: surfaceMod } = await loadSurface(SURFACE_NAME);
+  selectedSurface = surfaceMod;
+  if (!existsSync(surfacePath)) abortSuite(2, `surface missing: ${surfacePath}`);
+  // Surface guard (D16): the harness must never import src/commands.ts.
+  const surfaceHash = sha256File(surfacePath);
   const ownSrc = readFileSync("packages/bot-client/probe/command-suite.ts", "utf8");
   if (/from\s+["']\.\.\/src\/commands\.ts["']/.test(ownSrc)) abortSuite(2, "surface guard: this harness imports src/commands.ts");
-  record(`MENU choice=${MODE === "test" ? TEST_ID : "suite"} mode=${MODE} command="${process.argv.slice(2).join(" ")}"`);
-  record(`SURFACE file=${SURFACE_REL} sha256=${surfaceHash}`);
+  if (MODE === "goto") {
+    record(`MENU choice=goto-at mode=goto x=${gx} y=${gy} z=${gz} y_ignored=1 command="${process.argv.slice(2).join(" ")}"`);
+  } else {
+    record(`MENU choice=${MODE === "test" ? TEST_ID : "suite"} mode=${MODE} command="${process.argv.slice(2).join(" ")}"`);
+  }
+  record(`SURFACE file=${surfacePath} sha256=${surfaceHash} surface=${SURFACE_NAME}`);
+  if (!ATTACH) {
+    if (await portAnswers(PORT)) {
+      // The operator runs this host: adopt it, never build, spawn, or kill it.
+      ATTACH = URL;
+      BUILD = false;
+      record(`HOST adopt port=${PORT} url=${URL} (already answering; not spawned or killed)`);
+    } else {
+      if (process.env.ARENA_AUTH !== "required") abortSuite(2, "ARENA_AUTH !== required");
+      if (!VERIFY_KEY || !existsSync(VERIFY_KEY.replace(/^~\//, `${homedir()}/`))) abortSuite(2, `ARENA_VERIFY_KEY_FILE missing: ${VERIFY_KEY}`);
+    }
+  }
   record(ATTACH ? `HOST attach url=${ATTACH} owner=operator (suite does not spawn or kill it)` : `HOST mode=spawn port=${PORT}`);
   record(`SUITE trials=${TRIALS.length} hash=${TRIALS_HASH.slice(0, 12)} node=${process.version}`);
 
-  if (!ATTACH) {
-    if (process.env.ARENA_AUTH !== "required") abortSuite(2, "ARENA_AUTH !== required");
-    if (!VERIFY_KEY || !existsSync(VERIFY_KEY.replace(/^~\//, `${homedir()}/`))) abortSuite(2, `ARENA_VERIFY_KEY_FILE missing: ${VERIFY_KEY}`);
-    if (await portAnswers(PORT)) abortSuite(2, `port ${PORT} is already answering — refusing to adopt a foreign listener`);
-  }
-
   const id = buildIdentity();
-  if (!existsSync("dist/server/main.js")) abortSuite(2, "no dist/server/main.js after the build");
+  if (!ATTACH && !existsSync("dist/server/main.js")) abortSuite(2, "no dist/server/main.js after the build");
   record(`BUILD head=${id.head.slice(0, 12)} dist=${id.dist} server=${id.server} dirty=[${id.status.split("\n").filter(Boolean).join(" | ")}]`);
   const buildBlock = [
-    `# 158 ${MODE} run ${STAMP}`,
+    `# ${LABEL ?? (MODE === "goto" ? "168" : "158")} ${MODE} run ${STAMP}`,
     "",
     `- head: \`${id.head}\``,
     `- dirty: \`${id.status.split("\n").filter(Boolean).join("; ") || "clean"}\``,
     `- dist/server/main.js: \`${id.dist}\``,
     `- bot bundle: \`${id.bot}\``,
     `- trials: \`${TRIALS_FILE}\` sha256 \`${TRIALS_HASH}\``,
-    `- surface: \`${SURFACE_REL}\` sha256 \`${surfaceHash}\``,
-    `- mode: ${MODE}${MODE === "test" ? ` test: ${TEST_ID}` : ` passes: ${PASSES}`}; host: ${ATTACH ? `attached ${ATTACH}` : `spawned port ${PORT}`}; auth: required; token role: qa; samples: ${SAMPLE_MS}ms`,
+    `- surface: \`${surfacePath}\` sha256 \`${surfaceHash}\` surface \`${SURFACE_NAME}\``,
+    `- mode: ${MODE}${MODE === "test" ? ` test: ${TEST_ID}` : MODE === "goto" ? ` goto-at: ${GOTO_AT}` : ` passes: ${PASSES}`}; host: ${ATTACH ? `attached ${ATTACH}` : `spawned port ${PORT}`}; auth: required; token role: qa; samples: ${SAMPLE_MS}ms`,
     "",
   ].join("\n");
 
@@ -1131,6 +1198,51 @@ async function main(): Promise<void> {
   const allRows: TrialRow[] = [];
   const runs: Array<Record<string, unknown>> = [];
   const startedAll = Date.now();
+
+  // --- one ad-hoc coordinate: one host, one bot, one verdict ---------------
+  if (MODE === "goto") {
+    const adhoc: TrialDef = {
+      id: "goto-at",
+      title: `goto an ad-hoc x,z point (${gx},${gz}; y ${gy} ignored)`,
+      name: "gotoAt",
+      args: { x: gx, z: gz },
+      moving: true,
+      timeoutMs: 120_000,
+      expect: { ok: [true] },
+      design: [{ kind: "dist", at: { x: gx, z: gz }, max: 0.75 }],
+      progress: true,
+    };
+    let outcome = await oneTrial(1, adhoc, 0);
+    if (outcome.verdict === "INVALID") {
+      record(`RETRY trial=${adhoc.id} reason=${outcome.reasons.join(";")}`);
+      const retry = await oneTrial(1, adhoc, 1);
+      allRows.push(outcome.row);
+      appendFileSync(NDJSON, `${JSON.stringify(outcome.row)}\n`);
+      outcome = retry;
+    }
+    allRows.push(outcome.row);
+    appendFileSync(NDJSON, `${JSON.stringify(outcome.row)}\n`);
+    record(`VERDICT trial=${adhoc.id} ${outcome.verdict} reasons=[${outcome.reasons.join(",")}]`);
+    const skipped = outcome.verdict === "SKIP";
+    const passed = !skipped && (outcome.verdict === "PASS" || outcome.verdict === "WARN");
+    const code = skipped ? 2 : passed ? 0 : 1;
+    const tally = {
+      positives: 1,
+      pPass: outcome.verdict === "PASS" ? 1 : 0,
+      pFail: outcome.verdict === "FAIL" ? 1 : 0,
+      pWarn: outcome.verdict === "WARN" ? 1 : 0,
+      pInvalid: outcome.verdict === "INVALID" ? 1 : 0,
+      skips: skipped ? 1 : 0,
+      controls: 0,
+      controlsTripped: 0,
+      code,
+    };
+    runs.push({ pass: 1, start: new Date(startedAll).toISOString(), elapsed_s: round2((Date.now() - startedAll) / 1000), trials: skipped ? 0 : 1, pass_n: tally.pPass, fail: tally.pFail, warn: tally.pWarn, invalid: tally.pInvalid, skip: tally.skips });
+    writeOut(SUMMARY, buildBlock + "\n" + summaryMarkdown(id, allRows, runs, tally));
+    record(`SUITE mode=goto trial=goto-at x=${gx} z=${gz} y_ignored=1 exit=${code}`);
+    record(`SUITE elapsed=${round2((Date.now() - startedAll) / 1000)}s summary=${SUMMARY}`);
+    process.exit(code);
+  }
 
   // --- one named test: one host, one bot, one verdict ----------------------
   if (MODE === "test") {

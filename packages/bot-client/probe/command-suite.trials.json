@@ -13,6 +13,10 @@
       "x": -7.1,
       "z": 27.6
     },
+    "OUTSIDE_POINT": {
+      "x": -11.5,
+      "z": 8.0
+    },
     "HALL": "brutalist-building-1-cbake.floor-1.hall",
     "HALL0": "brutalist-building-1-cbake-0.floor-1.hall"
   },
@@ -180,6 +184,30 @@
       ],
       "progress": true,
       "title": "path to EAST (149's first live run)"
+    },
+    {
+      "id": "goto-at",
+      "name": "gotoAt",
+      "args": {
+        "x": -11.5,
+        "z": 8.0
+      },
+      "moving": true,
+      "timeoutMs": 120000,
+      "expect": {
+        "ok": [
+          true
+        ]
+      },
+      "design": [
+        {
+          "kind": "dist",
+          "point": "OUTSIDE_POINT",
+          "max": 0.75
+        }
+      ],
+      "progress": true,
+      "title": "goto an outside x,z point"
     },
     {
       "id": "walk",

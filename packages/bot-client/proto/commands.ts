@@ -1,5 +1,5 @@
 /**
- * The bot command layer: eleven typed handlers over a connected BotSession.
+ * The bot command layer: twelve typed handlers over a connected BotSession.
  * Node-only: no CLI, no token, no filesystem.
  */
 // ARCHITECTURE: The bot's command surface: parse, dispatch, status, and the
@@ -25,8 +25,8 @@ const TASK_TIMEOUT_MS = 180_000;
 /** The packed status is capped for the host's text frame. */
 const MAX_TEXT = 256;
 
-/** The eleven handler names. `status` and `abort` are host methods, not handlers. */
-export type CommandName = "arm" | "goto" | "stand" | "path" | "walk" | "reload" | "hunt" | "patrol" | "retrieve" | "getkey" | "projectile";
+/** The twelve handler names. `status` and `abort` are host methods, not handlers. */
+export type CommandName = "arm" | "goto" | "stand" | "path" | "gotoAt" | "walk" | "reload" | "hunt" | "patrol" | "retrieve" | "getkey" | "projectile";
 
 /**
  * Command Args type: the normalized arguments of each handler.
@@ -36,6 +36,7 @@ export type CommandArgs = {
   goto: { place: string };
   stand: { x: number; y: number; z: number; yaw?: number };
   path: { x: number; y: number; z: number; yaw?: number };
+  gotoAt: { x: number; z: number };
   walk: { points: Array<{ x: number; z: number }> };
   reload: { crate?: string };
   hunt: { minutes: number; weapon: "laser" };
@@ -119,7 +120,7 @@ export type CommandHost = {
 
 /**
  * Parse and validate one command.
- * @post The eleven handler names return a normalized `Command`; an unknown name
+ * @post The twelve handler names return a normalized `Command`; an unknown name
  *       returns `{error:"unknown-task"}`; bad arguments return the handler's
  *       own string (`bad-args`/`unsupported-weapon`).
  */
@@ -152,6 +153,12 @@ export function parseCommand(raw: { name: string; args?: Record<string, unknown>
       const yaw = a.yaw === undefined ? undefined : Number(a.yaw);
       if (a.yaw !== undefined && !Number.isFinite(yaw)) return { error: "bad-args" };
       return { name: "path", x, y, z, ...(yaw !== undefined ? { yaw } : {}) };
+    }
+    case "gotoAt": {
+      const x = Number(a.x);
+      const z = Number(a.z);
+      if (!Number.isFinite(x) || !Number.isFinite(z)) return { error: "bad-args" };
+      return { name: "gotoAt", x, z };
     }
     case "walk": {
       const rawPoints = Array.isArray(a.points)
@@ -478,6 +485,46 @@ const pathHandler = async (a: Record<string, unknown>): Promise<CommandResult> =
   const done = world.self();
   record(`PATH ${result.ok ? "done" : "fail"} why=${result.ok ? "-" : result.why} at=${done ? `${done.x.toFixed(2)},${done.y.toFixed(2)},${done.z.toFixed(2)}` : "?"}`);
   return result.ok ? { ...result, data: { x, y, z, ...(yawArg !== undefined ? { yaw: yawArg } : {}) } } : result;
+};
+
+// Task 167: a bare x,z point. The caller gives two numbers; the pawn's own
+// floor supplies y, so the mission is the `path`-shaped `stand:` goal.
+const gotoAtHandler = async (a: Record<string, unknown>): Promise<CommandResult> => {
+  const x = Number(a.x);
+  const z = Number(a.z);
+  if (!Number.isFinite(x) || !Number.isFinite(z)) return { ok: false, code: 1, why: "bad-args" };
+  const me = world.self();
+  if (!me) return { ok: false, code: 1, why: "no-self" };
+  const y = me.y;
+  if (abortRequested) return { ok: false, code: 4, why: "aborted" };
+  record(`GOTOAT start x=${x} z=${z} y=${y}`);
+  const mission = parseMission(`stand:${x},${y},${z}`);
+  if (!mission) return { ok: false, code: 1, why: "bad-args" };
+  let lastNoPlan: string | null = null;
+  try {
+    const code = await runMission(session, mission, {
+      timeoutMs: TASK_TIMEOUT_MS,
+      onTick: abortTick,
+      log: (line) => {
+        record(`  gotoAt ${line}`);
+        const m = /no plan: ([a-z-]+)/.exec(line);
+        if (m) lastNoPlan = m[1]!;
+      },
+      error: (line) => record(`  gotoAt ERROR ${line}`),
+    });
+    const at = world.self();
+    const pos = at ? `${at.x.toFixed(2)},${at.y.toFixed(2)},${at.z.toFixed(2)}` : "?";
+    const d = at ? Math.hypot(at.x - x, at.z - z) : Infinity;
+    record(`GOTOAT done at=${pos} d=${d.toFixed(2)} code=${code}`);
+    if (code === 3) record(`GOTOAT stuck at=${pos} target=${x},${z}`);
+    if (code === 2) return { ok: false, code: 2, why: `no-plan:${lastNoPlan ?? "unknown"}` };
+    if (code === 3) return { ok: false, code: 3, why: "timeout" };
+    if (code !== 0) return { ok: false, code, why: `code:${code}` };
+    return { ok: true, code: 0, data: { x, z, y, d } };
+  } catch (err) {
+    if (err instanceof AbortMission) return { ok: false, code: 4, why: "aborted" };
+    return { ok: false, code: 1, why: `error:${err instanceof Error ? err.message : String(err)}` };
+  }
 };
 
 const RELOAD_TIMEOUT_MS = 90_000;
@@ -1502,6 +1549,7 @@ const HANDLERS: Record<string, (a: Record<string, unknown>) => Promise<CommandRe
   goto: gotoHandler,
   stand: standHandler,
   path: pathHandler,
+  gotoAt: gotoAtHandler,
   walk: walkHandler,
   reload: reloadHandler,
   hunt: huntHandler,
