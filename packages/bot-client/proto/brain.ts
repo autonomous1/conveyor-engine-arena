@@ -261,6 +261,30 @@ function planPursuit(
 }
 
 /**
+ * Plan a walk to one point and return its points/grid for `createFollower`.
+ * @why Task 177: the retreat picks one escape/cover point and walks it once;
+ *      this is `planPursuit`'s `planPath` → `createFollower` shape without the
+ *      interception prediction.
+ */
+function planToPoint(
+  session: BotSession,
+  pose: Pose,
+  point: { x: number; z: number; y?: number },
+  cache: ReturnType<typeof createNavCache>,
+): { points: Triple[]; grid: Grid } | undefined {
+  const graph = session.world.sceneGraph();
+  if (!graph) return undefined;
+  const plan = planPath(graph, pose, { x: point.x, y: point.y ?? pose.y, z: point.z }, doorGate(session), {
+    view: navView(session, new Set()),
+    cache,
+    regions: bakedRegions(session),
+  });
+  if (!plan.ok) return undefined;
+  const points = plan.points.map(triple);
+  return { points, grid: gridFor(session, graph, points, new Set(), placeY(graph, pose)) };
+}
+
+/**
  * Shoot a named pawn until its health frame says dead, it disappears, the bot
  * runs out of ammo or dies, or the deadline passes.
  * @post Returns 0 on dead, 2 on refused/lost/no_ammo/died/no_dag/retreat, 3 on
@@ -318,10 +342,12 @@ export async function runAttack(session: BotSession, targetId: number, opts: Bra
   const STANDOFF_LOG_MS = 500;
   /** Non-player pawns within `radius` of `me`. */
   const threatsNear = (me: { x: number; z: number }, radius: number): number => {
-    const players = session.world.playerIds();
+    // Interim teams: every player is friendly, every NPC is the enemy. The
+    // future two-team model replaces this with a team id (see the report); until
+    // then a teammate must not count as a threat.
     let count = 0;
     for (const pawn of session.world.others()) {
-      if (players.has(pawn.id)) continue;
+      if (session.world.playerIds().has(pawn.id)) continue;
       if (Math.hypot(pawn.x - me.x, pawn.z - me.z) <= radius) count += 1;
     }
     return count;
@@ -330,30 +356,117 @@ export async function runAttack(session: BotSession, targetId: number, opts: Bra
    * Back away from the threat centroid (or `fallback` when none is near) until the
    * nearest threat is out of range, the retreat cap passes, or the deadline does.
    */
-  const retreatFrom = async (me: { x: number; z: number }, fallback: { x: number; z: number }, until: number): Promise<void> => {
-    const players = session.world.playerIds();
+  const retreatFrom = async (me: { x: number; y: number; z: number }, fallback: { x: number; y: number; z: number }, until: number): Promise<void> => {
+    const graph = session.world.sceneGraph();
+    const dag = graph?.spatialDag;
+    // Interim teams: the players are friendly, the NPCs are the enemy. The
+    // threat centroid, the nearest-threat exit and the cover attacker are the
+    // enemy NPCs only; a teammate never counts. The future two-team model
+    // replaces this with a team id.
     let sumX = 0;
     let sumZ = 0;
     let count = 0;
+    let nearestEnemy: { x: number; y: number; z: number } | undefined;
+    let enemyD = Infinity;
     for (const pawn of session.world.others()) {
-      if (players.has(pawn.id)) continue;
-      if (Math.hypot(pawn.x - me.x, pawn.z - me.z) > RETREAT_THREAT_M) continue;
-      sumX += pawn.x;
-      sumZ += pawn.z;
-      count += 1;
+      if (session.world.playerIds().has(pawn.id)) continue;
+      const d = Math.hypot(pawn.x - me.x, pawn.z - me.z);
+      if (d <= RETREAT_THREAT_M) {
+        sumX += pawn.x;
+        sumZ += pawn.z;
+        count += 1;
+      }
+      if (d < enemyD) {
+        enemyD = d;
+        nearestEnemy = { x: pawn.x, y: pawn.y, z: pawn.z };
+      }
     }
     const from = count > 0 ? { x: sumX / count, z: sumZ / count } : fallback;
+    const attacker = nearestEnemy ?? fallback;
     const away = Math.atan2(me.x - from.x, me.z - from.z);
+    const pose = (): Pose => {
+      const self = session.world.self();
+      return { x: self?.x ?? me.x, y: self?.y ?? me.y, z: self?.z ?? me.z, vx: 0, vz: 0, yaw: self?.yaw ?? 0 };
+    };
+    // Cover first: a spot the attacker cannot see is the retreat's real goal.
+    const cover = dag && graph
+      ? nearestCover(dag, graph, { x: me.x, y: me.y, z: me.z }, attacker, { dynamic: shutDoorBoxes(session) })
+      : undefined;
+    const candidates: Array<{ x: number; z: number; kind: "cover" | "away" }> = [];
+    if (cover) {
+      candidates.push({ x: cover.x, z: cover.z, kind: "cover" });
+      log(`attack: retreat cover attacker=${attacker.x.toFixed(2)},${attacker.z.toFixed(2)} to=${cover.x.toFixed(2)},${cover.z.toFixed(2)}`);
+    } else {
+      log("attack: retreat cover none");
+    }
+    for (const distance of [RETREAT_ESCAPE_M, 14, 10, 6]) {
+      for (const side of [0, 0.5, -0.5]) {
+        const a = away + side;
+        candidates.push({ x: me.x + Math.sin(a) * distance, z: me.z + Math.cos(a) * distance, kind: "away" });
+      }
+    }
+    interface RetreatPlan { follower: ReturnType<typeof createFollower>; point: { x: number; z: number }; kind: "cover" | "away" }
+    const cache = createNavCache();
+    const tried = new Set<string>();
+    let plan: RetreatPlan | undefined;
+    const choose = (): boolean => {
+      for (const c of candidates) {
+        const key = `${c.x.toFixed(2)},${c.z.toFixed(2)}`;
+        if (tried.has(key)) continue;
+        tried.add(key);
+        const planned = planToPoint(session, pose(), c, cache);
+        if (!planned) {
+          if (c.kind === "cover") log(`attack: retreat cover unreachable to=${c.x.toFixed(2)},${c.z.toFixed(2)}`);
+          continue;
+        }
+        plan = {
+          follower: createFollower(planned.points, planned.grid, { radius: session.world.pawnRadius }),
+          point: c,
+          kind: c.kind,
+        };
+        log(`attack: retreat plan kind=${c.kind} to=${c.x.toFixed(2)},${c.z.toFixed(2)}`);
+        return true;
+      }
+      return false;
+    };
+    if (!choose()) {
+      log("attack: retreat no-plan hold");
+      return;
+    }
+    let tick = 0;
     while (Date.now() < until) {
+      opts.onTick?.();
       const nowSelf = session.world.self();
       if (!nowSelf) return;
       let nearest = Infinity;
       for (const pawn of session.world.others()) {
-        if (players.has(pawn.id)) continue;
+        if (session.world.playerIds().has(pawn.id)) continue;
         nearest = Math.min(nearest, Math.hypot(pawn.x - nowSelf.x, pawn.z - nowSelf.z));
       }
       if (nearest > RETREAT_ESCAPE_M) return;
-      session.input.sendInput({ ...moveIntent(away, 1, 0), yaw: away });
+      const step = plan!.follower.step(pose(), otherPawns(session), ++tick);
+      session.input.sendInput(step.input);
+      if (step.status !== "running") {
+        if (step.status === "arrived" && plan!.kind === "cover") {
+          // The cover test picked the point; verify the attacker's sight line
+          // from where the bot actually stopped.
+          const eye = { x: nowSelf.x, y: nowSelf.y + EYE_HEIGHT, z: nowSelf.z };
+          const broken = dag
+            ? !hasLineOfSightDag(dag, { x: attacker.x, y: attacker.y + EYE_HEIGHT, z: attacker.z }, eye)
+            : false;
+          log(`attack: retreat cover reached los=${broken ? "no" : "yes"}`);
+          if (broken) return;
+        } else if (step.status === "arrived") {
+          return;
+        } else {
+          log("attack: retreat replan reason=stuck");
+        }
+        plan = undefined;
+        if (!choose()) {
+          log("attack: retreat no-plan hold");
+          return;
+        }
+      }
       await delay(50);
     }
   };
@@ -370,6 +483,7 @@ export async function runAttack(session: BotSession, targetId: number, opts: Bra
   let fallbackLogged = false;
   log("attack: acquire");
   while (Date.now() < deadline) {
+    opts.onTick?.();
     const now = Date.now();
     const me = session.world.self();
     if (!me) return 2;

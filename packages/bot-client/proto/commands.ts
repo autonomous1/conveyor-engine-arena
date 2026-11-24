@@ -295,6 +295,7 @@ const walkWithRecovery = async (target: { x: number; z: number }, ms: number, la
   let lastProgress = Date.now();
   let attempts = 0;
   while (Date.now() < deadline) {
+    if (abortRequested) return false;
     const me = world.self();
     if (!me) return false;
     const d = Math.hypot(me.x - target.x, me.z - target.z);
