@@ -331,6 +331,8 @@ export type InfoSession = {
   readonly hitPlace: string | undefined;
   /** The shown hit's point, or the floor point in point mode. */
   readonly hitPoint: Vec3 | undefined;
+  /** The hit's name: `metadata.name` when the subject has one, else its id. Absent on a miss or after expiry. */
+  readonly hitName: string | undefined;
   inspect(args: {
     now: number;
     origin: Vec3;
@@ -461,6 +463,11 @@ export function createInfoSession(opts: {
     },
     get hitPoint() {
       return shown?.hit?.point ?? shown?.point;
+    },
+    get hitName() {
+      if (!shown?.hit) return undefined;
+      const name = shown.hit.metadata.name;
+      return name && name.length > 0 ? name : shown.hit.id;
     },
     inspect(args) {
       const hit = pickInfoTarget(args.origin, args.direction, args.candidates, args.range ?? INFO_RANGE_M);

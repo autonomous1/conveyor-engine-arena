@@ -183,7 +183,7 @@ export function createInfoProbe(opts: {
       paint(value);
       const copied = args.point === true
         ? (session.hitPoint ? formatPoint(session.hitPoint) : undefined)
-        : (session.hitPlace ?? session.hitId);
+        : (session.hitName ?? session.hitPlace);
       if (copied) opts.copy?.(copied);
     },
     refresh(now, nextOwn, nextCabs) {

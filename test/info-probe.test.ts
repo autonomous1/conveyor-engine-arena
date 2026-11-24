@@ -325,7 +325,7 @@ test("place and you follow placeAt, including a nested room, a tall wall, and ou
   assert.match(moved, /place room/);
 });
 
-test("the info copy is the place under the hit", () => {
+test("the info copy is the object's name", () => {
   const file = placeFile();
   const session = createInfoSession({ doors: [], pickups: [] });
   session.onSceneGraph(frame(file));
@@ -334,9 +334,18 @@ test("the info copy is the place under the hit", () => {
   session.inspect({ now: 0, origin: vec(3, 5, 0), direction: vec(0, 0, 1), candidates: [wall], own });
   assert.equal(session.hitId, "wall");
   assert.equal(session.hitPlace, "room");
+  assert.equal(session.hitName, "wall");
+
+  const pawn: InfoCandidate = {
+    ...box("pawn", "8", [2.5, 0.2, 3], [3.5, 2, 3.2]),
+    metadata: { name: "Tester" },
+  };
+  session.inspect({ now: 0, origin: vec(3, 1.6, 0), direction: vec(0, 0, 1), candidates: [pawn], own });
+  assert.equal(session.hitName, "Tester");
 
   session.inspect({ now: 0, origin: vec(40, 1, 40), direction: vec(0, 0, 1), candidates: [], own });
   assert.equal(session.hitPlace, "hall");
+  assert.equal(session.hitName, undefined);
 
   session.onSceneGraph(undefined);
   assert.equal(session.hitPlace, undefined);
@@ -350,8 +359,8 @@ test("the info copy is the place under the hit", () => {
     copy: (text) => copied.push(text),
   });
   probe.onSceneGraph(frame(file));
-  const volumes = [{ id: 7, source: "wall", minX: 2.5, maxX: 3.5, minY: 0, maxY: 8, minZ: 3, maxZ: 3.2 }];
-  const look = () => probe.inspect({
+  const wallVolume = { id: 7, source: "wall", minX: 2.5, maxX: 3.5, minY: 0, maxY: 8, minZ: 3, maxZ: 3.2 };
+  const look = (volumes: readonly (typeof wallVolume)[]) => probe.inspect({
     now: 0,
     origin: vec(3, 5, 0),
     direction: vec(0, 0, 1),
@@ -362,11 +371,28 @@ test("the info copy is the place under the hit", () => {
     height: 1.8,
     own,
   });
-  look();
-  assert.deepEqual(copied, ["room"]);
+  look([wallVolume]);
+  assert.deepEqual(copied, ["wall"]);
+  // A crate's placement id is its name (the volume source becomes the id).
+  look([{ ...wallVolume, id: 9, source: "cover-crate-2-1-7" }]);
+  assert.deepEqual(copied, ["wall", "cover-crate-2-1-7"]);
+  // A miss keeps 129's own-place fallback.
+  probe.inspect({
+    now: 0,
+    origin: vec(40, 1, 40),
+    direction: vec(0, 0, 1),
+    leaves: new Map(),
+    volumes: [],
+    pawns: [],
+    radius: 0.4,
+    height: 1.8,
+    own,
+  });
+  assert.deepEqual(copied, ["wall", "cover-crate-2-1-7", "hall"]);
+  // A hit with no graph still copies the name (no place needed).
   probe.onSceneGraph(undefined);
-  look();
-  assert.deepEqual(copied, ["room", "wall"]);
+  look([wallVolume]);
+  assert.deepEqual(copied, ["wall", "cover-crate-2-1-7", "hall", "wall"]);
 });
 
 test("the point scan shows the hit point and a miss, and expires with the info line", () => {
