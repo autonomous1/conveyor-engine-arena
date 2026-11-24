@@ -27,6 +27,7 @@ import { createHash } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { createInterface } from "node:readline";
 import { connectBot, type BotSession } from "../src/connection.ts";
 import { openNodeSocket } from "../src/node-socket.ts";
 import { loadSurface, type SurfaceModule } from "./surface.ts";
@@ -54,8 +55,8 @@ const GOTO_AT_BASE = ((): string => {
   const xz = parts.length === 3 ? `${parts[0]}_${parts[2]}` : GOTO_AT;
   return xz.replace(/[^0-9a-z.-]/gi, "_");
 })();
-const MODE: "list" | "test" | "goto" | "suite" | "none" =
-  args.has("list") ? "list" : args.has("test") ? "test" : GOTO_AT.length > 0 ? "goto" : args.has("suite") ? "suite" : "none";
+const MODE: "list" | "test" | "goto" | "shell" | "suite" | "none" =
+  args.has("list") ? "list" : args.has("test") ? "test" : GOTO_AT.length > 0 ? "goto" : args.has("shell") ? "shell" : args.has("suite") ? "suite" : "none";
 const TEST_ID = args.get("test") ?? "";
 /**
  * `--attach ws://…`: use the operator's running host; never spawn or kill one.
@@ -64,6 +65,8 @@ const TEST_ID = args.get("test") ?? "";
  */
 let ATTACH = args.get("attach") ?? "";
 const PORT = Number(args.get("port") ?? 4175);
+/** `--seats n`: shell seats to open on one host (1..3). */
+const SEATS = Number(args.get("seats") ?? 1);
 const PASSES = Number(args.get("passes") ?? 3);
 /** Wall-clock cap for a suite (a full fresh-host run is ~15 min; a stall must not burn hours). */
 const MAX_MIN = Number(args.get("max-min") ?? 16);
@@ -79,18 +82,21 @@ const LABEL = args.get("label");
 const SURFACE_NAME = args.get("surface") ?? "probe";
 /** The selected command module; `main` assigns it before any trial runs. */
 let selectedSurface: SurfaceModule | undefined;
+/** The shell's shutdown hook; the process signal handlers route through it. */
+let shellShutdown: ((reason: string, code: number) => void) | undefined;
 const BASE = LABEL
   ? `${LABEL}-${STAMP}`
   : MODE === "test" ? `158-test-${TEST_ID}-${STAMP}`
   : MODE === "goto" ? `168-goto-at-${GOTO_AT_BASE}-${STAMP}`
+  : MODE === "shell" ? `171-shell-${STAMP}`
   : MODE === "list" ? `158-list-${STAMP}` : `158-suite-${STAMP}`;
 const LOG = `${LOG_DIR}/${BASE}.log`;
 const NDJSON = `${LOG_DIR}/${BASE}.ndjson`;
 const TRACE = `${LOG_DIR}/${BASE}.trace.ndjson`;
 const SUMMARY = `${LOG_DIR}/${BASE}.summary.md`;
 const USAGE =
-  "usage: command-suite.ts --list | --test <id> | --goto-at x,y,z | --suite [--port n] [--no-build] [--surface proto|probe]\n" +
-  "  one test = one process: one host, one bot, one verdict; --goto-at = one ad-hoc coordinate (y parsed and ignored); --suite = 3 passes of the 15 positives + both controls; --surface = the command module (default probe)";
+  "usage: command-suite.ts --list | --test <id> | --goto-at x,y,z | --shell [--seats 1..3] | --suite [--port n] [--no-build] [--surface proto|probe]\n" +
+  "  one test = one process: one host, one bot, one verdict; --goto-at = one ad-hoc coordinate (y parsed and ignored); --shell = held-open sessions with a bot> prompt and `<seat> <verb>` lines (help/seats/status/abort/q); --suite = 3 passes of the 15 positives + both controls; --surface = the command module (default probe)";
 /** Per-trial host log so one trial never overwrites another's host output. */
 const hostLogPath = (tag: string): string => `${LOG_DIR}/${MODE === "goto" ? "168" : "158"}-host-${tag.replace(/[/#]/g, "-")}-${STAMP}.log`;
 const SAMPLE_MS = 250;
@@ -113,6 +119,12 @@ function record(line: string): void {
   const row = `t=${secs().toFixed(1)}s ${line}`;
   lines.push(row);
   console.log(row);
+  appendFileSync(LOG, `${row}\n`);
+}
+/** File-only: the shell's handler chatter (hunt/patrol loops) stays out of the console. */
+function recordFile(line: string): void {
+  const row = `t=${secs().toFixed(1)}s ${line}`;
+  lines.push(row);
   appendFileSync(LOG, `${row}\n`);
 }
 function writeOut(path: string, body: string): void {
@@ -1066,6 +1078,97 @@ function evalDesignChecks(checks: DesignCheck[], ctx: DesignCtx): string[] {
 }
 const evalDesign = evalDesignChecks;
 
+// --- shell text parsing ---------------------------------------------------
+const SHELL_HELP = [
+  "<seat> arm",
+  "<seat> goto <place>",
+  "<seat> stand <x,y,z[,yaw]>",
+  "<seat> path <x,y,z[,yaw]>",
+  "<seat> goto-at <x,y,z>            (y parsed, ignored)",
+  "<seat> walk <x,z> [<x,z> ...]",
+  "<seat> reload [crate]",
+  "<seat> hunt [minutes]",
+  "<seat> patrol <place,place,...> [minutes]",
+  "<seat> retrieve <pickup|@outside-ammo> [@place]",
+  "<seat> getkey",
+  "<seat> projectile [bands] [throws] [seconds]",
+  "help | seats | status [seat] | abort|stop <seat|all> | q/quit/exit | Ctrl-C | Ctrl-D",
+];
+
+type ShellAction =
+  | { kind: "dispatch"; name: string; args: Record<string, unknown> }
+  | { kind: "builtin"; name: "help" | "status" | "abort" | "quit" }
+  | { kind: "unknown" }
+  | { kind: "error"; name: string; why: string };
+
+/** Map one text line to a command request; the handler does the validation. */
+function parseShellLine(line: string, world: BotSession["world"]): ShellAction {
+  const tokens = line.trim().split(/\s+/);
+  const verb = (tokens[0] ?? "").toLowerCase();
+  const nums = (spec: string | undefined): number[] => (spec ?? "").split(",").map((part) => Number(part));
+  switch (verb) {
+    case "help":
+      return { kind: "builtin", name: "help" };
+    case "status":
+      return { kind: "builtin", name: "status" };
+    case "abort":
+      return { kind: "builtin", name: "abort" };
+    case "q":
+    case "quit":
+    case "exit":
+      return { kind: "builtin", name: "quit" };
+    case "arm":
+      return { kind: "dispatch", name: "arm", args: {} };
+    case "getkey":
+      return { kind: "dispatch", name: "getkey", args: {} };
+    case "goto":
+      return { kind: "dispatch", name: "goto", args: { place: tokens[1] ?? "" } };
+    case "stand":
+    case "path": {
+      const [x, y, z, yaw] = nums(tokens[1]);
+      return { kind: "dispatch", name: verb, args: { x, y, z, ...(Number.isFinite(yaw) ? { yaw } : {}) } };
+    }
+    case "goto-at": {
+      const [x, , z] = nums(tokens[1]);
+      return { kind: "dispatch", name: "gotoAt", args: { x, z } };
+    }
+    case "walk": {
+      const points = tokens.slice(1).map((point) => {
+        const [x, z] = nums(point);
+        return { x, z };
+      });
+      return { kind: "dispatch", name: "walk", args: { points } };
+    }
+    case "reload":
+      return { kind: "dispatch", name: "reload", args: tokens[1] ? { crate: tokens[1] } : {} };
+    case "hunt":
+      return { kind: "dispatch", name: "hunt", args: { minutes: tokens[1] ? Number(tokens[1]) : 2, weapon: "laser" } };
+    case "patrol": {
+      const places = (tokens[1] ?? "").split(",").filter((place) => place.length > 0);
+      return { kind: "dispatch", name: "patrol", args: { places, minutes: tokens[2] ? Number(tokens[2]) : 3 } };
+    }
+    case "retrieve": {
+      let pickup = tokens[1] ?? "";
+      if (pickup === "@outside-ammo") {
+        const id = outsideAmmo(world);
+        if (!id) return { kind: "error", name: "retrieve", why: "no-outside-ammo" };
+        pickup = id;
+      }
+      const place = tokens[2]?.replace(/^@/, "");
+      return { kind: "dispatch", name: "retrieve", args: { pickup, ...(place ? { place } : {}) } };
+    }
+    case "projectile": {
+      const args: Record<string, unknown> = {};
+      if (tokens[1]) args.bands = tokens[1].split(",").map(Number);
+      if (tokens[2]) args.throws = Number(tokens[2]);
+      if (tokens[3]) args.seconds = Number(tokens[3]);
+      return { kind: "dispatch", name: "projectile", args };
+    }
+    default:
+      return { kind: "unknown" };
+  }
+}
+
 // --- modes ----------------------------------------------------------------
 function printMenu(): void {
   record(`MENU question tests=${TRIALS.length} suite=1`);
@@ -1088,6 +1191,10 @@ async function main(): Promise<void> {
     console.error(USAGE);
     abortSuite(2, `unknown surface: ${SURFACE_NAME} (proto|probe)`);
   }
+  if (!Number.isInteger(SEATS) || SEATS < 1 || SEATS > 3) {
+    console.error(USAGE);
+    abortSuite(2, `--seats must be an integer 1..3 (got ${args.get("seats") ?? "?"})`);
+  }
   if (MODE === "list") {
     printMenu();
     process.exit(0);
@@ -1097,9 +1204,14 @@ async function main(): Promise<void> {
   // `--goto-at` is one ad-hoc trial: it owns no table row and no menu entry.
   // The guard tests GOTO_AT itself, not MODE: `--test` outranks `--goto-at` in
   // the mode order, so a MODE === "goto" check would miss the conflict.
-  if (GOTO_AT.length > 0 && (args.has("test") || args.has("suite"))) {
+  const gotoConflict = GOTO_AT.length > 0 && (args.has("test") || args.has("suite") || args.has("shell"));
+  if (gotoConflict) {
     console.error(USAGE);
-    abortSuite(2, "--goto-at is one trial; it conflicts with --test/--suite");
+    abortSuite(2, "--goto-at is one trial; it conflicts with --test/--suite/--shell");
+  }
+  if (args.has("shell") && (args.has("test") || args.has("suite"))) {
+    console.error(USAGE);
+    abortSuite(2, "--shell is one session; it conflicts with --test/--suite");
   }
   let gx = Number.NaN;
   let gy = Number.NaN;
@@ -1129,7 +1241,7 @@ async function main(): Promise<void> {
   if (MODE === "goto") {
     record(`MENU choice=goto-at mode=goto x=${gx} y=${gy} z=${gz} y_ignored=1 command="${process.argv.slice(2).join(" ")}"`);
   } else {
-    record(`MENU choice=${MODE === "test" ? TEST_ID : "suite"} mode=${MODE} command="${process.argv.slice(2).join(" ")}"`);
+    record(`MENU choice=${MODE === "test" ? TEST_ID : MODE === "shell" ? "shell" : "suite"} mode=${MODE} command="${process.argv.slice(2).join(" ")}"`);
   }
   record(`SURFACE file=${surfacePath} sha256=${surfaceHash} surface=${SURFACE_NAME}`);
   if (!ATTACH) {
@@ -1161,6 +1273,333 @@ async function main(): Promise<void> {
     `- mode: ${MODE}${MODE === "test" ? ` test: ${TEST_ID}` : MODE === "goto" ? ` goto-at: ${GOTO_AT}` : ` passes: ${PASSES}`}; host: ${ATTACH ? `attached ${ATTACH}` : `spawned port ${PORT}`}; auth: required; token role: qa; samples: ${SAMPLE_MS}ms`,
     "",
   ].join("\n");
+
+  // --- shell: held-open seats, one host, one prompt -------------------------
+  if (MODE === "shell") {
+    const tree = process.env.BOT_CLIENT_TREE === "proto" ? "proto" : "src";
+    const shownPort = ATTACH ? new globalThis.URL(URL).port || String(PORT) : String(PORT);
+    let host: HostHandle | undefined;
+    if (!ATTACH) {
+      record(`HOST spawn shell port=${PORT}`);
+      host = startHost(PORT, "shell", `${LOG_DIR}/171-host-shell-${STAMP}.log`);
+      const spawnAt = Date.now();
+      await host.ready;
+      record(`HOST ready shell ms=${Date.now() - spawnAt}`);
+    } else {
+      record(`HOST attach url=${URL} owner=operator (suite does not spawn or kill it)`);
+    }
+    record(`SHELL start host=${ATTACH ? "attach" : "spawn"} port=${shownPort} seats=${SEATS} surface=${SURFACE_NAME} tree=${tree}`);
+    type Seat = { index: number; session: BotSession; cmdHost: CommandHost; world: BotSession["world"]; name: string; closed: boolean };
+    const seats = new Map<number, Seat>();
+    /** Abort the seat's running command and stop its pawn where it stands. */
+    const haltSeat = (seat: Seat): void => {
+      try {
+        seat.cmdHost.abort();
+      } catch {
+        // idle
+      }
+      const me = seat.world.self();
+      if (me) seat.session.input.sendInput({ moveX: 0, moveZ: 0, yaw: me.yaw });
+    };
+    const pending = new Set<Promise<unknown>>();
+    // Wall-contact logging: the suite's one-shot sampler, per seat. A new
+    // continuous contact per box logs once (the suite's episode rule); the
+    // counts print on `status` and at exit.
+    const seatCollisions = new Map<number, number>();
+    const seatPens = new Map<number, number>();
+    /** The last `attack:` phase line per seat (pursue/retreat/standoff/…). */
+    const seatPhase = new Map<number, string>();
+    /** Per-seat, per-box phase at the last logged contact; a phase change re-logs. */
+    const seatContactPhase = new Map<number, Map<string, string>>();
+    const seatPhaseCounts = new Map<number, Map<string, number>>();
+    const seatLastPose = new Map<number, { x: number; z: number }>();
+    let collisionSampler: ReturnType<typeof setInterval> | undefined;
+    const logCollisionCounts = (): void => {
+      for (const seat of seats.values()) {
+        const counts = seatPhaseCounts.get(seat.index);
+        const phases = counts ? [...counts.entries()].map(([phase, n]) => `${phase}:${n}`).join(",") : "-";
+        record(`SHELL collisions seat=${seat.index} count=${seatCollisions.get(seat.index) ?? 0} pen=${seatPens.get(seat.index) ?? 0} phases=${phases}`);
+      }
+    };
+    const sampleCollisions = (): void => {
+      for (const seat of seats.values()) {
+        if (seat.closed) continue;
+        const me = seat.world.self();
+        if (!me) continue;
+        const last = seatLastPose.get(seat.index);
+        const dx = last ? me.x - last.x : 0;
+        const dz = last ? me.z - last.z : 0;
+        const speed = Math.hypot(dx, dz) * 4; // 250 ms samples
+        const forward = dx * Math.sin(me.yaw) + dz * Math.cos(me.yaw);
+        const ratio = speed > 0.15 ? forward / Math.hypot(dx, dz) : 0;
+        const move = !last || speed < 0.15 ? "still" : ratio > 0.5 ? "forward" : ratio < -0.5 ? "back" : "side";
+        const phase = seatPhase.get(seat.index) ?? "-";
+        const hits: Array<{ id: number | null; source: string }> = [];
+        let pen = 0;
+        for (const b of seat.world.aabbs) {
+          const maxY = b.maxY ?? 0;
+          if (maxY <= me.y + 0.35) continue;
+          const source = (b as { source?: string }).source ?? "";
+          if (source.endsWith("-box") || source === "aabb") continue;
+          const box = { minX: b.minX, maxX: b.maxX, minY: b.minY ?? 0, maxY, minZ: b.minZ, maxZ: b.maxZ };
+          if (capsuleOverlapsAabb(me.x, me.y, me.z, seat.world.pawnRadius - 0.05, seat.world.pawnHeight, box)) pen += 1;
+          if (capsuleOverlapsAabb(me.x, me.y, me.z, seat.world.pawnRadius, seat.world.pawnHeight, box)) {
+            hits.push({ id: (b as { id?: number }).id ?? null, source });
+          }
+        }
+        const touching = seatContactPhase.get(seat.index) ?? new Map<string, string>();
+        const seen = new Set<string>();
+        for (const h of hits) {
+          const key = `${h.id ?? "?"}:${h.source}`;
+          seen.add(key);
+          const prev = touching.get(key);
+          if (prev === phase) continue;
+          touching.set(key, phase);
+          const at = `${me.x.toFixed(2)},${me.y.toFixed(2)},${me.z.toFixed(2)}`;
+          if (prev === undefined) {
+            // A new box contact: the collision count.
+            seatCollisions.set(seat.index, (seatCollisions.get(seat.index) ?? 0) + 1);
+            const counts = seatPhaseCounts.get(seat.index) ?? new Map<string, number>();
+            counts.set(phase, (counts.get(phase) ?? 0) + 1);
+            seatPhaseCounts.set(seat.index, counts);
+            record(`COLLIDE seat=${seat.index} t=${secs().toFixed(1)}s box=${h.id ?? "?"} src=${h.source} at=${at} phase=${phase} move=${move} speed=${speed.toFixed(1)}`);
+          } else {
+            // Still touching the same box, the attack phase changed: a CONTACT
+            // line, not a second collision.
+            record(`CONTACT seat=${seat.index} t=${secs().toFixed(1)}s box=${h.id ?? "?"} src=${h.source} at=${at} from=${prev} to=${phase} move=${move} speed=${speed.toFixed(1)}`);
+          }
+        }
+        for (const key of [...touching.keys()]) if (!seen.has(key)) touching.delete(key);
+        seatContactPhase.set(seat.index, touching);
+        seatLastPose.set(seat.index, { x: me.x, z: me.z });
+        if (pen > 0) seatPens.set(seat.index, (seatPens.get(seat.index) ?? 0) + 1);
+      }
+    };
+    let done = false;
+    let closing = false;
+    let rl: ReturnType<typeof createInterface> | undefined;
+    const finish = async (reason: string, code: number, drain = false): Promise<void> => {
+      if (done || closing) return;
+      closing = true;
+      // q/eof drain in-flight commands so a scripted pass prints its results;
+      // ctrl-c, a closed seat and host death abort immediately.
+      if (drain && pending.size > 0) {
+        await Promise.race([Promise.allSettled([...pending]), sleep(15_000)]);
+      }
+      done = true;
+      shellShutdown = undefined;
+      if (collisionSampler) clearInterval(collisionSampler);
+      record(`SHELL exit reason=${reason} code=${code}`);
+      logCollisionCounts();
+      for (const seat of seats.values()) {
+        try {
+          seat.cmdHost.abort();
+        } catch {
+          // idle
+        }
+      }
+      try {
+        rl?.close();
+      } catch {
+        // already closed
+      }
+      for (const seat of seats.values()) {
+        record(`SESSION close seat=${seat.index}`);
+        try {
+          seat.session.close();
+        } catch {
+          // already closed
+        }
+      }
+      await sleep(400);
+      if (host) {
+        const kill = await stopHost(host);
+        record(`HOST kill pid=${host.child.pid} exit=${kill.exit} free_ms=${kill.free_ms}${kill.freed ? "" : " NOT-FREE"}`);
+      } else {
+        record(`HOST leave url=${URL} (operator-owned, not touched)`);
+      }
+      process.exit(code);
+    };
+    shellShutdown = (reason, code) => {
+      void finish(reason, code);
+    };
+    let seatClosed: (index: number) => void = () => {};
+    seatClosed = (index: number) => {
+      if (done || closing) return;
+      const seat = seats.get(index);
+      if (!seat || seat.closed) return;
+      seat.closed = true;
+      record(`SHELL seat ${index} closed`);
+      seats.delete(index);
+      if (seats.size === 0 && !done) void finish("session-closed", 1);
+    };
+    for (let i = 1; i <= SEATS; i += 1) {
+      try {
+        const session = await connectBot({
+          url: URL,
+          token: TOKEN,
+          name: `${NAME}-${i}`,
+          role: "qa",
+          openSocket: trackSocket,
+          onLog: (line) => {
+            record(`[conn] seat=${i} ${line}`);
+            if (line.startsWith("close code=") || line.includes("connection lost") || line.includes("session abort")) seatClosed(i);
+          },
+        });
+        const world = session.world;
+        const joinAt = Date.now();
+        while ((!world.self() || !world.sceneGraph()) && Date.now() - joinAt < 15_000) await sleep(50);
+        const me = world.self();
+        if (!me || !world.sceneGraph()) throw new Error("no self or scene graph");
+        const cmdHost = selectedSurface!.createCommandHost({
+          session,
+          log: (line) => {
+            recordFile(`  shell[${i}] ${line}`);
+            const m = /attack: ([a-z-]+)/.exec(line);
+            if (m) seatPhase.set(i, m[1]!);
+          },
+        });
+        seats.set(i, { index: i, session, cmdHost, world, name: `${NAME}-${i}`, closed: false });
+        record(`SHELL seat ${i} self=${me.id} client=unknown place=${world.placeOf(me)?.id ?? "?"} players=[${[...world.playerIds()].join(",")}] weapon=${world.weapon() ?? "none"} keys=[${world.keys().join(",")}]`);
+      } catch (err) {
+        record(`SHELL seat ${i} failed why=${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+    if (seats.size === 0) {
+      await finish("no-seats", 2);
+      return;
+    }
+    const first = [...seats.values()][0]!;
+    const selfs = [...seats.values()].map((seat) => seat.world.self()?.id ?? "?");
+    record(`SHELL seats=[${[...seats.keys()].join(",")}] selfs=[${selfs.join(",")}] players=[${[...first.world.playerIds()].join(",")}]`);
+    collisionSampler = setInterval(sampleCollisions, 250);
+    const terminal = process.stdin.isTTY === true;
+    rl = createInterface({ input: process.stdin, output: process.stdout, terminal });
+    if (terminal) rl.setPrompt("bot> ");
+    let cmdNo = 0;
+    const handle = (raw: string): void => {
+      if (done || closing) return;
+      const line = raw.trim();
+      if (line.length === 0) return;
+      const tokens = line.split(/\s+/);
+      const verb = (tokens[0] ?? "").toLowerCase();
+      const numeric = /^\d+$/.test(tokens[0] ?? "");
+      const seatIndex = numeric ? Number(tokens[0]) : null;
+      if (!numeric) {
+        record(`SHELL line="${line}" seat=-`);
+        if (verb === "q" || verb === "quit" || verb === "exit") {
+          void finish("q", 0, true);
+          return;
+        }
+        if (verb === "help") {
+          for (const row of SHELL_HELP) record(`SHELL help ${row}`);
+          if (terminal) rl.prompt();
+          return;
+        }
+        if (verb === "seats") {
+          const now = [...seats.values()].map((seat) => seat.world.self()?.id ?? "?");
+          record(`SHELL seats=[${[...seats.keys()].join(",")}] selfs=[${now.join(",")}] players=[${[...first.world.playerIds()].join(",")}]`);
+          if (terminal) rl.prompt();
+          return;
+        }
+        if (verb === "status") {
+          const wanted = tokens[1] !== undefined ? Number(tokens[1]) : undefined;
+          void (async () => {
+            // Direct race (not a helper) so this continuation is queued ahead of
+            // the q/eof finish on the same pending set.
+            if (pending.size > 0) await Promise.race([Promise.allSettled([...pending]), sleep(10_000)]);
+            if (done) return;
+            for (const seat of seats.values()) {
+              if (wanted !== undefined && seat.index !== wanted) continue;
+              record(`SHELL status seat=${seat.index} ${JSON.stringify(seat.cmdHost.status())}`);
+            }
+            logCollisionCounts();
+            if (terminal) rl.prompt();
+          })();
+          return;
+        }
+        if (verb === "abort" || verb === "stop") {
+          const arg = (tokens[1] ?? "").toLowerCase();
+          if (arg === "all") {
+            for (const seat of seats.values()) haltSeat(seat);
+            record(`SHELL ${verb} seat=all`);
+          } else {
+            const index = Number(arg);
+            const seat = seats.get(index);
+            if (seat) {
+              haltSeat(seat);
+              record(`SHELL ${verb} seat=${index}`);
+            } else {
+              record(`SHELL unknown cmd="${line}"`);
+            }
+          }
+          if (terminal) rl.prompt();
+          return;
+        }
+        record(`SHELL rejected seat=- why=no-seat`);
+        record(`SHELL unknown cmd="${line}" (commands need a seat id: ${[...seats.keys()].join(",")})`);
+        if (terminal) rl.prompt();
+        return;
+      }
+      record(`SHELL line="${line}" seat=${seatIndex}`);
+      const target = seats.get(seatIndex!);
+      if (!target) {
+        record(`SHELL rejected seat=${seatIndex} why=no-seat`);
+        record(`SHELL unknown seat=${seatIndex} cmd="${line}" (seats ${[...seats.keys()].join(",")})`);
+        if (terminal) rl.prompt();
+        return;
+      }
+      const sub = (tokens[1] ?? "").toLowerCase();
+      if (sub === "abort" || sub === "stop") {
+        haltSeat(target);
+        record(`SHELL ${sub} seat=${seatIndex}`);
+        if (terminal) rl.prompt();
+        return;
+      }
+      const action = parseShellLine(tokens.slice(1).join(" "), target.world);
+      if (action.kind !== "dispatch") {
+        if (action.kind === "builtin" && action.name === "status") {
+          record(`SHELL status seat=${seatIndex} ${JSON.stringify(target.cmdHost.status())}`);
+        } else if (action.kind === "error") {
+          record(`SHELL rejected seat=${seatIndex} name=${action.name} why=${action.why}`);
+          record(`SHELL result seat=${seatIndex} name=${action.name} ok=0 code=1 why=${action.why} ms=0`);
+        } else {
+          record(`SHELL rejected seat=${seatIndex} why=unknown-verb`);
+          record(`SHELL unknown cmd="${line}"`);
+        }
+        if (terminal) rl.prompt();
+        return;
+      }
+      if (target.cmdHost.busy) {
+        record(`SHELL rejected seat=${seatIndex} name=${action.name} why=busy`);
+        record(`SHELL result seat=${seatIndex} name=${action.name} ok=0 code=1 why=busy ms=0`);
+        if (terminal) rl.prompt();
+        return;
+      }
+      record(`SHELL accepted seat=${seatIndex} name=${action.name} args=${JSON.stringify(action.args)}`);
+      const at = Date.now();
+      const promise = target.cmdHost.dispatch({ id: `shell-${seatIndex}-${++cmdNo}`, name: action.name, args: action.args }).then((result) => {
+        if (done) return;
+        record(`SHELL result seat=${seatIndex} name=${action.name} ok=${result.ok ? 1 : 0} code=${result.ok ? (result.code ?? 0) : result.code} why=${result.ok ? "-" : result.why} ms=${Date.now() - at}`);
+      }).catch((err: unknown) => {
+        record(`SHELL result seat=${seatIndex} name=${action.name} ok=0 code=1 why=error:${err instanceof Error ? err.message : String(err)} ms=${Date.now() - at}`);
+      });
+      pending.add(promise);
+      void promise.finally(() => pending.delete(promise));
+      if (terminal) rl.prompt();
+    };
+    rl.on("line", (line) => {
+      handle(line);
+    });
+    rl.on("SIGINT", () => {
+      void finish("ctrl-c", 130);
+    });
+    rl.on("close", () => {
+      if (!done) void finish("eof", 0, true);
+    });
+    if (terminal) rl.prompt();
+    return;
+  }
 
   // A suite on a shared host keeps ONE session: closing per trial makes the
   // host forget the pawn's kit (arena-host close → kit.forget), so reload/hunt/
@@ -1412,10 +1851,18 @@ function summaryMarkdown(
 }
 
 process.on("SIGINT", () => {
+  if (shellShutdown) {
+    shellShutdown("ctrl-c", 130);
+    return;
+  }
   killCurrentHostSync();
   process.exit(130);
 });
 process.on("SIGTERM", () => {
+  if (shellShutdown) {
+    shellShutdown("sigterm", 143);
+    return;
+  }
   killCurrentHostSync();
   process.exit(143);
 });

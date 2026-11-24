@@ -40,3 +40,83 @@ trace.ndjson,summary.md}` unless `--label` overrides the base. Exit: 0 PASS/WARN
 1 FAIL, 2 cannot start / bad arguments / bad mode / SKIP (including any
 `--goto-at` with `--test` or `--suite`). The trial table and `--list` are
 unchanged by the flag.
+
+## Shell (task 171)
+
+`--shell [--seats n]` keeps **n** seats (1..3, default 1) open for a whole
+conversation on one host: one `bot>` prompt, one `createCommandHost` per seat,
+the command module from `--surface proto|probe` (default `probe`), the plumbing
+from `--tree src|proto`. Unlike `--test`/`--goto-at`/`--suite`, the sessions are
+not closed between commands — each pawn keeps its seat, kit, keys and ammo. The
+start lists `SHELL seats=[1,2] selfs=[14,15] players=[14,15]` and one
+`SHELL seat <i> self=… place=… weapon=… keys=…` per seat. Piped stdin works (no
+prompt); a TTY shows `bot> `.
+
+Commands are `<seat> <verb> [args…]`, e.g. `1 goto-at -11.5,0,8.0`; a line
+without a numeric seat is an error naming the seats. Dispatch is **not awaited**:
+the prompt returns at once and the tagged `SHELL result seat=<i> …` prints when
+the command ends; a second command on a busy seat prints `SHELL busy seat=<i>`.
+Commands on different seats run concurrently. `q`/EOF drain the in-flight
+commands (15 s cap) before closing; `abort`/Ctrl-C abort immediately.
+
+| text | request |
+|---|---|
+| `<seat> arm` | `{name:"arm"}` |
+| `<seat> goto <place>` | `{name:"goto",place}` |
+| `<seat> stand <x,y,z[,yaw]>` | `{name:"stand",x,y,z[,yaw]}` |
+| `<seat> path <x,y,z[,yaw]>` | `{name:"path",x,y,z[,yaw]}` |
+| `<seat> goto-at <x,y,z>` | `{name:"gotoAt",x,z}` — `y` parsed and ignored |
+| `<seat> walk <x,z> [<x,z> …]` | `{name:"walk",points:[{x,z},…]}` |
+| `<seat> reload [crate]` | `{name:"reload"[,crate]}` |
+| `<seat> hunt [minutes]` | `{name:"hunt",minutes,weapon:"laser"}` |
+| `<seat> patrol <place,place,…> [minutes]` | `{name:"patrol",places,minutes}` |
+| `<seat> retrieve <pickup\|@outside-ammo> [@place]` | `{name:"retrieve",pickup[,place]}` |
+| `<seat> getkey` | `{name:"getkey"}` |
+| `<seat> projectile [bands] [throws] [seconds]` | `{name:"projectile",…}` (parser defaults) |
+| `help` / `seats` / `status [seat]` / `abort\|stop <seat\|all>` / `q`\|`quit`\|`exit` / Ctrl-C / Ctrl-D | built-ins (unprefixed; `<seat> stop` also works) |
+
+The shell maps text only — the command module validates (`bad-args` comes from
+`parseCommand`). `@outside-ammo` resolves at dispatch time through the suite's
+`outsideAmmo(world)` per seat.
+
+**Console vs log.** The handler's own chatter (plan/start/finish, `hunt attack: …`
+targets, `patrol plan …` legs, projectile traces) is written **only** to the run
+log (`171-shell-<stamp>.log`), not echoed to the console. The console keeps the
+shell's lines: `SHELL line`, `SHELL accepted seat=<i> name=<n> args=…` or
+`SHELL rejected seat=<i> … why=<busy|unknown-verb|bad-args|no-seat>`, and the
+`SHELL result seat=<i> name=<n> ok=… code=… why=… ms=…` when the command ends.
+A long `hunt`/`patrol` therefore prints the accepted line and then stays quiet
+until the result; `tail -f` the run log for the loop.
+
+Logs: `SHELL start … seats=<n>`, per-seat lines,
+`SHELL line=`, `SHELL result`, `SHELL exit reason=<q|ctrl-c|eof|session-closed>`,
+then `SESSION close seat=<i>` per seat and `HOST kill`; artifacts
+`171-shell-<stamp>.{log,summary.md}`. A seat's mid-session socket close drops
+that seat (the others continue); when none remain the shell exits
+`session-closed` (no reconnect). `--shell` conflicts with
+`--test`/`--goto-at`/`--suite` (exit 2); `--seats` must be 1..3 (exit 2).
+
+**Stop/abort.** `stop <seat|all>` (alias `abort`, and the seat-prefixed
+`<seat> stop`/`<seat> abort`) aborts the seat's running command and sends a
+zero-move input so the pawn halts where it stands; the result prints
+`SHELL result … why=aborted` and the seat is idle again. It is cooperative: the
+mission loop checks `onTick`, the arm's `standAtPoint` checks it, and the proto
+branch's `walkWithRecovery`/`runAttack` now check `abortRequested` too (the
+probe surface's stand and the branch's attack; the production `src` still has the
+158 abort gap until the coder ports these). A `stop` during `arm` cuts the
+crate-climb stall; if it lands before the weapon is in hand, the next `reload`
+reports `not-armed` — retry `arm`.
+
+**Wall-contact logging.** In shell mode the harness samples every seat's pawn
+every 250 ms against the world AABBs (the suite's true-radius rule: penetration
+at `radius - 5 cm`, contact at `radius`, pickup trigger boxes skipped) and
+records `COLLIDE seat=<i> t=<s> box=<id> src=<source> at=<x,y,z>
+phase=<attack phase> move=<forward|back|side|still> speed=<m/s>` per new box
+contact (counted), and `CONTACT … from=<phase> to=<phase>` when the attack phase
+changes while the pawn is still touching the same box (not counted, so a retreat
+slide into the pursuit is visible without inflating the collision count). `phase` is the last
+`attack:` handler line (`pursue`/`retreat`/`standoff`/`cover`/`no-plan`; `-` for
+non-attack commands), `move` is the pawn's motion along its facing. `SHELL
+collisions seat=<i> count=<n> pen=<m> phases=<phase:count,…>` prints on `status`
+and at exit, so the forward vs retreat contacts are separable. `pen` counts
+samples with >5 cm penetration; the `COLLIDE` count counts episodes, not ticks.
