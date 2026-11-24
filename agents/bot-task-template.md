@@ -6,13 +6,24 @@ Read `~/dev/conveyor-engine-arena/agents/bot-developer-role.md` first. Then this
 **Artifacts:** every log, trace, capture, and diff goes under `plan/dsh-tasks/logs/` (`<NN>-<what>.log`, `<NN>-trace.json`); the analysis/report under `plan/dsh-tasks/reports/`. Never the repo root. The report links the exact paths.
 **Safety:** one long-lived session per trial; clean `close()`; wait before any retry; never more than one bot in the arena while the operator is playing; never target the operator's pawn. Leftover seats are the known cause of `SERVER_FULL` and the stale-pawn confusion (task 49).
 
-> **This is a run/prototype, not a code change.** The bot-developer measures, diagnoses, and recommends; the coder implements.
-> Write the run's script under `packages/bot-client/tests/<name>.ts` — tracked and reviewable; the **Files** table names it. The script implements the behaviour itself, or imports it from the **proto fork**
-(`packages/bot-client/proto/`, a tracked copy of `src/`, reached with
-`--tree proto`; the source keeps its canonical `../src/…` imports and the runner
-redirects them): it imports the plumbing, never `src/`'s behaviour under test — a
-run that reports `tree=src` is a **production probe**, not a prototype. It is a
-> rough probe, not a module: when it works repeatedly and the runs table shows it, the script plus its measurements is a **proof-of-concept for the designer**, who drafts the production task from it; the coder builds that. `plan/dsh-tasks/live/` is gitignored and is for raw captures only. A code change you discover goes in the report as a recommended task, with the evidence line that justifies it.
+> **This is a rapid-prototype task; the coder's migration is a later, separate
+> task.** The bot-developer's turns are ~10× faster than the coder's by design. The
+> evidence is the runs table and the POC package (script/diff + migration analysis),
+> not a unit test. Do not put `src/` or `test/` in this task's Files table; the
+> coder's task is drafted from the POC only after it wins.
+>
+> Write the run's script under `packages/bot-client/probe/<name>.ts` — tracked and
+> reviewable; the **Files** table names it. The script implements the behaviour
+> itself, or imports it from the **proto fork** (`packages/bot-client/proto/`, a
+> tracked copy of `src/`, reached with `--tree proto`; the source keeps its
+> canonical `../src/…` imports and the runner redirects them): it imports the
+> plumbing, never `src/`'s behaviour under test — a run that reports `tree=src` is a
+> **production probe**, not a prototype. When it works repeatedly and the runs table
+> shows it, the script plus its measurements is a **proof-of-concept for the
+> designer**, who drafts the production task from it; the coder builds that.
+> `plan/dsh-tasks/live/` is gitignored and is for raw captures only. A code change
+> you discover goes in the report as a recommended task, with the evidence line that
+> justifies it.
 
 ## Question
 
@@ -60,7 +71,7 @@ run that reports `tree=src` is a **production probe**, not a prototype. It is a
 | `agents/<layer>-{flow,model}.md` or `agents/client-kb.md` | conveyor-engine-arena | Read-only. The §… named in Knowledge base (one row per file the run reads); `*-kb.md` is the split's index page. |
 | <the bot session/CLI file> | conveyor-engine-arena | Read-only. The commands and the log fields. |
 | <the host/arena file> | conveyor-engine-arena | Read-only. The accept path, the seat rule. |
-| `packages/bot-client/tests/<name>.ts` | conveyor-engine-arena | **New.** The run's script (tracked, reviewable). |
+| `packages/bot-client/probe/<name>.ts` | conveyor-engine-arena | **New.** The run's script (tracked, reviewable). |
 | `plan/dsh-tasks/logs/<NN>-*` | conveyor-engine-arena | **New.** The raw evidence. |
 | `plan/dsh-tasks/reports/<NN>-<slug>.md` | conveyor-engine-arena | **New.** The report. |
 

@@ -95,14 +95,37 @@ Rules of the craft:
 - **The operator's method.** Rapid prototype → observe → fix → hand off to the
   coder for the refined implementation. That is the division of labour.
 - **The driver home.** Every script a task asks for goes in
-  `packages/bot-client/tests/` (tracked, reviewable); the task's Files table
-  names it. `plan/dsh-tasks/live/` is gitignored — raw captures only, never a
+  `packages/bot-client/probe/` (tracked, reviewable), where the runner resolves it
+  by name; the task's Files table names it. `plan/dsh-tasks/live/` is gitignored — raw captures only, never a
   deliverable. Logs/reports in `plan/dsh-tasks/logs/` and `reports/`. Never the
   repo root.
 - **Build on the ledger.** `packages/bot-client/tests/POCS.md` records every
   behaviour a run has proven. A `proven` row is not re-prototyped: extend its
   script, its report and its row. A row that is `proven` and not `proposed` is
   the one to hand to the designer next.
+
+### Why this loop turns fast
+
+The prototype loop is an order of magnitude faster per cycle than the coder's:
+change one thing in `proto/`, run one live trial, read the evidence. The bugs worth
+finding at this seam — a frame category, a tick race, a seat/claim state, a planner
+budget — are discovered by the live run; a unit test written first does not propose
+them. A coder cycle (task → branch → tests → review → build → run, usually against a
+simulated world) is ~10× longer and finds a different class of bug.
+
+That is the division, not a shortcut. You own discovery in the live world; the coder
+owns the freeze into `src/` — unit tests, conventions, the shared planner, the
+publish. The coder's slower cycle is what makes the discovered behaviour safe to
+keep, not a better way to find it. Do not slow this loop with unit tests or scoped
+suites; those are the coder's gate after the port.
+
+The POC must be measured and repeatable, not merely "works once": the same command,
+the runs table, the branch diff. That package is what lets the coder port without
+re-deriving — the migration analysis, the constants and guards, the failure modes. A
+rough prototype is expected; a POC that has not been repeated is not evidence.
+
+The POC exists because the discovery loop is ten times faster than the coder's; the
+migration task is the freeze, not the first attempt.
 
 ### The proto fork — the rapid loop's workspace
 

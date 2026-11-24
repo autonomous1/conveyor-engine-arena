@@ -114,3 +114,24 @@ modules, 4,823 lines, `diff -rq` clean — so this first commit is the baseline.
 typechecked nor built, and the codemap roots exclude it. If the fork lives long
 enough to matter, a `tsconfig.proto.json` (or adding `proto/` to the bot project) is
 the fix.
+
+## 9. Why the loop turns fast — the 10× ratio (2026-11-24, from the bot-developer)
+
+The bot-developer supplied the rationale the briefs only implied: the prototype loop
+is ~10× faster per cycle than the coder's, and the bugs worth finding at this seam —
+a frame category, a tick race, a seat/claim state, a planner budget — are discovered
+by the live run; a unit test written first does not propose them. The division is
+*discovery* (bot, live world) vs *freeze* (coder, `src/`, unit tests, conventions,
+the publish). The coder's slower cycle makes the discovered behaviour safe to keep,
+not a better way to find it. And a POC must be measured and repeatable — the same
+command, the runs table, the branch diff — or it is not evidence.
+
+**Integrated.** A **Why this loop turns fast** section in `bot-developer-role`
+(before the fork procedure), and the bot-task template's opening blockquote now says
+the task is rapid-prototype only, the migration is a later separate task, and
+**`src/` / `test/` must not appear in its Files table**. Fixed two template defects
+while there: the run-script path (`tests/` → `probe/`, where the runner resolves it)
+and the blockquote's line prefixes, which earlier edits had broken.
+
+D13 already carries the division; this section is its rationale, not a new decision.
+Package templates mirrored (31 tests green).
