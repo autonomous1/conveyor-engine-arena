@@ -333,3 +333,45 @@ driver's scenario against the product path by the bot-developer. The coder repor
 any divergence (dropped step, changed constant, swapped order) and justifies it;
 the live run, not the unit test, is the gate. When the port fails where the driver
 works, that divergence is a finding for the designer.
+
+## D16 — A prototype owns its behaviour; a driver that imports production is a probe (2026-11-23)
+
+The rapid-prototype lane exists to find a working behaviour **without** the coder's
+unit-test loop. That only holds if the prototype carries its own implementation. A
+driver that imports the behaviour under test — `command-parity.ts` importing
+`createCommandHost` from `src/commands.ts`, `attack-run.ts` importing `runMission` —
+is a **production probe**: it runs production and can only report what production
+does. A live "fix" made through it is a production edit in the coder's lane, and the
+unit tests written against the same file pass while the arena disagrees.
+
+**Why:** the prototype's value is that it can be wrong cheaply — one file, live,
+edited in the loop. Importing production removes exactly that: every iteration edits
+reviewed source, and prototype and product can no longer diverge, so there is
+nothing to port and nothing to compare.
+
+**In practice:** a prototype imports the plumbing (connect, socket, world, hitscan)
+and implements the handler/plan/policy itself; it is iterated live with no tests.
+When it works, the designer checks the imports, drafts the migration (D15), the coder
+ports it into `src/`, and the driver becomes the parity probe that imports production.
+Task 157 is the counter-example: the arm fix landed in `brain.ts` and `commands.ts`,
+and its test passed on the pre-fix tree. A row whose script is a production probe is a
+**production fix** task, not a port.
+
+## D17 — A task's base tree is part of the contract (2026-11-23)
+
+A measurement is evidence only for the tree it was taken on. The 161 probe ran on
+`HEAD 52f166c` **plus** the coder's uncommitted `src/shared/bots/actions.ts`
+door-token fix (with the connection/input instrumentation); its `4/20` patrol passes
+depend on that fix. A task citing the 4/20 but executed on `HEAD` will read `0/20`,
+and that difference is a different tree, not a regression.
+
+**Why:** a spec is a claim about a diff. If the designer's tree and the coder's tree
+differ, the fail-first, the acceptance counts and any `proven` ledger row describe
+different code. The 161 report already declares "HEAD + dirty" in its setup table;
+the task must declare the same.
+
+**In practice:** every task carries a **Base tree** line — the commit, plus any
+prerequisite task or uncommitted paths. If a cited measurement needs an uncommitted
+change, it is either a prerequisite task the coder lands first, or the number is
+re-taken on `HEAD`. The coder's Pre-Flight prints the Base tree; a dirty file the
+task does not name, or a number it cannot reproduce, is a HALT.

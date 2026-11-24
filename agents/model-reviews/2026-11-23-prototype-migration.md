@@ -78,3 +78,73 @@ report's POC hand-off, for the designer to pick up.
 
 Arena: `modev:check` green (3 lints, 11 tests), `drift` clean, codemap up to date.
 Package: `npm run verify` green (31 tests).
+
+**Tooling (same day).** The shared query cache was reviewed and purged before the
+next sessions: 344 rows over three days, of which **116 (34%) were test fixtures**
+(`symbol plan` ×70, `symbol nope` ×46) because `packages/modev/test/cli.test.mjs`
+had no cache override and the CLI hardcoded `.cache`. Ported the isolation the
+package already had: `cli.mjs` now honours `MODEV_CACHE` (`CACHE_DIR`), and every
+test spawn points at `os.tmpdir()/modev-test-cache`. Verified: the suite passes,
+`packages/modev/.cache/` stays empty, and `modev stats` still reports no queries.
+Still open (not ported): the CLI's section regex is `(host|client|shared)`, so
+`query section bot-kb 13` misses — the package's config-driven version has `bot`.
+
+## 7. Lane inversion — the prototype imported production (D16)
+
+The operator restated the flow: **rapid prototype → production source**.
+`command-parity.ts` is meant to be the prototype; `src/commands.ts` is production.
+But the driver imports `createCommandHost` (and `command-host.ts` does too), so the
+"prototype" was production wearing a driver: every live fix edited reviewed source,
+and the unit tests against that same file passed while the arena disagreed. The
+prototype lane's speed comes from iterating a file that can be wrong cheaply;
+importing production removes exactly that.
+
+**Evidence.** `command-parity.ts` imports `createCommandHost`/`parseCommand` from
+`../src/commands.ts`; `command-host.ts` the same; `attack-run.ts` imports
+`runMission`; `probe-patrol-freeze.ts` imports `runMission`. Task 157 landed the arm
+fix in `brain.ts` + `commands.ts`, with a test that passes on the pre-fix tree.
+
+**Rule (D16).** A prototype imports the plumbing (connect, socket, world, hitscan)
+and implements the behaviour under test itself, iterated live with no tests. A
+driver that imports the behaviour is a **production probe** (parity): it verifies
+the port, its findings are coder tasks, and a row whose script is a probe is a
+production-fix task, not a port.
+
+**Edits.** `bot-developer-role` (craft step 1 + "a prototype owns its behaviour");
+`bot-kb` §6 (the two driver kinds); `designer-role` ("first check that the driver is
+a prototype"); `coder-role` (nothing to port if it imports production);
+`task-template` + `bot-task-template` (self-contained requirement); **D16**; the
+package templates mirrored (31 tests green).
+
+**Open.** `POCS.md` row 4 is `proven` with script `command-host.ts` — a production
+probe, not a prototype. The bot lane should relabel it or produce the real
+prototype; 157's test is a regression guard, not a fail-first.
+
+## 8. A task's base tree is part of the contract (D17)
+
+Operator: "the actions.ts fix is still uncommitted, so the task should either be
+written against that tree explicitly or the coder should land it first — otherwise
+the designer's spec and the coder's HEAD won't match, and the 4/20 passes may
+disappear."
+
+**Evidence.** The 161 report's setup table says `HEAD 52f166c + dirty`; the dirty
+list includes `M src/shared/bots/actions.ts` (the coder's door-token fix) plus
+`connection.ts`, `input.ts` and `test/bot-brain-real-graph.test.ts`. The `4/20`
+patrol passes were measured on that tree; on bare `HEAD` the same probe reads 16/20
+`no-plan: unsatisfiable`. The fix and its test
+(`estimateSeconds_is_finite_at_an_open_door_token` in
+`test/bot-brain-real-graph.test.ts`) are both uncommitted and correctly paired, so
+they can land as one commit.
+
+**Rule.** Every task carries a **Base tree** line — the commit plus any prerequisite
+task or uncommitted paths. A cited number that needs an uncommitted change becomes a
+prerequisite task the coder lands first, or is re-taken on `HEAD`. The coder's
+Pre-Flight prints the Base tree; a dirty file the task does not name, or a number it
+cannot reproduce, is a HALT (D17).
+
+**Edits.** `task-template` (Base tree slot), `designer-role` ("the base tree is part
+of the contract"), `coder-role` (Pre-Flight line + two HALT conditions), **D17**; the
+package templates mirrored (31 tests green).
+
+**Open.** The `actions.ts` fix should land as its own commit with its paired test
+before the patrol spec is written; the spec's Base tree is then plain `HEAD`.

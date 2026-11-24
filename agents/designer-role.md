@@ -55,6 +55,24 @@ A unit test proves the port matches the test, not the prototype. Task 154 is the
 case: the product `arm` handler passed its tests and walked off the crate live,
 while the driver's arm works.
 
+**First check that the driver is a prototype.** Read its imports. A prototype
+imports the plumbing (connect, socket, world) and implements the behaviour itself;
+a driver that imports the behaviour under test — `createCommandHost`, `runMission`
+from `src/` — is a **production probe**. It proves what production already does,
+its "live fixes" were production edits outside the coder's lane, and the unit tests
+against that same file pass while the arena disagrees (157: the arm fix landed in
+`brain.ts`/`commands.ts`, and its test passed on the pre-fix tree). If the row's
+script is a production probe, say so and draft a **production fix**, not a port.
+
+**The base tree is part of the contract.** Run `git status` before drafting. A
+measurement is evidence only for the tree it was taken on: the 161 probe measured
+`4/20` patrol passes on `HEAD` **plus** the coder's uncommitted `actions.ts`
+door-token fix. If you cite that number to a coder on `HEAD`, it becomes `0/20` and
+the gap is a different tree, not a regression. Either land the prerequisite first (a
+task the spec cites) or re-take the measurement on `HEAD`. Every task carries a
+**Base tree** line, and a cited number the coder cannot reproduce on its own tree is
+fiction, not evidence.
+
 The two copies have diverged: `agents/decisions.md` and `agents/README-dsh.md` are current; `plan/dsh-tasks/` holds older copies (its README still says `docs/decisions.md` and five always-gates). Read the `agents/` copies; treat the `plan/dsh-tasks/` ones as history.
 
 **Resources**

@@ -55,8 +55,10 @@ source change outside it is a report recommendation for the coder (11-90).
 
 1. **Make it work.** The shortest script that makes the bot do the thing —
    navigate, find a pawn, kill it, collect ammo/health, return to centre. One
-   file; imports from the source; inline loops; hardcoded ids; debug prints. No
-   abstraction, no module, no header, no test.
+   file; imports the plumbing (connect, socket, world, hitscan) but **not the
+   behaviour under test** — write the handler, plan step or policy in the prototype
+   itself; inline loops; hardcoded ids; debug prints. No abstraction, no module, no
+   header, no test.
 2. **Run it in the match.** Watch the log and the pawn. The world is the truth;
    the script is a probe.
 3. **Find the bug.** The script will have bugs and the bot will misbehave. That
@@ -84,6 +86,12 @@ Rules of the craft:
   loses the fixes. Hand over the ordered operations, the constants and the guards
   each one encodes; when the port lands, re-run the same scenario against the
   product path — the driver is the control.
+- **A prototype owns its behaviour.** The one thing it must not import is the
+  behaviour it is inventing. A driver that calls `createCommandHost` or `runMission`
+  from `src/` is a **production probe**, not a prototype: it can only report what
+  production does, and a "live fix" inside it edits the coder's lane. The loop is
+  live runs — not unit tests, not scoped suites; those are the coder's gate after
+  the port.
 - **The operator's method.** Rapid prototype → observe → fix → hand off to the
   coder for the refined implementation. That is the division of labour.
 - **The driver home.** Every script a task asks for goes in

@@ -104,8 +104,11 @@ handlers — those are `commands.ts`.
 
 ## 6. The driver lane
 
-`tests/*.ts` are rapid prototype drivers: git-tracked, but not tracked in this
-model — no count, no per-driver list. `tests/scenarios/*.ndjson` replay command
+`tests/*.ts` are live drivers: git-tracked, but not tracked in this model — no
+count, no per-driver list. A driver that imports the behaviour under test
+(`createCommandHost`, `runMission` from `src/`) is a **production probe**: it
+verifies the port, it is not a prototype. A prototype carries its own
+implementation. `tests/scenarios/*.ndjson` replay command
 chains over the `msg` loopback; `tests/POCS.md` is the ledger of proven
 behaviours.
 

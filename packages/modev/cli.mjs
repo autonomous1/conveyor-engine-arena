@@ -4,13 +4,17 @@
 // generated codemap and the KB markdown. Read-only: it never writes agents/.
 // Wiring: `node packages/modev/cli.mjs <cmd>`; tests import this file's main().
 // Invariants: `query symbol` is exact (no fuzzy guess); a miss exits 1 without
-// output; every query is logged to .cache/queries.jsonl, never to the repo.
+// output; every query is logged to $MODEV_CACHE or packages/modev/.cache/queries.jsonl,
+// never to the repo.
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { drift, findFiles, findSymbols, findText, loadIndex, queryEntity, querySection } from "./lib/index.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
+// The query log is a cache, not content: a temp dir in tests, the package's
+// `.cache` in normal use. Never the repo root.
+const CACHE_DIR = process.env.MODEV_CACHE ? path.resolve(process.env.MODEV_CACHE) : path.join(HERE, ".cache");
 const DEFAULT_ROOT = path.resolve(HERE, "../..");
 let optsRoot = DEFAULT_ROOT;
 
@@ -57,7 +61,7 @@ function parseArgs(argv) {
 
 function log(opts, command, arg, hits) {
   try {
-    const dir = path.join(HERE, ".cache");
+    const dir = CACHE_DIR;
     mkdirSync(dir, { recursive: true });
     appendFileSync(
       path.join(dir, "queries.jsonl"),
@@ -246,7 +250,7 @@ export function main(argv) {
   }
 
   if (command === "stats") {
-    const file = path.join(HERE, ".cache/queries.jsonl");
+    const file = path.join(CACHE_DIR, "queries.jsonl");
     if (!existsSync(file)) { console.log("modev: no queries logged yet"); return 0; }
     const rows = readFileSync(file, "utf8").trim().split("\n").filter(Boolean).map((line) => JSON.parse(line));
     const bySession = new Map();

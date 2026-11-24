@@ -16,6 +16,9 @@ import { drift, findFiles, findSymbols, findText, loadIndex, queryEntity, queryS
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURE = path.join(HERE, "fixtures");
 const CLI = path.join(HERE, "..", "cli.mjs");
+// Every spawn logs through MODEV_CACHE, so the suite never touches the package's
+// real .cache — a test must not pollute the query history a session reads.
+const CACHE = path.join(os.tmpdir(), "modev-test-cache");
 
 function tempFixture() {
   const root = mkdtempSync(path.join(os.tmpdir(), "modev-test-"));
@@ -85,14 +88,14 @@ test("drift is clean on the fixture and one finding per defect", () => {
 });
 
 test("the CLI contract: found is 0, a miss is 1, usage is 2", () => {
-  const ok = spawnSync(process.execPath, [CLI, "query", "symbol", "plan", "--root", FIXTURE], { encoding: "utf8" });
+  const ok = spawnSync(process.execPath, [CLI, "query", "symbol", "plan", "--root", FIXTURE], { encoding: "utf8", env: { ...process.env, MODEV_CACHE: CACHE } });
   assert.equal(ok.status, 0, ok.stderr);
   assert.match(ok.stdout, /^plan {2}async fn/m);
 
-  const miss = spawnSync(process.execPath, [CLI, "query", "symbol", "nope", "--root", FIXTURE], { encoding: "utf8" });
+  const miss = spawnSync(process.execPath, [CLI, "query", "symbol", "nope", "--root", FIXTURE], { encoding: "utf8", env: { ...process.env, MODEV_CACHE: CACHE } });
   assert.equal(miss.status, 1);
 
-  const usage = spawnSync(process.execPath, [CLI, "query", "symbol", "--root", FIXTURE], { encoding: "utf8" });
+  const usage = spawnSync(process.execPath, [CLI, "query", "symbol", "--root", FIXTURE], { encoding: "utf8", env: { ...process.env, MODEV_CACHE: CACHE } });
   assert.equal(usage.status, 2);
 });
 
@@ -109,10 +112,10 @@ test("query file lists a module's contract", () => {
 test("the query log records the session", () => {
   const result = spawnSync(process.execPath, [CLI, "query", "symbol", "plan", "--root", FIXTURE], {
     encoding: "utf8",
-    env: { ...process.env, MODEV_SESSION: "test-cli" },
+    env: { ...process.env, MODEV_SESSION: "test-cli", MODEV_CACHE: CACHE },
   });
   assert.equal(result.status, 0, result.stderr);
-  const log = path.join(HERE, "..", ".cache", "queries.jsonl");
+  const log = path.join(CACHE, "queries.jsonl");
   const lines = readFileSync(log, "utf8").trim().split("\n");
   const last = JSON.parse(lines[lines.length - 1]);
   assert.equal(last.session, "test-cli");
@@ -125,11 +128,11 @@ test("a file newer than the codemap is flagged stale, and a miss says why", () =
   const future = new Date(Date.now() + 60_000);
   utimesSync(path.join(root, "src/shared/bots/goap.ts"), future, future);
 
-  const hit = spawnSync(process.execPath, [CLI, "query", "symbol", "plan", "--root", root], { encoding: "utf8" });
+  const hit = spawnSync(process.execPath, [CLI, "query", "symbol", "plan", "--root", root], { encoding: "utf8", env: { ...process.env, MODEV_CACHE: CACHE } });
   assert.equal(hit.status, 0);
   assert.match(hit.stdout, /stale: src\/shared\/bots\/goap\.ts changed after/);
 
-  const miss = spawnSync(process.execPath, [CLI, "query", "symbol", "nope", "--root", root], { encoding: "utf8" });
+  const miss = spawnSync(process.execPath, [CLI, "query", "symbol", "nope", "--root", root], { encoding: "utf8", env: { ...process.env, MODEV_CACHE: CACHE } });
   assert.equal(miss.status, 1);
   assert.match(miss.stderr, /run npm run codemap/);
   rmSync(root, { recursive: true, force: true });
