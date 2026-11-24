@@ -263,9 +263,10 @@ function connFromWs(ws: WebSocket, gate: AuthGate, ip: string): HostConn {
     }
     consider();
   });
-  ws.on("close", () => {
+  ws.on("close", (code: number, reason: Buffer) => {
     closed = true;
     disarm();
+    conn.closeEvent = { code, reason: reason.toString() };
     for (const handler of closes) handler();
   });
   return conn;

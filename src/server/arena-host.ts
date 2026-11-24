@@ -62,9 +62,27 @@ export type HostConn = {
   onText(handler: (text: string) => void): void;
   onClose(handler: () => void): void;
   isOpen(): boolean;
+  /** The raw close event, set by the Node wrapper before the close handlers run. Solo leaves it unset. */
+  closeEvent?: { code?: number; reason?: string };
   /** Verified hello claims. The Node gate sets this. Solo leaves it unset. */
   claims?: HostClaims;
 };
+
+/**
+ * The one-line close record: the client, its pawn, the gateway state, and the
+ * raw close event the peer sent.
+ * @internal
+ * @post One line; `code=none` when the event carried none; reason whitespace-collapsed.
+ */
+export function closeLine(
+  clientId: number,
+  pawnId: number | undefined,
+  gateway: boolean,
+  ev?: { code?: number; reason?: string },
+): string {
+  const reason = (ev?.reason ?? "").replace(/\s+/g, " ").trim();
+  return `close client=${clientId} owned=${pawnId ?? "no"} gateway=${gateway ? "connected" : "closed"} code=${ev?.code ?? "none"} reason=${reason.length > 0 ? reason : "-"}`;
+}
 
 /**
  * Arena Host Options type.
@@ -653,7 +671,7 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
             grenades.drop(pawnId);
             reservedPads.delete(pawnId);
           }
-          console.log(`close client=${clientId} owned=${pawnId ?? "no"} gateway=${record?.connected === true ? "connected" : "closed"}`);
+          console.log(closeLine(clientId, pawnId, record?.connected === true, conn.closeEvent));
           doorHost.drop(clientId);
         }
       });
