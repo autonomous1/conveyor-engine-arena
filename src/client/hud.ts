@@ -40,8 +40,9 @@ export interface Hud {
   /** Crosshair inspect. Empty hides the line. Does not touch status or stats. */
   setInfo(text: string): void;
   /**
-   * Copy an inspect hit id. Empty does nothing. A missing clipboard leaves the line up.
-   * The copied hint uses Date.now and lasts one second.
+   * Copy an inspect readout — a place/id, or a point. Empty does nothing.
+   * A missing clipboard leaves the line up. The copied hint uses Date.now and
+   * lasts one second.
    */
   copyInfo(id: string): void;
 }
@@ -186,7 +187,7 @@ export function createHud(opts?: { hidden?: boolean }): Hud {
       paintInfo();
     },
     /**
-     * Copy an inspect hit id. Refresh must not call this.
+     * Copy an inspect readout — a place/id, or a point. Refresh must not call this.
      * A missing clipboard or a rejected write leaves the overlay up.
      */
     copyInfo(id: string) {

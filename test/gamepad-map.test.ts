@@ -36,6 +36,7 @@ function assertQuiet(actions: PadActions): void {
     use: { held: false, pressed: false },
     callLanding: { held: false, pressed: false },
     info: { held: false, pressed: false },
+    pointScan: { held: false, pressed: false },
     ascend: 0,
     menuToggle: { held: false, pressed: false },
     mapToggle: { held: false, pressed: false },
@@ -95,6 +96,29 @@ test("Start toggles the menu once and Back toggles the map once", () => {
   assert.equal(gamepadBindings("standard").fire, STD.RT);
   assert.equal(gamepadBindings("standard").grenade, STD.LT);
   assert.equal(gamepadBindings("jumper-t").fire, undefined);
+});
+
+test("R3 copies the aim point once per press and only in the standard profile", () => {
+  assert.equal(STD.R3, 11);
+  assert.equal(gamepadBindings("standard").pointScan, 11);
+  assert.equal(gamepadBindings("jumper-t").pointScan, undefined);
+  const reader = createPadReader();
+  const pressed = reader.step(fakePad({ buttons: { [STD.R3]: 1 } }), 16, "standard");
+  assert.equal(pressed.pointScan.pressed, true);
+  assert.equal(pressed.pointScan.held, true);
+  // Only the point lane fires: R3 is not Y, fire, or use.
+  assert.equal(pressed.info.pressed, false);
+  assert.equal(pressed.fire.pressed, false);
+  assert.equal(pressed.use.pressed, false);
+  const held = reader.step(fakePad({ buttons: { [STD.R3]: 1 } }), 16, "standard");
+  assert.equal(held.pointScan.pressed, false);
+  const released = reader.step(fakePad(), 16, "standard");
+  assert.equal(released.pointScan.held, false);
+  const again = reader.step(fakePad({ buttons: { [STD.R3]: 1 } }), 16, "standard");
+  assert.equal(again.pointScan.pressed, true);
+  assert.equal(reader.step(fakePad({ buttons: { [STD.R3]: 1 } }), 16, "standard", true).pointScan.pressed, false);
+  reader.reset();
+  assert.equal(reader.step(fakePad({ buttons: { [STD.R3]: 1 } }), 16, "standard").pointScan.pressed, true);
 });
 
 test("D-pad down repeats on press, after 350 ms, then every 120 ms", () => {
@@ -330,6 +354,17 @@ test("a focused pad fires from RT without pointer lock and drops the hold on blu
     pad.buttons[STD.START]!.value = 1;
     input.update(1 / 60);
     assert.deepEqual(menu, ["up", "toggle"]);
+
+    pad.buttons[STD.R3]!.pressed = true;
+    pad.buttons[STD.R3]!.value = 1;
+    input.update(1 / 60);
+    assert.equal(input.sample().pointScan, true);
+    pad.buttons[STD.R3]!.pressed = false;
+    pad.buttons[STD.R3]!.value = 0;
+    input.update(1 / 60);
+    assert.equal(input.sample().pointScan, false);
+    input.update(1 / 60);
+    assert.equal(input.sample().pointScan, false);
 
     pad.connected = false;
     pad.buttons[STD.RT]!.value = 1;

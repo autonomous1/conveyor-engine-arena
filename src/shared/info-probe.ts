@@ -132,6 +132,14 @@ export function formatMeters(distance: number): string {
 }
 
 /**
+ * The clipboard form of a hit point: two decimals, no spaces, `x,y,z`.
+ * @post `x,y,z` at two decimals; the HUD line uses the same numbers.
+ */
+export function formatPoint(p: Vec3): string {
+  return `${p.x.toFixed(2)},${p.y.toFixed(2)},${p.z.toFixed(2)}`;
+}
+
+/**
  * Feet height for `placeAt`. A pawn uses its feet. A tall wall or door uses
  * the volume base, so a hit at camera height still lands in the room band.
  * @why A slab that runs far above and below the hit is not a floor: sample
@@ -321,6 +329,8 @@ export type InfoSession = {
    * @post The hit's place, else the own place, else `undefined` when no graph has arrived.
    */
   readonly hitPlace: string | undefined;
+  /** The shown hit's point, or the floor point in point mode. */
+  readonly hitPoint: Vec3 | undefined;
   inspect(args: {
     now: number;
     origin: Vec3;
@@ -329,6 +339,10 @@ export type InfoSession = {
     own?: InfoOwn;
     cabs?: readonly CabState[];
     range?: number;
+    /** Show and copy the point instead of the subject/place line. */
+    point?: boolean;
+    /** Manifest floor y; the point mode falls back to the plane when the pick misses. */
+    groundY?: number;
   }): string;
   /** Status and own place from current state. No raycast. Empty after expiry. */
   refresh(now: number, own?: InfoOwn, cabs?: readonly CabState[]): string;
@@ -353,12 +367,28 @@ export function createInfoSession(opts: {
   }
   let remaining = new Set(opts.pickups.map((pickup) => pickup.id));
   let graph: SceneGraph | undefined;
-  let shown: { until: number; hit?: InfoHit } | undefined;
+  let shown: { until: number; mode: "info" | "point"; hit?: InfoHit; point?: Vec3 } | undefined;
   let lastHitId: string | undefined;
   let lastPlace: string | undefined;
 
+  /** The point mode's floor fallback: a downward ray to the manifest plane. */
+  const floorPoint = (origin: Vec3, direction: Vec3, groundY: number | undefined, range: number): Vec3 | undefined => {
+    if (groundY === undefined || !Number.isFinite(groundY) || !Number.isFinite(range)) return undefined;
+    const len = Math.hypot(direction.x, direction.y, direction.z);
+    if (!(len > 1e-6)) return undefined;
+    const dy = direction.y / len;
+    if (!(dy < -1e-6)) return undefined;
+    const t = (groundY - origin.y) / dy;
+    if (!(t > 0) || t > range) return undefined;
+    return { x: origin.x + (direction.x / len) * t, y: groundY, z: origin.z + (direction.z / len) * t };
+  };
+
   const text = (own?: InfoOwn, cabs?: readonly CabState[]): string => {
     if (!shown) return "";
+    if (shown.mode === "point") {
+      const point = shown.hit?.point ?? shown.point;
+      return point ? `point ${formatPoint(point)}` : "point: miss";
+    }
     const lines: string[] = [];
     const hit = shown.hit;
     if (hit) {
@@ -429,9 +459,20 @@ export function createInfoSession(opts: {
     get hitPlace() {
       return lastPlace;
     },
+    get hitPoint() {
+      return shown?.hit?.point ?? shown?.point;
+    },
     inspect(args) {
       const hit = pickInfoTarget(args.origin, args.direction, args.candidates, args.range ?? INFO_RANGE_M);
-      shown = { until: args.now + INFO_SHOW_MS, ...(hit ? { hit } : {}) };
+      const ground = args.point === true && !hit
+        ? floorPoint(args.origin, args.direction, args.groundY, args.range ?? INFO_RANGE_M)
+        : undefined;
+      shown = {
+        until: args.now + INFO_SHOW_MS,
+        mode: args.point === true ? "point" : "info",
+        ...(hit ? { hit } : {}),
+        ...(ground ? { point: ground } : {}),
+      };
       lastHitId = hit && hit.id.length > 0 ? hit.id : undefined;
       lastPlace = undefined;
       if (graph) {

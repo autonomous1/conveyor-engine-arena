@@ -369,6 +369,169 @@ test("the info copy is the place under the hit", () => {
   assert.deepEqual(copied, ["room", "wall"]);
 });
 
+test("the point scan shows the hit point and a miss, and expires with the info line", () => {
+  const wall = box("collision", "wall", [2.5, 0, 3], [3.5, 8, 3.2]);
+  const session = createInfoSession({ doors: [], pickups: [] });
+  const shown = session.inspect({
+    now: 100,
+    origin: vec(3, 5, 0),
+    direction: vec(0, 0, 1),
+    candidates: [wall],
+    point: true,
+  });
+  assert.equal(shown, "point 3.00,5.00,3.00");
+  assert.deepEqual(session.hitPoint, { x: 3, y: 5, z: 3 });
+  assert.equal(session.refresh(100 + INFO_SHOW_MS - 1), "point 3.00,5.00,3.00");
+  assert.equal(session.refresh(100 + INFO_SHOW_MS), "");
+  assert.equal(session.hitPoint, undefined);
+
+  const miss = session.inspect({
+    now: 0,
+    origin: vec(40, 1, 40),
+    direction: vec(0, 0, 1),
+    candidates: [],
+    point: true,
+  });
+  assert.equal(miss, "point: miss");
+  assert.equal(session.hitPoint, undefined);
+});
+
+test("the point probe copies the bare point and a miss copies nothing", () => {
+  const shown: string[] = [];
+  const copied: string[] = [];
+  const probe = createInfoProbe({
+    doors: [],
+    pickups: [],
+    props: [],
+    show: (text) => shown.push(text),
+    copy: (text) => copied.push(text),
+  });
+  const volumes = [{ id: 7, source: "wall", minX: 2.5, maxX: 3.5, minY: 0, maxY: 8, minZ: 3, maxZ: 3.2 }];
+  const look = (now: number, point: boolean) => probe.inspect({
+    now,
+    origin: vec(3, 5, 0),
+    direction: vec(0, 0, 1),
+    leaves: new Map(),
+    volumes,
+    pawns: [],
+    radius: 0.4,
+    height: 1.8,
+    point,
+  });
+  look(0, true);
+  assert.equal(shown.at(-1), "point 3.00,5.00,3.00");
+  assert.deepEqual(copied, ["3.00,5.00,3.00"]);
+
+  probe.inspect({
+    now: 0,
+    origin: vec(40, 1, 40),
+    direction: vec(0, 0, 1),
+    leaves: new Map(),
+    volumes,
+    pawns: [],
+    radius: 0.4,
+    height: 1.8,
+    point: true,
+  });
+  assert.equal(shown.at(-1), "point: miss");
+  assert.deepEqual(copied, ["3.00,5.00,3.00"]);
+});
+
+test("the point scan falls back to the manifest floor on open ground", () => {
+  const session = createInfoSession({ doors: [], pickups: [] });
+  const shown = session.inspect({
+    now: 100,
+    origin: vec(2, 1.7, 4),
+    direction: vec(0, -1, 0),
+    candidates: [],
+    point: true,
+    groundY: 0,
+  });
+  assert.equal(shown, "point 2.00,0.00,4.00");
+  assert.deepEqual(session.hitPoint, { x: 2, y: 0, z: 4 });
+  assert.equal(session.refresh(100 + INFO_SHOW_MS - 1, { x: 2, y: 1.7, z: 4 }), "point 2.00,0.00,4.00");
+  assert.equal(session.refresh(100 + INFO_SHOW_MS), "");
+  assert.equal(session.hitPoint, undefined);
+});
+
+test("the point scan without a ground plane or aimed at the sky still misses", () => {
+  const session = createInfoSession({ doors: [], pickups: [] });
+  const noGround = session.inspect({
+    now: 0,
+    origin: vec(2, 1.7, 4),
+    direction: vec(0, -1, 0),
+    candidates: [],
+    point: true,
+  });
+  assert.equal(noGround, "point: miss");
+  assert.equal(session.hitPoint, undefined);
+  const sky = session.inspect({
+    now: 0,
+    origin: vec(2, 1.7, 4),
+    direction: vec(0, 1, 0),
+    candidates: [],
+    point: true,
+    groundY: 0,
+  });
+  assert.equal(sky, "point: miss");
+  assert.equal(session.hitPoint, undefined);
+});
+
+test("a candidate stops the point scan before the floor", () => {
+  const session = createInfoSession({ doors: [], pickups: [] });
+  const wall = box("collision", "wall", [1.5, 0.5, 3.5], [2.5, 1, 4.5]);
+  const shown = session.inspect({
+    now: 0,
+    origin: vec(2, 1.7, 4),
+    direction: vec(0, -1, 0),
+    candidates: [wall],
+    point: true,
+    groundY: 0,
+  });
+  assert.equal(shown, "point 2.00,1.00,4.00");
+  assert.deepEqual(session.hitPoint, { x: 2, y: 1, z: 4 });
+});
+
+test("the point probe copies the floor point on open ground", () => {
+  const shown: string[] = [];
+  const copied: string[] = [];
+  const probe = createInfoProbe({
+    doors: [],
+    pickups: [],
+    props: [],
+    show: (text) => shown.push(text),
+    copy: (text) => copied.push(text),
+  });
+  probe.inspect({
+    now: 0,
+    origin: vec(2, 1.7, 4),
+    direction: vec(0, -1, 0),
+    leaves: new Map(),
+    volumes: [],
+    pawns: [],
+    radius: 0.4,
+    height: 1.8,
+    point: true,
+    groundY: 0,
+  });
+  assert.equal(shown.at(-1), "point 2.00,0.00,4.00");
+  assert.deepEqual(copied, ["2.00,0.00,4.00"]);
+  probe.inspect({
+    now: 0,
+    origin: vec(2, 1.7, 4),
+    direction: vec(0, 1, 0),
+    leaves: new Map(),
+    volumes: [],
+    pawns: [],
+    radius: 0.4,
+    height: 1.8,
+    point: true,
+    groundY: 0,
+  });
+  assert.equal(shown.at(-1), "point: miss");
+  assert.deepEqual(copied, ["2.00,0.00,4.00"]);
+});
+
 test("a cab stop is the place under the rider, and a moving cab reports the shaft", () => {
   const file = placeFile();
   const graph = loadGraph(file);
@@ -615,7 +778,7 @@ test("Y is free of the previous bindings and only emits info", () => {
   assert.equal(bound.info, STD.Y);
   assert.equal(gamepadBindings("jumper-t").info, undefined);
   for (const [name, index] of Object.entries(bound)) {
-    if (name === "info") continue;
+    if (name === "info" || name === "pointScan") continue;
     assert.equal(legacy.includes(index!), true, name);
   }
 
@@ -626,6 +789,7 @@ test("Y is free of the previous bindings and only emits info", () => {
       use: { held: false, pressed: false },
       callLanding: { held: false, pressed: false },
       info: { held: false, pressed: false },
+      pointScan: { held: false, pressed: false },
       ascend: 0,
       menuToggle: { held: false, pressed: false },
       mapToggle: { held: false, pressed: false },

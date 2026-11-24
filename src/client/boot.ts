@@ -624,6 +624,7 @@ export async function boot(
   const sendDt = 1 / INPUT_HZ;
   let lastDoorTick = 0;
   let wantInfo = false;
+  let wantPointScan = false;
   let probeOwn: { x: number; y: number; z: number } | undefined;
   let probeOwnedId: number | undefined;
   let probePawns: readonly ProbePawn[] = [];
@@ -631,6 +632,7 @@ export async function boot(
   function frame(now: number) {
     let threw = false;
     wantInfo = false;
+    wantPointScan = false;
     try {
       drawFrame(now);
     } catch (err) {
@@ -669,7 +671,7 @@ export async function boot(
     const doorDt = lastDoorTick ? Math.min(0.1, (now - lastDoorTick) / 1000) : 0;
     lastDoorTick = now;
     for (const rig of visuals.doors.values()) tickDoorSwing(rig.group, doorDt);
-    if (wantInfo) {
+    if (wantInfo || wantPointScan) {
       const aim = cameraAim(arena.camera);
       const leaves = new Map<string, ReturnType<typeof leafAabb>>();
       for (const [id, rig] of visuals.doors) leaves.set(id, leafAabb(rig.group));
@@ -686,6 +688,8 @@ export async function boot(
         own: probeOwn,
         cabs: probeCabs(),
         pickupHidden: (id) => visuals.placements.hidden(id),
+        point: wantPointScan,
+        groundY: view.floor?.y ?? 0,
       });
     }
     probe.refresh(now, probeOwn, probeCabs());
@@ -731,6 +735,7 @@ export async function boot(
     const ownedId = client.ownedEntity;
     const owned = ownedId === undefined ? undefined : render.entities.find((entity) => entity.id === ownedId);
     wantInfo = sample.info;
+    wantPointScan = sample.pointScan;
     probeOwnedId = ownedId;
     probeOwn = owned ? { x: owned.position.x, y: owned.position.y, z: owned.position.z } : undefined;
     probePawns = render.entities;

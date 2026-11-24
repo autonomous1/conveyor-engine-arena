@@ -58,6 +58,8 @@ export type PadActions = {
   callLanding: PadEdge;
   /** Y, one edge per press. Inspects the crosshair. Not sent to the host. */
   info: PadEdge;
+  /** R3, one edge per press. Copies the aim point. Local inspect; not sent. */
+  pointScan: PadEdge;
   ascend: -1 | 0 | 1;
   menuToggle: PadEdge;
   mapToggle: PadEdge;
@@ -189,6 +191,7 @@ function idleActions(): PadActions {
     use: quietEdge(),
     callLanding: quietEdge(),
     info: quietEdge(),
+    pointScan: quietEdge(),
     ascend: 0,
     menuToggle: quietEdge(),
     mapToggle: quietEdge(),
@@ -256,6 +259,7 @@ export function createPadReader(): PadReader {
   const back = new ButtonEdge();
   const callLanding = new ButtonEdge();
   const info = new ButtonEdge();
+  const pointScan = new ButtonEdge();
   const menuToggle = new ButtonEdge();
   const mapToggle = new ButtonEdge();
   const navY = new RepeatNav();
@@ -269,6 +273,7 @@ export function createPadReader(): PadReader {
     back.reset();
     callLanding.reset();
     info.reset();
+    pointScan.reset();
     menuToggle.reset();
     mapToggle.reset();
     navY.reset();
@@ -289,6 +294,7 @@ export function createPadReader(): PadReader {
       const cancel = back.step(buttonDown(frame, STD.B));
       const call = callLanding.step(buttonDown(frame, STD.X));
       const inspect = info.step(buttonDown(frame, STD.Y));
+      const scan = pointScan.step(buttonDown(frame, STD.R3));
       const start = menuToggle.step(buttonDown(frame, STD.START));
       const select = mapToggle.step(buttonDown(frame, STD.BACK));
       const stick = menu ? stickY.step(axisValue(frame, 1)) : (stickY.reset(), 0);
@@ -303,6 +309,7 @@ export function createPadReader(): PadReader {
         select: menu ? confirm : quietEdge(),
         callLanding: menu ? quietEdge() : call,
         info: menu ? quietEdge() : inspect,
+        pointScan: menu ? quietEdge() : scan,
         back: menu ? cancel : quietEdge(),
         menuToggle: start,
         mapToggle: select,

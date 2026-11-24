@@ -13,6 +13,7 @@ import { doorLeafBox } from "../shared/doors.js";
 import {
   collectInfoCandidates,
   createInfoSession,
+  formatPoint,
   type Aabb,
   type InfoOwn,
   type PawnPick,
@@ -57,6 +58,10 @@ export type InfoProbe = {
     own?: InfoOwn;
     cabs?: readonly CabState[];
     pickupHidden?: (id: string) => boolean;
+    /** Copy the hit point as `x,y,z` instead of the place/id. */
+    point?: boolean;
+    /** Manifest floor y for the point mode's fallback. */
+    groundY?: number;
   }): void;
   refresh(now: number, own?: InfoOwn, cabs?: readonly CabState[]): void;
 };
@@ -172,9 +177,13 @@ export function createInfoProbe(opts: {
         candidates,
         own: args.own,
         cabs: args.cabs,
+        point: args.point,
+        groundY: args.groundY,
       });
       paint(value);
-      const copied = session.hitPlace ?? session.hitId;
+      const copied = args.point === true
+        ? (session.hitPoint ? formatPoint(session.hitPoint) : undefined)
+        : (session.hitPlace ?? session.hitId);
       if (copied) opts.copy?.(copied);
     },
     refresh(now, nextOwn, nextCabs) {

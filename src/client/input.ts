@@ -71,6 +71,8 @@ export type PlaySample = {
   callLanding: boolean;
   /** I or Y was pressed once. Local inspect. A hold does not repeat. Not sent. */
   info: boolean;
+  /** R3 was pressed once. Copies the aim point. A hold does not repeat. Not sent. */
+  pointScan: boolean;
 };
 
 /**
@@ -186,6 +188,7 @@ export function attachPlayInput(
   let padCallQueued = false;
   let keyInfoQueued = false;
   let padInfoQueued = false;
+  let padPointScanQueued = false;
   let padAscend: -1 | 0 | 1 = 0;
   let padCabNav: -1 | 0 | 1 = 0;
   let sticksLive = false;
@@ -211,6 +214,7 @@ export function attachPlayInput(
     padCabConfirmQueued = false;
     padCallQueued = false;
     padInfoQueued = false;
+    padPointScanQueued = false;
     padAscend = 0;
     padCabNav = 0;
   };
@@ -250,6 +254,7 @@ export function attachPlayInput(
     }
     if (actions.callLanding.pressed) padCallQueued = true;
     if (actions.info.pressed) padInfoQueued = true;
+    if (actions.pointScan.pressed) padPointScanQueued = true;
     padAscend = actions.ascend;
     if (actions.nav !== 0) padCabNav = cabDelta(actions.nav);
   };
@@ -459,6 +464,7 @@ export function attachPlayInput(
       const cabConfirm = padCabConfirmQueued;
       const callLanding = padCallQueued;
       const info = !menuIsOpen() && (keyInfoQueued || padInfoQueued);
+      const pointScan = !menuIsOpen() && padPointScanQueued;
       fireQueued = false;
       grenadeQueued = false;
       useQueued = false;
@@ -469,6 +475,7 @@ export function attachPlayInput(
       padCabConfirmQueued = false;
       padCallQueued = false;
       padInfoQueued = false;
+      padPointScanQueued = false;
       keyInfoQueued = false;
       padCabNav = 0;
       return {
@@ -484,6 +491,7 @@ export function attachPlayInput(
         cabConfirm,
         callLanding,
         info,
+        pointScan,
         ...(digit ? { digit } : {}),
       };
     },
