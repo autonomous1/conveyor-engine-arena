@@ -19,6 +19,7 @@
     "build:server": "tsc -p tsconfig.server.json",
     "build:client": "node scripts/build-client.mjs",
     "build:bot": "node scripts/build-bot.mjs",
+    "probe": "node packages/bot-client/probe/run.mjs",
     "build:solo": "node scripts/build-solo.mjs && node scripts/check-web-bundle.mjs solo",
     "check:web": "node scripts/check-web-bundle.mjs web",
     "build": "npm run clean && npm run build:server && npm run build:client && npm run check:web && npm run build:solo",

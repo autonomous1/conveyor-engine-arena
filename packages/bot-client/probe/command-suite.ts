@@ -14,7 +14,7 @@
 // Run:
 //   ARENA_AUTH=required ARENA_VERIFY_KEY_FILE="$HOME/.config/ce-arena/ed25519.pub.pem" \
 //   CE_TOKEN="$(cat ~/.config/ce-arena/qa-token.pem)" \
-//     node --import ./scripts/ts-ext-register.mjs packages/bot-client/tests/command-suite.ts \
+//     node --import ./scripts/ts-ext-register.mjs packages/bot-client/probe/command-suite.ts \
 //     --port 4175 --passes 3 --negatives --label 158-suite --name s158
 //
 // Iteration: `--only arm-1 --passes 1 --no-build`.
@@ -53,10 +53,10 @@ const MAX_MIN = Number(args.get("max-min") ?? 16);
 const NAME = args.get("name") ?? "s158";
 const BUILD = args.get("build") === "1" ? true : args.get("build") === "0" || args.has("no-build") || ATTACH.length > 0 ? false : true;
 const ROOT = process.cwd();
-const TRIALS_FILE = "packages/bot-client/tests/command-suite.trials.json";
+const TRIALS_FILE = "packages/bot-client/probe/command-suite.trials.json";
 const STAMP = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
 const LOG_DIR = "plan/dsh-tasks/logs";
-const SURFACE_REL = "packages/bot-client/tests/commands-prototype.ts";
+const SURFACE_REL = "packages/bot-client/probe/commands-prototype.ts";
 /** Each mode owns its artifact basename so one test never overwrites another. */
 const LABEL = args.get("label");
 const BASE = LABEL
@@ -1066,7 +1066,7 @@ async function main(): Promise<void> {
   if (!existsSync(SURFACE_REL)) abortSuite(2, `surface missing: ${SURFACE_REL}`);
   // Surface guard (D16): the subject must be the prototype, never src/commands.ts.
   const surfaceHash = sha256File(SURFACE_REL);
-  const ownSrc = readFileSync("packages/bot-client/tests/command-suite.ts", "utf8");
+  const ownSrc = readFileSync("packages/bot-client/probe/command-suite.ts", "utf8");
   if (/from\s+["']\.\.\/src\/commands\.ts["']/.test(ownSrc)) abortSuite(2, "surface guard: this harness imports src/commands.ts");
   record(`MENU choice=${MODE === "test" ? TEST_ID : "suite"} mode=${MODE} command="${process.argv.slice(2).join(" ")}"`);
   record(`SURFACE file=${SURFACE_REL} sha256=${surfaceHash}`);
