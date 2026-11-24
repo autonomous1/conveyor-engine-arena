@@ -5,14 +5,19 @@
 // ARCHITECTURE: The bot executor: goal claim, GOAP plan, route, walk, use, ride, and pickup state machine.
 // Wiring: runMission/runBrain from the CLI and live tests; it drives BotSession input/world.
 // Invariants: A pursue plan is rebuilt on >=1 m target drift or 200 ms; the straight line is the fallback;
-//   the stand fact and the stand walk measure one plan-resolved goal, y included.
+//   the retreat plans one cover/away point, replans only on stuck/a cover LOS failure, and holds when no
+//   point plans; the stand fact and the stand walk measure one plan-resolved goal, y included;
+//   every plan-step kind has one binder in STEP_BINDERS, and a step's kind/arg are set by its
+//   binder, never re-parsed from the id; a `safety` plan gets PLAN_BUDGET_MS, and a missed warm
+//   attempt retries once at COLD_PLAN_BUDGET_MS; the combat ladder plans through
+//   combatGoals/chooseCombatGoal with the combat actions (test: combat_ladder_matrices).
 import type { BotCtx } from "../../../src/shared/bots/actions.js";
-import { createBotContext, estimateSeconds, groundActions } from "../../../src/shared/bots/actions.js";
-import type { Fact, Goal, Plan, PlanOptions, WorldState } from "../../../src/shared/bots/goap.js";
+import { createBotContext, estimateSeconds, groundActions, placeOfPickup } from "../../../src/shared/bots/actions.js";
+import type { Action, Fact, Goal, Plan, PlanOptions, WorldState } from "../../../src/shared/bots/goap.js";
 import { chooseGoal } from "../../../src/shared/bots/goap.js";
 import { buildWorldState, STAND, type WorldSnapshot } from "../../../src/shared/bots/state.js";
 import { reach, standAt, type StandGoal } from "../../../src/shared/bots/goals.js";
-import { INPUT_HZ, moveIntent } from "../../../src/shared/look.js";
+import { EYE_HEIGHT, INPUT_HZ, moveIntent } from "../../../src/shared/look.js";
 import { MOVE_SPEED, type FloorBox } from "../../../src/shared/movements.js";
 import { createFollower, doorStand, wishTo, type FollowInput, type FollowPawn, type Pose } from "../../../src/shared/nav/follow.js";
 import { buildGrid, findLocalPath, navBoxes, specForPlace, type Grid } from "../../../src/shared/nav/grid.js";
@@ -28,6 +33,7 @@ import type { Mission } from "./missions.js";
 import { createMotionPredictor } from "./predict.js";
 import { hasLineOfSightDag } from "../../../src/shared/hitscan.js";
 import { nearestCover } from "../../../src/shared/bots/cover.js";
+import { assaultGoal, chooseCombatGoal, combatActions, combatFacts, combatGoals, combatHeuristic, type HpClock } from "./combat.js";
 
 const STEP_MS = 1000 / INPUT_HZ;
 const RIDE_SUMMON_MS = 30_000;
@@ -42,8 +48,13 @@ const STAND_TOLERANCE = 0.35;
 const STAND_GOAL_Y = 0.6;
 /**
  * Budget for a periodic `safety` replan: the same state, warm route nets.
+ * The route heuristic's warm plans measure 79–259 ms; 250 ms sits inside that
+ * distribution, so a plan that missed it fell to the 4 s cold retry (177).
+ * 600 ms removes the retry for the measured plans.
+ * @invariant `safety` plans get PLAN_BUDGET_MS; a missed warm attempt retries
+ *            once at COLD_PLAN_BUDGET_MS. (test: warm_plan_budget_is_600ms)
  */
-const PLAN_BUDGET_MS = 250;
+const PLAN_BUDGET_MS = 600;
 /**
  * Budget for a plan after the state changed: the mission's first plan, and the
  * first plan after a finished action, a door/pickup change, or a `stuck`.
@@ -92,11 +103,17 @@ type Triple = [number, number, number];
 
 type Running = {
   id: string;
+  /** The binder that built it, and its raw argument: the executor's typed binding (177). */
+  kind: string;
+  arg: string;
   moving: boolean;
   started: number;
   tick(pose: Pose, tick: number, now: number): TickStatus;
   onDone?: () => void;
 };
+
+/** One plan-step kind to its binder. `arg` is everything after the first `:`. */
+type StepBinder = (id: string, arg: string, pose: Pose) => Running | undefined;
 
 type Walk = {
   points: Triple[];
@@ -288,7 +305,8 @@ function planToPoint(
  * Shoot a named pawn until its health frame says dead, it disappears, the bot
  * runs out of ammo or dies, or the deadline passes.
  * @post Returns 0 on dead, 2 on refused/lost/no_ammo/died/no_dag/retreat, 3 on
- *       timeout; no shot whose eye-to-target corridor contains a player.
+ *       timeout; no shot whose eye-to-target corridor contains a player. The
+ *       retreat plans one cover/away point and holds when none plans.
  */
 export async function runAttack(session: BotSession, targetId: number, opts: BrainOptions = {}): Promise<number> {
   const log = opts.log ?? (() => {});
@@ -355,10 +373,12 @@ export async function runAttack(session: BotSession, targetId: number, opts: Bra
   /**
    * Back away from the threat centroid (or `fallback` when none is near) until the
    * nearest threat is out of range, the retreat cap passes, or the deadline does.
+   * @why Cover first, then one planned away point: the cover is the retreat's real
+   *      goal, and one plan avoids the 176 250 ms replan loop. When no candidate
+   *      plans, the pawn holds instead of steering blindly into a wall.
    */
   const retreatFrom = async (me: { x: number; y: number; z: number }, fallback: { x: number; y: number; z: number }, until: number): Promise<void> => {
     const graph = session.world.sceneGraph();
-    const dag = graph?.spatialDag;
     // Interim teams: the players are friendly, the NPCs are the enemy. The
     // threat centroid, the nearest-threat exit and the cover attacker are the
     // enemy NPCs only; a teammate never counts. The future two-team model
@@ -451,9 +471,7 @@ export async function runAttack(session: BotSession, targetId: number, opts: Bra
           // The cover test picked the point; verify the attacker's sight line
           // from where the bot actually stopped.
           const eye = { x: nowSelf.x, y: nowSelf.y + EYE_HEIGHT, z: nowSelf.z };
-          const broken = dag
-            ? !hasLineOfSightDag(dag, { x: attacker.x, y: attacker.y + EYE_HEIGHT, z: attacker.z }, eye)
-            : false;
+          const broken = !hasLineOfSightDag(dag, { x: attacker.x, y: attacker.y + EYE_HEIGHT, z: attacker.z }, eye);
           log(`attack: retreat cover reached los=${broken ? "no" : "yes"}`);
           if (broken) return;
         } else if (step.status === "arrived") {
@@ -694,14 +712,53 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
   let failStreak = 0;
   let lastCmd: FollowInput | undefined;
   let lastReason = "initial";
+  /** The caller-owned hp clock for `underFire` (a drop within 1.5 s). */
+  let hpClock: HpClock = { hp: 100, at: -Infinity };
+  /** Set when a `returnFire` step finishes with the target dead: the mission's met fact. */
+  let firedDown = false;
 
+  /**
+   * The grounding union: the mission, the ladder's wants (so `hasAmmo` pulls the
+   * gear pickups) and every health crate's place, so `goTo:<crate place>` and
+   * `seekHealth` exist whichever goal wins. The set is stable per map.
+   */
+  const groundGoalsNow = (): Goal[] => {
+    const goals: Goal[] = [goal];
+    if (stand) goals.push(reach(stand.place));
+    const ladderWants: WorldState[] = [{ hpHigh: true }, { inCover: true }, { threatDown: true }];
+    for (const want of ladderWants) {
+      goals.push({ id: `ground:${Object.keys(want)[0]}`, want, priority: () => 0 });
+    }
+    const graph = session.world.sceneGraph();
+    if (graph) {
+      const available = new Set(session.world.pickups());
+      // The crates' *places*, not a `hasAmmo` want: the combat reload/seekHealth
+      // action needs `goTo:<place>`, but grounding every gear pickup also adds
+      // `pickup:<crate>` (eff `at=<place>`) as a cheap mission shortcut (188).
+      for (const item of session.world.pickupPlacements()) {
+        if ((item.kind !== "health" && item.kind !== "ammo") || !available.has(item.id)) continue;
+        goals.push({ id: `ground:crate:${item.id}`, want: { at: placeOfPickup(graph, item) }, priority: () => 0 });
+      }
+    }
+    return goals;
+  };
+
+  /** The assault order's pawn id, when the mission is one. */
+  const missionTarget = (): number | undefined => {
+    const match = /^assault:(\d+)$/.exec(goal.id);
+    return match ? Number(match[1]) : undefined;
+  };
   const ensureGround = (): boolean => {
     const graph = session.world.sceneGraph();
     if (!graph) return false;
     const hash = session.world.sceneGraphHash() ?? "local";
     if (ctx && hash === grounded) return true;
     placements = session.world.pickupPlacements();
-    actions = groundActions(graph, placements, [goal], stand);
+    // The union: the combat ladder adds places a mission-shaped grounding would
+    // miss (a health crate is neither a key nor gear).
+    const groundStarted = performance.now();
+    actions = groundActions(graph, placements, groundGoalsNow(), stand);
+    log(`ground actions=${actions.length} ms=${(performance.now() - groundStarted).toFixed(1)}`);
     ctx = createBotContext(graph, placements, {
       position: () => {
         const self = session.world.self();
@@ -737,7 +794,11 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
     // `at` is where the pawn is while an action moves; the door token is only
     // for the moment an action ended on that spot. A stale token is 20 m and
     // ~100 ms wrong, and a safety replan cannot afford it (162).
-    const state: Record<string, Fact> = { ...buildWorldState(snapshot(exec?.moving === true)) };
+    const state: Record<string, Fact> = {
+      ...buildWorldState(snapshot(exec?.moving === true)),
+      ...combatFacts(session, hpClock),
+    };
+    if (firedDown) state.threatDown = true;
     const self = session.world.self();
     if (stand && resolvedStand && self && Math.hypot(self.x - resolvedStand.x, self.z - resolvedStand.z) <= STAND_TOLERANCE &&
         Math.abs(self.y - resolvedStand.y) <= STAND_GOAL_Y &&
@@ -773,20 +834,6 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
     log(`finish ${row.id} t=${secs()}s dt=${dt}s${failed ? " failed" : ""}`);
   };
 
-  const begin = (id: string, pose: Pose): Running | undefined => {
-    const cut = id.indexOf(":");
-    const kind = cut < 0 ? id : id.slice(0, cut);
-    const arg = cut < 0 ? "" : id.slice(cut + 1);
-    if (kind === "goTo") return beginGoTo(id, arg, pose);
-    if (kind === "standAt") return beginStand(id, arg, pose);
-    if (kind === "ride") return beginRide(id, arg, pose);
-    if (kind === "rideTo") return beginRide(id, arg, pose, true);
-    if (kind === "goToDoor") return beginDoor(id, arg, pose);
-    if (kind === "unlock") return beginUnlock(id, arg, pose);
-    if (kind === "pickup") return beginPickup(id, arg, pose);
-    return undefined;
-  };
-
   const beginGoTo = (id: string, place: string, pose: Pose): Running | undefined => {
     const walked = walkToPlace(place, pose);
     if (!walked) return undefined;
@@ -795,6 +842,8 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
     const follow = makeFollow(walked);
     return {
       id,
+      kind: "goTo",
+      arg: place,
       moving: phase === "walk",
       started: Date.now(),
       onDone() {
@@ -848,6 +897,8 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
     let stopped = false;
     return {
       id,
+      kind: "standAt",
+      arg: key,
       moving: true,
       started: Date.now(),
       tick(current, nowTick) {
@@ -934,6 +985,8 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
     let exitDestination = destination;
     return {
       id,
+      kind: byGoal ? "rideTo" : "ride",
+      arg: arg,
       moving: true,
       started: Date.now(),
       tick(current, nowTick, now) {
@@ -1009,6 +1062,8 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
     const follow = makeFollow(walked);
     return {
       id,
+      kind: "goToDoor",
+      arg: arg,
       moving: true,
       started: Date.now(),
       onDone() {
@@ -1035,6 +1090,8 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
     let armed = false;
     return {
       id,
+      kind: "unlock",
+      arg: doorId,
       moving: false,
       started: Date.now(),
       tick(current, _tick, now) {
@@ -1076,6 +1133,8 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
     let waitStart = 0;
     return {
       id,
+      kind: "pickup",
+      arg: pickupId,
       moving: true,
       started: Date.now(),
       onDone() {
@@ -1162,6 +1221,112 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
     return { points, grid: gridFor(session, graph, points, omit, placeY(graph, pose)) };
   };
 
+  /**
+   * Walk to a point encoded as `x,z`: cover and retreat share it.
+   * @post `done` on arrival within 0.6 m; `stuck` when the follower stalls.
+   */
+  const beginWalkPoint = (id: string, arg: string, pose: Pose, kind: string): Running | undefined => {
+    const [rawX, rawZ] = arg.split(",");
+    const x = Number(rawX);
+    const z = Number(rawZ);
+    if (!Number.isFinite(x) || !Number.isFinite(z)) return undefined;
+    const walked = walkToPoint(pose, { x, y: pose.y, z }, new Set());
+    if (!walked) return undefined;
+    const follow = makeFollow(walked);
+    return {
+      id,
+      kind,
+      arg,
+      moving: true,
+      started: Date.now(),
+      tick(current, nowTick) {
+        const self = session.world.self();
+        if (self && Math.hypot(self.x - x, self.z - z) <= 0.6) return "done";
+        const step = follow.step(current, otherPawns(session), nowTick);
+        send(step.input);
+        if (step.status === "stuck") return "stuck";
+        if (step.status === "arrived") return "done";
+        return "running";
+      },
+    };
+  };
+
+  /**
+   * `seekHealth:<crate>` / `reload:<crate>`: the existing pickup executor, with
+   * its own kind so the loop's active-pickup check sees it.
+   */
+  const beginPickupAs = (kind: string) => (id: string, arg: string, pose: Pose): Running | undefined => {
+    const run = beginPickup(id, arg, pose);
+    if (run) run.kind = kind;
+    return run;
+  };
+
+  /**
+   * `returnFire:<pawn>`: `runAttack` is the step body (the prototype's aim/burst
+   * code is not re-derived). The tick reports the promise's outcome; the attack
+   * sends its own inputs, so this executor never sends.
+   * @post `done` when the target is down (code 0); `failed` otherwise.
+   */
+  const beginReturnFire = (id: string, arg: string, pose: Pose): Running | undefined => {
+    const targetId = Number(arg);
+    if (!Number.isInteger(targetId)) return undefined;
+    void pose;
+    let outcome: "running" | "done" | "failed" = "running";
+    void runAttack(session, targetId, {
+      log,
+      error,
+      onTick: opts.onTick,
+      timeoutMs: Math.max(2_000, deadline - Date.now()),
+    })
+      .then((code) => {
+        if (code === 0) firedDown = true;
+        outcome = code === 0 ? "done" : "failed";
+      })
+      .catch(() => {
+        outcome = "failed";
+      });
+    return {
+      id,
+      kind: "returnFire",
+      arg,
+      moving: false,
+      started: Date.now(),
+      tick() {
+        return outcome;
+      },
+    };
+  };
+
+  /**
+   * @why The typed map is the executor's action binding (177): a new plan-step
+   *      kind is one entry here and one grounded action in actions.ts — no
+   *      second string parse elsewhere in the loop. Each binder sets `kind`/`arg`
+   *      on its Running, so the loop reads those and never re-parses `exec.id`.
+   * @invariant Every plan-step kind has one binder in STEP_BINDERS; a step's
+   *            `kind`/`arg` are set by its binder, never re-parsed from the id.
+   *            (test: plan_step_map_covers_every_kind)
+   */
+  const STEP_BINDERS = new Map<string, StepBinder>([
+    ["goTo", beginGoTo],
+    ["standAt", beginStand],
+    ["ride", (id, arg, pose) => beginRide(id, arg, pose)],
+    ["rideTo", (id, arg, pose) => beginRide(id, arg, pose, true)],
+    ["goToDoor", beginDoor],
+    ["unlock", beginUnlock],
+    ["pickup", beginPickup],
+    ["seekHealth", beginPickupAs("seekHealth")],
+    ["reload", beginPickupAs("reload")],
+    ["takeCover", (id, arg, pose) => beginWalkPoint(id, arg, pose, "takeCover")],
+    ["retreat", (id, arg, pose) => beginWalkPoint(id, arg, pose, "retreat")],
+    ["returnFire", beginReturnFire],
+  ]);
+  const begin = (id: string, pose: Pose): Running | undefined => {
+    const cut = id.indexOf(":");
+    const kind = cut < 0 ? id : id.slice(0, cut);
+    const arg = cut < 0 ? "" : id.slice(cut + 1);
+    return STEP_BINDERS.get(kind)?.(id, arg, pose);
+  };
+
   const chooseStand = (
     doorId: string,
     hint: { x: number; z: number } | undefined,
@@ -1195,7 +1360,9 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
       await sleepRest(loopStart);
       continue;
     }
-    const activePickup = exec && exec.id.startsWith("pickup:") ? exec.id.slice("pickup:".length) : undefined;
+    const activePickup = exec && (exec.kind === "pickup" || exec.kind === "seekHealth" || exec.kind === "reload")
+      ? exec.arg
+      : undefined;
     if (exec && activePickup && pickupGone(session, activePickup)) {
       const item = session.world.pickupPlacements().find((row) => row.id === activePickup);
       if (item && pickupTaken(session, item)) {
@@ -1211,6 +1378,8 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
       await sleepRest(loopStart);
       continue;
     }
+    const hpNow = session.world.health?.()?.hp;
+    if (typeof hpNow === "number" && hpNow < hpClock.hp) hpClock = { hp: hpNow, at: Date.now() };
     const state = worldState();
     if (satisfies(state, goal.want)) return 0;
 
@@ -1231,27 +1400,39 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
       // The cold cap follows the state change: `safety` is the only periodic
       // same-state refresh, so only it stays on the warm budget.
       const budgetMs = opts.planMs ?? (reason === "safety" ? PLAN_BUDGET_MS : COLD_PLAN_BUDGET_MS);
+      // Build the ladder's action set before the plan clock starts: the combat
+      // cover scan walks the scene AABBs (188), and charging it to the plan
+      // deadline made a valid plan start already expired.
+      const ladder = combatGoals(state, goal);
+      const combat = combatActions(session, groundedCtx, { target: missionTarget() });
+      const planActions = combat.length > 0 ? [...actions, ...combat] : actions;
+      log(`plan ladder target=${missionTarget() ?? "-"} combat=${combat.length} goals=${ladder.map((g) => `${g.id}@${g.priority(state)}`).join(",")}`);
       const planDeadline = Math.min(deadline, Date.now() + budgetMs);
-      const planOpts: PlanOptions = {
-        minCost: groundedCtx.minActionS,
-        heuristic: estimateSeconds(goal, groundedCtx, placements, stand),
-        deadlineMs: planDeadline,
-        now: () => Date.now(),
-        ...(opts.maxExpand !== undefined ? { maxExpand: opts.maxExpand } : {}),
-        ...(opts.maxEvaluations !== undefined ? { maxEvaluations: opts.maxEvaluations } : {}),
+      // One route-bound closure per goal (the 160/185 contract): re-creating
+      // `estimateSeconds` inside the heuristic made every state a fresh "start"
+      // and paid the classify/route compile per evaluation (merged 188).
+      const planOpts = (g: Goal): PlanOptions => {
+        const estimate = estimateSeconds(g, groundedCtx, placements, stand);
+        return {
+          minCost: groundedCtx.minActionS,
+          heuristic: (s) => Math.max(estimate(s), combatHeuristic(g, planActions, groundedCtx)(s)),
+          deadlineMs: planDeadline,
+          now: () => Date.now(),
+          ...(opts.maxExpand !== undefined ? { maxExpand: opts.maxExpand } : {}),
+          ...(opts.maxEvaluations !== undefined ? { maxEvaluations: opts.maxEvaluations } : {}),
+        };
       };
       log("plan start");
       const planStarted = Date.now();
-      plan = chooseGoal(state, [goal], actions, groundedCtx, planOpts);
+      plan = chooseCombatGoal(state, ladder, planActions, groundedCtx, planOpts);
       // A periodic replan gets 250 ms; if that is not enough for a state that
       // exists, retry once at the cold budget before declaring `unsatisfiable`
       // (136).
       if (!plan && reason === "safety") {
-        plan = chooseGoal(state, [goal], actions, groundedCtx, {
-          ...planOpts,
+        plan = chooseCombatGoal(state, ladder, planActions, groundedCtx, (g) => ({
+          ...planOpts(g),
           deadlineMs: Math.min(deadline, Date.now() + COLD_PLAN_BUDGET_MS),
-          now: () => Date.now(),
-        });
+        }));
       }
       const planMs = Date.now() - planStarted;
       log(`plan done ${planMs}ms steps=${plan?.steps.length ?? 0} expanded=${plan?.expanded ?? 0}`);

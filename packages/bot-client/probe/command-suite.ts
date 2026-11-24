@@ -115,11 +115,29 @@ const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms
 
 mkdirSync(LOG_DIR, { recursive: true });
 const lines: string[] = [];
+/**
+ * The shell's prompt hook: `record` is the one console writer, and in `--shell`
+ * mode a write can land after the prompt (a command result, a status row, a
+ * collision line), leaving the prompt buried. The hook re-prompts once per
+ * synchronous burst, so a multi-row status gets one `bot> `, not one per row.
+ * Set only while the shell's readline is open; `finish` clears it.
+ */
+let shellReprompt: (() => void) | undefined;
+let repromptQueued = false;
+function queueShellReprompt(): void {
+  if (!shellReprompt || repromptQueued) return;
+  repromptQueued = true;
+  setImmediate(() => {
+    repromptQueued = false;
+    shellReprompt?.();
+  });
+}
 function record(line: string): void {
   const row = `t=${secs().toFixed(1)}s ${line}`;
   lines.push(row);
   console.log(row);
   appendFileSync(LOG, `${row}\n`);
+  queueShellReprompt();
 }
 /** File-only: the shell's handler chatter (hunt/patrol loops) stays out of the console. */
 function recordFile(line: string): void {
@@ -1387,6 +1405,7 @@ async function main(): Promise<void> {
         await Promise.race([Promise.allSettled([...pending]), sleep(15_000)]);
       }
       done = true;
+      shellReprompt = undefined;
       shellShutdown = undefined;
       if (collisionSampler) clearInterval(collisionSampler);
       record(`SHELL exit reason=${reason} code=${code}`);
@@ -1476,11 +1495,23 @@ async function main(): Promise<void> {
     const terminal = process.stdin.isTTY === true;
     rl = createInterface({ input: process.stdin, output: process.stdout, terminal });
     if (terminal) rl.setPrompt("bot> ");
+    // One console write can land long after the prompt (a result, a status row);
+    // the record hook re-prompts on the next tick, coalesced per burst. Only on a
+    // TTY: a piped stdin run keeps its console clean (no `> ` from readline).
+    if (terminal) {
+      shellReprompt = () => {
+        if (!done && !closing) rl?.prompt();
+      };
+    }
     let cmdNo = 0;
     const handle = (raw: string): void => {
       if (done || closing) return;
       const line = raw.trim();
-      if (line.length === 0) return;
+      if (line.length === 0) {
+        // No record row, so no queued reprompt: a blank Enter must not eat the prompt.
+        shellReprompt?.();
+        return;
+      }
       const tokens = line.split(/\s+/);
       const verb = (tokens[0] ?? "").toLowerCase();
       const numeric = /^\d+$/.test(tokens[0] ?? "");
@@ -1493,13 +1524,11 @@ async function main(): Promise<void> {
         }
         if (verb === "help") {
           for (const row of SHELL_HELP) record(`SHELL help ${row}`);
-          if (terminal) rl.prompt();
           return;
         }
         if (verb === "seats") {
           const now = [...seats.values()].map((seat) => seat.world.self()?.id ?? "?");
           record(`SHELL seats=[${[...seats.keys()].join(",")}] selfs=[${now.join(",")}] players=[${[...first.world.playerIds()].join(",")}]`);
-          if (terminal) rl.prompt();
           return;
         }
         if (verb === "status") {
@@ -1514,7 +1543,6 @@ async function main(): Promise<void> {
               record(`SHELL status seat=${seat.index} ${JSON.stringify(seat.cmdHost.status())}`);
             }
             logCollisionCounts();
-            if (terminal) rl.prompt();
           })();
           return;
         }
@@ -1533,12 +1561,10 @@ async function main(): Promise<void> {
               record(`SHELL unknown cmd="${line}"`);
             }
           }
-          if (terminal) rl.prompt();
           return;
         }
         record(`SHELL rejected seat=- why=no-seat`);
         record(`SHELL unknown cmd="${line}" (commands need a seat id: ${[...seats.keys()].join(",")})`);
-        if (terminal) rl.prompt();
         return;
       }
       record(`SHELL line="${line}" seat=${seatIndex}`);
@@ -1546,14 +1572,12 @@ async function main(): Promise<void> {
       if (!target) {
         record(`SHELL rejected seat=${seatIndex} why=no-seat`);
         record(`SHELL unknown seat=${seatIndex} cmd="${line}" (seats ${[...seats.keys()].join(",")})`);
-        if (terminal) rl.prompt();
         return;
       }
       const sub = (tokens[1] ?? "").toLowerCase();
       if (sub === "abort" || sub === "stop") {
         haltSeat(target);
         record(`SHELL ${sub} seat=${seatIndex}`);
-        if (terminal) rl.prompt();
         return;
       }
       const action = parseShellLine(tokens.slice(1).join(" "), target.world);
@@ -1567,13 +1591,11 @@ async function main(): Promise<void> {
           record(`SHELL rejected seat=${seatIndex} why=unknown-verb`);
           record(`SHELL unknown cmd="${line}"`);
         }
-        if (terminal) rl.prompt();
         return;
       }
       if (target.cmdHost.busy) {
         record(`SHELL rejected seat=${seatIndex} name=${action.name} why=busy`);
         record(`SHELL result seat=${seatIndex} name=${action.name} ok=0 code=1 why=busy ms=0`);
-        if (terminal) rl.prompt();
         return;
       }
       record(`SHELL accepted seat=${seatIndex} name=${action.name} args=${JSON.stringify(action.args)}`);
@@ -1586,7 +1608,6 @@ async function main(): Promise<void> {
       });
       pending.add(promise);
       void promise.finally(() => pending.delete(promise));
-      if (terminal) rl.prompt();
     };
     rl.on("line", (line) => {
       handle(line);

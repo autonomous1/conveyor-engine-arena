@@ -50,7 +50,9 @@ from `--tree src|proto`. Unlike `--test`/`--goto-at`/`--suite`, the sessions are
 not closed between commands — each pawn keeps its seat, kit, keys and ammo. The
 start lists `SHELL seats=[1,2] selfs=[14,15] players=[14,15]` and one
 `SHELL seat <i> self=… place=… weapon=… keys=…` per seat. Piped stdin works (no
-prompt); a TTY shows `bot> `.
+prompt); a TTY shows `bot> `, re-printed after any console line — a `SHELL
+result`, a `status` dump, a collision line — coalesced per burst, so the prompt
+is never left buried.
 
 Commands are `<seat> <verb> [args…]`, e.g. `1 goto-at -11.5,0,8.0`; a line
 without a numeric seat is an error naming the seats. Dispatch is **not awaited**:

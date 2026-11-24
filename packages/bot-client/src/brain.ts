@@ -6,7 +6,10 @@
 // Wiring: runMission/runBrain from the CLI and live tests; it drives BotSession input/world.
 // Invariants: A pursue plan is rebuilt on >=1 m target drift or 200 ms; the straight line is the fallback;
 //   the retreat plans one cover/away point, replans only on stuck/a cover LOS failure, and holds when no
-//   point plans; the stand fact and the stand walk measure one plan-resolved goal, y included.
+//   point plans; the stand fact and the stand walk measure one plan-resolved goal, y included;
+//   every plan-step kind has one binder in STEP_BINDERS, and a step's kind/arg are set by its
+//   binder, never re-parsed from the id; a `safety` plan gets PLAN_BUDGET_MS, and a missed warm
+//   attempt retries once at COLD_PLAN_BUDGET_MS.
 import type { BotCtx } from "../../../src/shared/bots/actions.js";
 import { createBotContext, estimateSeconds, groundActions } from "../../../src/shared/bots/actions.js";
 import type { Fact, Goal, Plan, PlanOptions, WorldState } from "../../../src/shared/bots/goap.js";
@@ -43,8 +46,13 @@ const STAND_TOLERANCE = 0.35;
 const STAND_GOAL_Y = 0.6;
 /**
  * Budget for a periodic `safety` replan: the same state, warm route nets.
+ * The route heuristic's warm plans measure 79–259 ms; 250 ms sits inside that
+ * distribution, so a plan that missed it fell to the 4 s cold retry (177).
+ * 600 ms removes the retry for the measured plans.
+ * @invariant `safety` plans get PLAN_BUDGET_MS; a missed warm attempt retries
+ *            once at COLD_PLAN_BUDGET_MS. (test: warm_plan_budget_is_600ms)
  */
-const PLAN_BUDGET_MS = 250;
+const PLAN_BUDGET_MS = 600;
 /**
  * Budget for a plan after the state changed: the mission's first plan, and the
  * first plan after a finished action, a door/pickup change, or a `stuck`.
@@ -93,11 +101,17 @@ type Triple = [number, number, number];
 
 type Running = {
   id: string;
+  /** The binder that built it, and its raw argument: the executor's typed binding (177). */
+  kind: string;
+  arg: string;
   moving: boolean;
   started: number;
   tick(pose: Pose, tick: number, now: number): TickStatus;
   onDone?: () => void;
 };
+
+/** One plan-step kind to its binder. `arg` is everything after the first `:`. */
+type StepBinder = (id: string, arg: string, pose: Pose) => Running | undefined;
 
 type Walk = {
   points: Triple[];
@@ -696,7 +710,6 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
   let failStreak = 0;
   let lastCmd: FollowInput | undefined;
   let lastReason = "initial";
-
   const ensureGround = (): boolean => {
     const graph = session.world.sceneGraph();
     if (!graph) return false;
@@ -775,20 +788,6 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
     log(`finish ${row.id} t=${secs()}s dt=${dt}s${failed ? " failed" : ""}`);
   };
 
-  const begin = (id: string, pose: Pose): Running | undefined => {
-    const cut = id.indexOf(":");
-    const kind = cut < 0 ? id : id.slice(0, cut);
-    const arg = cut < 0 ? "" : id.slice(cut + 1);
-    if (kind === "goTo") return beginGoTo(id, arg, pose);
-    if (kind === "standAt") return beginStand(id, arg, pose);
-    if (kind === "ride") return beginRide(id, arg, pose);
-    if (kind === "rideTo") return beginRide(id, arg, pose, true);
-    if (kind === "goToDoor") return beginDoor(id, arg, pose);
-    if (kind === "unlock") return beginUnlock(id, arg, pose);
-    if (kind === "pickup") return beginPickup(id, arg, pose);
-    return undefined;
-  };
-
   const beginGoTo = (id: string, place: string, pose: Pose): Running | undefined => {
     const walked = walkToPlace(place, pose);
     if (!walked) return undefined;
@@ -797,6 +796,8 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
     const follow = makeFollow(walked);
     return {
       id,
+      kind: "goTo",
+      arg: place,
       moving: phase === "walk",
       started: Date.now(),
       onDone() {
@@ -850,6 +851,8 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
     let stopped = false;
     return {
       id,
+      kind: "standAt",
+      arg: key,
       moving: true,
       started: Date.now(),
       tick(current, nowTick) {
@@ -936,6 +939,8 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
     let exitDestination = destination;
     return {
       id,
+      kind: byGoal ? "rideTo" : "ride",
+      arg: arg,
       moving: true,
       started: Date.now(),
       tick(current, nowTick, now) {
@@ -1011,6 +1016,8 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
     const follow = makeFollow(walked);
     return {
       id,
+      kind: "goToDoor",
+      arg: arg,
       moving: true,
       started: Date.now(),
       onDone() {
@@ -1037,6 +1044,8 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
     let armed = false;
     return {
       id,
+      kind: "unlock",
+      arg: doorId,
       moving: false,
       started: Date.now(),
       tick(current, _tick, now) {
@@ -1078,6 +1087,8 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
     let waitStart = 0;
     return {
       id,
+      kind: "pickup",
+      arg: pickupId,
       moving: true,
       started: Date.now(),
       onDone() {
@@ -1164,6 +1175,31 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
     return { points, grid: gridFor(session, graph, points, omit, placeY(graph, pose)) };
   };
 
+  /**
+   * @why The typed map is the executor's action binding (177): a new plan-step
+   *      kind is one entry here and one grounded action in actions.ts — no
+   *      second string parse elsewhere in the loop. Each binder sets `kind`/`arg`
+   *      on its Running, so the loop reads those and never re-parses `exec.id`.
+   * @invariant Every plan-step kind has one binder in STEP_BINDERS; a step's
+   *            `kind`/`arg` are set by its binder, never re-parsed from the id.
+   *            (test: plan_step_map_covers_the_seven_kinds)
+   */
+  const STEP_BINDERS = new Map<string, StepBinder>([
+    ["goTo", beginGoTo],
+    ["standAt", beginStand],
+    ["ride", (id, arg, pose) => beginRide(id, arg, pose)],
+    ["rideTo", (id, arg, pose) => beginRide(id, arg, pose, true)],
+    ["goToDoor", beginDoor],
+    ["unlock", beginUnlock],
+    ["pickup", beginPickup],
+  ]);
+  const begin = (id: string, pose: Pose): Running | undefined => {
+    const cut = id.indexOf(":");
+    const kind = cut < 0 ? id : id.slice(0, cut);
+    const arg = cut < 0 ? "" : id.slice(cut + 1);
+    return STEP_BINDERS.get(kind)?.(id, arg, pose);
+  };
+
   const chooseStand = (
     doorId: string,
     hint: { x: number; z: number } | undefined,
@@ -1197,7 +1233,7 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
       await sleepRest(loopStart);
       continue;
     }
-    const activePickup = exec && exec.id.startsWith("pickup:") ? exec.id.slice("pickup:".length) : undefined;
+    const activePickup = exec?.kind === "pickup" ? exec.arg : undefined;
     if (exec && activePickup && pickupGone(session, activePickup)) {
       const item = session.world.pickupPlacements().find((row) => row.id === activePickup);
       if (item && pickupTaken(session, item)) {

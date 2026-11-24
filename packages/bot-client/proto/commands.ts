@@ -2,8 +2,8 @@
  * The bot command layer: twelve typed handlers over a connected BotSession.
  * Node-only: no CLI, no token, no filesystem.
  */
-// ARCHITECTURE: The bot's command surface: parse, dispatch, status, and the
-//   cooperative abort, over a connected session.
+// ARCHITECTURE: The bot's twelve-handler command surface: parse, dispatch,
+//   status, and the cooperative abort, over a connected session.
 // Wiring: drivers under packages/bot-client/tests create one host and call
 //   `dispatch`; `parseCommand` is the typed entry for a second bot.
 // Order: create the host after the session owns a pawn; `dispatch` is
@@ -288,6 +288,12 @@ function buildStatus(id: string): CommandStatus {
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
+/**
+ * Walk to a target with the side-step recovery.
+ * @why The guard inside the loop is the mission's cooperative abort: a thrown
+ *      `AbortMission` cannot cross the `wishTo` loop, so the walk returns false
+ *      and the handler maps it to `aborted`.
+ */
 const walkWithRecovery = async (target: { x: number; z: number }, ms: number, label: string): Promise<boolean> => {
   const deadline = Date.now() + ms;
   let lastX = Number.NaN;
