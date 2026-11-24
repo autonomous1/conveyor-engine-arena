@@ -22,7 +22,13 @@ or `AGENTS.md` for “context”.
 prototype solution**, read the driver in full before the source — it is the
 reference implementation. The driver must be self-contained: if it imports the
 behaviour under test, there is nothing to port — it is a production fix, and the
-task must say so (see D16). Enumerate its ordered operations, constants, thresholds
+task must say so (see D16).
+
+**The prototype is a package fork.** When the task cites a `proto/` diff, the
+migration is that diff, file by file: apply each hunk to `src/` (or re-derive it
+with the same order and constants) and keep the migration map per file. The
+parity run is `npm run probe -- --tree src …` — nothing in the probe is rewired —
+and `proto/` is deleted once the port lands. Enumerate its ordered operations, constants, thresholds
 and guards, and keep a mapping in the report (driver step → source function). A step
 you drop, a constant you change, or an order you swap is a divergence: justify it in
 the report or keep the driver's shape. Unit tests mirror the driver; a live run

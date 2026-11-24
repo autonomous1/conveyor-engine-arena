@@ -7,9 +7,11 @@ Read `~/dev/conveyor-engine-arena/agents/bot-developer-role.md` first. Then this
 **Safety:** one long-lived session per trial; clean `close()`; wait before any retry; never more than one bot in the arena while the operator is playing; never target the operator's pawn. Leftover seats are the known cause of `SERVER_FULL` and the stale-pawn confusion (task 49).
 
 > **This is a run/prototype, not a code change.** The bot-developer measures, diagnoses, and recommends; the coder implements.
-> Write the run's script under `packages/bot-client/tests/<name>.ts` — tracked and reviewable; the **Files** table names it. The script implements the behaviour itself: it imports the plumbing (connect,
-> socket, world), never the behaviour under test (`createCommandHost`, `runMission`)
-> — a driver that imports those is a **production probe**, not a prototype. It is a
+> Write the run's script under `packages/bot-client/tests/<name>.ts` — tracked and reviewable; the **Files** table names it. The script implements the behaviour itself, or imports it from the **proto fork**
+(`packages/bot-client/proto/`, a tracked copy of `src/`, reached with
+`--tree proto`; the source keeps its canonical `../src/…` imports and the runner
+redirects them): it imports the plumbing, never `src/`'s behaviour under test — a
+run that reports `tree=src` is a **production probe**, not a prototype. It is a
 > rough probe, not a module: when it works repeatedly and the runs table shows it, the script plus its measurements is a **proof-of-concept for the designer**, who drafts the production task from it; the coder builds that. `plan/dsh-tasks/live/` is gitignored and is for raw captures only. A code change you discover goes in the report as a recommended task, with the evidence line that justifies it.
 
 ## Question

@@ -375,3 +375,36 @@ prerequisite task or uncommitted paths. If a cited measurement needs an uncommit
 change, it is either a prerequisite task the coder lands first, or the number is
 re-taken on `HEAD`. The coder's Pre-Flight prints the Base tree; a dirty file the
 task does not name, or a number it cannot reproduce, is a HALT.
+
+## D18 — The rapid loop runs on a fork of the package (`proto/`) (2026-11-24)
+
+The operator's procedure: copy `packages/bot-client/src` to
+`packages/bot-client/proto`, edit only `proto/`, run the probe against it on the
+live host, fix and iterate, then publish the diff to the designer/coder to
+integrate back into `src`.
+
+**Why:** the single-file prototype (`commands-prototype.ts`, 73 KB) had to duplicate
+the command surface by hand and re-thread every import; a package fork gets every
+module, the real import graph and the real types for free. Prototype and production
+stay structurally comparable, so the diff is a file-by-file migration spec instead
+of a re-derivation.
+
+**In practice:** the probe runner switches trees — `npm run probe -- --tree
+src|proto` — and probes keep their canonical `../src/…` imports; a loader hook
+redirects them to `proto/…` under `--tree proto` (task 165), so no probe source
+names a tree. `proto/` is **tracked** while the branch lives: a POC can run over
+several sessions, an untracked fork dies with the working tree, and a tracked fork
+lets the designer diff `src` against it at any time. Commit it when it diverges;
+when the port lands, delete it in the same commit, so history keeps the diff.
+Publish
+`git diff --no-index packages/bot-client/src packages/bot-client/proto >
+logs/<task>-proto.diff` with the runs table. The designer drafts from the diff, the
+coder ports it, the driver switches back to `../src/…` for the parity run, and
+`proto/` is deleted (or re-copied for the next POC). A driver that still imports
+`src/` is a production probe, not a prototype (D16).
+
+The harness itself (`command-suite.ts`, its trial table and the prototype surface)
+lives in `packages/bot-client/probe/`, tracked; `proto/` is the tracked fork.
+
+`.gitignore` gains `packages/bot-client/proto/` — a repo-root change, so the bot
+lane or the operator applies it.

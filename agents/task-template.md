@@ -17,7 +17,7 @@ Read `agents/AGENTS.md` first. Then this file. Then the KB sections named in **K
 
 **Architecture note:** <cite the specific `ARCHITECTURE` paragraph, `@invariant`, decision entry, or the **prototype/report** this task productionizes (a bot POC row, a research report). If it can't cite one, the task is speculative — stop and reconsider.>
 
-**Rapid prototype solution:** <when this task productionizes a working driver, its path — the coder ports it and does not re-derive. The driver must be **self-contained**: it implements the behaviour and imports only plumbing, never the behaviour under test. If it imports production, this is a **production fix**, not a port — say so. Delete the line for a fresh task.>
+**Rapid prototype solution:** <the published diff (`{{task_dir}}/logs/<task>-proto.diff`, from `git diff --no-index packages/bot-client/src packages/bot-client/proto`) and the base commit — the coder integrates the diff and does not re-derive. The fork is tracked while the branch lives; the diff and the driver are the spec. Delete the line for a fresh task.>
 
 **Knowledge base:** <the KB file(s) and section(s) this task touches, with the reason. E.g. `agents/host-model.md` §13 (the host state model) and `agents/host-flow.md` §5 (doors); `agents/client-kb.md` §13 (the client state model); `agents/shared-flow.md` §2–§3 (wire/protocol, data model) and `agents/shared-model.md` §11 (invariants). Name one half, not both: the section decides the file. Query the named section with `node packages/modev/cli.mjs query section <layer> <§N>` before the source; open the file only if the query fails. The KB is the map, not a field dump; a stale claim is a report note, not an edit. If this slot is missing or names no section, stop.>
 

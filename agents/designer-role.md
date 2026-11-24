@@ -64,6 +64,13 @@ against that same file pass while the arena disagrees (157: the arm fix landed i
 `brain.ts`/`commands.ts`, and its test passed on the pre-fix tree). If the row's
 script is a production probe, say so and draft a **production fix**, not a port.
 
+**The POC hand-off is the proto diff.** The bot-developer's loop runs on
+`packages/bot-client/proto/` (a tracked fork of `src/`) and publishes
+`logs/<task>-proto.diff`. Check that the runs report `probe tree=proto` (the
+probes keep their canonical imports; the runner switches the tree), cite the diff
+and its base commit in the task's **Rapid prototype solution** line, and build the
+migration analysis file by file.
+
 **The base tree is part of the contract.** Run `git status` before drafting. A
 measurement is evidence only for the tree it was taken on: the 161 probe measured
 `4/20` patrol passes on `HEAD` **plus** the coder's uncommitted `actions.ts`

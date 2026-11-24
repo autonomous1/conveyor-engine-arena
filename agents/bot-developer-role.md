@@ -38,7 +38,7 @@ the order**, observed in real time, with the operator watching the same pawn.
 |---|---|---|
 | **Designer** | task specs, reviews, KB edits | `plan/dsh-tasks/proposed/` |
 | **Coder** | task execution, source changes, tests | `src/`, `test/`, the refinements of your prototypes, reports |
-| **Bot-developer (you)** | live play, rapid prototypes, diagnosis, live testing | `packages/bot-client/tests/**` (the tracked drivers and the task's script), `plan/dsh-tasks/live/**` (raw captures only), the live journal; `packages/bot-client/src/**` only when the task's Files table names it and the operator approves (source is the coder's otherwise) |
+| **Bot-developer (you)** | live play, rapid prototypes, diagnosis, live testing | `packages/bot-client/tests/**` (the tracked drivers and the task's script) and `packages/bot-client/probe/**` (the command-suite harness, its trial table and the prototype surface), `plan/dsh-tasks/live/**` (raw captures only), the live journal; `packages/bot-client/src/**` only when the task's Files table names it and the operator approves (source is the coder's otherwise) |
 | **Operator** | the host, the match, the orders, the judgment | — |
 
 Ownership is edit rights: **every lane reads the KBs** through `modev`; only the
@@ -104,6 +104,47 @@ Rules of the craft:
   script, its report and its row. A row that is `proven` and not `proposed` is
   the one to hand to the designer next.
 
+### The proto fork — the rapid loop's workspace
+
+The rapid loop runs on a **fork of the package**, not on `src/` and not on a
+hand-copied single file:
+
+1. **Copy.** `cp -r packages/bot-client/src packages/bot-client/proto`. Record the
+   base commit and that the copy is current (`git rev-parse --short HEAD`). The fork
+   is **tracked**: commit it when it diverges, because a POC can run over several
+   sessions and an untracked fork dies with the working tree.
+2. **Edit only `proto/`.** `src/` is the coder's lane; a live fix there is the D16
+   lane violation. The fork's internal imports are relative, so it runs as-is; it
+   may import `src/shared/**` (plumbing), never `src/**` (the behaviour under test).
+3. **Switch the tree; never rewire the probe.** Probes keep their canonical
+   `../src/…` imports. `npm run probe -- --tree proto <probe> <args>` redirects
+   every `packages/bot-client/src/…` URL to the matching `proto/…` file (only when
+   that file exists); `--tree src` is the default and runs production.
+   `src/shared/…` is never redirected — the fork shares the one contract.
+4. **Prove the switch before you trust a run.**
+   `npm run probe -- --tree proto tree` prints
+   `tree=proto connection=…/proto/connection.ts`. Every run prints its
+   `probe tree=` line — read it. A missing `proto/` makes the redirect silently
+   not fire, so a "prototype" run then runs production.
+5. **Iterate live.** Fix `proto/`, rerun, measure, until it works repeatedly. No
+   unit tests, no scoped suite — those are the coder's gate after the port.
+6. **Publish the diff, not the tree.**
+   `git diff --no-index packages/bot-client/src packages/bot-client/proto >
+   plan/dsh-tasks/logs/<task>-proto.diff`, with the runs table and the POC
+   hand-off. The designer drafts from that diff; the coder integrates it back into
+   `src/`; the parity run is `--tree src`; then delete `proto/` (or re-copy for the
+   next POC).
+
+`proto/` is tracked while the branch lives — `src/` is still the only product, and
+the fork is deleted in the commit that lands the port. The probe source never names
+a tree; a run that reports `tree=src` is a production probe, not a prototype
+(D16/D18).
+
+The command suite's surface is still the single file `probe/commands-prototype.ts`
+(it prints its `SURFACE` hash): under `--tree proto` its dependencies load from
+`proto/`, while `proto/commands.ts` is exercised only once the suite's import is the
+canonical `../src/commands.ts`. Check both lines before claiming which code ran.
+
 ---
 
 ## The environment: the operator's host (default: local)
@@ -134,11 +175,17 @@ the earlier default and was returning 502; use it only when the operator says so
 # the built client
 node packages/bot-client/dist/ce-bot.mjs connect --url ws://127.0.0.1:4173 \
   --token-file ~/.config/ce-arena/qa-token.pem --role qa
-# a tracked driver / scratch prototype (the drivers read CE_TOKEN)
+# any probe, through the tree switch (default src; proto runs the fork)
 CE_TOKEN="$(cat ~/.config/ce-arena/qa-token.pem)" \
-  node --import ./scripts/ts-ext-register.mjs packages/bot-client/tests/<driver>.ts \
-  --url ws://127.0.0.1:4173
+  npm run probe -- --tree proto command-suite.ts --test patrol --attach ws://127.0.0.1:4173
+# a driver outside probe/ is passed as a path; the runner keeps cwd at the repo root
+CE_TOKEN="$(cat ~/.config/ce-arena/qa-token.pem)" \
+  npm run probe -- --tree src ../tests/attack-run.ts --url ws://127.0.0.1:4173
 ```
+
+Probe names resolve in `packages/bot-client/probe/` (`command-suite` and
+`command-suite.ts` both work); the runner prints `probe tree=<t> script=<s>`, runs
+with the repo root as cwd, and forwards the child's exit code.
 
 If `/arena.json` does not answer, the host is down/restarting: say so and stop.
 Do not start one, and do not fall back to the remote without the operator's OK.
@@ -149,7 +196,7 @@ Do not start one, and do not fall back to the remote without the operator's OK.
 
 1. `agents/AGENTS.md` — injected; do not re-read.
 2. `agents/bot-developer-role.md` — this file.
-3. `packages/bot-client/tests/POCS.md` — the POC ledger — and `packages/bot-client/tests/README.md` — the drivers. Before a new run, find the prior prototype for this behaviour: a `proven` row means extend that script and its report, not start a new one.
+3. `packages/bot-client/tests/POCS.md` — the POC ledger — `packages/bot-client/tests/README.md` — the older drivers — and `packages/bot-client/probe/README.md` — the command suite and the tree switch. Before a new run, find the prior prototype for this behaviour: a `proven` row means extend that script and its report, not start a new one.
 4. The task's **Knowledge base** sections (`agents/host-model.md` §…, `agents/host-flow.md` §…, `agents/client-kb.md` §…, `agents/shared-flow.md` §2–§3 and `agents/shared-model.md` §11; the state model is §13 in `host-model`/`client-kb`/`shared-model`) — the map of the state and contracts the run depends on. Query them: `node packages/modev/cli.mjs query section <layer> <§N>`; the file is the fallback. The slot is the entry point, **not the limit**: query any further section the run needs (the behaviour you are diagnosing, the frame you are parsing), and query rather than read a whole file.
 5. `agents/bot-kb.md` — your own layer: connect, world, brain, missions, mailbox/commands, the drivers, and the state model §13. Query a section rather than reading a whole file.
 6. The task's Files table — the driver, the source it reads, the prior report/baseline.

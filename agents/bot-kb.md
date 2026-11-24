@@ -107,8 +107,12 @@ handlers — those are `commands.ts`.
 `tests/*.ts` are live drivers: git-tracked, but not tracked in this model — no
 count, no per-driver list. A driver that imports the behaviour under test
 (`createCommandHost`, `runMission` from `src/`) is a **production probe**: it
-verifies the port, it is not a prototype. A prototype carries its own
-implementation. `tests/scenarios/*.ndjson` replay command
+verifies the port, it is not a prototype. The rapid loop's workspace is
+`packages/bot-client/proto/` — a tracked fork of `src/` that the probe runner
+reaches with `--tree proto` (the probes keep their canonical `../src/…` imports);
+the published artifact is the diff against `src/` (D18). The
+command-suite harness lives in `packages/bot-client/probe/` (the suite, its trial
+table and the prototype surface); `tests/` keeps the older drivers. `tests/scenarios/*.ndjson` replay command
 chains over the `msg` loopback; `tests/POCS.md` is the ledger of proven
 behaviours.
 
