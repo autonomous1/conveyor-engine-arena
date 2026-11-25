@@ -260,13 +260,17 @@ function awayPoint(session: BotSession, threat: { x: number; y: number; z: numbe
  *       other mission keeps its own priority.
  */
 export function combatGoals(state: WorldState, mission?: Goal): Goal[] {
+  // `rearm` is combat readiness, not self-preservation: scoped to an assault
+  // order so it cannot hijack a patrol/stand/reach (184 report §6, 188 gate).
+  // `survive`/`defend` stay global — they only fire on hp/under-fire facts.
+  const assault = mission?.want.threatDown === true;
   const goals: Goal[] = [
     { id: "survive", want: { hpHigh: true }, priority: (s) => (s.hpCritical ? 90 : s.hpWounded ? 80 : 0) },
     // One goal, both actions: the two-goal OR (cover first by array order) makes
     // the cost knob inert, so cover and fire both effect `defended` and the
     // route/8 s costs decide (184's report states the deviation).
     { id: "defend", want: { defended: true }, priority: (s) => (s.underFire && !s.hpCritical ? 70 : 0) },
-    { id: "rearm", want: { [HAS_AMMO]: true }, priority: (s) => (s[HAS_WEAPON] === true && s[HAS_AMMO] !== true ? 55 : 0) },
+    { id: "rearm", want: { [HAS_AMMO]: true }, priority: (s) => (assault && s[HAS_WEAPON] === true && s[HAS_AMMO] !== true ? 55 : 0) },
   ];
   if (mission) {
     const assault = mission.want.threatDown === true;
@@ -294,9 +298,27 @@ export function assaultGoal(targetId: number): Goal {
  *      threatDown-effecting action is the admissible floor.
  * @post 0 for goals with no flat-cost action; the fire floor for threatDown.
  */
-export function combatHeuristic(goal: Goal): (s: WorldState) => number {
-  const down = goal.want.threatDown === true;
-  return (s) => (down && s.threatDown !== true ? FIRE_S * (s.hpWounded ? FIRE_WOUNDED_MUL : 1) : 0);
+export function combatHeuristic(
+  goal: Goal,
+  actions: readonly Action<BotCtx>[],
+  ctx: BotCtx,
+): (s: WorldState) => number {
+  // The cheapest action whose effect satisfies the goal: any plan must end with
+  // one, so its cost is an admissible floor. Without it a ground-only goal
+  // (`hpHigh`, `defended`, `threatDown`) has h=0 — `estimateSeconds` cannot
+  // estimate a goal with no place — and A* expands every cheaper `goTo` first.
+  // Live that starved the heal plan for the whole 4 s cold budget, blocked the
+  // input loop and produced an `input-rate` resync cascade (184 hunt7).
+  const relevant = actions.filter((act) => satisfies(act.eff, goal.want));
+  if (relevant.length === 0) return () => 0;
+  return (s) => {
+    let best = Infinity;
+    for (const act of relevant) {
+      const cost = typeof act.cost === "number" ? act.cost : act.cost(s, ctx);
+      if (cost > 0 && cost < best && Number.isFinite(cost)) best = cost;
+    }
+    return Number.isFinite(best) ? best : 0;
+  };
 }
 
 const satisfies = (s: WorldState, want: WorldState): boolean => {

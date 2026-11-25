@@ -96,14 +96,19 @@ test("combat_ladder_priorities_and_the_assault_order", () => {
   assert.equal(priorities({ hpWounded: true, hpCritical: true }).survive, 90);
   assert.equal(priorities({ hpHigh: true, underFire: true }).defend, 70);
   assert.equal(priorities({ hpWounded: true, hpCritical: true, underFire: true }).defend, 0);
-  assert.equal(priorities({ hasWeapon: true }).rearm, 55);
-  assert.equal(priorities({ hasWeapon: true, hasAmmo: true }).rearm, 0);
+  // `rearm` is scoped to an assault order (189): a generic mission must not re-arm.
+  assert.equal(priorities({ hasWeapon: true }).rearm, 0);
+  assert.equal(priorities({ hasWeapon: true }, assaultGoal(7)).rearm, 55);
+  assert.equal(priorities({ hasWeapon: true, hasAmmo: true }, assaultGoal(7)).rearm, 0);
   assert.equal(priorities({ hpHigh: true }).idle, 10);
   assert.equal(priorities({ hpHigh: true }, assaultGoal(7))["assault:7"], 60);
   assert.equal(assaultGoal(7).want.threatDown, true);
-  assert.equal(combatHeuristic(assaultGoal(7))({}), 8);
-  assert.equal(combatHeuristic(assaultGoal(7))({ hpWounded: true }), 16);
-  assert.equal(combatHeuristic({ id: "reach", want: { at: "hall" }, priority: () => 1 })({}), 0);
+  // The floor is the cheapest action whose effect satisfies the goal (189).
+  const fire: Action<BotCtx> = { id: "returnFire:7", pre: {}, eff: { threatDown: true }, cost: (s) => (s.hpWounded ? 16 : 8) };
+  const ctx = {} as BotCtx;
+  assert.equal(combatHeuristic(assaultGoal(7), [fire], ctx)({}), 8);
+  assert.equal(combatHeuristic(assaultGoal(7), [fire], ctx)({ hpWounded: true }), 16);
+  assert.equal(combatHeuristic({ id: "reach", want: { at: "hall" }, priority: () => 1 }, [], ctx)({}), 0);
 });
 
 test("combat_ladder_matrices", () => {

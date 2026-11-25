@@ -1415,7 +1415,7 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
         const estimate = estimateSeconds(g, groundedCtx, placements, stand);
         return {
           minCost: groundedCtx.minActionS,
-          heuristic: (s) => Math.max(estimate(s), combatHeuristic(g)(s)),
+          heuristic: (s) => Math.max(estimate(s), combatHeuristic(g, planActions, groundedCtx)(s)),
           deadlineMs: planDeadline,
           now: () => Date.now(),
           ...(opts.maxExpand !== undefined ? { maxExpand: opts.maxExpand } : {}),
