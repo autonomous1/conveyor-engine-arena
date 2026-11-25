@@ -12,7 +12,7 @@
 //   attempt retries once at COLD_PLAN_BUDGET_MS; the combat ladder plans through
 //   combatGoals/chooseCombatGoal with the combat actions (test: combat_ladder_matrices).
 import type { BotCtx } from "../../../src/shared/bots/actions.js";
-import { createBotContext, estimateSeconds, groundActions, placeOfPickup } from "../../../src/shared/bots/actions.js";
+import { createBotContext, estimateSeconds, goTo, groundActions, pickup, placeOfPickup } from "../../../src/shared/bots/actions.js";
 import type { Action, Fact, Goal, Plan, PlanOptions, WorldState } from "../../../src/shared/bots/goap.js";
 import { chooseGoal } from "../../../src/shared/bots/goap.js";
 import { buildWorldState, STAND, type WorldSnapshot } from "../../../src/shared/bots/state.js";
@@ -33,7 +33,7 @@ import type { Mission } from "./missions.js";
 import { createMotionPredictor } from "./predict.js";
 import { hasLineOfSightDag } from "../../../src/shared/hitscan.js";
 import { nearestCover } from "../../../src/shared/bots/cover.js";
-import { assaultGoal, chooseCombatGoal, combatActions, combatFacts, combatGoals, combatHeuristic, type HpClock } from "./combat.js";
+import { assaultGoal, chooseCombatGoal, combatActions, combatFacts, combatGoals, combatHeuristic, threatWatchKey, type HpClock } from "./combat.js";
 
 const STEP_MS = 1000 / INPUT_HZ;
 const RIDE_SUMMON_MS = 30_000;
@@ -95,6 +95,8 @@ export type BrainOptions = {
   maxEvaluations?: number;
   /** Per-plan budget in ms. Default 250; the mission deadline still wins. */
   planMs?: number;
+  /** 199: the declared hostile player ids (SquadView v1). Absent = NPCs only. */
+  enemies?: ReadonlySet<number>;
 };
 
 type TickStatus = "running" | "done" | "failed" | "stuck";
@@ -129,6 +131,30 @@ type UseState = {
 };
 
 /**
+ * The patrol leg policy (201), pure so the matrix can drive it.
+ * - 0 → advance;
+ * - 2 with a `no plan:` line → retry the leg once, then skip it (or stop after 2
+ *   consecutive skips);
+ * - any other 2 (refused/lost/no-ammo/died) or 3 → propagate.
+ */
+export type PatrolLegOutcome = { action: "advance" | "retry" | "skip" | "stop" | "propagate"; consecutiveSkips: number };
+
+export function patrolLegOutcome(
+  code: number,
+  noPlan: string | null,
+  consecutiveSkips: number,
+  retried: boolean,
+): PatrolLegOutcome {
+  if (code === 0) return { action: "advance", consecutiveSkips: 0 };
+  if (code === 2 && noPlan !== null) {
+    if (!retried) return { action: "retry", consecutiveSkips };
+    const skips = consecutiveSkips + 1;
+    return skips >= 2 ? { action: "stop", consecutiveSkips: skips } : { action: "skip", consecutiveSkips: skips };
+  }
+  return { action: "propagate", consecutiveSkips };
+}
+
+/**
  * Run one goal, or loop a patrol until the timeout. Exit 0 met, 2 no plan, 3 timeout.
  */
 export async function runMission(session: BotSession, mission: Mission, opts: BrainOptions = {}): Promise<number> {
@@ -138,10 +164,46 @@ export async function runMission(session: BotSession, mission: Mission, opts: Br
   const timeoutMs = opts.timeoutMs ?? 300_000;
   const deadline = Date.now() + timeoutMs;
   let index = 0;
+  let consecutiveSkips = 0;
   while (Date.now() < deadline) {
-    const goal = reach(mission.places[index]!);
-    const code = await runBrain(session, goal, { ...opts, timeoutMs: deadline - Date.now() });
-    if (code !== 0) return code;
+    const place = mission.places[index]!;
+    // One leg = one `reach(place)`; the ladder inside runBrain pre-empts for
+    // combat and the leg resumes because its `at` fact is still unmet (201).
+    let noPlan: string | null = null;
+    const legLog = (line: string): void => {
+      opts.log?.(line);
+      const m = /no plan: ([a-z-]+)/.exec(line);
+      if (m) noPlan = m[1]!;
+    };
+    let code = await runBrain(session, reach(place), { ...opts, timeoutMs: deadline - Date.now(), log: legLog });
+    let retried = false;
+    let outcome = patrolLegOutcome(code, noPlan, consecutiveSkips, retried);
+    if (outcome.action === "retry") {
+      retried = true;
+      let retryNoPlan: string | null = null;
+      code = await runBrain(session, reach(place), {
+        ...opts,
+        timeoutMs: deadline - Date.now(),
+        log: (line) => {
+          opts.log?.(line);
+          const m = /no plan: ([a-z-]+)/.exec(line);
+          if (m) retryNoPlan = m[1]!;
+        },
+      });
+      outcome = patrolLegOutcome(code, retryNoPlan, consecutiveSkips, retried);
+    }
+    if (outcome.action === "propagate") return code;
+    if (outcome.action === "stop") {
+      opts.log?.(`patrol: stop after ${outcome.consecutiveSkips} dead legs`);
+      return 2;
+    }
+    if (outcome.action === "skip") {
+      opts.log?.(`patrol: skip leg=${place} reason=${noPlan ?? "unknown"}`);
+      consecutiveSkips = outcome.consecutiveSkips;
+      index = (index + 1) % mission.places.length;
+      continue;
+    }
+    consecutiveSkips = 0;
     index = (index + 1) % mission.places.length;
   }
   return 3;
@@ -706,6 +768,8 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
   let pending = "";
   let watchDoors = "";
   let watchPickups = "";
+  let watchThreat = "";
+  let threatReplanAt = 0;
   let planAt = 0;
   let tick = 0;
   let stuckCount = 0;
@@ -714,8 +778,6 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
   let lastReason = "initial";
   /** The caller-owned hp clock for `underFire` (a drop within 1.5 s). */
   let hpClock: HpClock = { hp: 100, at: -Infinity };
-  /** Set when a `returnFire` step finishes with the target dead: the mission's met fact. */
-  let firedDown = false;
 
   /**
    * The grounding union: the mission, the ladder's wants (so `hasAmmo` pulls the
@@ -758,7 +820,51 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
     // miss (a health crate is neither a key nor gear).
     const groundStarted = performance.now();
     actions = groundActions(graph, placements, groundGoalsNow(), stand);
-    log(`ground actions=${actions.length} ms=${(performance.now() - groundStarted).toFixed(1)}`);
+    // Shared `groundActions` drops keys no locked door names (`pickupsInOrder`
+    // keeps only the ranked keys), so the new arena's four routine keys cannot
+    // be planned: `retrieve:key-<n>` grounds no `pickup:key-<n>` and starves the
+    // cold budget (192). Append the mission's own holding pickup and its place;
+    // the shared fix is a coder task.
+    const holdingId = Object.keys(goal.want).find((k) => k.startsWith("holding:") && goal.want[k] === true);
+    if (holdingId) {
+      const id = holdingId.slice("holding:".length);
+      if (!actions.some((a) => a.id === `pickup:${id}`)) {
+        const item = placements.find((row) => row.id === id);
+        if (item) {
+          const place = placeOfPickup(graph, item);
+          if (!actions.some((a) => a.id === `goTo:${place}`)) actions.push(goTo(place));
+          actions.push(pickup(item, place));
+        }
+      }
+    }
+    // A closed-but-unlocked door is not in the goal-shaped set (it grounds only
+    // locked doors with a key), so a route out of the building cannot plan
+    // around it: the 192-hunt reload planned a 1-step, 3.1 s route to an outside
+    // ammo box from inside. Merge the unlocked-door actions from the full set;
+    // locked doors stay the union's job (a key must be held to unlock).
+    const lockedDoors = new Set(
+      graph.portals.filter((portal) => portal.kind === "door" && portal.locked === true).map((portal) => portal.door ?? portal.id),
+    );
+    const doorActions = groundActions(graph, placements, undefined)
+      .filter((act) => act.id.startsWith("goToDoor:") && !lockedDoors.has(act.id.slice("goToDoor:".length).split(":")[0]!));
+    let doorAdded = 0;
+    for (const act of doorActions) {
+      if (actions.some((row) => row.id === act.id)) continue;
+      actions.push(act);
+      doorAdded += 1;
+    }
+    // A `hasAmmo` order must use the combat `reload:<crate>` (which pays the
+    // walk); the shared `pickup:<ammo>` costs a flat ACT_S, ignoring the route,
+    // so it collapsed the floor and made the rearm search a 248-action Dijkstra
+    // (192-hunt 19:19: a 2-step plan missed the 4 s budget; found at 8 s as a
+    // room-pickup detour). Drop those pickups for this order only.
+    if (goal.want.hasAmmo === true && !Object.keys(goal.want).some((k) => k.startsWith("holding:"))) {
+      const ammoIds = new Set(placements.filter((item) => item.kind === "ammo").map((item) => item.id));
+      const before = actions.length;
+      actions = actions.filter((act) => !(act.id.startsWith("pickup:") && ammoIds.has(act.id.slice("pickup:".length))));
+      if (before !== actions.length) log(`ground drop-ammo-pickups=${before - actions.length}`);
+    }
+    log(`ground actions=${actions.length} unlocked-doors=+${doorAdded} ms=${(performance.now() - groundStarted).toFixed(1)}`);
     ctx = createBotContext(graph, placements, {
       position: () => {
         const self = session.world.self();
@@ -796,9 +902,8 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
     // ~100 ms wrong, and a safety replan cannot afford it (162).
     const state: Record<string, Fact> = {
       ...buildWorldState(snapshot(exec?.moving === true)),
-      ...combatFacts(session, hpClock),
+      ...combatFacts(session, hpClock, Date.now(), { missionTarget: missionTarget() ?? undefined, enemies: opts.enemies }),
     };
-    if (firedDown) state.threatDown = true;
     const self = session.world.self();
     if (stand && resolvedStand && self && Math.hypot(self.x - resolvedStand.x, self.z - resolvedStand.z) <= STAND_TOLERANCE &&
         Math.abs(self.y - resolvedStand.y) <= STAND_GOAL_Y &&
@@ -1279,7 +1384,7 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
       timeoutMs: Math.max(2_000, deadline - Date.now()),
     })
       .then((code) => {
-        if (code === 0) firedDown = true;
+        // 199: no executor flag; `threatDown` comes from the health frame only.
         outcome = code === 0 ? "done" : "failed";
       })
       .catch(() => {
@@ -1383,13 +1488,17 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
     const state = worldState();
     if (satisfies(state, goal.want)) return 0;
 
-    const parts = watchParts(session);
+    const parts = watchParts(session, opts.enemies);
     let reason = "";
     if (!plan) reason = pending || "initial";
     else if (Date.now() - planAt >= REPLAN_MS) reason = "safety";
     else if (parts.doors !== watchDoors) reason = "door";
     else if (parts.pickups !== watchPickups && !activePickup) reason = "pickup";
+    else if (parts.threat !== watchThreat && Date.now() - threatReplanAt >= 1_000) reason = "threat";
 
+    // 198: a started cover walk is held >=300 ms so a moving shooter cannot
+    // flap cover <-> fire between replans.
+    if (reason && exec && exec.id.startsWith("takeCover:") && Date.now() - exec.started < 300) reason = "";
     if (reason) {
       const groundedCtx = ctx;
       if (!groundedCtx) return 2;
@@ -1399,12 +1508,20 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
       if (reason !== "initial") log(`replan ${reason} t=${secs()}s`);
       // The cold cap follows the state change: `safety` is the only periodic
       // same-state refresh, so only it stays on the warm budget.
-      const budgetMs = opts.planMs ?? (reason === "safety" ? PLAN_BUDGET_MS : COLD_PLAN_BUDGET_MS);
+      // `threat` is a mid-fight state change (a moving shooter): warm budget, like safety.
+      const budgetMs = opts.planMs ?? (reason === "safety" || reason === "threat" ? PLAN_BUDGET_MS : COLD_PLAN_BUDGET_MS);
       // Build the ladder's action set before the plan clock starts: the combat
       // cover scan walks the scene AABBs (188), and charging it to the plan
       // deadline made a valid plan start already expired.
+      // 199: an ordered target that is a player must be declared hostile; refuse
+      // a squadmate instead of silently re-targeting the nearest NPC.
+      const ordered = missionTarget();
+      if (goal.want.threatDown === true && ordered !== undefined && session.world.playerIds?.().has(ordered) === true && opts.enemies?.has(ordered) !== true) {
+        log(`assault: not-a-hostile id=${ordered}`);
+        return 2;
+      }
       const ladder = combatGoals(state, goal);
-      const combat = combatActions(session, groundedCtx, { target: missionTarget() });
+      const combat = combatActions(session, groundedCtx, { target: missionTarget(), enemies: opts.enemies, onNote: log });
       const planActions = combat.length > 0 ? [...actions, ...combat] : actions;
       log(`plan ladder target=${missionTarget() ?? "-"} combat=${combat.length} goals=${ladder.map((g) => `${g.id}@${g.priority(state)}`).join(",")}`);
       const planDeadline = Math.min(deadline, Date.now() + budgetMs);
@@ -1440,6 +1557,8 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
       stuckCount = 0;
       watchDoors = parts.doors;
       watchPickups = parts.pickups;
+      watchThreat = parts.threat;
+      if (reason === "threat") threatReplanAt = Date.now();
       planAt = Date.now();
       pending = "";
       lastReason = reason;
@@ -1474,6 +1593,7 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
         continue;
       }
       failStreak = 0;
+      if (created.id.startsWith("takeCover:")) log(`cover start ${created.id}`);
       exec = created;
       log(`start ${id} t=${secs()}s reason=${lastReason}`);
       lastReason = "plan";
@@ -1578,10 +1698,14 @@ function pressDoor(
   return "running";
 }
 
-function watchParts(session: BotSession): { doors: string; pickups: string } {
+function watchParts(
+  session: BotSession,
+  enemies?: ReadonlySet<number>,
+): { doors: string; pickups: string; threat: string } {
   return {
     doors: session.world.doors().map((door) => `${door.id}:${door.open ? 1 : 0}:${door.locked ? 1 : 0}`).join(","),
     pickups: [...session.world.pickups()].sort().join(","),
+    threat: threatWatchKey(session, enemies),
   };
 }
 

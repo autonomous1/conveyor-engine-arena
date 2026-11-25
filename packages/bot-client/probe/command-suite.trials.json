@@ -2,8 +2,8 @@
   "_comment": "Task 158 trial table. One object per trial; the harness reads it and hardcodes no command behaviour beyond these fields. `title` is the menu label shared by --list and the ask-user question. Constants verified in command-parity.ts (the 140 matrix) and the 146 spawn probe.",
   "constants": {
     "spawnPad": {
-      "x": -6.848,
-      "z": 2.307
+      "x": -25.267281,
+      "z": 28.9902
     },
     "EAST": {
       "x": -13.9,
@@ -39,10 +39,7 @@
         }
       ],
       "armGate": true,
-      "requires": [
-        "alien-weapon-1"
-      ],
-      "title": "arm from the pad, fresh host — run 1 of 3"
+      "title": "arm from the spawn, fresh host \u2014 run 1 of 3"
     },
     {
       "id": "arm-2",
@@ -62,10 +59,7 @@
         }
       ],
       "armGate": true,
-      "requires": [
-        "alien-weapon-1"
-      ],
-      "title": "arm from the pad, fresh host — run 2 of 3"
+      "title": "arm from the spawn, fresh host \u2014 run 2 of 3"
     },
     {
       "id": "arm-3",
@@ -85,10 +79,7 @@
         }
       ],
       "armGate": true,
-      "requires": [
-        "alien-weapon-1"
-      ],
-      "title": "arm from the pad, fresh host — run 3 of 3"
+      "title": "arm from the spawn, fresh host \u2014 run 3 of 3"
     },
     {
       "id": "goto",
@@ -238,7 +229,7 @@
           "max": 0.75
         }
       ],
-      "title": "walk EAST → KEY"
+      "title": "walk EAST \u2192 KEY"
     },
     {
       "id": "reload",
@@ -360,7 +351,7 @@
       "requires": [
         "key"
       ],
-      "title": "key, then patrol HALL → HALL0"
+      "title": "key, then patrol HALL \u2192 HALL0"
     },
     {
       "id": "retrieve",
@@ -506,7 +497,7 @@
         ]
       },
       "negative": "plan",
-      "title": "control: goto a place that does not exist — must fail"
+      "title": "control: goto a place that does not exist \u2014 must fail"
     },
     {
       "id": "n02-wall",
@@ -521,7 +512,7 @@
       },
       "negative": "stallOrPen",
       "progress": true,
-      "title": "control: stand inside a wall — must fail"
+      "title": "control: stand inside a wall \u2014 must fail"
     }
   ]
 }

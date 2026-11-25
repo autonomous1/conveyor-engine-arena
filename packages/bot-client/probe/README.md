@@ -54,6 +54,8 @@ prompt); a TTY shows `bot> `, re-printed after any console line — a `SHELL
 result`, a `status` dump, a collision line — coalesced per burst, so the prompt
 is never left buried.
 
+**`--shell` never builds `src/`.** The host is spawned from the existing `dist/` (`npm run build:server` is never run by the shell; `--build 1` is ignored and the log prints `BUILD skipped reason=shell-never-builds`). Build once yourself if `dist` is stale; `--test`/`--suite` still build because a fresh host needs a current dist.
+
 Commands are `<seat> <verb> [args…]`, e.g. `1 goto-at -11.5,0,8.0`; a line
 without a numeric seat is an error naming the seats. Dispatch is **not awaited**:
 the prompt returns at once and the tagged `SHELL result seat=<i> …` prints when
@@ -73,9 +75,26 @@ commands (15 s cap) before closing; `abort`/Ctrl-C abort immediately.
 | `<seat> hunt [minutes]` | `{name:"hunt",minutes,weapon:"laser"}` |
 | `<seat> patrol <place,place,…> [minutes]` | `{name:"patrol",places,minutes}` |
 | `<seat> retrieve <pickup\|@outside-ammo> [@place]` | `{name:"retrieve",pickup[,place]}` |
-| `<seat> getkey` | `{name:"getkey"}` |
+| `<seat> getkey` | `{name:"getkey"}` — the nearest available key |
+| `<seat> arm` | `{name:"arm"}` — the nearest available weapon (one prop selector; no pinned id/pad) |
 | `<seat> projectile [bands] [throws] [seconds]` | `{name:"projectile",…}` (parser defaults) |
+| `<seat> seek-health <crate>` | `{name:"seekHealth",crate}` — combat (184's `survive`) |
+| `<seat> take-cover` | `{name:"takeCover"}` — combat (`defend`, cover) |
+| `<seat> return-fire <pawnId>` | `{name:"returnFire",pawnId}` — combat (`assault`) |
+| `<seat> retreat <place>` | `{name:"retreat",place}` — a reach to the place |
+| `<seat> reload` | `{name:"rearm"}` — **combat wins the collision**; legacy: `legacy reload` |
+| `<seat> survive` / `<seat> defend` | `{name:"survive"}` / `{name:"defend"}` — combat goals |
+| `<seat> assault <pawnId>` | `{name:"assault",pawnId}` — the assault goal (one plan; `hunt` stays the timed loop) |
 | `help` / `seats` / `status [seat]` / `abort\|stop <seat\|all>` / `q`\|`quit`\|`exit` / Ctrl-C / Ctrl-D | built-ins (unprefixed; `<seat> stop` also works) |
+
+**Combat verbs and the override.** The combat table is checked **before** the legacy
+switch, so the first match wins. The only collision is `reload`: the combat `rearm`
+wins and the legacy handler stays reachable as `legacy reload` (`SHELL legacy reload`
+then `name=reload`); `help` prints one row per name plus a `shadowed: reload` line.
+Builtins are never shadowable. The handlers live in the **proto** command surface
+(`proto/commands.ts`), so combat verbs need `--surface proto`; under the default
+`--surface probe` the shell prints `SHELL combat surface=probe unavailable` at start
+and rejects a combat verb with `why=surface-probe`.
 
 The shell maps text only — the command module validates (`bad-args` comes from
 `parseCommand`). `@outside-ammo` resolves at dispatch time through the suite's

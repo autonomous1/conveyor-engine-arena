@@ -71,7 +71,17 @@ const PASSES = Number(args.get("passes") ?? 3);
 /** Wall-clock cap for a suite (a full fresh-host run is ~15 min; a stall must not burn hours). */
 const MAX_MIN = Number(args.get("max-min") ?? 16);
 const NAME = args.get("name") ?? "s158";
-let BUILD = args.get("build") === "1" ? true : args.get("build") === "0" || args.has("no-build") || ATTACH.length > 0 ? false : true;
+// `--shell` NEVER builds: `npm run build:server` compiles the (coder-owned)
+// `src/`, and a concurrent coder suite must not race it. `--build 1` is ignored
+// in shell mode; `--test`/`--suite` keep their build (they need a fresh dist).
+const SHELL_NEVER_BUILDS = MODE === "shell";
+let BUILD = SHELL_NEVER_BUILDS
+  ? false
+  : args.get("build") === "1"
+    ? true
+    : args.get("build") === "0" || args.has("no-build") || ATTACH.length > 0
+      ? false
+      : true;
 const ROOT = process.cwd();
 const TRIALS_FILE = "packages/bot-client/probe/command-suite.trials.json";
 const STAMP = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
@@ -79,7 +89,13 @@ const LOG_DIR = "plan/dsh-tasks/logs";
 /** Each mode owns its artifact basename so one test never overwrites another. */
 const LABEL = args.get("label");
 /** `--surface proto|probe`: the command module the suite dispatches (default probe). */
-const SURFACE_NAME = args.get("surface") ?? "probe";
+const SURFACE_EXPLICIT = args.has("surface");
+// `--shell` defaults to the proto surface when the fork has the combat module:
+// the probe copy is the 158/171 legacy command module (pinned arm pads, no prop
+// selector), and silently running it made `arm` walk to the old outside climb
+// (2026-11-25). An explicit `--surface probe` still runs the legacy copy.
+const SURFACE_NAME = args.get("surface")
+  ?? (MODE === "shell" && existsSync("packages/bot-client/proto/combat.ts") ? "proto" : "probe");
 /** The selected command module; `main` assigns it before any trial runs. */
 let selectedSurface: SurfaceModule | undefined;
 /** The shell's shutdown hook; the process signal handlers route through it. */
@@ -95,7 +111,7 @@ const NDJSON = `${LOG_DIR}/${BASE}.ndjson`;
 const TRACE = `${LOG_DIR}/${BASE}.trace.ndjson`;
 const SUMMARY = `${LOG_DIR}/${BASE}.summary.md`;
 const USAGE =
-  "usage: command-suite.ts --list | --test <id> | --goto-at x,y,z | --shell [--seats 1..3] | --suite [--port n] [--no-build] [--surface proto|probe]\n" +
+  "usage: command-suite.ts --list | --test <id> | --goto-at x,y,z | --shell [--seats 1..4] [--no-build; never builds] | --suite [--port n] [--no-build] [--surface proto|probe]\n" +
   "  one test = one process: one host, one bot, one verdict; --goto-at = one ad-hoc coordinate (y parsed and ignored); --shell = held-open sessions with a bot> prompt and `<seat> <verb>` lines (help/seats/status/abort/q); --suite = 3 passes of the 15 positives + both controls; --surface = the command module (default probe)";
 /** Per-trial host log so one trial never overwrites another's host output. */
 const hostLogPath = (tag: string): string => `${LOG_DIR}/${MODE === "goto" ? "168" : "158"}-host-${tag.replace(/[/#]/g, "-")}-${STAMP}.log`;
@@ -214,7 +230,11 @@ function buildIdentity(): BuildId {
     server: sha256File("dist/server/main.js"),
     bot: sha256File("packages/bot-client/dist/ce-bot.mjs"),
   };
-  if (BUILD) {
+  if (SHELL_NEVER_BUILDS) {
+    record("BUILD skipped reason=shell-never-builds (dist must be current; run npm run build:server yourself)");
+    if (args.get("build") === "1") record("BUILD ignored flag=--build 1 (--shell never builds src/)");
+    id.dist = id.server;
+  } else if (BUILD) {
     record("BUILD start npm run build:server");
     const at = Date.now();
     const r = spawnSync("npm", ["run", "build:server"], { cwd: ROOT, encoding: "utf8" });
@@ -1110,20 +1130,68 @@ const SHELL_HELP = [
   "<seat> retrieve <pickup|@outside-ammo> [@place]",
   "<seat> getkey",
   "<seat> projectile [bands] [throws] [seconds]",
+  "<seat> seek-health <crate>         (combat; needs --surface proto)",
+  "<seat> take-cover                  (combat; needs --surface proto)",
+  "<seat> return-fire <pawnId>        (combat; needs --surface proto)",
+  "<seat> retreat <place>             (combat; needs --surface proto)",
+  "<seat> reload                      (combat rearm; legacy: legacy reload)",
+  "<seat> survive | defend            (combat goals; needs --surface proto)",
+  "<seat> assault <pawnId>            (combat goal; needs --surface proto)",
   "help | seats | status [seat] | abort|stop <seat|all> | q/quit/exit | Ctrl-C | Ctrl-D",
 ];
 
 type ShellAction =
-  | { kind: "dispatch"; name: string; args: Record<string, unknown> }
+  | { kind: "dispatch"; name: string; args: Record<string, unknown>; combat?: boolean; legacy?: boolean }
   | { kind: "builtin"; name: "help" | "status" | "abort" | "quit" }
   | { kind: "unknown" }
   | { kind: "error"; name: string; why: string };
 
+/**
+ * The combat vocabulary, checked before the legacy switch: the one place the
+ * override lives (184). A verb maps to the surface name and its args; `null`
+ * means bad args (the surface still validates).
+ */
+const COMBAT_VERBS: Record<string, { surface: string; args: (tokens: string[]) => Record<string, unknown> | null }> = {
+  "seek-health": { surface: "seekHealth", args: (tokens) => (tokens[1] ? { crate: tokens[1] } : null) },
+  "take-cover": { surface: "takeCover", args: () => ({}) },
+  "return-fire": {
+    surface: "returnFire",
+    args: (tokens) => {
+      const pawnId = Number(tokens[1]);
+      return Number.isInteger(pawnId) && pawnId > 0 ? { pawnId } : null;
+    },
+  },
+  retreat: { surface: "retreat", args: (tokens) => (tokens[1] ? { place: tokens[1] } : null) },
+  reload: { surface: "rearm", args: () => ({}) },
+  survive: { surface: "survive", args: () => ({}) },
+  defend: { surface: "defend", args: () => ({}) },
+  assault: {
+    surface: "assault",
+    args: (tokens) => {
+      const pawnId = Number(tokens[1]);
+      return Number.isInteger(pawnId) && pawnId > 0 ? { pawnId } : null;
+    },
+  },
+};
+
 /** Map one text line to a command request; the handler does the validation. */
-function parseShellLine(line: string, world: BotSession["world"]): ShellAction {
+function parseShellLine(line: string, world: BotSession["world"], skipCombat = false): ShellAction {
   const tokens = line.trim().split(/\s+/);
   const verb = (tokens[0] ?? "").toLowerCase();
   const nums = (spec: string | undefined): number[] => (spec ?? "").split(",").map((part) => Number(part));
+  // `legacy <verb>` reaches the shadowed legacy command through the same switch,
+  // with the combat table skipped (else `reload` maps straight back to `rearm`).
+  if (verb === "legacy") {
+    const inner = parseShellLine(tokens.slice(1).join(" "), world, true);
+    return inner.kind === "dispatch" ? { ...inner, legacy: true } : inner;
+  }
+  const combat = skipCombat ? undefined : COMBAT_VERBS[verb];
+  if (combat) {
+    const args = combat.args(tokens);
+    return args === null
+      ? { kind: "error", name: combat.surface, why: "bad-args" }
+      : { kind: "dispatch", name: combat.surface, args, combat: true };
+  }
   switch (verb) {
     case "help":
       return { kind: "builtin", name: "help" };
@@ -1141,6 +1209,9 @@ function parseShellLine(line: string, world: BotSession["world"]): ShellAction {
       return { kind: "dispatch", name: "getkey", args: {} };
     case "goto":
       return { kind: "dispatch", name: "goto", args: { place: tokens[1] ?? "" } };
+    case "regroup":
+      // 200: an anchor order at 45 (not forced); the place must be a graph id.
+      return { kind: "dispatch", name: "regroup", args: { place: tokens[1] ?? "" } };
     case "stand":
     case "path": {
       const [x, y, z, yaw] = nums(tokens[1]);
@@ -1209,9 +1280,9 @@ async function main(): Promise<void> {
     console.error(USAGE);
     abortSuite(2, `unknown surface: ${SURFACE_NAME} (proto|probe)`);
   }
-  if (!Number.isInteger(SEATS) || SEATS < 1 || SEATS > 3) {
+  if (!Number.isInteger(SEATS) || SEATS < 1 || SEATS > 4) {
     console.error(USAGE);
-    abortSuite(2, `--seats must be an integer 1..3 (got ${args.get("seats") ?? "?"})`);
+    abortSuite(2, `--seats must be an integer 1..4 (got ${args.get("seats") ?? "?"})`);
   }
   if (MODE === "list") {
     printMenu();
@@ -1307,6 +1378,8 @@ async function main(): Promise<void> {
       record(`HOST attach url=${URL} owner=operator (suite does not spawn or kill it)`);
     }
     record(`SHELL start host=${ATTACH ? "attach" : "spawn"} port=${shownPort} seats=${SEATS} surface=${SURFACE_NAME} tree=${tree}`);
+    if (!SURFACE_EXPLICIT) record(`SHELL surface=${SURFACE_NAME} (default: proto when proto/combat.ts exists; --surface probe runs the legacy copy)`);
+    if (SURFACE_NAME !== "proto") record("SHELL surface=probe: combat verbs unavailable, arm/getkey are the legacy pinned-pad handlers (use --surface proto)");
     type Seat = { index: number; session: BotSession; cmdHost: CommandHost; world: BotSession["world"]; name: string; closed: boolean };
     const seats = new Map<number, Seat>();
     /** Abort the seat's running command and stop its pawn where it stands. */
@@ -1524,6 +1597,7 @@ async function main(): Promise<void> {
         }
         if (verb === "help") {
           for (const row of SHELL_HELP) record(`SHELL help ${row}`);
+          record("SHELL help shadowed: reload (legacy: legacy reload)");
           return;
         }
         if (verb === "seats") {
@@ -1591,6 +1665,12 @@ async function main(): Promise<void> {
           record(`SHELL rejected seat=${seatIndex} why=unknown-verb`);
           record(`SHELL unknown cmd="${line}"`);
         }
+        return;
+      }
+      if (action.legacy) record(`SHELL legacy ${action.name}`);
+      if (action.combat && SURFACE_NAME !== "proto") {
+        record(`SHELL rejected seat=${seatIndex} name=${action.name} why=surface-probe`);
+        record(`SHELL result seat=${seatIndex} name=${action.name} ok=0 code=1 why=surface-probe ms=0`);
         return;
       }
       if (target.cmdHost.busy) {

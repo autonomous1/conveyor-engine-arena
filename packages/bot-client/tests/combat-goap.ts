@@ -8,11 +8,14 @@ import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path";
 import { loadArena } from "../../../src/server/world-loader.ts";
 import { parseSceneGraph } from "../../../src/shared/scene-graph.ts";
-import { createBotContext, groundActions, placeOfPickup, type BotCtx } from "../../../src/shared/bots/actions.ts";
-import { assaultGoal, chooseCombatGoal, combatGoals, combatHeuristic } from "../proto/combat.ts";
+import { createBotContext, estimateSeconds, goTo, groundActions, placeOfPickup, type BotCtx } from "../../../src/shared/bots/actions.ts";
+import { assaultGoal, chooseCombatGoal, combatActions, combatFacts, combatGoals, combatHeuristic, healGoal, regroupGoal, threatWatchKey, visibleThreat } from "../proto/combat.ts";
 import { HAS_AMMO } from "../../../src/shared/bots/state.ts";
 import { reach } from "../../../src/shared/bots/goals.ts";
 import { plan, type Action, type Goal, type Plan, type WorldState } from "../../../src/shared/bots/goap.ts";
+import { placeAt } from "../../../src/shared/scene-graph.ts";
+import { nextReloadCandidate, parseCommand, reloadVerdict } from "../proto/commands.ts";
+import { patrolLegOutcome } from "../proto/brain.ts";
 import { buildWorldState } from "../../../src/shared/bots/state.ts";
 import type { PickupPlacement } from "../../../src/shared/pickups.ts";
 import { homedir } from "node:os";
@@ -313,6 +316,260 @@ const farPlace = placeOfPickup(graph, FAR_CRATE);
     });
   }
 }
+
+// ---- 9 the heal as a goal (193), on the real graph -------------------------
+// The health crates come from the props placements (the arena view carries only
+// weapons/keys). `combatActions` needs a session; a minimal fake world is enough
+// because the heal path reads no pawn/health state.
+const crateProps = JSON.parse(readFileSync("web/game/props.placements.json", "utf8"));
+const allProps: Array<{ id: string; type: string; position: [number, number, number] }> = crateProps.placements ?? crateProps;
+const asPlacement = (p: { id: string; type: string; position: [number, number, number] }): PickupPlacement => ({
+  id: p.id, kind: p.type, model: "x", amount: 1,
+  minX: p.position[0] - 0.2, maxX: p.position[0] + 0.2,
+  minY: p.position[1], maxY: p.position[1] + 0.4,
+  minZ: p.position[2] - 0.2, maxZ: p.position[2] + 0.2,
+} as PickupPlacement);
+const healthProps = allProps.filter((p) => p.type === "health");
+const floorCrateProp = healthProps.find((p) => p.id === "cover-crate-2-6-0") ?? healthProps[0]!;
+const raisedCrateProp = healthProps.find((p) => p.position[1] >= 3);
+const fakeSession = (self: { x: number; y: number; z: number }, placements: PickupPlacement[], hostiles: Array<{ x: number; y: number; z: number }> = [], boxes: Array<{ minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number }> = [], dead: Set<number> = new Set<number>(), players: Set<number> = new Set<number>()) => ({
+  world: {
+    self: () => ({ id: 1, x: self.x, y: self.y, z: self.z, yaw: 0 }),
+    others: () => hostiles.map((h, i) => ({ id: 90 + i, x: h.x, y: h.y, z: h.z, yaw: 0 })),
+    playerIds: () => players,
+    healthOf: (id: number) => ({ hp: dead.has(id) ? 0 : 100, alive: !dead.has(id), dead: dead.has(id) }),
+    aabbs: boxes,
+    pickups: () => placements.map((p) => p.id),
+    pickupPlacements: () => placements,
+    placeOf: (pos: { x: number; y: number; z: number }) => ({ id: placeAt(graph!, pos.x, pos.y, pos.z).id, kind: "place" }),
+    sceneGraph: () => graph,
+    weapon: () => "",
+    ammo: () => 0,
+  },
+});
+
+const healCase = (
+  name: string,
+  crateProp: { id: string; position: [number, number, number] },
+  self: { x: number; y: number; z: number },
+  hp: number,
+): void => {
+  const item = asPlacement(crateProp as { id: string; type: string; position: [number, number, number] });
+  const placements = [item];
+  const place = placeOfPickup(graph!, item);
+  const session = fakeSession(self, placements);
+  const actx = createBotContext(graph!, placements);
+  // `goTo` is the base action the brain grounds for the crate place; the
+  // fake harness adds it explicitly so the indoor/raised cases plan.
+  const acts = [...combatActions(session as never, actx), goTo(place)];
+  const selfPlace = placeAt(graph!, self.x, self.y, self.z).id;
+  const state = { ...buildWorldState({ at: selfPlace, pickups: [item.id], doors }), safe: true, ...(hp <= 50 ? { hpWounded: true } : {}), ...(hp < 25 ? { hpCritical: true } : {}), ...(hp >= 70 ? { hpHigh: true } : {}) } as WorldState;
+  const started = performance.now();
+  const chosen = chooseCombatGoal(state, combatGoals(state), acts, actx, (g) => ({
+    deadlineMs: Date.now() + 600,
+    now: () => Date.now(),
+    minCost: actx.minActionS,
+    heuristic: (s: WorldState) => Math.max(estimateSeconds(g, actx, placements)(s), combatHeuristic(g, acts, actx)(s)),
+  }));
+  const seek = acts.find((a) => a.id.startsWith("seekHealth:"));
+  const criticalCost = seek && typeof seek.cost === "function" ? seek.cost({ ...state, hpCritical: true } as WorldState, actx) : null;
+  record({ kind: "heal", case: name, crate: item.id, cratePlace: place, hp, chosen: chosen?.goal ?? "idle", steps: chosen?.steps ?? null, planMs: round1(performance.now() - started), expanded: chosen?.expanded ?? null, criticalCost: criticalCost === null ? null : round1(criticalCost * 1000) / 1000, pass: hp >= 70 ? chosen === undefined : (chosen?.steps?.[0]?.startsWith("seekHealth:") || chosen?.steps?.[0]?.startsWith("goTo:")) === true });
+};
+
+// The place inventory: one row per health crate (the three resolvers).
+for (const p of healthProps) {
+  const item = asPlacement(p);
+  const place = placeOfPickup(graph!, item);
+  const at03 = placeAt(graph!, (item.minX + item.maxX) / 2, 0.3, (item.minZ + item.maxZ) / 2).id;
+  const atMin = placeAt(graph!, (item.minX + item.maxX) / 2, (item.minY ?? 0) + 0.2, (item.minZ + item.maxZ) / 2).id;
+  record({ kind: "place", id: p.id, minY: item.minY, maxY: item.maxY, placeOfPickup: place, placeAt03: at03, placeAtMinY02: atMin, inGraph: graph!.placeById.has(place) });
+}
+
+const floorCrate = asPlacement(floorCrateProp as { id: string; type: string; position: [number, number, number] });
+const floorPlace = placeOfPickup(graph!, floorCrate);
+const floorSelf = (floorCrateProp as { position: [number, number, number] }).position;
+healCase("heal-inplace", floorCrateProp as never, { x: floorSelf[0], y: floorSelf[1], z: floorSelf[2] }, 30);
+healCase("heal-indoor", floorCrateProp as never, { x: -22.64, y: 0, z: 27.16 }, 30);
+healCase("hp30+crate", floorCrateProp as never, { x: floorSelf[0], y: floorSelf[1], z: floorSelf[2] }, 30);
+healCase("hp20+crate", floorCrateProp as never, { x: floorSelf[0], y: floorSelf[1], z: floorSelf[2] }, 20);
+healCase("hp80+crate", floorCrateProp as never, { x: floorSelf[0], y: floorSelf[1], z: floorSelf[2] }, 80);
+if (raisedCrateProp) healCase("raised-crate", raisedCrateProp as never, { x: -22.64, y: 0, z: 27.16 }, 30);
+
+// ---- 10 survive: break contact before the critical heal (197) ---------------
+const surviveCase = (
+  name: string,
+  hp: number,
+  threatDist: number | null,
+  opts: { crate?: boolean; underFire?: boolean; mission?: boolean; threats?: number; expect: string } = { expect: "" },
+): void => {
+  const placements = opts.crate === false ? [] : [asPlacement(floorCrateProp as never)];
+  const self = { x: -22.64, y: 0, z: 27.16 };
+  const hostiles = threatDist === null
+    ? []
+    : Array.from({ length: opts.threats ?? 1 }, (_, i) => ({ x: self.x + threatDist + i * 0.1, y: 0, z: self.z }));
+  const session = fakeSession(self, placements, hostiles);
+  const actx = createBotContext(graph!, placements);
+  const acts = combatActions(session as never, actx, { onNote: () => undefined });
+  const place = placeOfPickup(graph!, asPlacement(floorCrateProp as never));
+  const facts: Record<string, unknown> = { at: place, pickups: placements.map((p) => p.id), doors };
+  if (hp >= 70) facts.hpHigh = true;
+  if (hp <= 50) facts.hpWounded = true;
+  if (hp < 25) facts.hpCritical = true;
+  if (hp < 25 || (hp <= 50 && hostiles.length >= 2)) facts.hpPressured = true;
+  if (opts.underFire) facts.underFire = true;
+  if (!opts.underFire && hostiles.length === 0 && threatDist === null) facts.safe = true;
+  if (facts.hpPressured === true || (facts.hpWounded === true && facts.safe !== true)) facts.needsRetreat = true;
+  // buildWorldState only emits its own facts; overlay the hp/safe facts.
+  const state = { ...buildWorldState({ at: place, pickups: placements.map((p2) => p2.id), doors }), ...facts } as WorldState;
+  const mission = opts.mission ? { id: "assault", want: { threatDown: true }, priority: () => 60 } : undefined;
+  const ladder = combatGoals(state, mission);
+  const started = performance.now();
+  const chosen = chooseCombatGoal(state, ladder, acts, actx, (g) => ({
+    deadlineMs: Date.now() + 600, now: () => Date.now(), minCost: actx.minActionS,
+    heuristic: (s: WorldState) => combatHeuristic(g, acts, actx)(s),
+  }));
+  const seek = acts.filter((a) => a.id.startsWith("seekHealth:")).map((a) => ({ id: a.id, pre: a.pre, usable: typeof a.usable === "function" ? a.usable(state, actx) : undefined }));
+  if (name === "critical+no-threat+crate") console.log("DBG", JSON.stringify({ ladder: ladder.map((g) => `${g.id}@${g.priority(state)}`), seek, at: state.at, avail: state["avail:" + placements[0]?.id] }));
+  const ids = new Set(acts.map((a) => a.id));
+  record({
+    kind: "survive", case: name, hp, threats: hostiles.length, crate: opts.crate !== false,
+    chosen: chosen?.goal ?? "idle", steps: chosen?.steps ?? null,
+    retreatGrounded: [...ids].some((i) => i.startsWith("retreat:")), planMs: round1(performance.now() - started),
+    pass: opts.expect === "none" ? chosen === undefined : chosen?.goal === opts.expect,
+  });
+};
+surviveCase("critical+threat+crate", 20, 8, { expect: "survive" });
+surviveCase("critical+no-threat+crate", 20, null, { expect: "survive" });
+surviveCase("critical+no-crate", 20, 8, { crate: false, underFire: true, expect: "none" });
+surviveCase("hp40+crate", 40, null, { expect: "heal" });
+surviveCase("hp50+2threats+crate", 50, 8, { threats: 2, expect: "survive" });
+surviveCase("critical+assault", 20, 8, { mission: true, expect: "survive" });
+surviveCase("hp40+threat+exit", 40, 8, { expect: "heal" });
+
+// ---- 11 defend: the live defended fact (198) ------------------------------
+const defendedFact = (name: string, cfg: { threat?: boolean; boxes?: boolean; dead?: boolean; mission?: number; underFire?: boolean; expect: boolean }): void => {
+  const self = { x: -22.64, y: 0, z: 27.16 };
+  const hostiles = cfg.threat ? [{ x: self.x + 8, y: 0, z: self.z }] : [];
+  const boxes = cfg.boxes ? [{ minX: self.x + 3, maxX: self.x + 4, minY: 0, maxY: 2, minZ: self.z - 1, maxZ: self.z + 1 }] : [];
+  const session = fakeSession(self, [], hostiles, boxes, cfg.dead ? new Set([90]) : new Set<number>());
+  const facts = combatFacts(session as never, { hp: 80, at: cfg.underFire ? Date.now() : Date.now() - 5_000 }, Date.now(), { missionTarget: cfg.mission });
+  record({ kind: "defend-fact", case: name, defended: facts.defended === true, expect: cfg.expect, pass: (facts.defended === true) === cfg.expect, threatKey: threatWatchKey(session as never) });
+};
+defendedFact("in-cover (mission target, LOS blocked)", { mission: 90, boxes: true, expect: true });
+defendedFact("targetDown", { threat: true, dead: true, expect: true });
+defendedFact("hidden shooter, damage memory hot", { underFire: true, expect: false });
+defendedFact("threat gone", { expect: true });
+
+const defendPlan = (name: string, cfg: { ammo?: boolean; target?: number; expect: string }): void => {
+  const ammoProp = allProps.find((p2) => p2.type === "ammo");
+  const placements = cfg.ammo ? [asPlacement(ammoProp as never)] : [];
+  const self = { x: -22.64, y: 0, z: 27.16 };
+  const session = fakeSession(self, placements, [{ x: self.x + 8, y: 0, z: self.z }]);
+  const actx = createBotContext(graph!, placements);
+  const acts = combatActions(session as never, actx, { target: cfg.target, onNote: () => undefined });
+  const facts = combatFacts(session as never, { hp: 80, at: Date.now() }, Date.now(), {});
+  const base = { ...buildWorldState({ at: "outside", pickups: placements.map((p2) => p2.id), doors }), ...facts } as WorldState;
+  // The fake world has no weapon/ammo; the action preconditions read the state.
+  const state = { ...base, hasWeapon: true, ...(cfg.expect === "defend" ? { hasAmmo: true } : {}) } as WorldState;
+  const turnedOff = Object.fromEntries(Object.entries(state).filter(([k]) => k !== "defended"));
+  const chosen = chooseCombatGoal(turnedOff as WorldState, combatGoals(turnedOff as WorldState), acts, actx, (g) => ({ deadlineMs: Date.now() + 600, now: () => Date.now(), minCost: actx.minActionS, heuristic: (s: WorldState) => combatHeuristic(g, acts, actx)(s) }));
+  record({ kind: "defend", case: name, chosen: chosen?.goal ?? "idle", steps: chosen?.steps ?? null, pass: (chosen?.goal ?? "idle") === cfg.expect });
+};
+defendPlan("underFire+returnFire", { target: 90, expect: "defend" });
+defendPlan("underFire+rearm", { ammo: true, expect: "rearm" });
+
+// ---- 12 assault: live threatDown + hostile set (199) ----------------------
+const assaultCase = (name: string, cfg: { dead?: boolean; absent?: boolean; players?: boolean; enemies?: boolean; target?: number; expect: string }): void => {
+  const self = { x: -22.64, y: 0, z: 27.16 };
+  const hostiles = cfg.absent ? [] : [{ x: self.x + 8, y: 0, z: self.z }];
+  const players = cfg.players ? new Set<number>([90]) : new Set<number>();
+  const enemies = cfg.enemies ? new Set<number>([90]) : new Set<number>();
+  const session = fakeSession(self, [], hostiles, [], cfg.dead ? new Set<number>([90]) : new Set<number>(), players);
+  const actx = createBotContext(graph!, []);
+  const target = cfg.target ?? 90;
+  const facts = combatFacts(session as never, { hp: 80, at: Date.now() - 5_000 }, Date.now(), { missionTarget: target, enemies });
+  const acts = combatActions(session as never, actx, { target, enemies });
+  const state = { ...buildWorldState({ at: "outside", pickups: [], doors }), ...facts, hasWeapon: true, hasAmmo: true } as WorldState;
+  const mission = { id: `assault:${target}`, want: { threatDown: true }, priority: () => 60 };
+  const chosen = chooseCombatGoal(state, combatGoals(state, mission), acts, actx, (g) => ({ deadlineMs: Date.now() + 600, now: () => Date.now(), minCost: actx.minActionS, heuristic: (s: WorldState) => combatHeuristic(g, acts, actx)(s) }));
+  record({ kind: "assault", case: name, target, threatDown: facts.threatDown === true, threatVisible: facts.threatVisible === true, chosen: chosen?.goal ?? "idle", steps: chosen?.steps ?? null, pass: (chosen?.goal ?? "idle") === cfg.expect });
+};
+assaultCase("assault-live-target", { expect: "assault:90" });
+assaultCase("assault-target-dead", { dead: true, expect: "idle" });
+assaultCase("assault-target-absent-not-dead", { absent: true, target: 12, expect: "assault:12" });
+// the hostile set: a player is visible only when declared
+const playerThreat = (enemies: boolean): string | undefined => {
+  const self = { x: -22.64, y: 0, z: 27.16 };
+  const session = fakeSession(self, [], [{ x: self.x + 8, y: 0, z: self.z }], [], new Set<number>(), new Set<number>([90]));
+  return visibleThreat(session as never, enemies ? new Set<number>([90]) : new Set<number>())?.id === 90 ? "hostile" : "friendly";
+};
+record({ kind: "assault", case: "player-in-enemies", threat: playerThreat(true), pass: playerThreat(true) === "hostile" });
+record({ kind: "assault", case: "player-not-in-enemies", threat: playerThreat(false), pass: playerThreat(false) === "friendly" });
+
+// ---- 13 regroup: an anchor order at 45 (200) ------------------------------
+const REGROUP_ANCHOR = "outside";
+const regroupCase = (name: string, cfg: { hp?: number; underFire?: boolean; crate?: boolean; target?: number; expect: string }): void => {
+  const self = { x: -22.64, y: 0, z: 27.16 };
+  const crate = asPlacement(floorCrateProp as never);
+  const placements = cfg.crate === false ? [] : [crate];
+  const hostiles = cfg.underFire ? [{ x: self.x + 8, y: 0, z: self.z }] : [];
+  const session = fakeSession(self, placements, hostiles);
+  const actx = createBotContext(graph!, placements);
+  const facts = combatFacts(session as never, { hp: cfg.hp ?? 80, at: cfg.underFire ? Date.now() : Date.now() - 5_000 }, Date.now(), {});
+  const acts = combatActions(session as never, actx, { target: cfg.target });
+  const place = placeOfPickup(graph!, crate);
+  const state = { ...buildWorldState({ at: "brutalist-building-1-cbake.floor-1.hall", pickups: placements.map((p2) => p2.id), doors }), ...facts, hasWeapon: true, hasAmmo: true } as WorldState;
+  const goal = regroupGoal(REGROUP_ANCHOR);
+  const ground = groundActions(graph!, placements, [goal]);
+  const groundIds = new Set(ground.map((a) => a.id));
+  const actions = [...ground, ...acts];
+  const chosen = chooseCombatGoal(state, combatGoals(state, goal), actions, actx, (g) => ({ deadlineMs: Date.now() + 600, now: () => Date.now(), minCost: actx.minActionS, heuristic: (s: WorldState) => combatHeuristic(g, actions, actx)(s) }));
+  record({ kind: "regroup", case: name, anchor: REGROUP_ANCHOR, goToGrounded: groundIds.has(`goTo:${REGROUP_ANCHOR}`), chosen: chosen?.goal ?? "idle", steps: chosen?.steps ?? null, pass: (chosen?.goal ?? "idle") === cfg.expect });
+};
+regroupCase("reachable-anchor", { expect: `regroup:${REGROUP_ANCHOR}` });
+regroupCase("underFire-defend-wins", { underFire: true, target: 90, expect: "defend" });
+regroupCase("hp20-survive-wins", { hp: 20, expect: "survive" });
+// locked anchor shape: synthetic key → unlock → goTo
+const lockedActions: Action<unknown>[] = [
+  { id: "pickup:key", pre: {}, eff: { hasKey: true }, cost: () => 0.5 },
+  { id: "unlock:door", pre: { hasKey: true }, eff: { doorOpen: true }, cost: () => 0.5 },
+  { id: "goTo:anchor", pre: { doorOpen: true }, eff: { at: "anchor" }, cost: () => 1 },
+] as never;
+const lockedPlan = plan({ at: "start" } as never, { id: "regroup:anchor", want: { at: "anchor" }, priority: () => 45 }, lockedActions as never, createBotContext(graph!, []), { deadlineMs: Date.now() + 600, now: () => Date.now(), minCost: 0.1 });
+record({ kind: "regroup", case: "locked-anchor-shape", steps: lockedPlan?.steps ?? null, pass: lockedPlan?.steps?.join(">") === "pickup:key>unlock:door>goTo:anchor" });
+// bad anchor: parse + graph membership
+const badParse = parseCommand({ name: "regroup", args: { place: "" } });
+record({ kind: "regroup", case: "bad-anchor", parseError: "error" in badParse, graphHasFake: graph!.placeById.has("no-such-place-xyz"), pass: ("error" in badParse) && !graph!.placeById.has("no-such-place-xyz") });
+
+// ---- 14 patrol leg policy (201) -------------------------------------------
+const patrolRow = (name: string, code: number, noPlan: string | null, skips: number, retried: boolean, expect: string): void => {
+  const out = patrolLegOutcome(code, noPlan, skips, retried);
+  record({ kind: "patrol", case: name, outcome: out.action, skips: out.consecutiveSkips, pass: out.action === expect });
+};
+patrolRow("leg-reached", 0, null, 0, false, "advance");
+patrolRow("leg-no-plan-retry", 2, "unsatisfiable", 0, false, "retry");
+patrolRow("leg-no-plan-skip", 2, "unsatisfiable", 0, true, "skip");
+patrolRow("leg-second-skip-stops", 2, "unsatisfiable", 1, true, "stop");
+patrolRow("code2-without-plan-propagates", 2, null, 0, false, "propagate");
+patrolRow("timeout-propagates", 3, null, 0, false, "propagate");
+
+// ---- 15 reload re-scan policy (202) ---------------------------------------
+const rrRow = (candidates: string[], tried: string[], expect: string): void => {
+  const rows = candidates.map((id) => ({ item: { id } }));
+  const chosen = nextReloadCandidate(rows, new Set(tried));
+  record({ kind: "reload-policy", case: `next(${candidates.join(",")}|tried=${tried.join(",")})`, chosen: chosen?.item.id ?? "none", pass: (chosen?.item.id ?? "none") === expect });
+};
+rrRow(["a", "b", "c"], [], "a");
+rrRow(["a", "b", "c"], ["a"], "b");
+rrRow(["pin", "a", "b"], [], "pin");
+rrRow(["pin", "a", "b"], ["pin"], "a");
+const rvRow = (scan: number, attempts: Array<{ crate: string; why: string }>, expect: string): void => {
+  const v = reloadVerdict(scan, attempts);
+  record({ kind: "reload-policy", case: `verdict(${scan}|${attempts.length})`, why: v.why, crate: v.crate ?? "-", pass: v.why === expect });
+};
+rvRow(0, [], "no-crate");
+rvRow(2, [], "gone");
+rvRow(2, [{ crate: "a", why: "no-plan:x" }, { crate: "b", why: "gone" }], "gone");
 
 // ---- summary ---------------------------------------------------------------
 const plans = rows.filter((row) => row.kind === "plan");
