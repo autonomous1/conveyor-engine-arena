@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { loadArena } from "../src/server/world-loader.ts";
+import { loadReferenceArena } from "./arena-reference.ts";
 import { createBotContext, groundActions } from "../src/shared/bots/actions.ts";
 
-const loaded = loadArena();
+const loaded = loadReferenceArena();
 const graph = loaded.sceneGraph!;
 const doors = loaded.view.doors;
 const doorA = doors.find((door) => door.id.startsWith("brutalist-building-1-cbake.door-1-1"))!;

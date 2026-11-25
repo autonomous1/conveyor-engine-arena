@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import { register } from "node:module";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -28,7 +27,7 @@ const { doorLeafBox } = await import("../src/shared/doors.ts");
 const { approachVelocity, MOVE_DT, wishPlanar } = await import("../src/shared/movements.ts");
 const { isElevatorShaft, placeAt } = await import("../src/shared/scene-graph.ts");
 const { capsuleOverlapsAabb } = await import("../src/shared/pickups.ts");
-const { loadArena } = await import("../src/server/world-loader.ts");
+const { loadReferenceArena, referenceText } = await import("./arena-reference.ts");
 const { runMission } = await import("../packages/bot-client/src/brain.ts");
 const { parseMission } = await import("../packages/bot-client/src/missions.ts");
 const { createCommandHost } = await import("../packages/bot-client/src/commands.ts");
@@ -36,10 +35,10 @@ const { createCommandHost } = await import("../packages/bot-client/src/commands.
 const HALL = "brutalist-building-2-cbake.floor-1.hall";
 const SPAWN = { x: 0.5407, y: 0, z: -1.7784 };
 
-const loaded = loadArena();
+const loaded = loadReferenceArena();
 const graph = loaded.sceneGraph;
 assert.ok(graph, "real scene graph missing");
-const baked = JSON.parse(readFileSync(new URL("../web/game/scene-graph.json", import.meta.url), "utf8")) as {
+const baked = JSON.parse(referenceText("scene-graph.json")) as {
   places: unknown[];
   portals: unknown[];
 };

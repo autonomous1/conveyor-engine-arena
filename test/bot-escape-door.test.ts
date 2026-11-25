@@ -24,7 +24,7 @@ const { createHostBotSense } = await import("../src/server/bot-sense.ts");
 const { createArenaDoors, createDoorBlockers } = await import("../src/server/doors.ts");
 const { doorsOnRoute, planEscapeGoal, splitMix, steerUnownedWander, stepUnownedWander } = await import("../src/server/game.ts");
 const { pawnBodies } = await import("../src/server/pickups.ts");
-const { loadArena } = await import("../src/server/world-loader.ts");
+const { loadReferenceArena } = await import("./arena-reference.ts");
 const { createPawnHealth } = await import("../src/shared/health.ts");
 const { createNavCache } = await import("../src/shared/nav/legs.ts");
 
@@ -52,7 +52,7 @@ function rig(opts: {
   cannotReach?: boolean;
   spy?: Array<[number, string, string]>;
 } = {}) {
-  const loaded = loadArena();
+  const loaded = loadReferenceArena();
   const agent = loaded.agents.find((item) => item.role !== "player")!;
   // `loadArena` shares its view between calls, so a test edits its own copy of the doors.
   const doors = loaded.view.doors.map((door) => ({ ...door }));

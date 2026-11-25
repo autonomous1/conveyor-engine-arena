@@ -9,7 +9,7 @@ import { AuthoritativeWorld } from "conveyor-engine-world";
 import { createArenaElevators } from "../dist/server/elevators.js";
 import type { ArenaElevator } from "../dist/shared/arena-view.js";
 import { commitShielded, enqueuePlanarMove, MOVE_DT } from "../dist/shared/movements.js";
-import { loadArena } from "../src/server/world-loader.ts";
+import { loadReferenceArena } from "./arena-reference.ts";
 import { createBotContext, groundActions } from "../src/shared/bots/actions.ts";
 import { buildWorldState } from "../src/shared/bots/state.ts";
 import { reach } from "../src/shared/bots/goals.ts";
@@ -296,7 +296,7 @@ test("E on the upper landing brings the cab up from the ground", () => {
   assert.equal(ride.host.onUse(ride.pawn), true);
 });
 
-const loaded = loadArena();
+const loaded = loadReferenceArena();
 const goapGraph = loaded.sceneGraph!;
 const elevators = goapGraph.portals.filter((portal) => portal.kind === "elevator");
 assert.ok(elevators.length > 0, "the installed graph must have elevator portals");

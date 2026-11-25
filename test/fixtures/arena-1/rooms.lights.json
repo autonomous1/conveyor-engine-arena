@@ -1,0 +1,54 @@
+{
+  "formatVersion": 1,
+  "units": "meters",
+  "lights": [
+    {
+      "id": "brutalist-building-1-cbake.elevator-1-1.lamp",
+      "type": "point",
+      "position": [
+        -33.630692,
+        2.2,
+        26.841872
+      ],
+      "color": "#ffd9a0",
+      "intensity": 5,
+      "range": 3.5
+    },
+    {
+      "id": "brutalist-building-1-cbake-0.elevator-1-1.lamp",
+      "type": "point",
+      "position": [
+        -34.589494,
+        2.2,
+        -29.065128
+      ],
+      "color": "#ffd9a0",
+      "intensity": 5,
+      "range": 3.5
+    },
+    {
+      "id": "brutalist-building-1-cbake-9.elevator-1-1.lamp",
+      "type": "point",
+      "position": [
+        -8.081933,
+        2.2,
+        -23.798162
+      ],
+      "color": "#ffd9a0",
+      "intensity": 5,
+      "range": 3.5
+    },
+    {
+      "id": "brutalist-building-1-cbake-5.elevator-1-1.lamp",
+      "type": "point",
+      "position": [
+        52.571215,
+        2.2,
+        -28.926788
+      ],
+      "color": "#ffd9a0",
+      "intensity": 5,
+      "range": 3.5
+    }
+  ]
+}

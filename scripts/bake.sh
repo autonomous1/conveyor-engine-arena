@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 ./node_modules/.bin/blueprint-scene bake \
---svg ./dev/scenes/arena-1/designs/arena-1.svg \
+--svg ./dev/scenes/arena-1/designs/arena-2.svg \
 --models ./web/assets/models \
 --floors ./dev/scenes/arena-1/designs/floorplans \
 --rooms ./web/assets/models \

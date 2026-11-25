@@ -1,0 +1,1408 @@
+{
+  "formatVersion": 1,
+  "gameId": "conveyor-engine-arena",
+  "gameVersion": "0.1.0",
+  "worldVersion": "example-v1",
+  "bundleId": "arena.one-room.v1",
+  "bundleVersion": "1",
+  "units": "meters",
+  "coordinateSystem": "y-up",
+  "scene": {
+    "id": "arena",
+    "bounds": "./web/game/bounds.json",
+    "floor": {
+      "y": 0,
+      "material": "floor-stone"
+    },
+    "sky": {
+      "kind": "sky-dome",
+      "material": "cloudy-sky"
+    },
+    "cityscape": {
+      "material": "cityscape-pano"
+    },
+    "shadows": {
+      "quality": "soft",
+      "radius": "80"
+    },
+    "doorSwing": {
+      "openMs": 2800,
+      "closeMs": 2800
+    },
+    "characterBeam": {
+      "fadeMs": 1700,
+      "despawnDelayMs": 1200,
+      "despawnSoundDelayMs": 0,
+      "deathHoldMs": 0
+    },
+    "spawnPoints": "./web/game/spawn-points.json",
+    "playerSpawnPoints": "./web/game/player-spawns.json",
+    "lights": "./web/game/rooms.lights.json",
+    "elevators": "./web/game/elevators.json",
+    "sceneGraph": "./web/game/scene-graph.json",
+    "regions": "./web/game/regions.json",
+    "placements": [
+      "./web/game/buildings.placements.json",
+      "./web/game/doors.placements.json",
+      "./web/game/props.placements.json",
+      "./web/game/rooms.placements.json"
+    ]
+  },
+  "assets": [
+    {
+      "id": "floor-stone",
+      "kind": "texture",
+      "type": "floor",
+      "uri": "/assets/textures/floor-tile-2.png",
+      "instance": "static",
+      "mediaType": "image/png",
+      "license": {
+        "id": "CC0-1.0",
+        "status": "spdx"
+      },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Original procedural placeholder made for this arena. No third-party art."
+      }
+    },
+    {
+      "id": "brutalist-building-1-cbake",
+      "kind": "model",
+      "type": "building",
+      "instance": "static",
+      "uri": "/assets/models/brutalist-building-1-cbake.cut.glb",
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
+      "provenance": {
+        "origin": "manual",
+        "notes": "Original rebaked onto simpler cube model for this arena."
+      }
+    },
+    {
+      "id": "brutalist-building-1-cbake.floor-2.hall",
+      "kind": "model",
+      "type": "floor",
+      "instance": "static",
+      "uri": "/assets/models/brutalist-building-1-cbake.floor-2.hall.glb",
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Elevated hall floor baked from brutalist-building-1-cbake.floors.svg. Albedo is the floor-texture pattern."
+      }
+    },
+    {
+      "id": "brutalist-building-1-cbake.floor-3.hall",
+      "kind": "model",
+      "type": "floor",
+      "instance": "static",
+      "uri": "/assets/models/brutalist-building-1-cbake.floor-3.hall.glb",
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Elevated hall floor baked from brutalist-building-1-cbake.floors.svg. Albedo is the floor-texture pattern."
+      }
+    },
+    {
+      "id": "brutalist-building-1-cbake.floor-4.hall",
+      "kind": "model",
+      "type": "floor",
+      "instance": "static",
+      "uri": "/assets/models/brutalist-building-1-cbake.floor-4.hall.glb",
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Elevated hall floor baked from brutalist-building-1-cbake.floors.svg. Albedo is the floor-texture pattern."
+      }
+    },
+    {
+      "id": "brutalist-building-1-cbake.floor-5.hall",
+      "kind": "model",
+      "type": "floor",
+      "instance": "static",
+      "uri": "/assets/models/brutalist-building-1-cbake.floor-5.hall.glb",
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Elevated hall floor baked from brutalist-building-1-cbake.floors.svg. Albedo is the floor-texture pattern."
+      }
+    },
+    {
+      "id": "brutalist-building-1-cbake.floor-6.hall",
+      "kind": "model",
+      "type": "floor",
+      "instance": "static",
+      "uri": "/assets/models/brutalist-building-1-cbake.floor-6.hall.glb",
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Elevated hall floor baked from brutalist-building-1-cbake.floors.svg. Albedo is the floor-texture pattern."
+      }
+    },
+    {
+      "id": "brutalist-building-1-cbake.floor-7.hall",
+      "kind": "model",
+      "type": "floor",
+      "instance": "static",
+      "uri": "/assets/models/brutalist-building-1-cbake.floor-7.hall.glb",
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Elevated hall floor baked from brutalist-building-1-cbake.floors.svg. Albedo is the floor-texture pattern."
+      }
+    },
+    {
+      "id": "brutalist-building-1-cbake.floor-8.hall",
+      "kind": "model",
+      "type": "floor",
+      "instance": "static",
+      "uri": "/assets/models/brutalist-building-1-cbake.floor-8.hall.glb",
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Elevated hall floor baked from brutalist-building-1-cbake.floors.svg. Albedo is the floor-texture pattern."
+      }
+    },
+    {
+      "id": "brutalist-building-1-cbake.floor-9.hall",
+      "kind": "model",
+      "type": "floor",
+      "instance": "static",
+      "uri": "/assets/models/brutalist-building-1-cbake.floor-9.hall.glb",
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Elevated hall floor baked from brutalist-building-1-cbake.floors.svg. Albedo is the floor-texture pattern."
+      }
+    },
+    {
+      "id": "brutalist-building-1-cbake.floor-10.hall",
+      "kind": "model",
+      "type": "floor",
+      "instance": "static",
+      "uri": "/assets/models/brutalist-building-1-cbake.floor-10.hall.glb",
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Elevated hall floor baked from brutalist-building-1-cbake.floors.svg. Albedo is the floor-texture pattern."
+      }
+    },
+    {
+      "id": "brutalist-building-2-cbake",
+      "kind": "model",
+      "type": "building",
+      "instance": "static",
+      "uri": "/assets/models/brutalist-building-2-cbake.cut.glb",
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
+      "provenance": {
+        "origin": "manual",
+        "notes": "Original rebaked onto simpler cube model for this arena."
+      }
+    },
+    {
+      "id": "brutalist-building-2-cbake.floor-2.hall",
+      "kind": "model",
+      "type": "floor",
+      "instance": "static",
+      "uri": "/assets/models/brutalist-building-2-cbake.floor-2.hall.glb",
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Elevated hall floor baked from brutalist-building-2-cbake.floors.svg. Albedo is the floor-texture pattern."
+      }
+    },
+    {
+      "id": "brutalist-building-2-cbake.floor-3.hall",
+      "kind": "model",
+      "type": "floor",
+      "instance": "static",
+      "uri": "/assets/models/brutalist-building-2-cbake.floor-3.hall.glb",
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Elevated hall floor baked from brutalist-building-2-cbake.floors.svg. Albedo is the floor-texture pattern."
+      }
+    },
+    {
+      "id": "brutalist-building-3-bake",
+      "kind": "model",
+      "type": "building",
+      "instance": "static",
+      "uri": "/assets/models/brutalist-building-3-bake.cut.glb",
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
+      "provenance": {
+        "origin": "manual",
+        "notes": "Original rebaked onto simpler cube model for this arena."
+      }
+    },
+    {
+      "id": "cityscape-pano",
+      "kind": "texture",
+      "type": "background",
+      "uri": "/assets/textures/cityscape-pano-6.png",
+      "shape": "cylinder",
+      "radius": 80,
+      "height": 80.534,
+      "mediaType": "image/png",
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
+      "provenance": {
+        "origin": "manual",
+        "notes": "Distant city backdrop supplied for this arena."
+      }
+    },
+    {
+      "id": "cloudy-sky",
+      "kind": "texture",
+      "type": "sky",
+      "uri": "/assets/textures/equi-sky-map.png",
+      "shape": "dome",
+      "radius": 160,
+      "height": 320,
+      "mediaType": "image/png",
+      "license": {
+        "id": "CC0-1.0",
+        "status": "spdx"
+      },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Cubic sky texture map"
+      }
+    },
+    {
+      "id": "player-a",
+      "kind": "model",
+      "type": "character",
+      "uri": "/assets/models/mechi-rider.glb",
+      "scale": 4,
+      "animations": {
+        "idle": {
+          "clip": "zombie run",
+          "speed": 0
+        },
+        "walk": {
+          "clip": "zombie walk",
+          "referenceSpeed": 0.425933865,
+          "speed": 1
+        },
+        "run": {
+          "clip": "surf",
+          "speed": 2
+        },
+        "fall": {
+          "clip": "fall",
+          "speed": 0
+        },
+        "angry": {
+          "clip": "angry",
+          "speed": 3
+        }
+      },
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "CC0-1.0",
+        "status": "spdx"
+      },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Original procedural placeholder made for this arena. No third-party art."
+      }
+    },
+    {
+      "id": "player-b",
+      "kind": "model",
+      "type": "character",
+      "uri": "/assets/models/anatomical-skeleton-cross-3d-model.glb",
+      "scale": 2,
+      "animations": {
+        "idle": {
+          "clip": "zombie run",
+          "speed": 0
+        },
+        "walk": {
+          "clip": "zombie walk",
+          "referenceSpeed": 0.425933865,
+          "speed": 0.5
+        },
+        "run": {
+          "clip": "zombie walk",
+          "referenceSpeed": 0.65238566,
+          "speed": 2
+        },
+        "fall": {
+          "clip": "fall",
+          "speed": 0
+        },
+        "angry": {
+          "clip": "run",
+          "speed": 0
+        }
+      },
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "CC0-1.0",
+        "status": "spdx"
+      },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Original procedural placeholder made for this arena. No third-party art."
+      }
+    },
+    {
+      "id": "player-d",
+      "kind": "model",
+      "type": "character",
+      "uri": "/assets/models/quad-skeleton-3.glb",
+      "scale": 2,
+      "animations": {
+        "idle": {
+          "clip": "freaky.001",
+          "speed": 0
+        },
+        "walk": {
+          "clip": "zombie walk",
+          "referenceSpeed": 0.425933865,
+          "speed": 1
+        },
+        "run": {
+          "clip": "zombie walk",
+          "referenceSpeed": 0.65238566,
+          "speed": 2
+        },
+        "fall": {
+          "clip": "defeat_03.001",
+          "speed": 0
+        },
+        "angry": {
+          "clip": "dance_04.001",
+          "speed": 0
+        }
+      },
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "CC0-1.0",
+        "status": "spdx"
+      },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Original procedural placeholder made for this arena. No third-party art."
+      }
+    },
+    {
+      "id": "ratty",
+      "kind": "model",
+      "type": "character",
+      "uri": "/assets/models/ratty.glb",
+      "scale": 1.5,
+      "animations": {
+        "idle": {
+          "clip": "zombie reaching down and grabbing an object.001",
+          "speed": 0
+        },
+        "walk": {
+          "clip": "hunch-back zombie walk.001",
+          "speed": 1
+        },
+        "run": {
+          "clip": "rat-like running away, fast motion.001",
+          "speed": 3
+        },
+        "fall": {
+          "clip": "fall.001",
+          "speed": 0
+        },
+        "angry": {
+          "clip": "hunched over rat-like shuffle walk arms gyrating.001",
+          "speed": 3
+        }
+      },
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "CC0-1.0",
+        "status": "spdx"
+      },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Original procedural placeholder made for this arena. No third-party art."
+      }
+    },
+    {
+      "id": "cyborg-endoskeleton",
+      "kind": "model",
+      "type": "character",
+      "uri": "/assets/models/fantasy-monster-3d-model.glb",
+      "scale": 2,
+      "animations": {
+        "idle": {
+          "clip": "fold_arms",
+          "speed": 0
+        },
+        "walk": {
+          "clip": "walk",
+          "speed": 1,
+          "referenceSpeed": 0.897262531
+        },
+        "run": {
+          "clip": "run",
+          "speed": 3,
+          "referenceSpeed": 3.220485679
+        },
+        "fall": {
+          "clip": "fall",
+          "speed": 0
+        },
+        "angry": {
+          "clip": "front_kick_02",
+          "speed": 0
+        }
+      },
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "CC0-1.0",
+        "status": "spdx"
+      },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Original procedural placeholder made for this arena. No third-party art."
+      }
+    },
+    {
+      "id": "player-1",
+      "kind": "model",
+      "type": "character",
+      "uri": "/assets/models/player-2.glb",
+      "scale": 2,
+      "animations": {
+        "idle": {
+          "clip": "idle.001",
+          "speed": 0
+        },
+        "walk": {
+          "clip": "walk.001",
+          "speed": 1
+        },
+        "run": {
+          "clip": "run.001",
+          "speed": 2.5
+        },
+        "fall": {
+          "clip": "fall.001",
+          "speed": 0
+        },
+        "angry": {
+          "clip": "angry_02.001",
+          "speed": 3
+        }
+      },
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "CC0-1.0",
+        "status": "spdx"
+      },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Original procedural placeholder made for this arena. No third-party art."
+      }
+    },
+    {
+      "id": "grok-bot",
+      "kind": "model",
+      "type": "character",
+      "uri": "/assets/models/grok-bot.glb",
+      "scale": 2,
+      "animations": {
+        "idle": {
+          "clip": "idle",
+          "speed": 0
+        },
+        "walk": {
+          "clip": "walk",
+          "speed": 1,
+          "referenceSpeed": 0.897262531
+        },
+        "run": {
+          "clip": "run",
+          "speed": 3,
+          "referenceSpeed": 3.220485679
+        },
+        "fall": {
+          "clip": "dance_05",
+          "speed": 0
+        },
+        "angry": {
+          "clip": "dance_05",
+          "speed": 3
+        }
+      },
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "CC0-1.0",
+        "status": "spdx"
+      },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Original procedural placeholder made for this arena. No third-party art."
+      }
+    },
+    {
+      "id": "steampunk-dog",
+      "kind": "model",
+      "type": "character",
+      "uri": "/assets/models/steampunk-dog.glb",
+      "scale": 2,
+      "animations": {
+        "idle": {
+          "clip": "preset:quadruped:walk",
+          "speed": 0
+        },
+        "walk": {
+          "clip": "preset:quadruped:walk",
+          "speed": 1,
+          "referenceSpeed": 0.897262531
+        },
+        "run": {
+          "clip": "preset:quadruped:walk",
+          "speed": 3,
+          "referenceSpeed": 3.220485679
+        },
+        "fall": {
+          "clip": "preset:quadruped:walk",
+          "speed": 0
+        },
+        "angry": {
+          "clip": "preset:quadruped:walk",
+          "speed": 3
+        }
+      },
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "CC0-1.0",
+        "status": "spdx"
+      },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Original procedural placeholder made for this arena. No third-party art."
+      }
+    },
+    {
+      "id": "door-1",
+      "kind": "model",
+      "type": "door",
+      "action": "yaw",
+      "instance": "static",
+      "uri": "/assets/models/door1.glb",
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "CC0-1.0",
+        "status": "spdx"
+      },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Generated with blueprint-sceen prop --shape door"
+      }
+    },
+    {
+      "id": "door-2",
+      "kind": "model",
+      "type": "door",
+      "action": "yaw",
+      "instance": "static",
+      "uri": "/assets/models/door2.glb",
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "CC0-1.0",
+        "status": "spdx"
+      },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Generated with blueprint-sceen prop --shape door"
+      }
+    },
+    {
+      "id": "elevator-1-door",
+      "kind": "model",
+      "type": "door",
+      "action": "yaw",
+      "instance": "static",
+      "uri": "/assets/models/elevator-1-door.glb",
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "CC0-1.0",
+        "status": "spdx"
+      },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Generated with blueprint-sceen prop --shape door"
+      }
+    },
+    {
+      "id": "elevator-1-door-2",
+      "kind": "model",
+      "type": "door",
+      "action": "yaw",
+      "instance": "static",
+      "uri": "/assets/models/elevator-1-door-2.glb",
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "CC0-1.0",
+        "status": "spdx"
+      },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Generated with blueprint-sceen prop --shape door"
+      }
+    },
+    {
+      "id": "brutalist-building-2-cbake.l1.landing",
+      "kind": "model",
+      "type": "floor",
+      "instance": "static",
+      "uri": "/assets/models/brutalist-building-2-cbake.l1.landing.glb",
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "CC0-1.0",
+        "status": "spdx"
+      },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Generated with blueprint-sceen bake"
+      }
+    },
+    {
+      "id": "brutalist-building-2-cbake.s1.stairs",
+      "kind": "model",
+      "type": "floor",
+      "instance": "static",
+      "uri": "/assets/models/brutalist-building-2-cbake.s1.stairs.glb",
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
+      "provenance": {
+        "origin": "procedural"
+      }
+    },
+    {
+      "id": "brutalist-building-2-cbake.s2.stairs",
+      "kind": "model",
+      "type": "floor",
+      "instance": "static",
+      "uri": "/assets/models/brutalist-building-2-cbake.s2.stairs.glb",
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
+      "provenance": {
+        "origin": "procedural"
+      }
+    },
+    {
+      "id": "brutalist-building-2-cbake.l2.1.landing",
+      "kind": "model",
+      "type": "floor",
+      "instance": "static",
+      "uri": "/assets/models/brutalist-building-2-cbake.l2.1.landing.glb",
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "CC0-1.0",
+        "status": "spdx"
+      },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Generated with blueprint-sceen bake"
+      }
+    },
+    {
+      "id": "brutalist-building-2-cbake.s2.1.stairs",
+      "kind": "model",
+      "type": "floor",
+      "instance": "static",
+      "uri": "/assets/models/brutalist-building-2-cbake.s2.1.stairs.glb",
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
+      "provenance": {
+        "origin": "procedural"
+      }
+    },
+    {
+      "id": "brutalist-building-2-cbake.s2.2.stairs",
+      "kind": "model",
+      "type": "floor",
+      "instance": "static",
+      "uri": "/assets/models/brutalist-building-2-cbake.s2.2.stairs.glb",
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
+      "provenance": {
+        "origin": "procedural"
+      }
+    },
+    {
+      "id": "ammo-box",
+      "kind": "model",
+      "type": "ammo",
+      "instance": "static",
+      "uri": "/assets/models/ammo-box.glb",
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "CC0-1.0",
+        "status": "spdx"
+      },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Generated with blueprint-sceen prop --shape crate"
+      }
+    },
+    {
+      "id": "med-kit",
+      "kind": "model",
+      "type": "health",
+      "instance": "static",
+      "uri": "/assets/models/med-kit.glb",
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "CC0-1.0",
+        "status": "spdx"
+      },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Generated with blueprint-sceen prop --shape crate"
+      }
+    },
+    {
+      "id": "step",
+      "kind": "model",
+      "type": "crate",
+      "instance": "static",
+      "uri": "/assets/models/step.glb",
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "CC0-1.0",
+        "status": "spdx"
+      },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Generated with blueprint-sceen prop --shape crate"
+      }
+    },
+    {
+      "id": "szukalski-centerpiece",
+      "kind": "model",
+      "type": "building",
+      "instance": "static",
+      "uri": "/assets/models/szukalski-centerpiece.glb",
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "CC0-1.0",
+        "status": "spdx"
+      },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Generated with tripo"
+      }
+    },
+    {
+      "id": "room-a",
+      "kind": "model",
+      "type": "room",
+      "instance": "static",
+      "uri": "/assets/models/room-a.glb",
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "CC0-1.0",
+        "status": "spdx"
+      },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Generated with blueprint-sceen prop --shape crate"
+      }
+    },
+    {
+      "id": "room-b",
+      "kind": "model",
+      "type": "room",
+      "instance": "static",
+      "uri": "/assets/models/room-b.glb",
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "CC0-1.0",
+        "status": "spdx"
+      },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Generated with blueprint-sceen prop --shape crate"
+      }
+    },
+    {
+      "id": "elevator-1",
+      "kind": "model",
+      "type": "room",
+      "instance": "static",
+      "uri": "/assets/models/elevator-1.glb",
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "CC0-1.0",
+        "status": "spdx"
+      },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Generated with blueprint-sceen prop --shape crate"
+      }
+    },
+    {
+      "id": "room-b.open",
+      "kind": "model",
+      "type": "room",
+      "instance": "static",
+      "uri": "/assets/models/room-b.open.glb",
+      "mediaType": "model/gltf-binary",
+      "license": {
+        "id": "CC0-1.0",
+        "status": "spdx"
+      },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "room-b with the shared exterior doorway cut out of the facade face"
+      }
+    },
+    {
+      "id": "key-1",
+      "kind": "model",
+      "type": "key",
+      "instance": "static",
+      "animation": "idle",
+      "uri": "/assets/models/key-1.glb",
+      "mediaType": "model/gltf-binary",
+      "animations": {
+        "idle": {
+          "clip": "rotate",
+          "speed": 0
+        },
+        "walk": {
+          "clip": "rotate",
+          "speed": 0
+        },
+        "run": {
+          "clip": "rotate",
+          "speed": 0
+        },
+        "fall": {
+          "clip": "rotate",
+          "speed": 0
+        },
+        "angry": {
+          "clip": "rotate",
+          "speed": 0
+        }
+      },
+      "license": {
+        "id": "CC0-1.0",
+        "status": "spdx"
+      },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Created with blender extrude 2d curve"
+      }
+    },
+    {
+      "id": "alien-weapon-enh",
+      "kind": "model",
+      "scale": 1.5,
+      "type": "weapon",
+      "instance": "static",
+      "animation": "idle",
+      "uri": "/assets/models/laser-rifle.glb",
+      "mediaType": "model/gltf-binary",
+      "animations": {
+        "idle": {
+          "clip": "rotate",
+          "speed": 0
+        },
+        "walk": {
+          "clip": "rotate",
+          "speed": 0
+        },
+        "run": {
+          "clip": "rotate",
+          "speed": 0
+        },
+        "fall": {
+          "clip": "rotate",
+          "speed": 0
+        },
+        "angry": {
+          "clip": "rotate",
+          "speed": 0
+        }
+      },
+      "license": {
+        "id": "CC0-1.0",
+        "status": "spdx"
+      },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Original procedural placeholder made for this arena. No third-party art."
+      }
+    },
+    {
+      "id": "grenade",
+      "kind": "model",
+      "type": "projectile",
+      "instance": "static",
+      "uri": "/assets/models/grenade-launched.glb",
+      "mediaType": "model/gltf-binary",
+      "projectile": {
+        "impact": "explode",
+        "damage": 50
+      },
+      "license": {
+        "id": "CC0-1.0",
+        "status": "spdx"
+      },
+      "provenance": {
+        "origin": "procedural",
+        "notes": "Created with blender"
+      }
+    },
+    {
+      "id": "grenade-explosion",
+      "kind": "texture",
+      "uri": "/assets/textures/grenade-explosion-sheet.png",
+      "mediaType": "image/png",
+      "sprite": {
+        "columns": 6,
+        "rows": 5,
+        "frameCount": 30,
+        "frameWidth": 256,
+        "frameHeight": 256,
+        "fps": 30,
+        "size": 8,
+        "laserImpactSize": 0.8,
+        "blending": "normal"
+      },
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
+      "provenance": {
+        "origin": "manual",
+        "notes": "Grenade explosion sprite sheet supplied for this arena: 1536x1280, 30 frames of 256x256, 6 columns x 5 rows."
+      }
+    },
+    {
+      "id": "laser-impact",
+      "kind": "texture",
+      "optional": true,
+      "uri": "/assets/textures/laser-impact-sheet.png",
+      "mediaType": "image/png",
+      "sprite": {
+        "columns": 6,
+        "rows": 5,
+        "frameCount": 30,
+        "frameWidth": 256,
+        "frameHeight": 256,
+        "fps": 30,
+        "size": 0.8,
+        "laserImpactSize": 0.8,
+        "blending": "normal"
+      },
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
+      "provenance": {
+        "origin": "manual",
+        "notes": "Laser hit sprite sheet, 1536x1280: 30 frames of 256x256 in 6 columns x 5 rows at 30 fps. The client derives frame size from the loaded image (width/columns by height/rows). Optional rotation is degrees. Optional: while the file is absent, laser hits use the grenade-explosion sheet."
+      }
+    },
+    {
+      "id": "grenade-surface-explosion",
+      "kind": "texture",
+      "optional": true,
+      "uri": "/assets/textures/grenade-ground-blast-sheet.png",
+      "mediaType": "image/png",
+      "sprite": {
+        "columns": 6,
+        "rows": 5,
+        "frameCount": 30,
+        "frameWidth": 256,
+        "frameHeight": 256,
+        "fps": 30,
+        "size": 8,
+        "anchorY": 0.48,
+        "blending": "normal"
+      },
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
+      "provenance": {
+        "origin": "manual",
+        "notes": "Surface grenade blast sprite sheet, 1536x1280: 30 frames of 256x256 in 6 columns x 5 rows at 30 fps. Drawn with the bottom edge on the impact surface. The client derives frame size from the loaded image. Optional: while the file is absent, surface hits use the grenade-explosion sheet."
+      }
+    },
+    {
+      "id": "laser-blast",
+      "kind": "audio",
+      "uri": "/assets/audio/laser-blast-sfx.mp3",
+      "mediaType": "audio/mpeg",
+      "sound": {
+        "volume": 0.6,
+        "maxVoices": 4,
+        "positional": true,
+        "refDistance": 4
+      },
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
+      "provenance": {
+        "origin": "manual",
+        "notes": "Laser blast sound supplied for this arena. Plays once per laser shot."
+      }
+    },
+    {
+      "id": "grenade-launch",
+      "kind": "audio",
+      "uri": "/assets/audio/grenade-launch.wav",
+      "mediaType": "audio/wav",
+      "sound": {
+        "volume": 0.8,
+        "maxVoices": 2,
+        "positional": true,
+        "refDistance": 3
+      },
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
+      "provenance": {
+        "origin": "manual",
+        "notes": "Grenade launch sound supplied for this arena. Plays once per throw."
+      }
+    },
+    {
+      "id": "grenade-blast",
+      "kind": "audio",
+      "uri": "/assets/audio/grenade-launch-grenade-blast.wav",
+      "mediaType": "audio/wav",
+      "sound": {
+        "volume": 2,
+        "maxVoices": 4,
+        "positional": true,
+        "refDistance": 8
+      },
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
+      "provenance": {
+        "origin": "manual",
+        "notes": "Grenade blast sound supplied for this arena. Plays at the detonation point. The file name suggests launch plus blast; it is used as the blast only."
+      }
+    },
+    {
+      "id": "crate-pickup",
+      "kind": "audio",
+      "uri": "/assets/audio/crate-pickup.wav",
+      "mediaType": "audio/wav",
+      "sound": {
+        "volume": 0.8,
+        "maxVoices": 2,
+        "positional": true,
+        "refDistance": 3,
+        "pickupKinds": ["ammo"]
+      },
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
+      "provenance": {
+        "origin": "manual",
+        "notes": "Sound for taking an ammo crate (the ammo-box pickup, type ammo). Plays once per pickup the host confirms. To swap the file, change uri only."
+      }
+    },
+    {
+      "id": "key-pickup",
+      "kind": "audio",
+      "uri": "/assets/audio/key-pickup.wav",
+      "mediaType": "audio/wav",
+      "sound": {
+        "volume": 0.8,
+        "maxVoices": 2,
+        "positional": true,
+        "refDistance": 3,
+        "pickupKinds": ["key"]
+      },
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
+      "provenance": {
+        "origin": "manual",
+        "notes": "Sound for taking a key (the key-1 pickup, type key). Plays once per pickup the host confirms. To swap the file, change uri only."
+      }
+    },
+    {
+      "id": "medkit-pickup",
+      "kind": "audio",
+      "optional": true,
+      "uri": "/assets/audio/medkit-pickup.wav",
+      "mediaType": "audio/wav",
+      "sound": {
+        "volume": 0.8,
+        "maxVoices": 2,
+        "positional": true,
+        "refDistance": 3,
+        "pickupKinds": ["health"]
+      },
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
+      "provenance": {
+        "origin": "manual",
+        "notes": "Sound for taking a med-kit (the med-kit pickup, type health). Optional: while the file is absent the host warns once and the sound stays silent."
+      }
+    },
+    {
+      "id": "door-open",
+      "kind": "audio",
+      "optional": true,
+      "uri": "/assets/audio/metal-door-creak-open.wav",
+      "mediaType": "audio/wav",
+      "sound": {
+        "volume": 0.8,
+        "maxVoices": 4,
+        "positional": true,
+        "refDistance": 4
+      },
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
+      "provenance": {
+        "origin": "manual",
+        "notes": "Door creaking open. Plays when a door changes from closed to open. Optional: while the file is absent the host warns once and the sound stays silent."
+      }
+    },
+    {
+      "id": "door-close",
+      "kind": "audio",
+      "optional": true,
+      "uri": "/assets/audio/metal-door-close.wav",
+      "mediaType": "audio/wav",
+      "sound": {
+        "volume": 0.8,
+        "maxVoices": 4,
+        "positional": true,
+        "refDistance": 4
+      },
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
+      "provenance": {
+        "origin": "manual",
+        "notes": "Door closing. Plays when a door starts to close (the swing is as long as the file). Optional: while the file is absent the host warns once and the sound stays silent."
+      }
+    },
+    {
+      "id": "elevator-start",
+      "kind": "audio",
+      "optional": true,
+      "uri": "/assets/audio/elevator-start.opus",
+      "mediaType": "audio/ogg",
+      "sound": {
+        "volume": 0.8,
+        "maxVoices": 2,
+        "positional": true,
+        "refDistance": 5
+      },
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
+      "provenance": {
+        "origin": "manual",
+        "notes": "Elevator starting to move. Ogg Opus (decodeAudioData: Chrome and Firefox; Safari from 18.4). Plays at the cab when it leaves a stop. Optional: while the file is absent the host warns once and the sound stays silent."
+      }
+    },
+    {
+      "id": "beam-spawn",
+      "kind": "texture",
+      "optional": true,
+      "uri": "/assets/textures/beam-spawn-sheet.png",
+      "mediaType": "image/png",
+      "sprite": {
+        "columns": 8,
+        "rows": 6,
+        "frameCount": 48,
+        "frameWidth": 256,
+        "frameHeight": 256,
+        "fps": 24,
+        "blending": "additive"
+      },
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
+      "provenance": {
+        "origin": "manual",
+        "notes": "Transporter beam overlay played over a character that spawns. Sheet 2048x1536: 48 frames of 256x256 in 8 columns x 6 rows at 24 fps (2 s). The beam is ~160 px wide and vertical within each frame. size defaults to the pawn height (square sprite). Optional: while the file is absent the beam is skipped."
+      }
+    },
+    {
+      "id": "beam-despawn",
+      "kind": "texture",
+      "optional": true,
+      "uri": "/assets/textures/beam-despawn-sheet.png",
+      "mediaType": "image/png",
+      "sprite": {
+        "columns": 8,
+        "rows": 6,
+        "frameCount": 48,
+        "frameWidth": 256,
+        "frameHeight": 256,
+        "fps": 24,
+        "blending": "additive",
+        "rotation": 90
+      },
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
+      "provenance": {
+        "origin": "manual",
+        "notes": "Transporter beam overlay played over a character that despawns, from scene.characterBeam.despawnDelayMs after the event. Same 8x6 / 48 / 24 fps sheet as beam-spawn, but the beam runs horizontally in the art; sprite.rotation 90 turns it vertical. Optional: while the file is absent the beam is skipped."
+      }
+    },
+    {
+      "id": "beam-spawn-sfx",
+      "kind": "audio",
+      "optional": true,
+      "uri": "/assets/audio/beam-transport-sfx-spawn.mp3",
+      "mediaType": "audio/mpeg",
+      "sound": {
+        "volume": 0.8,
+        "maxVoices": 4,
+        "positional": true,
+        "refDistance": 4
+      },
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
+      "provenance": {
+        "origin": "manual",
+        "notes": "Transporter sound for a character that spawns. Plays at the spawn. Optional: while the file is absent the host warns once and the sound stays silent."
+      }
+    },
+    {
+      "id": "beam-despawn-sfx",
+      "kind": "audio",
+      "optional": true,
+      "uri": "/assets/audio/beam-transport-sfx-despawn.mp3",
+      "mediaType": "audio/mpeg",
+      "sound": {
+        "volume": 0.8,
+        "maxVoices": 4,
+        "positional": true,
+        "refDistance": 4
+      },
+      "license": {
+        "id": "unspecified",
+        "status": "unknown"
+      },
+      "provenance": {
+        "origin": "manual",
+        "notes": "Transporter sound for a character that despawns. Plays at the despawn event plus scene.characterBeam.despawnSoundDelayMs. Optional: while the file is absent the host warns once and the sound stays silent."
+      }
+    }
+  ],
+  "player": {
+    "radius": 0.45,
+    "height": 1.8,
+    "clientPlayer": {
+      "pickupProps": true,
+      "modelChoices": [
+        "grok-bot",
+        "player-1"
+      ]
+    },
+    "npcPlayer": {
+      "pickupProps": false,
+      "modelChoices": [
+        "steampunk-dog",
+        "ratty",
+        "cyborg-endoskeleton",
+        "player-a",
+        "player-b",
+        "player-d"
+      ]
+    }
+  }
+}
