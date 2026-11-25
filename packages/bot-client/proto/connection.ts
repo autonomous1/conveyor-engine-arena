@@ -40,6 +40,35 @@ export class BotRejected extends Error {
   }
 }
 
+/** Ack coalescing window: one ack per 50 ms, carrying the highest seq (190). */
+const ACK_COALESCE_MS = 50;
+
+/**
+ * Coalesce acks to one send per `tickMs` window, carrying the highest seq.
+ * @why The host's ack is monotonic (`max(lastAckSeq)`), so intermediate acks
+ *      carry no information. Acking every snapshot made an event-loop block (a
+ *      plan, a cover scan) flush one ack per buffered snapshot in a single host
+ *      tick and cross the transport's 16 frames/tick limit (`input-rate`); 3
+ *      seats on one loop crossed it together (190).
+ * @invariant One send per window, carrying the highest pending seq; a
+ *            non-positive or non-finite seq never sends.
+ *            (test: ack_coalescer_one_send_per_window_highest_seq)
+ */
+export function createAckCoalescer(send: (seq: number) => void, tickMs: number): (seq: number) => void {
+  let pending = 0;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const flush = (): void => {
+    timer = undefined;
+    const seq = pending;
+    pending = 0;
+    if (seq > 0) send(seq);
+  };
+  return (seq: number): void => {
+    if (Number.isFinite(seq) && seq > pending) pending = seq;
+    if (timer === undefined) timer = setTimeout(flush, tickMs);
+  };
+}
+
 /**
  * How to open one bot session: URL, token, name, optional socket factory,
  * preloaded scene graph/regions, and log hook.
@@ -226,6 +255,9 @@ export async function connectBot(o: ConnectBotOptions): Promise<BotSession> {
       resolve();
     };
     let lastSeq = 0;
+    const queueAck = createAckCoalescer((seq) => {
+      if (ws.readyState === 1) ws.send(JSON.stringify({ v: 1, type: "ack", snapshotSeq: seq }));
+    }, ACK_COALESCE_MS);
 
     ws.addEventListener("open", () => {
       ws.send(JSON.stringify(helloFrame(view, o, reconnectToken, model)));
@@ -289,7 +321,7 @@ export async function connectBot(o: ConnectBotOptions): Promise<BotSession> {
         lastSeq = Number.isFinite(snap.seq) ? snap.seq : lastSeq;
         client.applySnapshot(snap);
         world.applySnapshot(snap);
-        if (ws.readyState === 1) ws.send(JSON.stringify({ v: 1, type: "ack", snapshotSeq: snap.seq }));
+        queueAck(Number.isFinite(snap.seq) ? snap.seq : lastSeq);
       } catch {
         if (ws.readyState === 1) ws.send(JSON.stringify({ v: 1, type: "resync" }));
       }
