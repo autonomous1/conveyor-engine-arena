@@ -408,3 +408,22 @@ lives in `packages/bot-client/probe/`, tracked; `proto/` is the tracked fork.
 
 `.gitignore` gains `packages/bot-client/proto/` — a repo-root change, so the bot
 lane or the operator applies it.
+
+## D19 — The build output is the coder's; the bot lane attaches or uses `--no-build` (2026-11-25)
+
+`npm run build` / `build:server` writes `dist/`, and the coder's scoped tests build
+and read the same directory. The bot-developer's suite also starts hosts from
+`dist/server`, so it built too — two builds interleaving leave a half-written
+`dist/`, and the coder's gate flakes on code nobody changed.
+
+**Why:** `dist/` is one shared artifact with no lock. Whoever writes it last wins,
+and a half-written tree is a silent wrong-binary. The lane that owns the code should
+own the build.
+
+**In practice:** the bot lane never builds. It attaches to the operator's host
+(`--attach`, no build) or runs with `--no-build` against a `dist/` the operator or
+the coder just built. A run that needs a build asks the operator, or takes a
+worktree. Probes need no build — Node strips types; only the host does. `--shell`
+was changed to never build by default (2026-11-25, `--build 1` still forces it);
+`--test`/`--suite` still build unless `--no-build`/`--attach`, so those two modes
+must opt out.

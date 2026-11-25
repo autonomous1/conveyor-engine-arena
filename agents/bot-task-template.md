@@ -4,6 +4,9 @@ Read `~/dev/conveyor-engine-arena/agents/bot-developer-role.md` first. Then this
 
 **Prohibitions:** `agents/AGENTS.md` (memory/skills, sibling repos); the run's evidence is the live log + this file.
 **Artifacts:** every log, trace, capture, and diff goes under `plan/dsh-tasks/logs/` (`<NN>-<what>.log`, `<NN>-trace.json`); the analysis/report under `plan/dsh-tasks/reports/`. Never the repo root. The report links the exact paths.
+**Build:** never run `npm run build` / `build:server` — it writes `dist/`, which the
+coder's scoped tests also build and read. Run with `--attach` or `--no-build`; if a
+build is required, the operator runs it.
 **Safety:** one long-lived session per trial; clean `close()`; wait before any retry; never more than one bot in the arena while the operator is playing; never target the operator's pawn. Leftover seats are the known cause of `SERVER_FULL` and the stale-pawn confusion (task 49).
 
 > **This is a rapid-prototype task; the coder's migration is a later, separate

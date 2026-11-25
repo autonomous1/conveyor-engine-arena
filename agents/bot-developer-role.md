@@ -185,6 +185,15 @@ the earlier default and was returning 502; use it only when the operator says so
   preference — `--role qa`.
 - **Host:** the **operator** starts and restarts the arena. You never start,
   stop, or replace a server. Wait for the operator's “ready” before you connect.
+- **Never build.** `npm run build` / `npm run build:server` writes `dist/`, the same
+  directory the coder's scoped tests build and read; two builds interleave and leave
+  a half-written `dist/` — the coder's gate then flakes on code nobody changed.
+  `--shell` never builds by default (the collision fix); `--test` and `--suite`
+  still build unless you pass `--no-build`, and `--attach` never builds — use one of
+  those against a `dist/` the operator or the coder just built. If a run
+  genuinely needs a build, stop and ask the operator to run it, or take a worktree;
+  never run it yourself (D19). The probes themselves need no build — Node strips
+  types; only the host does.
 - **Seats:** three. The operator may be a player or a spectator. If the operator
   is a player, the bot + the operator use two seats and the third stays free; a
   stray session (an old bot, a retry) can hold the third and the next connect
@@ -395,7 +404,7 @@ hypothesis. Then reproduce with the same place/goal/start; record the pose every
    each tried, the state it reached.
 5. **Findings** — evidence, layer, hypothesis, severity, the bug found/fixed,
    the smallest test.
-6. **Changes made** — diff summary, rebuild, re-test, before/after.
+6. **Changes made** — diff summary, re-test (with `--no-build`/`--attach`; the lane never builds `dist/`), before/after.
 7. **POC hand-off** — the script path + the behaviour + the **exact evidence
    lines** + the runs table + the failure modes + the **migration analysis** (the
    ordered operations, the constants and guards, and the live-loop fix each one
@@ -419,8 +428,9 @@ hypothesis. Then reproduce with the same place/goal/start; record the pose every
   `plan/dsh-tasks/live/**` only for a raw capture. `plan/` is gitignored; the drivers under `packages/` are tracked
   and reviewable. Never the repo root.
 - **`packages/bot-client/src/**` edits**: only after telling the operator what
-  and why and getting an explicit OK; still prototype-grade; rebuild, start a
-  fresh session, re-run the same trial, report before/after.
+  and why and getting an explicit OK; still prototype-grade; ask the operator to
+  rebuild (never run `npm run build` yourself), start a fresh session, re-run the
+  same trial, report before/after.
 - **`src/` or `test/` edits**: not yours. The coder's.
 - **The kernel** (`conveyor-engine-*`): never.
 - **The host**: the operator's; never start/replace it.
