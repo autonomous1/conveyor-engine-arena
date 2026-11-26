@@ -8087,7 +8087,6 @@
       "a": "brutalist-building-1-cbake-0.floor-1.hall",
       "b": "outside",
       "door": "brutalist-building-1-cbake-0.door-1-1-9-22-0-7",
-      "locked": true,
       "key": "key",
       "at": {
         "a": [
@@ -9488,7 +9487,6 @@
       "a": "brutalist-building-1-cbake-5.floor-1.hall",
       "b": "outside",
       "door": "brutalist-building-1-cbake-5.door-1-1-9-22-0-7",
-      "locked": true,
       "key": "key",
       "at": {
         "a": [
@@ -10889,7 +10887,6 @@
       "a": "brutalist-building-1-cbake-9.floor-1.hall",
       "b": "outside",
       "door": "brutalist-building-1-cbake-9.door-1-1-9-22-0-7",
-      "locked": true,
       "key": "key",
       "at": {
         "a": [
@@ -12290,7 +12287,6 @@
       "a": "brutalist-building-1-cbake.floor-1.hall",
       "b": "outside",
       "door": "brutalist-building-1-cbake.door-1-1-9-22-0-7",
-      "locked": true,
       "key": "key",
       "at": {
         "a": [

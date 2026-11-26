@@ -675,7 +675,8 @@
        id="player-pad-5"
        x="-6.8483553"
        y="294.69312"
-       style="font-size:3.17499995px;line-height:3.17499995px;stroke:#0000ff;stroke-width:0.26458332;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1">
+       style="font-size:3.17499995px;line-height:3.17499995px;stroke:#0000ff;stroke-width:0.26458332;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+       team="a">
       <tspan
          x="-6.8483553"
          y="294.69312"
@@ -686,7 +687,8 @@
        id="player-pad-5-6"
        x="-3.2428725"
        y="294.69312"
-       style="font-size:3.17499995px;line-height:3.17499995px;display:inline;stroke:#0000ff;stroke-width:0.26458332;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1">
+       style="font-size:3.17499995px;line-height:3.17499995px;display:inline;stroke:#0000ff;stroke-width:0.26458332;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+       team="b">
       <tspan
          x="-3.2428725"
          y="294.69312"
@@ -697,7 +699,8 @@
        id="player-pad-5-1"
        x="3.958122"
        y="294.76236"
-       style="font-size:3.17499995px;line-height:3.17499995px;display:inline;stroke:#0000ff;stroke-width:0.26458332;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1">
+       style="font-size:3.17499995px;line-height:3.17499995px;display:inline;stroke:#0000ff;stroke-width:0.26458332;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+       team="c">
       <tspan
          x="3.958122"
          y="294.76236"
