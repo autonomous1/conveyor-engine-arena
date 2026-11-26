@@ -109,9 +109,16 @@ export type QaCaptureFrame = {
 };
 
 /**
- * Players Frame type.
+ * One connected player pawn's team, sent with the roster frame.
+ * @when A row is present only for a roster pawn that spawned on a teamed pad.
  */
-export type PlayersFrame = { t: "players"; ids: number[] };
+export type PlayerTeamRow = { id: number; team: string };
+/**
+ * Players Frame type.
+ * @when Sent with the welcome and whenever the roster changes. `teams` is
+ * absent when no connected player has a team.
+ */
+export type PlayersFrame = { t: "players"; ids: number[]; teams?: PlayerTeamRow[] };
 /**
  * Claim Row type.
  */
@@ -257,6 +264,8 @@ export function parseMsg(frame: unknown): MsgFrame | undefined {
 
 /**
  * Parses Players.
+ * @post Ids are deduped and sorted; `teams` is emitted in `ids` order, only for
+ * ids in `ids`, and omitted when empty or absent.
  */
 export function parsePlayers(frame: unknown): PlayersFrame | undefined {
   if (!frame || typeof frame !== "object" || Array.isArray(frame)) return undefined;
@@ -267,7 +276,19 @@ export function parsePlayers(frame: unknown): PlayersFrame | undefined {
     if (typeof value !== "number" || !Number.isInteger(value) || value <= 0) return undefined;
     ids.push(value);
   }
-  return { t: "players", ids: [...new Set(ids)].sort((a, b) => a - b) };
+  const sorted = [...new Set(ids)].sort((a, b) => a - b);
+  if (rec.teams === undefined) return { t: "players", ids: sorted };
+  if (!Array.isArray(rec.teams)) return undefined;
+  const byId = new Map<number, string>();
+  for (const row of rec.teams) {
+    if (!row || typeof row !== "object" || Array.isArray(row)) return undefined;
+    const entry = row as Record<string, unknown>;
+    if (typeof entry.id !== "number" || !Number.isInteger(entry.id) || entry.id <= 0) return undefined;
+    if (typeof entry.team !== "string" || entry.team.length === 0) return undefined;
+    byId.set(entry.id, entry.team);
+  }
+  const teams = sorted.filter((id) => byId.has(id)).map((id) => ({ id, team: byId.get(id)! }));
+  return { t: "players", ids: sorted, ...(teams.length > 0 ? { teams } : {}) };
 }
 
 const SNAPSHOT_REASONS = new Set<string>(["invalid", "busy", "noRenderer"]);

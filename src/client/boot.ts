@@ -43,6 +43,7 @@ import { createHud, localHealthLabel } from "./hud.js";
 import { cameraAim, createInfoProbe, leafAabb, type ProbePawn } from "./info-probe.js";
 import { attachPlayInput } from "./input.js";
 import { createLaserBeams } from "./laser.js";
+import { teamColors } from "./map-marker.js";
 import { assetBase } from "../shared/asset-base.js";
 import type { QaCaptureFrame } from "../shared/bot-protocol.js";
 import { connectLive, type LaserNotice, type OpenSocket } from "./net.js";
@@ -75,6 +76,9 @@ export async function boot(
   const claims = authKey ? decodeClaims(authKey) : undefined;
   const observerAllowed = qa || (claims !== undefined && !("error" in claims) && hasSpectate(claims));
   const playerIds = new Set<number>();
+  const playerTeams = new Map<number, string>();
+  // One palette per page, from the map's pads: a join never recolors the map.
+  const teamPalette = teamColors((view.playerSpawns ?? []).map((spawn) => spawn.team));
   // Solo runs the host in this tab, so the kernel can predict the owned pawn.
   const predictOwned = opts?.solo === true;
   const hud = createHud(qa ? { hidden: true } : undefined);
@@ -499,9 +503,12 @@ export async function boot(
     world: view.world,
     client,
     predict: predictOwned,
-    onPlayers: (ids) => {
+    onPlayers: (ids, teams) => {
       playerIds.clear();
       for (const id of ids) playerIds.add(id);
+      playerTeams.clear();
+      for (const [id, team] of teams ?? []) playerTeams.set(id, team);
+      probe.onPlayers(playerTeams);
     },
     fireDebug: () => options.fireDebug,
     onStatus: (status) => {
@@ -939,7 +946,11 @@ export async function boot(
     );
     sceneMap.setPlayers(render.entities
       .filter((entity) => entity.id !== ownedId && entity.visible && playerIds.has(entity.id))
-      .map((entity) => ({ id: entity.id, x: entity.position.x, z: entity.position.z })));
+      .map((entity) => {
+        const team = playerTeams.get(entity.id);
+        const color = team === undefined ? undefined : teamPalette.get(team);
+        return { id: entity.id, x: entity.position.x, z: entity.position.z, ...(color === undefined ? {} : { color }) };
+      }));
     const observeText = observer ? `observing ${followId ?? "none"}${followLost ? " (lost)" : ""} · ` : "";
     hud.setStatus(presentFaultHud(
       `${observeText}${statusText} · ${look}${hpText} · meshes ${pawns.count} models ${pawns.count - pawns.fallbacks} fallback ${pawns.fallbacks + visuals.fallbacks}${liftText}`,

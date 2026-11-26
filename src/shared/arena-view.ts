@@ -240,9 +240,10 @@ export type ArenaView = {
   spawns?: Array<{ id: string; x: number; z: number; yaw: number }>;
   /**
    * Human pads from `scene.playerSpawnPoints`. Wander spawns stay in `spawns`.
+   * `team` is the pad's faction, from the baked `team`; an unteamed map omits it.
    * Not part of either content hash.
    */
-  playerSpawns?: Array<{ id: string; x: number; z: number; yaw: number }>;
+  playerSpawns?: Array<{ id: string; x: number; z: number; yaw: number; team?: string }>;
   /**
    * Room lights from `scene.lights`. Empty when that field is absent.
    * Part of `presentationHash` only.

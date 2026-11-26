@@ -231,8 +231,9 @@ export function createPawnHealth(now: () => number = Date.now): PawnHealth {
 
 /**
  * Spawn Pick type.
+ * @why `team` is carried for the respawn picker's caller; the picker itself ignores it.
  */
-export type SpawnPick = { x: number; y: number; z: number; yaw: number };
+export type SpawnPick = { x: number; y: number; z: number; yaw: number; team?: string };
 
 /**
  * Block Aabb type.

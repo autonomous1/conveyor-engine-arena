@@ -196,6 +196,51 @@ test("a gone pickup is absent, and the nearer pawn hides the one behind it", () 
   assert.equal(ada?.metadata.model, "grok");
 });
 
+test("a pawn's team is copied into the metadata and ends the subject line", () => {
+  const pawn = { id: "8", min: vec(-0.4, 0, 3), max: vec(0.4, 1.8, 3.8), name: "player-1", team: "a" };
+  const rows = collectInfoCandidates({
+    doors: [],
+    pickups: [],
+    pawns: [pawn],
+    volumes: [],
+    propIds: [],
+    pickupIds: [],
+  });
+  assert.equal(rows.find((row) => row.id === "8")?.metadata.team, "a");
+  const session = createInfoSession({ doors: [], pickups: [] });
+  const shown = session.inspect({ now: 0, origin: vec(0, 1.2, 0), direction: vec(0, 0, 1), candidates: rows });
+  assert.match(shown, /pawn 8 · player-1 · team a/);
+});
+
+test("the probe reads teams from the roster map and drops them when it is replaced", () => {
+  const lines: string[] = [];
+  const probe = createInfoProbe({
+    doors: [],
+    pickups: [],
+    props: [],
+    show(text) {
+      lines.push(text);
+    },
+  });
+  probe.onPlayers(new Map([[4, "b"]]));
+  const pawn = { id: 4, position: { x: 0.5, y: 0, z: 6 }, render: { assetKey: "grok" } };
+  const look = (now: number) => probe.inspect({
+    now,
+    origin: vec(0.5, 1, 2),
+    direction: vec(0, 0, 1),
+    leaves: new Map(),
+    volumes: [],
+    pawns: [pawn],
+    radius: 0.4,
+    height: 1.8,
+  });
+  look(0);
+  assert.equal(lines.at(-1)?.split("\n")[0], "pawn 4 · grok · team b");
+  probe.onPlayers(new Map());
+  look(10);
+  assert.equal(lines.at(-1)?.split("\n")[0], "pawn 4 · grok");
+});
+
 test("door lines follow the live open and locked bits and do not invent a key", () => {
   assert.equal(formatDoorLine("hall.door", { open: false, locked: true, key: "key-1" }), "door hall.door · closed · locked · needs key-1");
   assert.equal(formatDoorLine("hall.door", { open: false, locked: false, key: "key-1" }), "door hall.door · closed · unlocked · key key-1");

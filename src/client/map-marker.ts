@@ -3,8 +3,8 @@
  * Yaw follows `aimDirection`: yaw 0 faces world +Z, so on the −Z-up map a
  * yaw of π points up and +π/2 (world +X) points right.
  */
-// ARCHITECTURE: Pure scene-map marker math: self pose, floor label, and marker
-//   geometry.
+// ARCHITECTURE: Pure scene-map marker math: self pose, floor label, team colors,
+//   and marker geometry.
 // Wiring: scene-map.ts calls `selfMoved`/`floorLabel`; tests cover the marker.
 import { elevatorPolygonBounds } from "../shared/elevators.ts";
 import type { MapFrame } from "../shared/map-frame.ts";
@@ -54,22 +54,49 @@ export const OTHER_DOT_R = 4;
 /**
  * Other Player type.
  */
-export type OtherPlayer = { id: number; x: number; z: number };
+export type OtherPlayer = {
+  id: number;
+  x: number;
+  z: number;
+  /** The player's team color. Absent falls back to {@link OTHER_PLAYER_COLOR}. */
+  color?: string;
+};
 
 /**
- * Yellow dot centres for the other players, in panel pixels.
- * @post One dot per player, in input order.
+ * A color per distinct team, spread over the hue wheel.
+ * @why Sorted and spread over the map's full team list, not the connected
+ *      roster, so a join never recolors the map; any team id works.
+ * @post The same team list gives the same colors in every client; an absent or
+ *       blank team id is skipped; an empty input is an empty map.
+ */
+export function teamColors(teams: Iterable<string | undefined>): ReadonlyMap<string, string> {
+  const unique = [...new Set([...teams].filter((team): team is string => typeof team === "string" && team.length > 0))].sort();
+  const colors = new Map<string, string>();
+  unique.forEach((team, index) => {
+    const hue = Math.round(30 + (index * 360) / unique.length) % 360;
+    colors.set(team, `hsl(${hue}, 80%, 62%)`);
+  });
+  return colors;
+}
+
+/**
+ * Dot centres with their color, in panel pixels.
+ * @post One dot per player, in input order; a teamless player is yellow.
  */
 export function otherPlayerDots(
   frame: Pick<MapFrame, "toPixel">,
   players: readonly OtherPlayer[],
-): Array<{ id: number; center: [number, number] }> {
-  return players.map((player) => ({ id: player.id, center: frame.toPixel(player.x, player.z) }));
+): Array<{ id: number; center: [number, number]; color: string }> {
+  return players.map((player) => ({
+    id: player.id,
+    center: frame.toPixel(player.x, player.z),
+    color: player.color ?? OTHER_PLAYER_COLOR,
+  }));
 }
 
 /**
- * True when the other-player set or a position changed by more than 5 cm.
- * @post A length or id change is true; small jitter is false.
+ * True when the other-player set, a position, or a team color changed.
+ * @post A length, id or color change is true; small jitter is false.
  */
 export function playersMoved(prev: readonly OtherPlayer[], next: readonly OtherPlayer[]): boolean {
   if (prev.length !== next.length) return true;
@@ -77,6 +104,7 @@ export function playersMoved(prev: readonly OtherPlayer[], next: readonly OtherP
     const a = prev[i]!;
     const b = next[i]!;
     if (a.id !== b.id) return true;
+    if (a.color !== b.color) return true;
     if (Math.hypot(a.x - b.x, a.z - b.z) > 0.05) return true;
   }
   return false;

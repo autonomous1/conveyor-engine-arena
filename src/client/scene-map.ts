@@ -15,7 +15,7 @@ import type { ProfileRing } from "../shared/building-profile.ts";
 import { aimDirection, yawFromQuat } from "../shared/look.ts";
 import { MAP_BAKE_META_URL, MAP_BAKE_URL, SCENE_MAP_SIZE, mapFrame } from "../shared/map-frame.ts";
 import {
-  OTHER_DOT_R, OTHER_PLAYER_COLOR, SELF_COLOR, SELF_DOT_R, SELF_LABEL_COLOR,
+  OTHER_DOT_R, SELF_COLOR, SELF_DOT_R, SELF_LABEL_COLOR,
   floorLabel, otherPlayerDots, playersMoved, selfMarker, selfMoved,
   type FloorSource, type OtherPlayer, type SelfPose,
 } from "./map-marker.ts";
@@ -423,7 +423,7 @@ export type SceneMap = {
   layout(): MapLayout | undefined;
   /** Local player marker. `undefined` clears it. Cheap: repaints only when visible and moved. */
   setSelf(pose: SelfPose | undefined, lifts?: readonly FloorSource[]): void;
-  /** Other players, drawn yellow. Cheap: repaints only when the set or a position changed. */
+  /** Other players, drawn in their team's color. Cheap: repaints only when the set, a position or a color changed. */
   setPlayers(players: readonly OtherPlayer[]): void;
 };
 
@@ -498,7 +498,7 @@ export function createSceneMap(): SceneMap {
       for (const dot of otherPlayerDots(cached, players)) {
         ctx.beginPath();
         ctx.arc(dot.center[0], dot.center[1], OTHER_DOT_R, 0, Math.PI * 2);
-        ctx.fillStyle = OTHER_PLAYER_COLOR;
+        ctx.fillStyle = dot.color;
         ctx.fill();
         ctx.stroke();
       }

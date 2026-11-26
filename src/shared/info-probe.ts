@@ -43,6 +43,12 @@ export type InfoMetadata = {
   name?: string;
   model?: string;
   pickupKind?: string;
+  /**
+   * The pawn's team.
+   * @why The popup can only know a team through the roster frame; the snapshot's
+   * render descriptor has no team. Absent for a non-player or an unteamed map.
+   */
+  team?: string;
 };
 
 /**
@@ -113,11 +119,13 @@ export function formatPickupLine(id: string, kind: string | undefined, available
 
 /**
  * Formats Pawn Line.
+ * @post `team` is appended last, so a line without one is unchanged.
  */
-export function formatPawnLine(id: string, name?: string, model?: string): string {
+export function formatPawnLine(id: string, name?: string, model?: string, team?: string): string {
   const parts = [`pawn ${id}`];
   if (name) parts.push(name);
   if (model) parts.push(model);
+  if (team) parts.push(`team ${team}`);
   return parts.join(" · ");
 }
 
@@ -228,6 +236,8 @@ export type PawnPick = {
   max: Vec3;
   name?: string;
   model?: string;
+  /** The pawn's team, from the client's roster map. Absent when it has none. */
+  team?: string;
 };
 
 /**
@@ -280,6 +290,7 @@ export function collectInfoCandidates(args: {
     const candidate = fromCorners("pawn", pawn.id, pawn.min, pawn.max, {
       ...(pawn.name ? { name: pawn.name } : {}),
       ...(pawn.model ? { model: pawn.model } : {}),
+      ...(pawn.team ? { team: pawn.team } : {}),
     });
     if (candidate) out.push(candidate);
   }
@@ -419,7 +430,7 @@ export function createInfoSession(opts: {
     if (hit.kind === "pickup") {
       return formatPickupLine(hit.id, kinds.get(hit.id) ?? hit.metadata.pickupKind, remaining.has(hit.id));
     }
-    if (hit.kind === "pawn") return formatPawnLine(hit.id, hit.metadata.name, hit.metadata.model);
+    if (hit.kind === "pawn") return formatPawnLine(hit.id, hit.metadata.name, hit.metadata.model, hit.metadata.team);
     if (hit.kind === "prop") return `prop ${hit.id}`;
     return `collision ${hit.id}`;
   };

@@ -11,7 +11,7 @@ import { fireShotFrame, summarizeInbound } from "../shared/fire-debug.js";
 import { parseAudit, type AuditCounters } from "../shared/audit.js";
 import { parseHealth, type DamageCause } from "../shared/health.js";
 import { parseSpawn, type SpawnFrame } from "../shared/spawn-frame.js";
-import { parsePlayers, parseQaCapture, parseSceneGraphFrame, type QaCaptureFrame, type SceneGraphFrame } from "../shared/bot-protocol.js";
+import { parsePlayers, parseQaCapture, parseSceneGraphFrame, type PlayerTeamRow, type QaCaptureFrame, type SceneGraphFrame } from "../shared/bot-protocol.js";
 import { parseDoor, parseDoorSet, useFrame, type DoorFrame } from "../shared/doors.js";
 import { parseElevatorSet, parseElevatorState, type ElevatorState } from "../shared/elevators.js";
 import { parseGrenadePose, grenadeFrame, type GrenadePose } from "../shared/grenade.js";
@@ -133,6 +133,11 @@ function asHealth(msg: Record<string, unknown>): HealthNotice | undefined {
   return notice;
 }
 
+/** `undefined` rows are an empty map, so a frame without teams clears the map. */
+function teamMap(rows: readonly PlayerTeamRow[] | undefined): ReadonlyMap<number, string> {
+  return new Map((rows ?? []).map((row) => [row.id, row.team]));
+}
+
 /**
  * connect Live.
  */
@@ -191,8 +196,8 @@ export function connectLive(opts: {
   auth?: boolean;
   /** Hello `spectate: true`. The host does not seat this client. */
   spectate?: boolean;
-  /** Connected players' owned pawn ids, from welcome and roster changes. */
-  onPlayers?: (ids: readonly number[]) => void;
+  /** Connected players' owned pawn ids and teams, from welcome and roster changes. */
+  onPlayers?: (ids: readonly number[], teams?: ReadonlyMap<number, string>) => void;
   /** Solo only: the kernel owns the input sequence and predicts the owned pawn. */
   predict?: boolean;
   /** Host closed 4401 or 4403. The page clears the key and leaves the game. */
@@ -417,7 +422,7 @@ export function connectLive(opts: {
     if (typeof msg.t === "string") {
       if (msg.t === "players") {
         const players = parsePlayers(msg);
-        if (players) opts.onPlayers?.(players.ids);
+        if (players) opts.onPlayers?.(players.ids, teamMap(players.teams));
         return;
       }
       if (msg.t === "sceneGraph") {
@@ -457,8 +462,8 @@ export function connectLive(opts: {
       if (msg.type === "welcome") {
         opts.onSceneGraph?.(undefined);
         if (Array.isArray(msg.players)) {
-          const players = parsePlayers({ t: "players", ids: msg.players });
-          if (players) opts.onPlayers?.(players.ids);
+          const players = parsePlayers({ t: "players", ids: msg.players, ...(Array.isArray(msg.teams) ? { teams: msg.teams } : {}) });
+          if (players) opts.onPlayers?.(players.ids, teamMap(players.teams));
         }
         const token = typeof msg.reconnectToken === "string" ? msg.reconnectToken : undefined;
         if (token && useAuth) sessionStorage.setItem(TOKEN_KEY, token);

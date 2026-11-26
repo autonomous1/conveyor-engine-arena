@@ -45,6 +45,8 @@ export type InfoProbe = {
   onPickupSet(ids: readonly string[]): void;
   onPickupGone(id: string): void;
   onSceneGraph(frame: SceneGraphFrame | undefined): void;
+  /** Replace (never merge) the roster's entity → team map. */
+  onPlayers(teams: ReadonlyMap<number, string>): void;
   inspect(args: {
     now: number;
     origin: Vec3;
@@ -129,6 +131,8 @@ export function createInfoProbe(opts: {
   const pickupIds = pickups.map((pickup) => pickup.id);
   let own: InfoOwn | undefined;
   let cabs: readonly CabState[] | undefined;
+  /** Entity id → team, replaced per roster frame. */
+  let rosterTeams: ReadonlyMap<number, string> = new Map();
 
   const paint = (value: string) => {
     opts.show(value);
@@ -150,6 +154,9 @@ export function createInfoProbe(opts: {
     onSceneGraph(frame) {
       session.onSceneGraph(frame);
     },
+    onPlayers(next) {
+      rosterTeams = next;
+    },
     inspect(args) {
       own = args.own;
       cabs = args.cabs;
@@ -165,7 +172,7 @@ export function createInfoProbe(opts: {
             max: corners.max,
           };
         }),
-        pawns: pawnPicks(args.pawns, args.ownedId, args.radius, args.height),
+        pawns: pawnPicks(args.pawns, args.ownedId, args.radius, args.height, rosterTeams),
         volumes: args.volumes,
         propIds,
         pickupIds,
@@ -242,7 +249,13 @@ function pickupCorners(
   };
 }
 
-function pawnPicks(pawns: readonly ProbePawn[], ownedId: number | undefined, radius: number, height: number) {
+function pawnPicks(
+  pawns: readonly ProbePawn[],
+  ownedId: number | undefined,
+  radius: number,
+  height: number,
+  teams: ReadonlyMap<number, string>,
+) {
   if (!(radius > 0) || !(height > 0)) return [];
   const out: PawnPick[] = [];
   for (const pawn of pawns) {
@@ -254,12 +267,14 @@ function pawnPicks(pawns: readonly ProbePawn[], ownedId: number | undefined, rad
     const model = typeof pawn.render?.assetKey === "string" && pawn.render.assetKey.length > 0
       ? pawn.render.assetKey
       : undefined;
+    const team = teams.get(id);
     out.push({
       id: String(id),
       min: { x: x - radius, y, z: z - radius },
       max: { x: x + radius, y: y + height, z: z + radius },
       ...(name ? { name } : {}),
       ...(model ? { model } : {}),
+      ...(team ? { team } : {}),
     });
   }
   return out;

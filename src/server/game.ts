@@ -1135,7 +1135,9 @@ function respawnPawn(world: AuthoritativeWorld, agents: WanderAgent[], id: numbe
       agent.nextTurn = 0;
     }
   }
-  const pads = agent?.role === "player" ? playerSpawns : world.listSpawnPoints();
+  const pads = agent?.role === "player"
+    ? (agent.team === undefined ? playerSpawns : playerSpawns.filter((pad) => pad.team === agent.team))
+    : world.listSpawnPoints();
   const spawn = claimClearSpawn(world, id, pads) ?? pads[0];
   const view = world.store.view(id);
   if (!view || !spawn) {

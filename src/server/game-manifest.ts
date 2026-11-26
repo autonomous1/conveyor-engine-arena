@@ -2033,7 +2033,7 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
     : undefined;
 
   const readSpawns = (entries: Array<{ item: unknown; path: string }>, seen: Set<string>) => {
-    const parsed: Array<{ id: string; x: number; y: number; z: number; yaw: number }> = [];
+    const parsed: Array<{ id: string; x: number; y: number; z: number; yaw: number; team?: string }> = [];
     for (const entry of entries) {
       const { item, path } = entry;
       if (!isObject(item)) {
@@ -2045,9 +2045,12 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
       const y = num(item.y, `${path}.y`, issues);
       const z = num(item.z, `${path}.z`, issues);
       const yaw = num(item.yaw, `${path}.yaw`, issues);
+      const team = item.team === undefined ? undefined : str(item.team, `${path}.team`, issues);
       if (id && seen.has(id)) issues.push({ path: `${path}.id`, message: `duplicate id ${id}` });
       if (id) seen.add(id);
-      if (id && x !== undefined && y !== undefined && z !== undefined && yaw !== undefined) parsed.push({ id, x, y, z, yaw });
+      if (id && x !== undefined && y !== undefined && z !== undefined && yaw !== undefined) {
+        parsed.push({ id, x, y, z, yaw, ...(team === undefined ? {} : { team }) });
+      }
     }
     return parsed;
   };
@@ -2329,7 +2332,15 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
     pawnHeight,
     spawns: spawns.map((spawn) => ({ id: spawn.id, x: spawn.x, z: spawn.z, yaw: spawn.yaw })),
     ...(playerSpawns.length > 0
-      ? { playerSpawns: playerSpawns.map((spawn) => ({ id: spawn.id, x: spawn.x, z: spawn.z, yaw: spawn.yaw })) }
+      ? {
+        playerSpawns: playerSpawns.map((spawn) => ({
+          id: spawn.id,
+          x: spawn.x,
+          z: spawn.z,
+          yaw: spawn.yaw,
+          ...(spawn.team === undefined ? {} : { team: spawn.team }),
+        })),
+      }
       : {}),
     lights,
     ...(elevators.length ? { elevators } : {}),

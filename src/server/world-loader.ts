@@ -23,6 +23,11 @@ export type WanderAgent = {
   speeds: Record<string, number>;
   /** Human pad. Unset pawns wander on `spawnPoints`. */
   role?: "player";
+  /**
+   * The pad's faction, inherited at spawn.
+   * @invariant A player respawns on a pad whose `team` equals this (test: a_dead_player_respawns_on_a_pad_of_its_own_team).
+   */
+  team?: string;
   /** Sampled baked-region goal. Absent on the heading roll and while idle after a failed sample. */
   goal?: { x: number; y: number; z: number };
   /** Waypoints for `goal`. The follower in the wander loop consumes these. */
@@ -50,7 +55,7 @@ export type LoadedArena = {
   agents: WanderAgent[];
   view: ArenaView;
   /** Human pads. Wander pawns are not created here. */
-  playerSpawns: ReadonlyArray<{ id: string; x: number; y: number; z: number; yaw: number }>;
+  playerSpawns: ReadonlyArray<{ id: string; x: number; y: number; z: number; yaw: number; team?: string }>;
   /** Privileged places and portals. Absent when the manifest has no `scene.sceneGraph`. */
   sceneGraph?: SceneGraph;
   /** Privileged baked regions. Absent when the manifest has no `scene.regions`. */
@@ -75,6 +80,7 @@ export function loadArena(files?: GameFiles, env?: Record<string, string | undef
     y: 0,
     z: spawn.z,
     yaw: spawn.yaw,
+    ...(spawn.team === undefined ? {} : { team: spawn.team }),
   }));
   const agents: WanderAgent[] = [
     ...game.definition.spawnPoints.map((spawn, index) => spawnAgent(world, game, spawn, bots[index % bots.length] ?? humans[0] ?? "grok-bot", index, "walk")),
@@ -86,6 +92,7 @@ export function loadArena(files?: GameFiles, env?: Record<string, string | undef
       game.definition.spawnPoints.length + index,
       "idle",
       "player",
+      spawn.team,
     )),
   ];
   world.commit(0n);
@@ -124,6 +131,7 @@ function spawnAgent(
   index: number,
   gait: Movement,
   role?: "player",
+  team?: string,
 ): WanderAgent {
   const id = world.createEntity(0n, { type: "pawn", shape: "capsule", assetKey }, index + 1);
   world.enqueue({
@@ -145,5 +153,6 @@ function spawnAgent(
     nextTurn: 10 + index * 8,
     speeds,
     ...(role ? { role } : {}),
+    ...(team === undefined ? {} : { team }),
   };
 }

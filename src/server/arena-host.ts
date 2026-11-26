@@ -27,7 +27,7 @@ import { createArenaDoors, createDoorBlockers } from "./doors.js";
 import { createArenaElevators } from "./elevators.js";
 import { createArenaFire } from "./fire.js";
 import { applyPawnModel, claimClearSpawn, createHeldInputs, placePawn, startPropAnimation, startWanderLoop, teleportBlockReason } from "./game.js";
-import { playerRoster } from "./players.js";
+import { playerRoster, playerTeams } from "./players.js";
 import { createArenaClaims } from "./claims.js";
 import { createArenaMessages } from "./messages.js";
 import { shutDoorBoxes } from "../shared/bots/cover.js";
@@ -181,7 +181,10 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
     welcome.doors = doorHost.snapshot();
     const elevators = elevatorHost.snapshot();
     if (elevators.length > 0) welcome.elevators = elevators;
-    welcome.players = roster();
+    const welcomeRoster = roster();
+    welcome.players = welcomeRoster;
+    const welcomeTeams = playerTeams(welcomeRoster, loaded.agents);
+    if (welcomeTeams.length > 0) welcome.teams = welcomeTeams;
     welcome.claims = claimHost.snapshot();
     welcome.messages = true;
     const owned = welcome.ownedEntityId;
@@ -272,7 +275,10 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
       if (pad) {
         placePawn(loaded.world, owned, pad);
         const agent = loaded.agents.find((item) => item.id === owned);
-        if (agent) agent.heading = pad.yaw;
+        if (agent) {
+          agent.heading = pad.yaw;
+          agent.team = pad.team;
+        }
         reservedPads.set(owned, pad);
         // One frame to everyone: this pawn just appeared on the pad (a client beams it in).
         const joined = encodeFrame(spawnFrame(owned, pad.x, pad.y, pad.z));
@@ -464,10 +470,11 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
   let lastRoster = "";
   const stopLoop = startWanderLoop(loaded.world, loaded.agents, engine, held, (line) => console.error(line), health, audit, () => {
     const rosterIds = roster();
-    const rosterSig = rosterIds.join(",");
+    const rosterTeams = playerTeams(rosterIds, loaded.agents);
+    const rosterSig = `${rosterIds.join(",")}|${rosterTeams.map((row) => `${row.id}:${row.team}`).join(",")}`;
     if (rosterSig !== lastRoster) {
       lastRoster = rosterSig;
-      const frame = encodeFrame({ t: "players", ids: rosterIds });
+      const frame = encodeFrame({ t: "players", ids: rosterIds, ...(rosterTeams.length > 0 ? { teams: rosterTeams } : {}) });
       for (const clientId of engine.connected) engine.session(clientId)?.socket.send(frame);
     }
     const now = Date.now();

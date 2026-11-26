@@ -473,6 +473,19 @@ test("scene graph follows a scoped token and stays off the static host", { timeo
 
 test("players_frame_is_strict_and_sorted", () => {
   assert.deepEqual(parseArenaFrame(JSON.stringify({ t: "players", ids: [9, 7, 9] })), { t: "players", ids: [7, 9] });
+  assert.deepEqual(
+    parseArenaFrame(JSON.stringify({ t: "players", ids: [9, 7], teams: [{ id: 9, team: "b" }, { id: 7, team: "a" }] })),
+    { t: "players", ids: [7, 9], teams: [{ id: 7, team: "a" }, { id: 9, team: "b" }] },
+  );
+  // An empty or off-roster team list omits `teams` rather than sending an empty array.
+  assert.deepEqual(parseArenaFrame(JSON.stringify({ t: "players", ids: [7], teams: [] })), { t: "players", ids: [7] });
+  assert.deepEqual(
+    parseArenaFrame(JSON.stringify({ t: "players", ids: [7], teams: [{ id: 8, team: "a" }] })),
+    { t: "players", ids: [7] },
+  );
+  assert.equal(parseArenaFrame(JSON.stringify({ t: "players", ids: [7], teams: "a" })), undefined);
+  assert.equal(parseArenaFrame(JSON.stringify({ t: "players", ids: [7], teams: [{ id: 7, team: "" }] })), undefined);
+  assert.equal(parseArenaFrame(JSON.stringify({ t: "players", ids: [7], teams: [{ id: 0, team: "a" }] })), undefined);
   assert.equal(parseArenaFrame(JSON.stringify({ t: "players", ids: [1, "x"] })), undefined);
   assert.equal(parseArenaFrame(JSON.stringify({ t: "players", ids: [0] })), undefined);
 });

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { mapFrame } from "../src/shared/map-frame.ts";
-import { OTHER_PLAYER_COLOR, floorLabel, otherPlayerDots, playersMoved, selfMarker, selfMoved } from "../src/client/map-marker.ts";
+import { OTHER_PLAYER_COLOR, floorLabel, otherPlayerDots, playersMoved, selfMarker, selfMoved, teamColors } from "../src/client/map-marker.ts";
 
 const frame = mapFrame({ minX: -10, maxX: 10, minZ: -10, maxZ: 10 }, 360, 360)!;
 const near = (a: number, b: number) => assert.ok(Math.abs(a - b) < 1e-9, `${a} vs ${b}`);
@@ -46,7 +46,28 @@ test("other players are yellow dots at their map pixels", () => {
   const dots = otherPlayerDots(frame, [{ id: 1, x: 5, z: -8 }, { id: 2, x: -5, z: 5 }]);
   assert.deepEqual(dots[0]!.center, frame.toPixel(5, -8));
   assert.equal(OTHER_PLAYER_COLOR, "#ffd84d");
+  // A dot carries its player's team color, and the yellow stays the fallback.
+  assert.equal(dots[1]!.color, OTHER_PLAYER_COLOR);
+  const teamDot = otherPlayerDots(frame, [{ id: 3, x: 0, z: 0, color: "hsl(30, 80%, 62%)" }]);
+  assert.equal(teamDot[0]!.color, "hsl(30, 80%, 62%)");
   assert.equal(playersMoved([{ id: 1, x: 0, z: 0 }], [{ id: 1, x: 0.01, z: 0 }]), false);
   assert.equal(playersMoved([{ id: 1, x: 0, z: 0 }], [{ id: 1, x: 0.2, z: 0 }]), true);
   assert.equal(playersMoved([{ id: 1, x: 0, z: 0 }], [{ id: 2, x: 0, z: 0 }]), true);
+});
+
+test("a team color change repaints without a move", () => {
+  // A color-only change repaints even at the same id and position.
+  assert.equal(playersMoved([{ id: 1, x: 0, z: 0, color: "#a" }], [{ id: 1, x: 0, z: 0, color: "#b" }]), true);
+  assert.equal(playersMoved([{ id: 1, x: 0, z: 0, color: "#a" }], [{ id: 1, x: 0, z: 0, color: "#a" }]), false);
+});
+
+test("teamColors is deterministic, sorted, and spreads distinct teams", () => {
+  assert.deepEqual([...teamColors(["b", "a", "a"]).keys()], ["a", "b"]);
+  assert.deepEqual(teamColors(["a", "b"]), teamColors(["b", "a"]));
+  const two = teamColors(["a", "b"]);
+  assert.notEqual(two.get("a"), two.get("b"));
+  for (const color of two.values()) assert.match(color, /^hsl\(\d+, 80%, 62%\)$/);
+  assert.equal(new Set(teamColors(["c", "a", "b"]).values()).size, 3);
+  assert.equal(teamColors([undefined, ""]).size, 0);
+  assert.equal(teamColors([]).size, 0);
 });

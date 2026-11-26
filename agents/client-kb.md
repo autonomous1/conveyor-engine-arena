@@ -104,7 +104,8 @@ options dialog adds its own 8 (`options.ts`), HUD 5 (`hud.ts`), scene map 2
 `setStats` is gated by `statsVisible`. `drawFrame` calls
 `setStatus`/`setProfile`/`setPad` every frame (`boot.ts`) and
 `probe.refresh` → `paint("")` every frame via the info probe (`createInfoProbe`, `info-probe.ts`). The scene map
-repaints only when `selfMoved`/dirty (`scene-map.ts`).
+repaints only when `selfMoved`/`playersMoved`/dirty (`scene-map.ts`), and the
+other players are drawn in their team's color (yellow when the map assigns none).
 
 ## 8. Audio
 
@@ -204,6 +205,7 @@ internals are the linked sections and the codemap. `S`/`B`/`X`: see
 | tag | state | container | element type | key → value | written by | lifetime |
 |---|---|---|---|---|---|---|
 | S | players seen | `playerIds` | Set<number> | entity id | `onPlayers` | replaced per `players` frame |
+| S | player teams | `playerTeams` | Map | entity id → team | `onPlayers` | replaced per `players` frame |
 | S | door open state | `doorOpen` | Map | door id → open | welcome, `swingDoor` | per session; last host frame wins |
 | B | cab state and local pick | `cabState`, `cabPick` | Maps | cab id → `ElevatorState` / stop | `applyCab`, ship input, open/closed | per session |
 | B | pickups remaining | `pickupIds` + `visuals.placements` | Set + placement visibility | placement id | `onPickupSet`/`onPickup` | until taken |
