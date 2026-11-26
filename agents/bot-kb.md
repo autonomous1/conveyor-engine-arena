@@ -92,7 +92,7 @@ patrol loop, or a stand target; execution is `brain.ts`.
 `transcript.ndjson`, and `notes.md`. A row is returned at most once until the
 inbox is truncated; `NOTE_MAX` bounds the note text.
 
-`createCommandHost` (`commands.ts`) is the production interface: eleven typed
+`createCommandHost` (`commands.ts`) is the production interface: twelve typed
 handlers (`CommandName`), `dispatch`, `status`, `abort`, and the
 `CommandResult`/`CommandArtifact`/`CommandStatus` shapes. One dispatch at a time;
 `TASK_TIMEOUT_MS` (180 s) clamps a task; the packed status is trimmed to
