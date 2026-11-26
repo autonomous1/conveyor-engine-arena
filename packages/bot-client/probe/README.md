@@ -43,10 +43,11 @@ unchanged by the flag.
 
 ## Shell (task 171)
 
-`--shell [--seats n]` keeps **n** seats (1..3, default 1) open for a whole
+`--shell [--seats n]` keeps **n** seats (1..4, default 1) open for a whole
 conversation on one host: one `bot>` prompt, one `createCommandHost` per seat,
-the command module from `--surface proto|probe` (default `probe`), the plumbing
-from `--tree src|proto`. Unlike `--test`/`--goto-at`/`--suite`, the sessions are
+the command module from `--surface proto|probe` (default: `proto` in shell mode
+when `proto/combat.ts` exists, else `probe`; an explicit `--surface probe` runs
+the legacy pinned-pad copy), the plumbing from `--tree src|proto`. Unlike `--test`/`--goto-at`/`--suite`, the sessions are
 not closed between commands — each pawn keeps its seat, kit, keys and ammo. The
 start lists `SHELL seats=[1,2] selfs=[14,15] players=[14,15]` and one
 `SHELL seat <i> self=… place=… weapon=… keys=…` per seat. Piped stdin works (no
@@ -83,7 +84,8 @@ commands (15 s cap) before closing; `abort`/Ctrl-C abort immediately.
 | `<seat> return-fire <pawnId>` | `{name:"returnFire",pawnId}` — combat (`assault`) |
 | `<seat> retreat <place>` | `{name:"retreat",place}` — a reach to the place |
 | `<seat> reload` | `{name:"rearm"}` — **combat wins the collision**; legacy: `legacy reload` |
-| `<seat> survive` / `<seat> defend` | `{name:"survive"}` / `{name:"defend"}` — combat goals |
+| `<seat> survive` / `<seat> defend` | `{name:"survive"}` / `{name:"defend"}` — combat goals (`defend` takes `[minutes] [radius]` and holds/fires as a posture) |
+| `<seat> regroup <place>` | `{name:"regroup", place}` — anchor at 45 (not forced; combat orders pre-empt) |
 | `<seat> assault <pawnId>` | `{name:"assault",pawnId}` — the assault goal (one plan; `hunt` stays the timed loop) |
 | `help` / `seats` / `status [seat]` / `abort\|stop <seat\|all>` / `q`\|`quit`\|`exit` / Ctrl-C / Ctrl-D | built-ins (unprefixed; `<seat> stop` also works) |
 

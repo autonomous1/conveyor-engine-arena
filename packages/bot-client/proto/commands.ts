@@ -1,8 +1,8 @@
 /**
- * The bot command layer: twelve typed handlers over a connected BotSession.
+ * The bot command layer: twenty-one typed handlers over a connected BotSession.
  * Node-only: no CLI, no token, no filesystem.
  */
-// ARCHITECTURE: The bot's twelve-handler command surface: parse, dispatch,
+// ARCHITECTURE: The bot's twenty-one-handler command surface: parse, dispatch,
 //   status, and the cooperative abort, over a connected session.
 // Wiring: drivers under packages/bot-client/tests create one host and call
 //   `dispatch`; `parseCommand` is the typed entry for a second bot.
@@ -304,6 +304,11 @@ export function reloadVerdict(
   return last ? { why: last.why, crate: last.crate } : { why: "gone" };
 }
 
+/**
+ * One command host over a connected session: parse, dispatch, busy and abort.
+ * @post A second dispatch while busy rejects `code:1, why:"busy"`; the host
+ *       owns no socket and writes no file.
+ */
 export function createCommandHost(options: CreateCommandHostOptions): CommandHost {
   const session = options.session;
   const log = options.log;

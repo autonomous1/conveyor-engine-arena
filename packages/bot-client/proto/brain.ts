@@ -4,6 +4,9 @@
  */
 // ARCHITECTURE: The bot executor: goal claim, GOAP plan, route, walk, use, ride, and pickup state machine.
 // Wiring: runMission/runBrain from the CLI and live tests; it drives BotSession input/world.
+// Order: a step result is handled before a new plan — a stuck gets one avoid retry and a
+//   repeated signature gives up (204); then the mission's watch replans on a door/pickup
+//   change, the 1 Hz threat watch, or the 5 s safety, and only safety/threat take the warm budget.
 // Invariants: A pursue plan is rebuilt on >=1 m target drift or 200 ms; the straight line is the fallback;
 //   the retreat plans one cover/away point, replans only on stuck/a cover LOS failure, and holds when no
 //   point plans; the stand fact and the stand walk measure one plan-resolved goal, y included;
@@ -106,6 +109,10 @@ export type BrainOptions = {
  */
 export type StuckOutcome = { action: "avoid" | "giveup"; retries: number };
 
+/**
+ * The stuck outcome for one step signature.
+ * @post A new signature → one avoid retry; the same signature twice → give up.
+ */
 export function stuckOutcome(signature: string, previous: string, retries: number): StuckOutcome {
   if (signature !== previous) return { action: "avoid", retries: 0 };
   return retries + 1 >= 2 ? { action: "giveup", retries: retries + 1 } : { action: "avoid", retries: retries + 1 };
@@ -151,6 +158,10 @@ type UseState = {
  */
 export type PatrolLegOutcome = { action: "advance" | "retry" | "skip" | "stop" | "propagate"; consecutiveSkips: number };
 
+/**
+ * The patrol leg outcome for one leg.
+ * @post The retry/skip/stop/propagate rule above; the leg index survives a dead leg.
+ */
 export function patrolLegOutcome(
   code: number,
   noPlan: string | null,

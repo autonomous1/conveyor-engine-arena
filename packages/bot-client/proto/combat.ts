@@ -9,12 +9,15 @@
 //   fragment), `combatActions` (wrapping existing executors), `combatGoals` (the
 //   survival ladder) and `chooseCombatGoal` (per-goal heuristics).
 // Wiring: src/brain.ts merges the facts/actions into its plan loop and plans
-//   with the ladder; test/goap-combat.test.ts drives the offline matrices.
+//   with the ladder; test/goap-combat.test.ts and tests/combat-goap.ts drive the
+//   offline and parity matrices.
 // Order: facts come from the live session every state build; the actions are
 //   rebuilt per plan because their targets (crates, cover points) move.
 // Invariants: `combatFacts` never mutates the session; `underFire`'s clock is the
-//   caller's (buildWorldState stays pure); every action wraps an executor the
-//   brain already has and no action has a non-positive cost.
+//   caller's (buildWorldState stays pure); the facts are live per state build
+//   (`safe`, `hpPressured`, `needsRetreat`, live `defended`); `crateMetres` counts a
+//   crate in the bot's own place as 0 m; every action wraps an executor the brain
+//   already has and no action has a non-positive cost.
 import type { Action, Goal, Fact, Plan, PlanOptions, WorldState } from "../../../src/shared/bots/goap.js";
 import { plan } from "../../../src/shared/bots/goap.js";
 import type { BotCtx } from "../../../src/shared/bots/actions.js";
@@ -407,11 +410,6 @@ export function combatGoals(state: WorldState, mission?: Goal): Goal[] {
 }
 
 /**
- * The assault order: fire on `targetId` until it is down.
- * @why It carries `threatDown` so `combatGoals` can rank it at 60 and the
- *      `returnFire` action can satisfy it.
- */
-/**
  * The forced heal goal: the hunt's `hp <= 50` trigger runs it directly, the
  * ladder keeps the band priority. A duplicate `heal` mission is not appended.
  */
@@ -429,6 +427,11 @@ export function regroupGoal(anchor: string): Goal {
   return { id: `regroup:${anchor}`, want: { at: anchor }, priority: () => 45 };
 }
 
+/**
+ * The assault order: fire on `targetId` until it is down.
+ * @why It carries `threatDown` so `combatGoals` can rank it at 60 and the
+ *      `returnFire` action can satisfy it.
+ */
 export function assaultGoal(targetId: number): Goal {
   return { id: `assault:${targetId}`, want: { threatDown: true }, priority: () => 60 };
 }

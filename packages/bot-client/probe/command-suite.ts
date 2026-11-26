@@ -1135,7 +1135,8 @@ const SHELL_HELP = [
   "<seat> return-fire <pawnId>        (combat; needs --surface proto)",
   "<seat> retreat <place>             (combat; needs --surface proto)",
   "<seat> reload                      (combat rearm; legacy: legacy reload)",
-  "<seat> survive | defend            (combat goals; needs --surface proto)",
+  "<seat> survive | defend            (combat goals; defend takes [minutes] [radius] as a posture)",
+  "<seat> regroup <place>            (anchor at 45, not forced; needs --surface proto)",
   "<seat> assault <pawnId>            (combat goal; needs --surface proto)",
   "help | seats | status [seat] | abort|stop <seat|all> | q/quit/exit | Ctrl-C | Ctrl-D",
 ];
