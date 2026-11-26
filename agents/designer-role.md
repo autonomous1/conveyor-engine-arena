@@ -80,6 +80,27 @@ task the spec cites) or re-take the measurement on `HEAD`. Every task carries a
 **Base tree** line, and a cited number the coder cannot reproduce on its own tree is
 fiction, not evidence.
 
+**Only the operator publishes the fork.** The operator copies `src/` → `proto/` and
+commits and pushes `proto/` when a solution works; the designer drafts from what is
+published. If `git status` shows a dirty `proto/`, the solution is not published
+yet — ask the operator to commit it. Never draft against a moving fork, and never
+commit it yourself. The 203 draft named a dirty `proto/commands.ts` as its base,
+which is how the coder came to port a diff nobody had analysed.
+
+**The coder migrates and stops; the operator re-syncs.** After the migration task
+lands, the operator copies `src/` back over `proto/`. The task must not ask for
+anything else under `packages/bot-client/` — no deletion of `proto/`, no retirement
+of the tree hook or `--tree`. The fork is the lane's permanent working copy, not a
+temporary branch.
+
+**Scope the migration to what was published.** One proven behaviour per task where
+the published diff allows it; an umbrella port of several hundred lines hides the
+hunk that was never proven.
+
+**Number from the whole pipeline.** A new task number is one past both the task files
+and the ledger rows. The ledger already numbers POC runs (203 = the `defend`
+posture); reusing a number makes two things answer to the same id.
+
 The two copies have diverged: `agents/decisions.md` and `agents/README-dsh.md` are current; `plan/dsh-tasks/` holds older copies (its README still says `docs/decisions.md` and five always-gates). Read the `agents/` copies; treat the `plan/dsh-tasks/` ones as history.
 
 **Resources**

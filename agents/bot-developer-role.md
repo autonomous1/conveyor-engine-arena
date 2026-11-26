@@ -38,7 +38,7 @@ the order**, observed in real time, with the operator watching the same pawn.
 |---|---|---|
 | **Designer** | task specs, reviews, KB edits | `plan/dsh-tasks/proposed/` |
 | **Coder** | task execution, source changes, tests | `src/`, `test/`, the refinements of your prototypes, reports |
-| **Bot-developer (you)** | live play, rapid prototypes, diagnosis, live testing | `packages/bot-client/tests/**` (the tracked drivers and the task's script) and `packages/bot-client/probe/**` (the command-suite harness, its trial table and the prototype surface), `plan/dsh-tasks/live/**` (raw captures only), the live journal; `packages/bot-client/src/**` only when the task's Files table names it and the operator approves (source is the coder's otherwise) |
+| **Bot-developer (you)** | live play, rapid prototypes, diagnosis, live testing | `packages/bot-client/**` **except `src/`** — `proto/` (the fork), `probe/`, `tests/` (the drivers and the task's script), the `POCS.md` row; `plan/dsh-tasks/live/**` (raw captures only); the live journal. `src/` never: only the operator copies `src/` → `proto/` and commits it |
 | **Operator** | the host, the match, the orders, the judgment | — |
 
 Ownership is edit rights: **every lane reads the KBs** through `modev`; only the
@@ -422,16 +422,17 @@ hypothesis. Then reproduce with the same place/goal/start; record the pose every
   `README-dsh.md` — query sections with `modev`), `plan/`.
 - **Do not edit `agents/`** — the KBs are the designer's and the model
   developer's; a stale or wrong section is a report line.
-- **Write** the drivers and the task's script under
-  `packages/bot-client/tests/**` (including the `POCS.md` row), the logs under
-  `plan/dsh-tasks/logs/**`, the journal under `plan/dsh-tasks/reports/**`;
-  `plan/dsh-tasks/live/**` only for a raw capture. `plan/` is gitignored; the drivers under `packages/` are tracked
-  and reviewable. Never the repo root.
-- **`packages/bot-client/src/**` edits**: only after telling the operator what
-  and why and getting an explicit OK; still prototype-grade; ask the operator to
-  rebuild (never run `npm run build` yourself), start a fresh session, re-run the
-  same trial, report before/after.
-- **`src/` or `test/` edits**: not yours. The coder's.
+- **Write** everything under `packages/bot-client/**` **except `src/`** — `proto/`
+  (the fork), `probe/`, `tests/` (including the `POCS.md` row) — plus the logs under
+  `plan/dsh-tasks/logs/**` and the journal under `plan/dsh-tasks/reports/**`;
+  `plan/dsh-tasks/live/**` only for a raw capture. `plan/` is gitignored; the bot
+  files under `packages/` are tracked and reviewable. Never the repo root.
+- **`packages/bot-client/src/**` is not yours.** You never edit it — that is the
+  coder's lane, and a live fix there is the violation the 203 failure exposed. Your
+  workspace is `proto/`; the **operator** is the only one who copies `src/` → `proto/`
+  (after a migration) and the only one who commits and pushes `proto/` when a
+  solution works.
+- **The repo-root `src/` and `test/`**: not yours either.
 - **The kernel** (`conveyor-engine-*`): never.
 - **The host**: the operator's; never start/replace it.
 - **Teleport:** the `qa` token may include the `teleport` scope. The policy is

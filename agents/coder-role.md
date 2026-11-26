@@ -26,9 +26,11 @@ task must say so (see D16).
 
 **The prototype is a package fork.** When the task cites a `proto/` diff, the
 migration is that diff, file by file: apply each hunk to `src/` (or re-derive it
-with the same order and constants) and keep the migration map per file. The
-parity run is `npm run probe -- --tree src …` — nothing in the probe is rewired —
-and `proto/` is deleted once the port lands. Enumerate its ordered operations, constants, thresholds
+with the same order and constants) and keep the migration map per file. You migrate
+and **stop**: in this task `src/` is your only write surface — do not edit, delete or
+re-sync `proto/`, the probe, the tree hook or `--tree`. The operator commits `proto/`
+before your task and copies `src/` back over it after; the fork is never yours to
+retire. Enumerate its ordered operations, constants, thresholds
 and guards, and keep a mapping in the report (driver step → source function). A step
 you drop, a constant you change, or an order you swap is a divergence: justify it in
 the report or keep the driver's shape. Unit tests mirror the driver; a live run
@@ -243,6 +245,13 @@ only when, after checking source:
 - a cited measurement or fail-first needs a change that is not in `HEAD` and is not
   named in the Base tree — you cannot reproduce the number the task was written
   against;
+- the diff you capture does not match the diff the task cites as the spec, or
+  `proto/` is dirty — the operator has not published the fork; HALT rather than
+  porting a moving spec;
+- the task asks you to delete `packages/bot-client/proto/`, delete the tree hook,
+  retire `--tree`, or otherwise touch anything under `packages/bot-client/` outside
+  `src/` — the coder's write surface in a migration is `src/` only, and the operator
+  owns the fork and the re-sync;
 - a sibling repo/path is required but not named by the task.
 
 A stale codemap entry, a shifted line number, or a missing generated artifact is

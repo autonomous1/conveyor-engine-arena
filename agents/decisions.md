@@ -394,8 +394,11 @@ src|proto` — and probes keep their canonical `../src/…` imports; a loader ho
 redirects them to `proto/…` under `--tree proto` (task 165), so no probe source
 names a tree. `proto/` is **tracked** while the branch lives: a POC can run over
 several sessions, an untracked fork dies with the working tree, and a tracked fork
-lets the designer diff `src` against it at any time. Commit it when it diverges;
-when the port lands, delete it in the same commit, so history keeps the diff.
+lets the designer diff `src` against it at any time. The fork is **permanent**:
+only the operator copies `src/` → `proto/` (after a migration lands) and commits and
+pushes `proto/` when a solution works; the designer drafts only from that published
+state; the coder migrates `proto` → `src/` and stops; the operator copies `src/` back
+over `proto/`. Nothing is retired, and the switch stays.
 Publish
 `git diff --no-index packages/bot-client/src packages/bot-client/proto >
 logs/<task>-proto.diff` with the runs table. The designer drafts from the diff, the
