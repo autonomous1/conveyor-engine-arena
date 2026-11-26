@@ -11,8 +11,9 @@
 //   the retreat plans one cover/away point, replans only on stuck/a cover LOS failure, and holds when no
 //   point plans; the stand fact and the stand walk measure one plan-resolved goal, y included;
 //   every plan-step kind has one binder in STEP_BINDERS, and a step's kind/arg are set by its
-//   binder, never re-parsed from the id; a `safety` plan gets PLAN_BUDGET_MS, and a missed warm
-//   attempt retries once at COLD_PLAN_BUDGET_MS; the combat ladder plans through
+//   binder, never re-parsed from the id; a `safety` plan gets PLAN_BUDGET_MS, a missed warm
+//   attempt retries once at COLD_PLAN_BUDGET_MS, and a `threat` plan gets
+//   THREAT_PLAN_BUDGET_MS; the combat ladder plans through
 //   combatGoals/chooseCombatGoal with the combat actions (test: combat_ladder_matrices).
 import type { BotCtx } from "../../../src/shared/bots/actions.js";
 import { createBotContext, estimateSeconds, goTo, groundActions, pickup, placeOfPickup } from "../../../src/shared/bots/actions.js";
@@ -59,6 +60,13 @@ const STAND_GOAL_Y = 0.6;
  */
 const PLAN_BUDGET_MS = 600;
 /**
+ * Budget for a `threat` replan (the 1 Hz threat watch): a mid-fight state change
+ * where a shooter moved. The hunt-3 live heal plan measured 976 ms on the new
+ * map's 277-ground-action set, over the 600 ms warm budget, so the first heal
+ * replan found nothing; 1.5 s covers it without the 4 s input-loop block.
+ */
+const THREAT_PLAN_BUDGET_MS = 1_500;
+/**
  * Budget for a plan after the state changed: the mission's first plan, and the
  * first plan after a finished action, a door/pickup change, or a `stuck`.
  * `goap.plan` calls `h(start)` before its first `expired()` check, so a new
@@ -100,6 +108,12 @@ export type BrainOptions = {
   planMs?: number;
   /** 199: the declared hostile player ids (SquadView v1). Absent = NPCs only. */
   enemies?: ReadonlySet<number>;
+  /**
+   * The host goal claim. Default (`"goal"`/undefined) waits for the key;
+   * `"advisory"` acquires without waiting (a team-issued order); `false` skips
+   * the claim entirely (the hunt's free-for-all).
+   */
+  claim?: boolean | "goal" | "advisory";
 };
 
 /**
@@ -731,8 +745,20 @@ export async function runAttack(session: BotSession, targetId: number, opts: Bra
  */
 export async function runBrain(session: BotSession, goal: Goal, opts: BrainOptions = {}): Promise<number> {
   const key = goal.id;
-  const supported = session.world.claimsSupported?.() === true;
+  const supported = opts.claim !== false && session.world.claimsSupported?.() === true;
   if (supported && session.world.self() !== undefined) {
+    if (opts.claim === "advisory") {
+      // A team-issued order: acquire and go. The first owner keeps the key, the
+      // rest act anyway; the host ignores a non-owner's release (claims.ts).
+      const self = session.world.self();
+      session.claims.acquire(key, 30_000);
+      try {
+        return await runBrainInner(session, goal, opts);
+      } finally {
+        clearInterval((session as { __claimRenew?: ReturnType<typeof setInterval> }).__claimRenew);
+        if (self && session.world.claims().get(key)?.owner === self.id) session.claims.release?.(key);
+      }
+    }
     const claimed = await claimGoal(session, key, Date.now() + (opts.timeoutMs ?? 300_000), opts.log ?? (() => {}));
     if (!claimed) return 3;
     try {
@@ -788,6 +814,8 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
   let grounded = "";
   let plan: Plan | undefined;
   let exec: Running | undefined;
+  /** Stops the `returnFire` executor's background `runAttack` on a replan. */
+  let stopAttack: (() => void) | undefined;
   let pending = "";
   let watchDoors = "";
   let watchPickups = "";
@@ -802,7 +830,10 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
   let lastCmd: FollowInput | undefined;
   let lastReason = "initial";
   /** The caller-owned hp clock for `underFire` (a drop within 1.5 s). */
-  let hpClock: HpClock = { hp: 100, at: -Infinity };
+  // Start at the live hp, not 100: a run that begins at hp 50 used to stamp a
+  // "drop" on its first state build and report underFire for 1.5 s with no
+  // shooter (the hunt's heal dead-end).
+  let hpClock: HpClock = { hp: session.world.health?.()?.hp ?? 100, at: -Infinity };
 
   /**
    * The grounding union: the mission, the ladder's wants (so `hasAmmo` pulls the
@@ -1402,10 +1433,15 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
     if (!Number.isInteger(targetId)) return undefined;
     void pose;
     let outcome: "running" | "done" | "failed" = "running";
+    let stopped = false;
     void runAttack(session, targetId, {
       log,
       error,
-      onTick: opts.onTick,
+      onTick: () => {
+        opts.onTick?.();
+        // A brain replan supersedes this fight; the throw unwinds the attack.
+        if (stopped) throw new Error("returnFire stopped");
+      },
       timeoutMs: Math.max(2_000, deadline - Date.now()),
     })
       .then((code) => {
@@ -1415,6 +1451,9 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
       .catch(() => {
         outcome = "failed";
       });
+    stopAttack = () => {
+      stopped = true;
+    };
     return {
       id,
       kind: "returnFire",
@@ -1509,7 +1548,13 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
       continue;
     }
     const hpNow = session.world.health?.()?.hp;
-    if (typeof hpNow === "number" && hpNow < hpClock.hp) hpClock = { hp: hpNow, at: Date.now() };
+    // Track the last hp, not the running minimum: after a heal the next hit is
+    // a drop again and must refresh `underFire` (F6 in the hunt review).
+    if (typeof hpNow === "number" && hpNow !== hpClock.hp) {
+      hpClock = hpNow < hpClock.hp
+        ? { hp: hpNow, at: Date.now() }
+        : { hp: hpNow, at: hpClock.at };
+    }
     const state = worldState();
     if (satisfies(state, goal.want)) return 0;
 
@@ -1524,7 +1569,19 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
     // 198: a started cover walk is held >=300 ms so a moving shooter cannot
     // flap cover <-> fire between replans.
     if (reason && exec && exec.id.startsWith("takeCover:") && Date.now() - exec.started < 300) reason = "";
+    // The fight owns the loop while `returnFire` runs: only a NEW visible
+    // threat id pre-empts it; the same target moving, the 5 s safety tick and
+    // door/pickup churn do not (the first run planned 39 targets, 0 shots).
+    if (reason && exec?.kind === "returnFire") {
+      const threatId = parts.threat === "-" ? "" : parts.threat.split(":")[0];
+      const preempt = reason === "threat" && threatId !== "" && threatId !== exec.arg;
+      if (!preempt) reason = "";
+    }
     if (reason) {
+      // A replan supersedes the fight: stop the old runAttack so two attacks
+      // never share the input loop.
+      if (exec?.kind === "returnFire") stopAttack?.();
+      stopAttack = undefined;
       const groundedCtx = ctx;
       if (!groundedCtx) return 2;
       // A macrotask between replans so the timeout and the socket can run.
@@ -1532,9 +1589,10 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
       if (Date.now() >= deadline) return 3;
       if (reason !== "initial") log(`replan ${reason} t=${secs()}s`);
       // The cold cap follows the state change: `safety` is the only periodic
-      // same-state refresh, so only it stays on the warm budget.
-      // `threat` is a mid-fight state change (a moving shooter): warm budget, like safety.
-      const budgetMs = opts.planMs ?? (reason === "safety" || reason === "threat" ? PLAN_BUDGET_MS : COLD_PLAN_BUDGET_MS);
+      // same-state refresh, so it stays on the warm budget. `threat` is a
+      // mid-fight state change (a moving shooter) and gets 1.5 s: the hunt-3
+      // heal plan measured 976 ms, over the 600 ms warm budget.
+      const budgetMs = opts.planMs ?? (reason === "threat" ? THREAT_PLAN_BUDGET_MS : reason === "safety" ? PLAN_BUDGET_MS : COLD_PLAN_BUDGET_MS);
       // Build the ladder's action set before the plan clock starts: the combat
       // cover scan walks the scene AABBs (188), and charging it to the plan
       // deadline made a valid plan start already expired.
@@ -1566,7 +1624,7 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
       };
       log("plan start");
       const planStarted = Date.now();
-      plan = chooseCombatGoal(state, ladder, planActions, groundedCtx, planOpts);
+      plan = chooseCombatGoal(state, ladder, planActions, groundedCtx, planOpts, (g) => (g.want.threatDown === true ? combat : planActions));
       // A periodic replan gets 250 ms; if that is not enough for a state that
       // exists, retry once at the cold budget before declaring `unsatisfiable`
       // (136).
@@ -1574,7 +1632,7 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
         plan = chooseCombatGoal(state, ladder, planActions, groundedCtx, (g) => ({
           ...planOpts(g),
           deadlineMs: Math.min(deadline, Date.now() + COLD_PLAN_BUDGET_MS),
-        }));
+        }), (g) => (g.want.threatDown === true ? combat : planActions));
       }
       const planMs = Date.now() - planStarted;
       log(`plan done ${planMs}ms steps=${plan?.steps.length ?? 0} expanded=${plan?.expanded ?? 0}`);

@@ -100,7 +100,7 @@ export type CommandStatus = {
 /**
  * Dispatch Options type.
  */
-export type DispatchOptions = { onLine?: (line: string) => void };
+export type DispatchOptions = { onLine?: (line: string) => void; claim?: "goal" | "advisory" };
 
 /**
  * Create Command Host Options type.
@@ -473,7 +473,7 @@ const availableProps = (kind: "weapon" | "key" | "ammo"): Prop[] => {
   return rows;
 };
 
-const armHandler = async (): Promise<CommandResult> => {
+const armHandler = async (_a: Record<string, unknown>, opts?: DispatchOptions): Promise<CommandResult> => {
   if ((world.weapon() ?? "") !== "") return { ok: true, code: 0, note: "already-armed" };
   const failures: string[] = [];
   const tried = new Set<string>();
@@ -491,6 +491,7 @@ const armHandler = async (): Promise<CommandResult> => {
     }
     const code = await runMission(session, mission, {
       timeoutMs: 60_000,
+      claim: opts?.claim,
       onTick: abortTick,
       log: (line) => record(`  arm ${line}`),
       error: (line) => record(`  arm ERROR ${line}`),
@@ -502,13 +503,14 @@ const armHandler = async (): Promise<CommandResult> => {
   return { ok: false, code: 1, why: failures.length === 0 ? "no-weapon" : `not-armed(${failures.join(",")})` };
 };
 
-const runMissionTask = async (missionText: string, label: string): Promise<CommandResult> => {
+const runMissionTask = async (missionText: string, label: string, claim?: "goal" | "advisory"): Promise<CommandResult> => {
   const mission = parseMission(missionText);
   if (!mission) return { ok: false, code: 1, why: "bad-args" };
   let lastNoPlan: string | null = null;
   try {
     const code = await runMission(session, mission, {
       timeoutMs: TASK_TIMEOUT_MS,
+      claim,
       onTick: abortTick,
       log: (line) => {
         onLine?.(`${label} ${line}`);
@@ -527,10 +529,10 @@ const runMissionTask = async (missionText: string, label: string): Promise<Comma
   }
 };
 
-const gotoHandler = async (a: Record<string, unknown>): Promise<CommandResult> => {
+const gotoHandler = async (a: Record<string, unknown>, opts?: DispatchOptions): Promise<CommandResult> => {
   const place = typeof a.place === "string" ? a.place : "";
   if (place.length === 0) return { ok: false, code: 1, why: "bad-args" };
-  return runMissionTask(`reach:${place}`, "goto");
+  return runMissionTask(`reach:${place}`, "goto", opts?.claim);
 };
 
 // Task 132: a point destination is a wishTo walk, not a `stand:` plan. The
@@ -567,7 +569,7 @@ const standHandler = async (a: Record<string, unknown>): Promise<CommandResult> 
 };
 
 // Task 149: the planned twin of `stand`; 132 keeps `stand` on wishTo.
-const pathHandler = async (a: Record<string, unknown>): Promise<CommandResult> => {
+const pathHandler = async (a: Record<string, unknown>, opts?: DispatchOptions): Promise<CommandResult> => {
   const x = Number(a.x);
   const y = Number(a.y);
   const z = Number(a.z);
@@ -577,7 +579,7 @@ const pathHandler = async (a: Record<string, unknown>): Promise<CommandResult> =
   if (abortRequested) return { ok: false, code: 4, why: "aborted" };
   record(`PATH start x=${x} y=${y} z=${z} yaw=${yawArg ?? "keep"}`);
   const missionText = `stand:${x},${y},${z}${yawArg === undefined ? "" : `,${yawArg}`}`;
-  const result = await runMissionTask(missionText, "path");
+  const result = await runMissionTask(missionText, "path", opts?.claim);
   const done = world.self();
   record(`PATH ${result.ok ? "done" : "fail"} why=${result.ok ? "-" : result.why} at=${done ? `${done.x.toFixed(2)},${done.y.toFixed(2)},${done.z.toFixed(2)}` : "?"}`);
   return result.ok ? { ...result, data: { x, y, z, ...(yawArg !== undefined ? { yaw: yawArg } : {}) } } : result;
@@ -585,7 +587,7 @@ const pathHandler = async (a: Record<string, unknown>): Promise<CommandResult> =
 
 // Task 167: a bare x,z point. The caller gives two numbers; the pawn's own
 // floor supplies y, so the mission is the `path`-shaped `stand:` goal.
-const gotoAtHandler = async (a: Record<string, unknown>): Promise<CommandResult> => {
+const gotoAtHandler = async (a: Record<string, unknown>, opts?: DispatchOptions): Promise<CommandResult> => {
   const x = Number(a.x);
   const z = Number(a.z);
   if (!Number.isFinite(x) || !Number.isFinite(z)) return { ok: false, code: 1, why: "bad-args" };
@@ -600,6 +602,7 @@ const gotoAtHandler = async (a: Record<string, unknown>): Promise<CommandResult>
   try {
     const code = await runMission(session, mission, {
       timeoutMs: TASK_TIMEOUT_MS,
+      claim: opts?.claim,
       onTick: abortTick,
       log: (line) => {
         record(`  gotoAt ${line}`);
@@ -631,7 +634,7 @@ type Placement = { id: string; kind?: string; minX: number; maxX: number; minZ: 
 // `runMission` per attempt also gives the retry `reason=initial` and the cold
 // budget, so a transient mid-mission `threat` no-plan does not end the hunt.
 const RELOAD_ATTEMPTS = 6;
-const reloadCycle = async (pin?: string): Promise<{ ok: boolean; code: number; why?: string; ammo: number; crate?: string }> => {
+const reloadCycle = async (pin?: string, claim?: "goal" | "advisory"): Promise<{ ok: boolean; code: number; why?: string; ammo: number; crate?: string }> => {
   const firstScan = availableProps("ammo");
   if (firstScan.length === 0) return { ok: false, code: 1, why: "no-crate", ammo: world.ammo() };
   const tried = new Set<string>();
@@ -657,6 +660,7 @@ const reloadCycle = async (pin?: string): Promise<{ ok: boolean; code: number; w
       let lastNoPlan: string | null = null;
       const code = await runMission(session, mission, {
         timeoutMs: RELOAD_TIMEOUT_MS,
+        claim,
         onTick: abortTick,
         log: (line) => {
           record(`  reload ${line}`);
@@ -686,15 +690,15 @@ const reloadCycle = async (pin?: string): Promise<{ ok: boolean; code: number; w
   return { ok: false, code: lastCode, why: verdict.why, ammo: world.ammo(), crate: verdict.crate };
 };
 
-const reloadHandler = async (a: Record<string, unknown>): Promise<CommandResult> => {
+const reloadHandler = async (a: Record<string, unknown>, opts?: DispatchOptions): Promise<CommandResult> => {
   if (world.ammo() > 0) return { ok: true, code: 0, note: "already-loaded", data: { ammo: world.ammo() } };
   const pin = typeof a.crate === "string" && a.crate.length > 0 ? a.crate : undefined;
-  const r = await reloadCycle(pin);
+  const r = await reloadCycle(pin, opts?.claim);
   if (r.ok) return { ok: true, code: 0, data: { ammo: r.ammo, crate: r.crate } };
   return { ok: false, code: r.code, why: r.why ?? "no-crate" };
 };
 
-const huntHandler = async (a: Record<string, unknown>): Promise<CommandResult> => {
+const huntHandler = async (a: Record<string, unknown>, opts?: DispatchOptions): Promise<CommandResult> => {
   const startedAt = Date.now();
   const minutes = a.minutes === undefined ? 2 : Number(a.minutes);
   if (!Number.isFinite(minutes) || minutes < 0.5 || minutes > 10) return { ok: false, code: 1, why: "bad-args" };
@@ -728,6 +732,7 @@ const huntHandler = async (a: Record<string, unknown>): Promise<CommandResult> =
       record(`HEAL start hp=${world.health()?.hp ?? "?"}`);
       const healCode = await runBrain(session, healGoal(), {
         timeoutMs: Math.min(60_000, Math.max(1_000, deadline - Date.now())),
+        claim: opts?.claim,
         onTick: abortTick,
         log: (line) => record(`  heal ${line}`),
         error: (line) => record(`  heal ERROR ${line}`),
@@ -737,7 +742,7 @@ const huntHandler = async (a: Record<string, unknown>): Promise<CommandResult> =
     }
     if (world.ammo() <= 0) {
       reloads += 1;
-      if (!(await reloadCycle()).ok) {
+      if (!(await reloadCycle(undefined, opts?.claim)).ok) {
         record(`HUNT end kills=${kills} shots=${shots} minutes=${minutes} elapsed=${taskElapsed(startedAt)}s`);
         return { ok: false, code: 1, why: "no-ammo" };
       }
@@ -753,13 +758,17 @@ const huntHandler = async (a: Record<string, unknown>): Promise<CommandResult> =
     record(`HUNT target id=${tgt.id} d=${nearest.d.toFixed(1)} place=outside`);
     let outcome = "timeout";
     let targetShots = 0;
-    const mission = parseMission(`attack:${tgt.id}`);
-    if (!mission) continue;
-    const code = await runMission(session, mission, {
+    // The hunt runs the GOAP ladder, not `runAttack` directly: `survive`,
+    // `heal` and `defend` pre-empt `assault` at 60, so `underFire`,
+    // `hpPressured` and the visible threat decide the next action. The claim
+    // stays off (free-for-all: two seats may chase the same pawn).
+    const code = await runBrain(session, assaultGoal(tgt.id), {
       timeoutMs: Math.min(60_000, Math.max(1_000, deadline - Date.now())),
+      claim: false,
       onTick: abortTick,
       log: (line) => {
         record(`  hunt ${line}`);
+        // The ladder line is the evidence: goals=<id>@<priority> shows the facts.
         if (/attack: fire/.test(line)) { shots += 1; targetShots += 1; }
         if (/attack: dead/.test(line)) outcome = "dead";
         else if (/attack: lost/.test(line)) outcome = "lost";
@@ -781,7 +790,7 @@ const huntHandler = async (a: Record<string, unknown>): Promise<CommandResult> =
   return { ok: true, code: 0, data: { minutes, kills, shots, reloads, heals, hp: world.healthOf(selfId)?.hp ?? null } };
 };
 
-const patrolHandler = async (a: Record<string, unknown>): Promise<CommandResult> => {
+const patrolHandler = async (a: Record<string, unknown>, opts?: DispatchOptions): Promise<CommandResult> => {
   const startedAt = Date.now();
   const raw = Array.isArray(a.places) ? a.places : [];
   if (raw.length < 2 || raw.some((p) => typeof p !== "string" || (p as string).trim().length === 0)) {
@@ -810,6 +819,7 @@ const patrolHandler = async (a: Record<string, unknown>): Promise<CommandResult>
   try {
     code = await runMission(session, mission, {
       timeoutMs: minutes * 60_000,
+      claim: opts?.claim,
       onTick: abortTick,
       log: (line) => {
         record(`  patrol ${line}`);
@@ -832,7 +842,7 @@ type PickupRow = { id: string; kind?: string; minX: number; maxX: number; minZ: 
 function pickupPlace(item: PickupRow): string {
   return world.placeOf({ x: (item.minX + item.maxX) / 2, y: (item.minY ?? 0) + 0.2, z: (item.minZ + item.maxZ) / 2 })?.id ?? "outside";
 }
-const retrieveHandler = async (a: Record<string, unknown>): Promise<CommandResult> => {
+const retrieveHandler = async (a: Record<string, unknown>, opts?: DispatchOptions): Promise<CommandResult> => {
   const pickup = typeof a.pickup === "string" ? a.pickup : "";
   if (pickup.length === 0) return { ok: false, code: 1, why: "bad-args" };
   const item = (world.pickupPlacements() as readonly PickupRow[]).find((row) => row.id === pickup);
@@ -844,6 +854,7 @@ const retrieveHandler = async (a: Record<string, unknown>): Promise<CommandResul
   let lastNoPlan: string | null = null;
   const code = await runMission(session, mission, {
     timeoutMs: TASK_TIMEOUT_MS,
+    claim: opts?.claim,
     onTick: abortTick,
     log: (line) => {
       record(`  retrieve ${line}`);
@@ -863,7 +874,7 @@ const retrieveHandler = async (a: Record<string, unknown>): Promise<CommandResul
   return { ok: false, code, why: `code:${code}` };
 };
 
-const getkeyHandler = async (): Promise<CommandResult> => {
+const getkeyHandler = async (_a: Record<string, unknown>, opts?: DispatchOptions): Promise<CommandResult> => {
   const failures: string[] = [];
   const tried = new Set<string>();
   for (let attempt = 0; attempt < 8; attempt += 1) {
@@ -878,6 +889,7 @@ const getkeyHandler = async (): Promise<CommandResult> => {
     }
     const code = await runMission(session, mission, {
       timeoutMs: 45_000,
+      claim: opts?.claim,
       onTick: abortTick,
       log: (line) => record(`  getkey ${line}`),
       error: (line) => record(`  getkey ERROR ${line}`),
@@ -1664,11 +1676,12 @@ const projectileHandler = async (a: Record<string, unknown>): Promise<CommandRes
  * plan/executor path — no bespoke loop.
  * @post 0 met, 2 no plan, 3 timeout, 4 aborted.
  */
-const runGoalTask = async (label: string, goal: Goal): Promise<CommandResult> => {
+const runGoalTask = async (label: string, goal: Goal, claim?: "goal" | "advisory"): Promise<CommandResult> => {
   let lastNoPlan: string | null = null;
   try {
     const code = await runBrain(session, { ...goal, priority: () => 100 }, {
       timeoutMs: TASK_TIMEOUT_MS,
+      claim,
       onTick: abortTick,
       log: (line) => {
         // The run log keeps the plan lines: the shell dispatch passes no onLine,
@@ -1690,37 +1703,37 @@ const runGoalTask = async (label: string, goal: Goal): Promise<CommandResult> =>
   }
 };
 
-const seekHealthHandler = async (a: Record<string, unknown>): Promise<CommandResult> => {
+const seekHealthHandler = async (a: Record<string, unknown>, opts?: DispatchOptions): Promise<CommandResult> => {
   const crate = typeof a.crate === "string" ? a.crate : "";
   if (crate.length === 0) return { ok: false, code: 1, why: "bad-args" };
   record(`SEEK start crate=${crate}`);
-  const result = await runGoalTask(`seek-health ${crate}`, { id: `seekHealth:${crate}`, want: { hpHigh: true }, priority: () => 100 });
+  const result = await runGoalTask(`seek-health ${crate}`, { id: `seekHealth:${crate}`, want: { hpHigh: true }, priority: () => 100 }, opts?.claim);
   record(`SEEK end crate=${crate} ok=${result.ok ? 1 : 0}${result.ok ? "" : ` why=${result.why}`}`);
   return result;
 };
 
-const takeCoverHandler = async (): Promise<CommandResult> =>
-  runGoalTask("take-cover", { id: "takeCover", want: { inCover: true }, priority: () => 100 });
+const takeCoverHandler = async (_a: Record<string, unknown>, opts?: DispatchOptions): Promise<CommandResult> =>
+  runGoalTask("take-cover", { id: "takeCover", want: { inCover: true }, priority: () => 100 }, opts?.claim);
 
-const returnFireHandler = async (a: Record<string, unknown>): Promise<CommandResult> => {
+const returnFireHandler = async (a: Record<string, unknown>, opts?: DispatchOptions): Promise<CommandResult> => {
   const pawnId = Number(a.pawnId);
   if (!Number.isInteger(pawnId) || pawnId <= 0) return { ok: false, code: 1, why: "bad-args" };
-  return runGoalTask(`return-fire ${pawnId}`, assaultGoal(pawnId));
+  return runGoalTask(`return-fire ${pawnId}`, assaultGoal(pawnId), opts?.claim);
 };
 
-const retreatHandler = async (a: Record<string, unknown>): Promise<CommandResult> => {
+const retreatHandler = async (a: Record<string, unknown>, opts?: DispatchOptions): Promise<CommandResult> => {
   const place = typeof a.place === "string" ? a.place : "";
   if (place.length === 0) return { ok: false, code: 1, why: "bad-args" };
   // The 184 `retreat:<place>` action carries a `hpCritical` pre and a `safe`
   // effect no goal wants; an operator-forced retreat is a reach to the place.
-  return runMissionTask(`reach:${place}`, "retreat");
+  return runMissionTask(`reach:${place}`, "retreat", opts?.claim);
 };
 
-const rearmHandler = async (): Promise<CommandResult> =>
-  runGoalTask("rearm", { id: "rearm", want: { hasAmmo: true }, priority: () => 100 });
+const rearmHandler = async (_a: Record<string, unknown>, opts?: DispatchOptions): Promise<CommandResult> =>
+  runGoalTask("rearm", { id: "rearm", want: { hasAmmo: true }, priority: () => 100 }, opts?.claim);
 
-const surviveHandler = async (): Promise<CommandResult> =>
-  runGoalTask("survive", { id: "survive", want: { hpHigh: true }, priority: () => 100 });
+const surviveHandler = async (_a: Record<string, unknown>, opts?: DispatchOptions): Promise<CommandResult> =>
+  runGoalTask("survive", { id: "survive", want: { hpHigh: true }, priority: () => 100 }, opts?.claim);
 
 /**
  * The defend POSTURE (the shell verb): hold this spot and shoot NPCs that come
@@ -1785,13 +1798,13 @@ const defendHandler = async (a: Record<string, unknown>): Promise<CommandResult>
   return { ok: true, code: 0 };
 };
 
-const assaultHandler = async (a: Record<string, unknown>): Promise<CommandResult> => {
+const assaultHandler = async (a: Record<string, unknown>, opts?: DispatchOptions): Promise<CommandResult> => {
   const pawnId = Number(a.pawnId);
   if (!Number.isInteger(pawnId) || pawnId <= 0) return { ok: false, code: 1, why: "bad-args" };
-  return runGoalTask(`assault ${pawnId}`, assaultGoal(pawnId));
+  return runGoalTask(`assault ${pawnId}`, assaultGoal(pawnId), opts?.claim);
 };
 
-const regroupHandler = async (a: Record<string, unknown>): Promise<CommandResult> => {
+const regroupHandler = async (a: Record<string, unknown>, opts?: DispatchOptions): Promise<CommandResult> => {
   const place = typeof a.place === "string" ? a.place : "";
   const graph = session.world.sceneGraph();
   if (!graph || !graph.placeById.has(place)) {
@@ -1802,6 +1815,7 @@ const regroupHandler = async (a: Record<string, unknown>): Promise<CommandResult
   let lastNoPlan: string | null = null;
   const code = await runBrain(session, regroupGoal(place), {
     timeoutMs: TASK_TIMEOUT_MS,
+    claim: opts?.claim,
     onTick: abortTick,
     log: (line) => {
       record(`  regroup ${line}`);
@@ -1816,7 +1830,7 @@ const regroupHandler = async (a: Record<string, unknown>): Promise<CommandResult
   return { ok: false, code, why: `code:${code}` };
 };
 
-const HANDLERS: Record<string, (a: Record<string, unknown>) => Promise<CommandResult>> = {
+const HANDLERS: Record<string, (a: Record<string, unknown>, opts?: DispatchOptions) => Promise<CommandResult>> = {
   arm: armHandler,
   goto: gotoHandler,
   stand: standHandler,
@@ -1855,7 +1869,7 @@ const HANDLERS: Record<string, (a: Record<string, unknown>) => Promise<CommandRe
     players = new Set<number>(world.playerIds());
     let result: CommandResult;
     try {
-      result = await handler(request.args ?? {});
+      result = await handler(request.args ?? {}, opts);
     } catch (err) {
       result = err instanceof AbortMission
         ? { ok: false, code: 4, why: "aborted" }

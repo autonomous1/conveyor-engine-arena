@@ -50,7 +50,9 @@ when `proto/combat.ts` exists, else `probe`; an explicit `--surface probe` runs
 the legacy pinned-pad copy), the plumbing from `--tree src|proto`. Unlike `--test`/`--goto-at`/`--suite`, the sessions are
 not closed between commands — each pawn keeps its seat, kit, keys and ammo. The
 start lists `SHELL seats=[1,2] selfs=[14,15] players=[14,15]` and one
-`SHELL seat <i> self=… place=… weapon=… keys=…` per seat. Piped stdin works (no
+`SHELL seat <i> self=… place=… weapon=… keys=…` per seat, then one
+`SHELL team-seat=<i> self=<pawn> team=<a|b|->` per seat when the proto world
+carries the host roster's teams (208). Piped stdin works (no
 prompt); a TTY shows `bot> `, re-printed after any console line — a `SHELL
 result`, a `status` dump, a collision line — coalesced per burst, so the prompt
 is never left buried.
@@ -87,7 +89,7 @@ commands (15 s cap) before closing; `abort`/Ctrl-C abort immediately.
 | `<seat> survive` / `<seat> defend` | `{name:"survive"}` / `{name:"defend"}` — combat goals (`defend` takes `[minutes] [radius]` and holds/fires as a posture) |
 | `<seat> regroup <place>` | `{name:"regroup", place}` — anchor at 45 (not forced; combat orders pre-empt) |
 | `<seat> assault <pawnId>` | `{name:"assault",pawnId}` — the assault goal (one plan; `hunt` stays the timed loop) |
-| `help` / `seats` / `status [seat]` / `abort\|stop <seat\|all>` / `q`\|`quit`\|`exit` / Ctrl-C / Ctrl-D | built-ins (unprefixed; `<seat> stop` also works) |
+| `help` / `seats` / `status [seat]` / `abort\|stop <seat\|all>` / `team <id> <verb>` / `q`\|`quit`\|`exit` / Ctrl-C / Ctrl-D | built-ins (unprefixed; `<seat> stop` also works) |
 
 **Combat verbs and the override.** The combat table is checked **before** the legacy
 switch, so the first match wins. The only collision is `reload`: the combat `rearm`
@@ -101,6 +103,26 @@ and rejects a combat verb with `why=surface-probe`.
 The shell maps text only — the command module validates (`bad-args` comes from
 `parseCommand`). `@outside-ammo` resolves at dispatch time through the suite's
 `outsideAmmo(world)` per seat.
+
+**Team selector (task 210).** `team <id> <verb> [args…]` resolves the **probe's**
+seats whose pawn is on the host roster's team `<id>` — the `players` frame's
+`teams` rows, carried by the proto world's `teamOf(id)` — then runs `<verb>
+[args…]` on each member exactly as a hand-typed `<seat> <verb>` would (the same
+`SHELL accepted seat=<i> …` / `SHELL result seat=<i> …` records). It prints
+`SHELL team=<id> seats=[…] count=<n>` first; an empty team prints
+`SHELL rejected team=<id> why=no-seat` and dispatches nothing. `status` and
+`abort|stop` work as team verbs; any other built-in is
+`SHELL rejected team=<id> why=builtin`. A missing id/verb is
+`SHELL rejected team why=usage`. Under `--tree src` (no `teamOf`) it prints
+`SHELL team=<id> why=no-teamof tree=src` and does nothing — the selector needs
+the fork. It selects only the shell's own seats, never the operator's pawn.
+
+A team-issued goal is **advisory** (D10): the shell dispatches each member with
+`{claim:"advisory"}`, so every member acquires the host claim and acts without
+waiting for another member's goal claim; a single-seat `<seat> <verb>` still
+takes the default `claim:"goal"` and waits (the 211 control). While a team
+`goto-at` is in flight the shell samples every member's distance to the target
+at 4 Hz (`TEAM t=… seat=<i> d=…`) and stops when the last member returns.
 
 **Console vs log.** The handler's own chatter (plan/start/finish, `hunt attack: …`
 targets, `patrol plan …` legs, projectile traces) is written **only** to the run

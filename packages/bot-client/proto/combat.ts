@@ -202,10 +202,13 @@ export function combatFacts(
     // 199: the health frame is the only truth (absence is not death).
     const down = session.world.healthOf(target.id)?.dead === true;
     if (!los || down) facts.defended = true;
-    if (down) {
-      facts.targetDown = true;
-      if (opts.missionTarget === target.id) facts.threatDown = true;
-    }
+    if (down) facts.targetDown = true;
+  }
+  // The assault releases on the ordered pawn's health frame even when another
+  // hostile is the one in sight (`target` above is the visible threat): the
+  // hunt's per-target accounting reads this, not the in-sight target's death.
+  if (opts.missionTarget !== undefined && session.world.healthOf?.(opts.missionTarget)?.dead === true) {
+    facts.threatDown = true;
   }
   // `defended` is live (198): in cover, the target down, or the last threat gone.
   // `threatGone` = the last threat id is absent from `others()` OR nothing is
@@ -302,7 +305,9 @@ export function combatActions(
     actions.push({
       id: `returnFire:${threat.id}`,
       pre: { [HAS_WEAPON]: true, [HAS_AMMO]: true, threatVisible: true },
-      eff: { threatDown: true, defended: true },
+      // The generic threat only satisfies the assault order when it *is* the
+      // ordered pawn; `defend` (want defended) still gets the shot otherwise.
+      eff: { defended: true, ...(opts.target === threat.id ? { threatDown: true } : {}) },
       usable: () => true,
       cost: (s) => FIRE_S * (s.hpWounded ? FIRE_WOUNDED_MUL : 1),
     });
@@ -486,6 +491,7 @@ export function chooseCombatGoal(
   actions: readonly Action<BotCtx>[],
   ctx: BotCtx,
   optsFor: (goal: Goal) => PlanOptions,
+  actionsFor?: (goal: Goal) => readonly Action<BotCtx>[],
 ): Plan | undefined {
   const ranked = goals
     .map((g, i) => ({ g, i, p: g.priority(state) }))
@@ -494,7 +500,7 @@ export function chooseCombatGoal(
   for (const r of ranked) {
     const opts = optsFor(r.g);
     if (opts.deadlineMs !== undefined && opts.now && opts.now() >= opts.deadlineMs) return undefined;
-    const found = plan(state, r.g, actions as readonly Action<BotCtx>[], ctx, opts);
+    const found = plan(state, r.g, (actionsFor ? actionsFor(r.g) : actions) as readonly Action<BotCtx>[], ctx, opts);
     if (found) return found;
   }
   return undefined;

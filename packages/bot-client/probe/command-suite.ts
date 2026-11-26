@@ -1138,6 +1138,7 @@ const SHELL_HELP = [
   "<seat> survive | defend            (combat goals; defend takes [minutes] [radius] as a posture)",
   "<seat> regroup <place>            (anchor at 45, not forced; needs --surface proto)",
   "<seat> assault <pawnId>            (combat goal; needs --surface proto)",
+  "team <id> <verb> [args]          (the probe seats whose pawn is on the host roster's team; needs --tree proto)",
   "help | seats | status [seat] | abort|stop <seat|all> | q/quit/exit | Ctrl-C | Ctrl-D",
 ];
 
@@ -1281,9 +1282,9 @@ async function main(): Promise<void> {
     console.error(USAGE);
     abortSuite(2, `unknown surface: ${SURFACE_NAME} (proto|probe)`);
   }
-  if (!Number.isInteger(SEATS) || SEATS < 1 || SEATS > 4) {
+  if (!Number.isInteger(SEATS) || SEATS < 1 || SEATS > 16) {
     console.error(USAGE);
-    abortSuite(2, `--seats must be an integer 1..4 (got ${args.get("seats") ?? "?"})`);
+    abortSuite(2, `--seats must be an integer 1..16 (got ${args.get("seats") ?? "?"})`);
   }
   if (MODE === "list") {
     printMenu();
@@ -1565,6 +1566,10 @@ async function main(): Promise<void> {
     const first = [...seats.values()][0]!;
     const selfs = [...seats.values()].map((seat) => seat.world.self()?.id ?? "?");
     record(`SHELL seats=[${[...seats.keys()].join(",")}] selfs=[${selfs.join(",")}] players=[${[...first.world.playerIds()].join(",")}]`);
+    for (const seat of seats.values()) {
+      const team = (seat.world as { teamOf?: (id: number) => string | undefined }).teamOf?.(seat.world.self()?.id ?? -1) ?? "-";
+      record(`SHELL team-seat=${seat.index} self=${seat.world.self()?.id ?? "?"} team=${team}`);
+    }
     collisionSampler = setInterval(sampleCollisions, 250);
     const terminal = process.stdin.isTTY === true;
     rl = createInterface({ input: process.stdin, output: process.stdout, terminal });
@@ -1578,6 +1583,67 @@ async function main(): Promise<void> {
       };
     }
     let cmdNo = 0;
+    /** The `goto-at x,z` target of a team line, for the 4 Hz `TEAM` sampler. */
+    const teamTarget = (text: string): { x: number; z: number } | undefined => {
+      const parts = text.split(/\s+/);
+      const verb = (parts[0] ?? "").toLowerCase();
+      if (verb !== "goto-at" && verb !== "gotoat") return undefined;
+      const pair = (parts[1] ?? "").split(",");
+      const x = Number(pair[0]);
+      const z = Number(pair[1]);
+      return Number.isFinite(x) && Number.isFinite(z) ? { x, z } : undefined;
+    };
+    /**
+     * The one numeric-seat dispatch path: parse the verb+args and run it on one
+     * seat. The numeric branch and `team` both call it, so a team line produces
+     * exactly the per-seat records a hand-typed `<seat> <verb>` does.
+     * @post `shown` is the command text for the unknown-verb record (numeric
+     *       keeps its full `1 foo` line).
+     */
+    const dispatchTo = (seat: Seat, text: string, shown = text, opts?: { claim?: "goal" | "advisory" }): Promise<void> | undefined => {
+      const tokens = text.split(/\s+/);
+      const sub = (tokens[0] ?? "").toLowerCase();
+      if (sub === "abort" || sub === "stop") {
+        haltSeat(seat);
+        record(`SHELL ${sub} seat=${seat.index}`);
+        return;
+      }
+      const action = parseShellLine(text, seat.world);
+      if (action.kind !== "dispatch") {
+        if (action.kind === "builtin" && action.name === "status") {
+          record(`SHELL status seat=${seat.index} ${JSON.stringify(seat.cmdHost.status())}`);
+        } else if (action.kind === "error") {
+          record(`SHELL rejected seat=${seat.index} name=${action.name} why=${action.why}`);
+          record(`SHELL result seat=${seat.index} name=${action.name} ok=0 code=1 why=${action.why} ms=0`);
+        } else {
+          record(`SHELL rejected seat=${seat.index} why=unknown-verb`);
+          record(`SHELL unknown cmd="${shown}"`);
+        }
+        return;
+      }
+      if (action.legacy) record(`SHELL legacy ${action.name}`);
+      if (action.combat && SURFACE_NAME !== "proto") {
+        record(`SHELL rejected seat=${seat.index} name=${action.name} why=surface-probe`);
+        record(`SHELL result seat=${seat.index} name=${action.name} ok=0 code=1 why=surface-probe ms=0`);
+        return;
+      }
+      if (seat.cmdHost.busy) {
+        record(`SHELL rejected seat=${seat.index} name=${action.name} why=busy`);
+        record(`SHELL result seat=${seat.index} name=${action.name} ok=0 code=1 why=busy ms=0`);
+        return;
+      }
+      record(`SHELL accepted seat=${seat.index} name=${action.name} args=${JSON.stringify(action.args)}`);
+      const at = Date.now();
+      const promise = seat.cmdHost.dispatch({ id: `shell-${seat.index}-${++cmdNo}`, name: action.name, args: action.args }, opts).then((result) => {
+        if (done) return;
+        record(`SHELL result seat=${seat.index} name=${action.name} ok=${result.ok ? 1 : 0} code=${result.ok ? (result.code ?? 0) : result.code} why=${result.ok ? "-" : result.why} ms=${Date.now() - at}`);
+      }).catch((err: unknown) => {
+        record(`SHELL result seat=${seat.index} name=${action.name} ok=0 code=1 why=error:${err instanceof Error ? err.message : String(err)} ms=${Date.now() - at}`);
+      });
+      pending.add(promise);
+      void promise.finally(() => pending.delete(promise));
+      return promise;
+    };
     const handle = (raw: string): void => {
       if (done || closing) return;
       const line = raw.trim();
@@ -1604,6 +1670,57 @@ async function main(): Promise<void> {
         if (verb === "seats") {
           const now = [...seats.values()].map((seat) => seat.world.self()?.id ?? "?");
           record(`SHELL seats=[${[...seats.keys()].join(",")}] selfs=[${now.join(",")}] players=[${[...first.world.playerIds()].join(",")}]`);
+          return;
+        }
+        if (verb === "team") {
+          const teamId = tokens[1] ?? "";
+          const rest = tokens.slice(2).join(" ");
+          if (teamId.length === 0 || rest.length === 0) {
+            record("SHELL rejected team why=usage");
+            record("SHELL team usage: team <id> <verb> [args]");
+            return;
+          }
+          const teamOf = (seat: Seat): string | undefined =>
+            (seat.world as { teamOf?: (id: number) => string | undefined }).teamOf?.(seat.world.self()?.id ?? -1);
+          if (![...seats.values()].some((seat) => typeof (seat.world as { teamOf?: unknown }).teamOf === "function")) {
+            record(`SHELL team=${teamId} why=no-teamof tree=${tree}`);
+            return;
+          }
+          const members = [...seats.values()].filter((seat) => teamOf(seat) === teamId);
+          record(`SHELL team=${teamId} seats=[${members.map((seat) => seat.index).join(",")}] count=${members.length}`);
+          if (members.length === 0) {
+            record(`SHELL rejected team=${teamId} why=no-seat`);
+            return;
+          }
+          const memberVerb = (rest.split(/\s+/)[0] ?? "").toLowerCase();
+          if (memberVerb === "help" || memberVerb === "seats" || memberVerb === "q" || memberVerb === "quit" || memberVerb === "exit") {
+            record(`SHELL rejected team=${teamId} why=builtin`);
+            return;
+          }
+          // A team order is advisory (D10): each member acquires and acts; no
+          // member waits for another member's goal claim.
+          const advisory = { claim: "advisory" as const };
+          const promises: Promise<void>[] = [];
+          for (const seat of members) {
+            const p = dispatchTo(seat, rest, `team ${teamId} ${rest}`, advisory);
+            if (p) promises.push(p);
+          }
+          const target = teamTarget(rest);
+          if (target && promises.length > 0) {
+            const started = Date.now();
+            const timer = setInterval(() => {
+              const rows = members
+                .map((seat) => {
+                  const me = seat.world.self();
+                  const d = me ? Math.hypot(me.x - target.x, me.z - target.z) : Infinity;
+                  return `seat=${seat.index} d=${Number.isFinite(d) ? d.toFixed(1) : "?"}`;
+                })
+                .join(" ");
+              record(`TEAM t=${((Date.now() - started) / 1000).toFixed(1)}s ${rows}`);
+            }, 250);
+            timer.unref?.();
+            void Promise.allSettled(promises).then(() => clearInterval(timer));
+          }
           return;
         }
         if (verb === "status") {
@@ -1655,40 +1772,7 @@ async function main(): Promise<void> {
         record(`SHELL ${sub} seat=${seatIndex}`);
         return;
       }
-      const action = parseShellLine(tokens.slice(1).join(" "), target.world);
-      if (action.kind !== "dispatch") {
-        if (action.kind === "builtin" && action.name === "status") {
-          record(`SHELL status seat=${seatIndex} ${JSON.stringify(target.cmdHost.status())}`);
-        } else if (action.kind === "error") {
-          record(`SHELL rejected seat=${seatIndex} name=${action.name} why=${action.why}`);
-          record(`SHELL result seat=${seatIndex} name=${action.name} ok=0 code=1 why=${action.why} ms=0`);
-        } else {
-          record(`SHELL rejected seat=${seatIndex} why=unknown-verb`);
-          record(`SHELL unknown cmd="${line}"`);
-        }
-        return;
-      }
-      if (action.legacy) record(`SHELL legacy ${action.name}`);
-      if (action.combat && SURFACE_NAME !== "proto") {
-        record(`SHELL rejected seat=${seatIndex} name=${action.name} why=surface-probe`);
-        record(`SHELL result seat=${seatIndex} name=${action.name} ok=0 code=1 why=surface-probe ms=0`);
-        return;
-      }
-      if (target.cmdHost.busy) {
-        record(`SHELL rejected seat=${seatIndex} name=${action.name} why=busy`);
-        record(`SHELL result seat=${seatIndex} name=${action.name} ok=0 code=1 why=busy ms=0`);
-        return;
-      }
-      record(`SHELL accepted seat=${seatIndex} name=${action.name} args=${JSON.stringify(action.args)}`);
-      const at = Date.now();
-      const promise = target.cmdHost.dispatch({ id: `shell-${seatIndex}-${++cmdNo}`, name: action.name, args: action.args }).then((result) => {
-        if (done) return;
-        record(`SHELL result seat=${seatIndex} name=${action.name} ok=${result.ok ? 1 : 0} code=${result.ok ? (result.code ?? 0) : result.code} why=${result.ok ? "-" : result.why} ms=${Date.now() - at}`);
-      }).catch((err: unknown) => {
-        record(`SHELL result seat=${seatIndex} name=${action.name} ok=0 code=1 why=error:${err instanceof Error ? err.message : String(err)} ms=${Date.now() - at}`);
-      });
-      pending.add(promise);
-      void promise.finally(() => pending.delete(promise));
+      dispatchTo(target, tokens.slice(1).join(" "), line);
     };
     rl.on("line", (line) => {
       handle(line);

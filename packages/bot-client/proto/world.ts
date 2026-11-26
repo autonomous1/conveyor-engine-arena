@@ -161,7 +161,10 @@ export type BotWorld = {
   /** Health row for any entity the host has reported. */
   healthOf(entity: number): { entity: number; hp: number; dead: boolean } | undefined;
   playerIds(): ReadonlySet<number>;
-  applyPlayers(ids: readonly number[]): void;
+  /** Roster ids plus the host's optional `teams` rows (208); both follow the frame. */
+  applyPlayers(ids: readonly number[], teams?: readonly { id: number; team: string }[]): void;
+  /** The last roster frame's team for a pawn, or undefined (no team / unknown id). */
+  teamOf(id: number): string | undefined;
   role(): string | undefined;
   scope(): readonly string[] | undefined;
   sceneGraph(): SceneGraph | undefined;
@@ -225,6 +228,7 @@ export function createBotWorld(view: WorldView): BotWorld {
   let sawMessages = false;
   const vitals = new Map<number, { entity: number; hp: number; dead: boolean }>();
   const players = new Set<number>();
+  const teamsById = new Map<number, string>();
   let ownedId: number | undefined;
   let pickupIds: string[] = [];
   let heldKeys: string[] = [];
@@ -330,9 +334,14 @@ export function createBotWorld(view: WorldView): BotWorld {
     playerIds() {
       return players;
     },
-    applyPlayers(ids) {
+    applyPlayers(ids, teams) {
       players.clear();
       for (const id of ids) players.add(id);
+      teamsById.clear();
+      for (const row of teams ?? []) teamsById.set(row.id, row.team);
+    },
+    teamOf(id) {
+      return teamsById.get(id);
     },
     role() {
       return role;
