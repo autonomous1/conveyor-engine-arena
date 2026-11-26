@@ -99,6 +99,18 @@ export type BrainOptions = {
   enemies?: ReadonlySet<number>;
 };
 
+/**
+ * The stuck policy (204): the first stuck on a step gets one avoid retry; the
+ * same stuck signature twice gets a second retry; the third gives up with a
+ * reason instead of re-issuing the same goTo forever. Pure for the matrix.
+ */
+export type StuckOutcome = { action: "avoid" | "giveup"; retries: number };
+
+export function stuckOutcome(signature: string, previous: string, retries: number): StuckOutcome {
+  if (signature !== previous) return { action: "avoid", retries: 0 };
+  return retries + 1 >= 2 ? { action: "giveup", retries: retries + 1 } : { action: "avoid", retries: retries + 1 };
+}
+
 type TickStatus = "running" | "done" | "failed" | "stuck";
 
 type Triple = [number, number, number];
@@ -773,6 +785,8 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
   let planAt = 0;
   let tick = 0;
   let stuckCount = 0;
+  let stuckSig = "";
+  let stuckRetries = 0;
   let failStreak = 0;
   let lastCmd: FollowInput | undefined;
   let lastReason = "initial";
@@ -1607,6 +1621,8 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
       plan = undefined;
       exec = undefined;
       stuckCount = 0;
+      stuckSig = "";
+      stuckRetries = 0;
     } else if (result === "failed") {
       finish(exec, true);
       pending = `${exec.id} failed`;
@@ -1616,6 +1632,15 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
     } else if (result === "stuck") {
       stuckCount += 1;
       if (stuckCount >= 2) {
+        const sig = `${exec.id}|${(Math.round(pose.x * 4) / 4).toFixed(2)}|${(Math.round(pose.z * 4) / 4).toFixed(2)}`;
+        const outcome = stuckOutcome(sig, stuckSig, stuckRetries);
+        if (outcome.action === "giveup") {
+          log(`stuck: no alternate route id=${exec.id} at=${pose.x.toFixed(2)},${pose.z.toFixed(2)}`);
+          return 2;
+        }
+        log(`stuck: avoid id=${exec.id} at=${pose.x.toFixed(2)},${pose.z.toFixed(2)} retry=${outcome.retries}`);
+        stuckSig = sig;
+        stuckRetries = outcome.retries;
         pending = "stuck";
         plan = undefined;
         exec = undefined;
@@ -1795,11 +1820,18 @@ function outsideGridFor(
   const view = navView(session, omit);
   const shut = new Set<string>();
   for (const door of view.doors) if (!door.open) shut.add(door.id);
+  // 204: the live cab boxes must be in the grid. Without `cabs`, `navBoxes`
+  // drops every elevator-room box (`roomShift` = "drop"), so the walker routes
+  // through the cab walls the collision detector reports (the goap-tasks-2
+  // stuck loop). The cache key includes the cab signature so a moved cab
+  // rebuilds the grid.
+  const cabs = session.world.cabs?.() ?? [];
+  const cabKey = cabs.map((cab) => `${cab.id}:${cab.at}:${cab.y}`).join(",");
   // 0.25 m is ~288 ms for the whole outside (220k cells); 0.5 m is ~166 ms.
-  const key = `outside|${[...omit].sort().join(",")}|${[...shut].sort().join(",")}|${view.pawnRadius}|${view.pawnHeight}`;
+  const key = `outside|${[...omit].sort().join(",")}|${[...shut].sort().join(",")}|${view.pawnRadius}|${view.pawnHeight}|${cabKey}`;
   const hit = cache.get(key);
   if (hit) return hit;
-  const grid = buildGrid(spec.area, navBoxes(view, graph, shut), {
+  const grid = buildGrid(spec.area, navBoxes(view, graph, shut, cabs), {
     cell: 0.5,
     radius: view.pawnRadius,
     height: view.pawnHeight,
@@ -1879,7 +1911,9 @@ function gridFor(
   const view = navView(session, omit);
   const shut = new Set<string>();
   for (const door of view.doors) if (!door.open) shut.add(door.id);
-  return buildGrid(area, navBoxes(view, graph, shut), {
+  // 204: same cab fix as outsideGridFor — see the comment there.
+  const cabs = session.world.cabs?.() ?? [];
+  return buildGrid(area, navBoxes(view, graph, shut, cabs), {
     cell: 0.25,
     radius: view.pawnRadius,
     height: view.pawnHeight,

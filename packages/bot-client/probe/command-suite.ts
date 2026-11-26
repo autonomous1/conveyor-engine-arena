@@ -1164,7 +1164,7 @@ const COMBAT_VERBS: Record<string, { surface: string; args: (tokens: string[]) =
   retreat: { surface: "retreat", args: (tokens) => (tokens[1] ? { place: tokens[1] } : null) },
   reload: { surface: "rearm", args: () => ({}) },
   survive: { surface: "survive", args: () => ({}) },
-  defend: { surface: "defend", args: () => ({}) },
+  defend: { surface: "defend", args: (tokens) => ({ minutes: tokens[1] ? Number(tokens[1]) : undefined, radius: tokens[2] ? Number(tokens[2]) : undefined }) },
   assault: {
     surface: "assault",
     args: (tokens) => {

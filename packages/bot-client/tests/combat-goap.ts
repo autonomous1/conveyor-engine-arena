@@ -14,8 +14,9 @@ import { HAS_AMMO } from "../../../src/shared/bots/state.ts";
 import { reach } from "../../../src/shared/bots/goals.ts";
 import { plan, type Action, type Goal, type Plan, type WorldState } from "../../../src/shared/bots/goap.ts";
 import { placeAt } from "../../../src/shared/scene-graph.ts";
+import { navBoxes } from "../../../src/shared/nav/grid.ts";
 import { nextReloadCandidate, parseCommand, reloadVerdict } from "../proto/commands.ts";
-import { patrolLegOutcome } from "../proto/brain.ts";
+import { patrolLegOutcome, stuckOutcome } from "../proto/brain.ts";
 import { buildWorldState } from "../../../src/shared/bots/state.ts";
 import type { PickupPlacement } from "../../../src/shared/pickups.ts";
 import { homedir } from "node:os";
@@ -570,6 +571,30 @@ const rvRow = (scan: number, attempts: Array<{ crate: string; why: string }>, ex
 rvRow(0, [], "no-crate");
 rvRow(2, [], "gone");
 rvRow(2, [{ crate: "a", why: "no-plan:x" }, { crate: "b", why: "gone" }], "gone");
+
+// ---- 16 elevator walk grid + stuck policy (204) ---------------------------
+const shaft = graph!.shafts.find((row) => row.room);
+if (shaft?.room) {
+  const box = { source: `${shaft.room}.back.0`, minX: -1, maxX: 1, minY: 0, maxY: 3, minZ: -1, maxZ: 1 };
+  const view = { aabbs: [box], doors: [] } as never;
+  const without = navBoxes(view, graph!, new Set()).length;
+  const withCabs = navBoxes(view, graph!, new Set(), [{ id: shaft.id, at: 0, phase: "idle", y: 0 }]).length;
+  record({ kind: "grid", case: "cab-boxes", shaft: shaft.id, without, with: withCabs, pass: without === 0 && withCabs === 1 });
+}
+const stuckRow = (sig: string, prev: string, retries: number, expect: string): void => {
+  const out = stuckOutcome(sig, prev, retries);
+  record({ kind: "stuck", case: `stuck(${sig},${prev},${retries})`, action: out.action, retries: out.retries, pass: out.action === expect });
+};
+stuckRow("A", "", 0, "avoid");
+stuckRow("A", "A", 0, "avoid");
+stuckRow("A", "A", 1, "giveup");
+stuckRow("B", "A", 1, "avoid");
+const upper = [...graph!.placeById.keys()].find((p2) => /floor-2\.hall$/.test(p2));
+if (upper) {
+  const acts = groundActions(graph!, [], [{ want: { at: upper } }] as never);
+  const rides = acts.filter((a) => a.id.startsWith("rideTo:")).map((a) => a.id);
+  record({ kind: "grid", case: "ride-upper-floor", place: upper, rides: rides.length, sample: rides[0] ?? null, pass: rides.length > 0 });
+}
 
 // ---- summary ---------------------------------------------------------------
 const plans = rows.filter((row) => row.kind === "plan");
