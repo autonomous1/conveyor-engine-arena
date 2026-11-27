@@ -117,6 +117,10 @@ seats whose pawn is on the host roster's team `<id>` — the `players` frame's
 `SHELL team=<id> why=no-teamof tree=src` and does nothing — the selector needs
 the fork. It selects only the shell's own seats, never the operator's pawn.
 
+A `goToDoor` step logs `shell[<i>] door <id> named=<place> stand=<place>
+side=<near|far>` — the stand side versus the place the plan named (task 213; the
+named side wins over the nearest).
+
 A team-issued goal is **advisory** (D10): the shell dispatches each member with
 `{claim:"advisory"}`, so every member acquires the host claim and acts without
 waiting for another member's goal claim; a single-seat `<seat> <verb>` still

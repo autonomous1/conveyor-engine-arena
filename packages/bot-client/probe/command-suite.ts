@@ -1565,7 +1565,8 @@ async function main(): Promise<void> {
     }
     const first = [...seats.values()][0]!;
     const selfs = [...seats.values()].map((seat) => seat.world.self()?.id ?? "?");
-    record(`SHELL seats=[${[...seats.keys()].join(",")}] selfs=[${selfs.join(",")}] players=[${[...first.world.playerIds()].join(",")}]`);
+    const operatorId = [...first.world.playerIds()].find((id) => !selfs.includes(id));
+    record(`SHELL seats=[${[...seats.keys()].join(",")}] selfs=[${selfs.join(",")}] players=[${[...first.world.playerIds()].join(",")}] operator=${operatorId ?? "-"}`);
     for (const seat of seats.values()) {
       const team = (seat.world as { teamOf?: (id: number) => string | undefined }).teamOf?.(seat.world.self()?.id ?? -1) ?? "-";
       record(`SHELL team-seat=${seat.index} self=${seat.world.self()?.id ?? "?"} team=${team}`);
@@ -1583,14 +1584,18 @@ async function main(): Promise<void> {
       };
     }
     let cmdNo = 0;
-    /** The `goto-at x,z` target of a team line, for the 4 Hz `TEAM` sampler. */
+    /** The `goto-at x,y,z` target of a team line, for the 4 Hz `TEAM` sampler. */
     const teamTarget = (text: string): { x: number; z: number } | undefined => {
       const parts = text.split(/\s+/);
       const verb = (parts[0] ?? "").toLowerCase();
       if (verb !== "goto-at" && verb !== "gotoat") return undefined;
       const pair = (parts[1] ?? "").split(",");
       const x = Number(pair[0]);
-      const z = Number(pair[1]);
+      // 227: the order is `x,y,z` (the shell and the handler take z from the
+      // third slot; y is ignored). A two-number `x,z` still works. The old
+      // x,pair[1] read measured every TEAM row to z=0, not the goal (225/17:41
+      // d=33.0/10.3 were distances to (-6.15,0), not (-6.15,9.36)).
+      const z = Number(pair.length >= 3 ? pair[2] : pair[1]);
       return Number.isFinite(x) && Number.isFinite(z) ? { x, z } : undefined;
     };
     /**
@@ -1600,7 +1605,7 @@ async function main(): Promise<void> {
      * @post `shown` is the command text for the unknown-verb record (numeric
      *       keeps its full `1 foo` line).
      */
-    const dispatchTo = (seat: Seat, text: string, shown = text, opts?: { claim?: "goal" | "advisory" }): Promise<void> | undefined => {
+    const dispatchTo = (seat: Seat, text: string, shown = text, opts?: { claim?: "goal" | "advisory"; operatorId?: number }): Promise<void> | undefined => {
       const tokens = text.split(/\s+/);
       const sub = (tokens[0] ?? "").toLowerCase();
       if (sub === "abort" || sub === "stop") {
@@ -1634,7 +1639,10 @@ async function main(): Promise<void> {
       }
       record(`SHELL accepted seat=${seat.index} name=${action.name} args=${JSON.stringify(action.args)}`);
       const at = Date.now();
-      const promise = seat.cmdHost.dispatch({ id: `shell-${seat.index}-${++cmdNo}`, name: action.name, args: action.args }, opts).then((result) => {
+      const promise = seat.cmdHost.dispatch(
+        { id: `shell-${seat.index}-${++cmdNo}`, name: action.name, args: action.args },
+        { ...opts, operatorId },
+      ).then((result) => {
         if (done) return;
         record(`SHELL result seat=${seat.index} name=${action.name} ok=${result.ok ? 1 : 0} code=${result.ok ? (result.code ?? 0) : result.code} why=${result.ok ? "-" : result.why} ms=${Date.now() - at}`);
       }).catch((err: unknown) => {

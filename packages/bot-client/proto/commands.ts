@@ -100,7 +100,7 @@ export type CommandStatus = {
 /**
  * Dispatch Options type.
  */
-export type DispatchOptions = { onLine?: (line: string) => void; claim?: "goal" | "advisory" };
+export type DispatchOptions = { onLine?: (line: string) => void; claim?: "goal" | "advisory"; operatorId?: number };
 
 /**
  * Create Command Host Options type.
@@ -491,7 +491,7 @@ const armHandler = async (_a: Record<string, unknown>, opts?: DispatchOptions): 
     }
     const code = await runMission(session, mission, {
       timeoutMs: 60_000,
-      claim: opts?.claim,
+      claim: opts?.claim, operatorId: opts?.operatorId,
       onTick: abortTick,
       log: (line) => record(`  arm ${line}`),
       error: (line) => record(`  arm ERROR ${line}`),
@@ -503,7 +503,7 @@ const armHandler = async (_a: Record<string, unknown>, opts?: DispatchOptions): 
   return { ok: false, code: 1, why: failures.length === 0 ? "no-weapon" : `not-armed(${failures.join(",")})` };
 };
 
-const runMissionTask = async (missionText: string, label: string, claim?: "goal" | "advisory"): Promise<CommandResult> => {
+const runMissionTask = async (missionText: string, label: string, claim?: "goal" | "advisory", operatorId?: number): Promise<CommandResult> => {
   const mission = parseMission(missionText);
   if (!mission) return { ok: false, code: 1, why: "bad-args" };
   let lastNoPlan: string | null = null;
@@ -511,6 +511,7 @@ const runMissionTask = async (missionText: string, label: string, claim?: "goal"
     const code = await runMission(session, mission, {
       timeoutMs: TASK_TIMEOUT_MS,
       claim,
+      operatorId,
       onTick: abortTick,
       log: (line) => {
         onLine?.(`${label} ${line}`);
@@ -532,7 +533,7 @@ const runMissionTask = async (missionText: string, label: string, claim?: "goal"
 const gotoHandler = async (a: Record<string, unknown>, opts?: DispatchOptions): Promise<CommandResult> => {
   const place = typeof a.place === "string" ? a.place : "";
   if (place.length === 0) return { ok: false, code: 1, why: "bad-args" };
-  return runMissionTask(`reach:${place}`, "goto", opts?.claim);
+  return runMissionTask(`reach:${place}`, "goto", opts?.claim, opts?.operatorId);
 };
 
 // Task 132: a point destination is a wishTo walk, not a `stand:` plan. The
@@ -579,7 +580,7 @@ const pathHandler = async (a: Record<string, unknown>, opts?: DispatchOptions): 
   if (abortRequested) return { ok: false, code: 4, why: "aborted" };
   record(`PATH start x=${x} y=${y} z=${z} yaw=${yawArg ?? "keep"}`);
   const missionText = `stand:${x},${y},${z}${yawArg === undefined ? "" : `,${yawArg}`}`;
-  const result = await runMissionTask(missionText, "path", opts?.claim);
+  const result = await runMissionTask(missionText, "path", opts?.claim, opts?.operatorId);
   const done = world.self();
   record(`PATH ${result.ok ? "done" : "fail"} why=${result.ok ? "-" : result.why} at=${done ? `${done.x.toFixed(2)},${done.y.toFixed(2)},${done.z.toFixed(2)}` : "?"}`);
   return result.ok ? { ...result, data: { x, y, z, ...(yawArg !== undefined ? { yaw: yawArg } : {}) } } : result;
@@ -602,7 +603,7 @@ const gotoAtHandler = async (a: Record<string, unknown>, opts?: DispatchOptions)
   try {
     const code = await runMission(session, mission, {
       timeoutMs: TASK_TIMEOUT_MS,
-      claim: opts?.claim,
+      claim: opts?.claim, operatorId: opts?.operatorId,
       onTick: abortTick,
       log: (line) => {
         record(`  gotoAt ${line}`);
@@ -693,7 +694,7 @@ const reloadCycle = async (pin?: string, claim?: "goal" | "advisory"): Promise<{
 const reloadHandler = async (a: Record<string, unknown>, opts?: DispatchOptions): Promise<CommandResult> => {
   if (world.ammo() > 0) return { ok: true, code: 0, note: "already-loaded", data: { ammo: world.ammo() } };
   const pin = typeof a.crate === "string" && a.crate.length > 0 ? a.crate : undefined;
-  const r = await reloadCycle(pin, opts?.claim);
+  const r = await reloadCycle(pin, opts?.claim, opts?.operatorId);
   if (r.ok) return { ok: true, code: 0, data: { ammo: r.ammo, crate: r.crate } };
   return { ok: false, code: r.code, why: r.why ?? "no-crate" };
 };
@@ -732,7 +733,7 @@ const huntHandler = async (a: Record<string, unknown>, opts?: DispatchOptions): 
       record(`HEAL start hp=${world.health()?.hp ?? "?"}`);
       const healCode = await runBrain(session, healGoal(), {
         timeoutMs: Math.min(60_000, Math.max(1_000, deadline - Date.now())),
-        claim: opts?.claim,
+        claim: opts?.claim, operatorId: opts?.operatorId,
         onTick: abortTick,
         log: (line) => record(`  heal ${line}`),
         error: (line) => record(`  heal ERROR ${line}`),
@@ -819,7 +820,7 @@ const patrolHandler = async (a: Record<string, unknown>, opts?: DispatchOptions)
   try {
     code = await runMission(session, mission, {
       timeoutMs: minutes * 60_000,
-      claim: opts?.claim,
+      claim: opts?.claim, operatorId: opts?.operatorId,
       onTick: abortTick,
       log: (line) => {
         record(`  patrol ${line}`);
@@ -854,7 +855,7 @@ const retrieveHandler = async (a: Record<string, unknown>, opts?: DispatchOption
   let lastNoPlan: string | null = null;
   const code = await runMission(session, mission, {
     timeoutMs: TASK_TIMEOUT_MS,
-    claim: opts?.claim,
+    claim: opts?.claim, operatorId: opts?.operatorId,
     onTick: abortTick,
     log: (line) => {
       record(`  retrieve ${line}`);
@@ -889,7 +890,7 @@ const getkeyHandler = async (_a: Record<string, unknown>, opts?: DispatchOptions
     }
     const code = await runMission(session, mission, {
       timeoutMs: 45_000,
-      claim: opts?.claim,
+      claim: opts?.claim, operatorId: opts?.operatorId,
       onTick: abortTick,
       log: (line) => record(`  getkey ${line}`),
       error: (line) => record(`  getkey ERROR ${line}`),
@@ -1676,12 +1677,13 @@ const projectileHandler = async (a: Record<string, unknown>): Promise<CommandRes
  * plan/executor path — no bespoke loop.
  * @post 0 met, 2 no plan, 3 timeout, 4 aborted.
  */
-const runGoalTask = async (label: string, goal: Goal, claim?: "goal" | "advisory"): Promise<CommandResult> => {
+const runGoalTask = async (label: string, goal: Goal, claim?: "goal" | "advisory", operatorId?: number): Promise<CommandResult> => {
   let lastNoPlan: string | null = null;
   try {
     const code = await runBrain(session, { ...goal, priority: () => 100 }, {
       timeoutMs: TASK_TIMEOUT_MS,
       claim,
+      operatorId,
       onTick: abortTick,
       log: (line) => {
         // The run log keeps the plan lines: the shell dispatch passes no onLine,
@@ -1707,18 +1709,18 @@ const seekHealthHandler = async (a: Record<string, unknown>, opts?: DispatchOpti
   const crate = typeof a.crate === "string" ? a.crate : "";
   if (crate.length === 0) return { ok: false, code: 1, why: "bad-args" };
   record(`SEEK start crate=${crate}`);
-  const result = await runGoalTask(`seek-health ${crate}`, { id: `seekHealth:${crate}`, want: { hpHigh: true }, priority: () => 100 }, opts?.claim);
+  const result = await runGoalTask(`seek-health ${crate}`, { id: `seekHealth:${crate}`, want: { hpHigh: true }, priority: () => 100 }, opts?.claim, opts?.operatorId);
   record(`SEEK end crate=${crate} ok=${result.ok ? 1 : 0}${result.ok ? "" : ` why=${result.why}`}`);
   return result;
 };
 
 const takeCoverHandler = async (_a: Record<string, unknown>, opts?: DispatchOptions): Promise<CommandResult> =>
-  runGoalTask("take-cover", { id: "takeCover", want: { inCover: true }, priority: () => 100 }, opts?.claim);
+  runGoalTask("take-cover", { id: "takeCover", want: { inCover: true }, priority: () => 100 }, opts?.claim, opts?.operatorId);
 
 const returnFireHandler = async (a: Record<string, unknown>, opts?: DispatchOptions): Promise<CommandResult> => {
   const pawnId = Number(a.pawnId);
   if (!Number.isInteger(pawnId) || pawnId <= 0) return { ok: false, code: 1, why: "bad-args" };
-  return runGoalTask(`return-fire ${pawnId}`, assaultGoal(pawnId), opts?.claim);
+  return runGoalTask(`return-fire ${pawnId}`, assaultGoal(pawnId), opts?.claim, opts?.operatorId);
 };
 
 const retreatHandler = async (a: Record<string, unknown>, opts?: DispatchOptions): Promise<CommandResult> => {
@@ -1726,14 +1728,14 @@ const retreatHandler = async (a: Record<string, unknown>, opts?: DispatchOptions
   if (place.length === 0) return { ok: false, code: 1, why: "bad-args" };
   // The 184 `retreat:<place>` action carries a `hpCritical` pre and a `safe`
   // effect no goal wants; an operator-forced retreat is a reach to the place.
-  return runMissionTask(`reach:${place}`, "retreat", opts?.claim);
+  return runMissionTask(`reach:${place}`, "retreat", opts?.claim, opts?.operatorId);
 };
 
 const rearmHandler = async (_a: Record<string, unknown>, opts?: DispatchOptions): Promise<CommandResult> =>
-  runGoalTask("rearm", { id: "rearm", want: { hasAmmo: true }, priority: () => 100 }, opts?.claim);
+  runGoalTask("rearm", { id: "rearm", want: { hasAmmo: true }, priority: () => 100 }, opts?.claim, opts?.operatorId);
 
 const surviveHandler = async (_a: Record<string, unknown>, opts?: DispatchOptions): Promise<CommandResult> =>
-  runGoalTask("survive", { id: "survive", want: { hpHigh: true }, priority: () => 100 }, opts?.claim);
+  runGoalTask("survive", { id: "survive", want: { hpHigh: true }, priority: () => 100 }, opts?.claim, opts?.operatorId);
 
 /**
  * The defend POSTURE (the shell verb): hold this spot and shoot NPCs that come
@@ -1801,7 +1803,7 @@ const defendHandler = async (a: Record<string, unknown>): Promise<CommandResult>
 const assaultHandler = async (a: Record<string, unknown>, opts?: DispatchOptions): Promise<CommandResult> => {
   const pawnId = Number(a.pawnId);
   if (!Number.isInteger(pawnId) || pawnId <= 0) return { ok: false, code: 1, why: "bad-args" };
-  return runGoalTask(`assault ${pawnId}`, assaultGoal(pawnId), opts?.claim);
+  return runGoalTask(`assault ${pawnId}`, assaultGoal(pawnId), opts?.claim, opts?.operatorId);
 };
 
 const regroupHandler = async (a: Record<string, unknown>, opts?: DispatchOptions): Promise<CommandResult> => {
@@ -1815,7 +1817,7 @@ const regroupHandler = async (a: Record<string, unknown>, opts?: DispatchOptions
   let lastNoPlan: string | null = null;
   const code = await runBrain(session, regroupGoal(place), {
     timeoutMs: TASK_TIMEOUT_MS,
-    claim: opts?.claim,
+    claim: opts?.claim, operatorId: opts?.operatorId,
     onTick: abortTick,
     log: (line) => {
       record(`  regroup ${line}`);

@@ -87,6 +87,13 @@ const PURSUE_LEAD_M = 6;
 const PURSUE_SPEED = MOVE_SPEED;
 const GRAPH_WAIT_MS = 1_500;
 const USE_WAIT_MS = 1_000;
+/** 212/214: the pawn is at a planned door when this close to its body. */
+const DOOR_REACH = 1.5;
+/** 217: team goto-at spread — the assigned vertex on this polygon. */
+const TEAM_SPREAD_R = 1.2;
+const TEAM_SPREAD_A = 0;
+/** 218: followers queue this far behind the near door stand. */
+const TEAM_QUEUE_M = 2;
 const PICKUP_WAIT_MS = 2_000;
 const NO_GRAPH = "no scene graph (token lacks scene-graph scope?)";
 
@@ -114,6 +121,8 @@ export type BrainOptions = {
    * the claim entirely (the hunt's free-for-all).
    */
   claim?: boolean | "goal" | "advisory";
+  /** The human operator's pawn: excluded from team leader/rank (217). */
+  operatorId?: number;
 };
 
 /**
@@ -154,6 +163,10 @@ type Walk = {
   points: Triple[];
   grid: Grid;
   doorId?: string;
+  /** 214: a shut door blocks the point route; the walk is to its near side. */
+  door?: { id: string; target: { x: number; y: number; z: number } };
+  /** 212's nav: the shut-unlocked doors the planned point route crosses, in order. */
+  doors?: string[];
 };
 
 type UseState = {
@@ -744,7 +757,10 @@ export async function runAttack(session: BotSession, targetId: number, opts: Bra
  * @post 0 met, 2 no plan/target, 3 timeout or lost claim.
  */
 export async function runBrain(session: BotSession, goal: Goal, opts: BrainOptions = {}): Promise<number> {
-  const key = goal.id;
+  // 226: team goto-at gives every seat the same goal id; a shared advisory claim
+  // made the seats contend the same key and replan constantly. Scope it per seat.
+  const selfKey = session.world.self()?.id ?? 0;
+  const key = `${goal.id}:${selfKey}`;
   const supported = opts.claim !== false && session.world.claimsSupported?.() === true;
   if (supported && session.world.self() !== undefined) {
     if (opts.claim === "advisory") {
@@ -781,6 +797,14 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
 
   let stand: Stand | undefined;
   const standTarget = (goal as Partial<StandGoal>).stand;
+  // 230: `stand:x,y,z` carries no facing; the resolved yaw (0) is a default, not
+  // a contract. Requiring it made the STAND fact wait for the pawn to face 0
+  // while the follow/avoid steering kept turning it (goap-tasks-21: 5 of 6
+  // near-goal samples at d<=0.35 failed only on dyaw, yaw 1.0-2.3 rad; the
+  // 14-43 s churn). A door stand and an explicit `stand:...,yaw` keep the check.
+  const standYawSet = standTarget === undefined
+    ? true
+    : standTarget.kind === "door" || standTarget.yaw !== undefined;
   if (standTarget) {
     const graph = session.world.sceneGraph();
     const views: DoorView[] = [];
@@ -814,6 +838,7 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
   let grounded = "";
   let plan: Plan | undefined;
   let exec: Running | undefined;
+  let doorClaim: string | undefined;
   /** Stops the `returnFire` executor's background `runAttack` on a replan. */
   let stopAttack: (() => void) | undefined;
   let pending = "";
@@ -963,7 +988,7 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
     const self = session.world.self();
     if (stand && resolvedStand && self && Math.hypot(self.x - resolvedStand.x, self.z - resolvedStand.z) <= STAND_TOLERANCE &&
         Math.abs(self.y - resolvedStand.y) <= STAND_GOAL_Y &&
-        Math.abs(angleDiff(self.yaw, resolvedStand.yaw)) <= STAND_TOLERANCE) state[STAND] = stand.key;
+        (!standYawSet || Math.abs(angleDiff(self.yaw, resolvedStand.yaw)) <= STAND_TOLERANCE)) state[STAND] = stand.key;
     return state;
   };
 
@@ -1001,6 +1026,11 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
     let phase: "walk" | "use" = "walk";
     let use: UseState | undefined;
     const follow = makeFollow(walked);
+    const releaseDoor = (): void => {
+      if (!doorClaim) return;
+      session.claims.release(doorClaim);
+      doorClaim = undefined;
+    };
     return {
       id,
       kind: "goTo",
@@ -1011,9 +1041,13 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
         sticky = undefined;
       },
       tick(current, nowTick, now) {
-        if (phase === "walk" && !walked.doorId && here() === place) return "done";
+        if (phase === "walk" && !walked.doorId && here() === place) {
+          releaseDoor();
+          return "done";
+        }
         if (phase === "use" && walked.doorId && use) {
           this.moving = false;
+          if (!use.sent) log(`DOOROPEN id=${walked.doorId} at=${current.x.toFixed(2)},${current.z.toFixed(2)} reason=claim ms=0`);
           return pressDoor(session, walked.doorId, use, current, now, send, false);
         }
         const step = follow.step(current, otherPawns(session), nowTick);
@@ -1026,7 +1060,11 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
             use = { started: now, sent: false, second: false, secondAt: 0 };
             return "running";
           }
-          return here() === place ? "done" : "failed";
+          if (here() === place) {
+            releaseDoor();
+            return "done";
+          }
+          return "failed";
         }
         return "running";
       },
@@ -1044,17 +1082,48 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
 
   const beginStand = (id: string, key: string, pose: Pose): Running | undefined => {
     if (!stand || stand.key !== key) return undefined;
-    const walked = walkToPoint(pose, stand, new Set());
+    // 217: do not converge on one point — each team member takes its own vertex.
+    const self1 = session.world.self();
+    const team1 = self1 ? session.world.teamOf(self1.id) : undefined;
+    const teamIds1 = team1 !== undefined
+      ? [...session.world.playerIds()]
+          .filter((id) => session.world.teamOf(id) === team1 && id !== opts.operatorId)
+          .sort((a, b) => a - b)
+      : [];
+    const rank1 = self1 ? teamIds1.indexOf(self1.id) : -1;
+    const n1 = teamIds1.length;
+    const spread = n1 > 1 && rank1 >= 0
+      ? {
+          x: stand.x + TEAM_SPREAD_R * Math.cos(TEAM_SPREAD_A + (2 * Math.PI * rank1) / n1),
+          y: stand.y,
+          z: stand.z + TEAM_SPREAD_R * Math.sin(TEAM_SPREAD_A + (2 * Math.PI * rank1) / n1),
+          yaw: stand.yaw,
+        }
+      : stand;
+    let walked = walkToPoint(pose, spread, new Set());
     if (!walked) return undefined;
+    // 223: the walk targets the member's own vertex — never the shared point.
+    // 228: the ARRIVAL TEST and the STAND fact must be the same reachable point
+    // (the 151 invariant above). 223 made the arrival test the spread vertex
+    // while `resolvedStand` (the fact) stayed the walk's snapped last point; when
+    // `planPath` snaps the vertex, the action finishes 0.35 m from the vertex but
+    // the fact (measured at the snap) never latches, so the 1.5 s `threat` tick
+    // restarts it (goap-tasks-19: 69 `replan threat` in the 47.63 order, 33-43 s
+    // settles; the threat-free 71.31 order settled in 6.7-9.7 s). The seat may
+    // stop up to the snap (~1 m) off its vertex; the vertex distinction stands.
     resolveStandGoal(walked);
-    const goal = resolvedStand;
-    if (!goal) return undefined;
+    let goal = resolvedStand ?? spread;
     // At the goal's XZ but off its floor: no walk can finish here. Fail the
     // start so the brain's fail streak returns the mission instead of spinning.
     const here0 = session.world.self();
     if (here0 && Math.hypot(here0.x - goal.x, here0.z - goal.z) <= STAND_TOLERANCE &&
         Math.abs(here0.y - goal.y) > STAND_GOAL_Y) return undefined;
-    const follow = makeFollow(walked);
+    let follow = makeFollow(walked);
+    let use: UseState | undefined;
+    let phase: "walk" | "press" | "retry" = "walk";
+    let doorId = walked.door?.id;
+    let doorIdx = 0;
+    let retried = false;
     let stopped = false;
     return {
       id,
@@ -1063,7 +1132,43 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
       moving: true,
       started: Date.now(),
       tick(current, nowTick) {
+        if (phase === "press" && doorId) {
+          use ??= { started: Date.now(), sent: false, second: false, secondAt: 0 };
+          const status = pressDoor(session, doorId, use, current, Date.now(), send, false);
+          if (status === "failed") return "failed";
+          if (status === "done") phase = "retry";
+          return "running";
+        }
+        if (phase === "retry") {
+          if (retried) return "failed";
+          retried = true;
+          walked = walkToPoint(current, spread, new Set());
+          if (!walked) return "failed";
+          resolveStandGoal(walked);
+          // 228: the re-walk may snap elsewhere; the arrival test follows the fact.
+          goal = resolvedStand ?? goal;
+          follow = makeFollow(walked);
+          doorId = walked.door?.id;
+          doorIdx = 0;
+          phase = "walk";
+          return "running";
+        }
         const self = session.world.self();
+        const nextDoor = walked.doors?.[doorIdx];
+        if (nextDoor && self) {
+          const body = session.world.doorBody(nextDoor);
+          if (body && Math.hypot(self.x - body.position[0], self.z - body.position[2]) <= DOOR_REACH) {
+            use ??= { started: Date.now(), sent: false, second: false, secondAt: 0 };
+            const status = pressDoor(session, nextDoor, use, current, Date.now(), send, false);
+            if (status === "failed") return "failed";
+            if (status === "done") {
+              log(`DOOROPEN id=${nextDoor} at=${self.x.toFixed(2)},${self.z.toFixed(2)} reason=route ms=0`);
+              doorIdx += 1;
+              use = undefined;
+            }
+            return "running";
+          }
+        }
         if (self && Math.hypot(self.x - goal.x, self.z - goal.z) <= STAND_TOLERANCE) {
           if (Math.abs(self.y - goal.y) > STAND_GOAL_Y) return "failed";
           if (!stopped) {
@@ -1076,6 +1181,10 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
         send(step.input);
         if (step.status === "stuck") return "stuck";
         if (step.status === "arrived") {
+          if (doorId) {
+            phase = "press";
+            return "running";
+          }
           if (!stopped) {
             stopped = true;
             send({ moveX: 0, moveZ: 0, yaw: goal.yaw });
@@ -1215,12 +1324,58 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
 
   const beginDoor = (id: string, arg: string, pose: Pose): Running | undefined => {
     // `goToDoor:<door>:<place>` names the side; the door is the part before it.
-    const doorId = arg.includes(":") ? arg.slice(0, arg.indexOf(":")) : arg;
-    const stand = chooseStand(doorId, undefined, pose);
+    // 213: the named place is the stand side — never the nearest/current side.
+    const cut = arg.indexOf(":");
+    const doorId = cut < 0 ? arg : arg.slice(0, cut);
+    const named = cut < 0 ? undefined : arg.slice(cut + 1);
+    const stand = chooseStand(doorId, named, pose);
     if (!stand) return undefined;
-    const walked = walkToPoint(pose, stand, new Set());
+    // 218: the leader takes the near stand; the followers wait 2 m behind it so
+    // they cannot crowd the doorway and stall the leader.
+    const self0 = session.world.self();
+    const team0 = self0 ? session.world.teamOf(self0.id) : undefined;
+    const ids0 = team0 !== undefined
+      ? [...session.world.playerIds()].filter((id) => session.world.teamOf(id) === team0 && id !== opts.operatorId).sort((a, b) => a - b)
+      : [];
+    const rank0 = self0 ? ids0.indexOf(self0.id) : -1;
+    let queue = stand;
+    let nearStand = stand;
+    if (rank0 > 0) {
+      const body0 = session.world.doorBody(doorId);
+      if (body0) {
+        const dx = stand.x - body0.position[0];
+        const dz = stand.z - body0.position[2];
+        const len = Math.hypot(dx, dz) || 1;
+        const dist = TEAM_QUEUE_M * rank0;
+        const nx = dx / len;
+        const nz = dz / len;
+        // 222: the queue is behind the door (normal); the follower's own near
+        // offset is sideways (tangent) so it never walks back to the leader's stand.
+        queue = { x: stand.x + nx * dist, y: stand.y, z: stand.z + nz * dist };
+        nearStand = { x: stand.x - nz * dist, y: stand.y, z: stand.z + nx * dist };
+      }
+    }
+    const graph = session.world.sceneGraph();
+    const standPlace = graph ? placeAt(graph, stand.x, stand.y, stand.z).id : "?";
+    const self = session.world.self();
+    const here = self ? session.world.placeOf(self)?.id : undefined;
+    const team = self ? session.world.teamOf(self.id) : undefined;
+    const teamIds = team !== undefined
+      ? [...session.world.playerIds()]
+          .filter((id) => session.world.teamOf(id) === team && id !== opts.operatorId)
+          .sort((a, b) => a - b)
+      : [];
+    const rank = self ? teamIds.indexOf(self.id) : -1;
+    const leaderId = teamIds[0];
+    const isLeader = self !== undefined && self.id === leaderId;
+    const claimKey = `door:${team ?? "-"}:${doorId}`;
+    if (isLeader) session.claims.acquire(claimKey, 30_000);
+    let owned = false;
+    log(`door ${doorId} named=${named ?? "-"} stand=${standPlace} side=${here !== undefined && standPlace === here ? "near" : "far"} claim=${claimKey} lead=${leaderId ?? "-"} rank=${rank}`);
+    let walked = walkToPoint(pose, queue, new Set());
     if (!walked) return undefined;
-    const follow = makeFollow(walked);
+    let follow = makeFollow(walked);
+    let atQueue = rank0 > 0;
     return {
       id,
       kind: "goToDoor",
@@ -1232,6 +1387,40 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
       },
       tick(current, nowTick) {
         const self = session.world.self();
+        if (!owned) {
+          const row = session.world.claims().get(claimKey);
+          // 227: the leader retries too. The host table is first-come
+          // (`claims.ts` ignores a claim while another pawn owns the key); a
+          // follower whose beginDoor ran first can hold the door, and the old
+          // `!isLeader` guard left the leader waiting on its own follower's
+          // whole mission. 225: seat 1 (leader) stalled 160 s at the hall door
+          // and only the `stuck` recovery at 162.5 s freed it.
+          if (row === undefined) session.claims.acquire(claimKey, 30_000);
+          owned = self !== undefined && session.world.claims().get(claimKey)?.owner === self.id;
+          if (!owned) {
+            const step = follow.step(current, otherPawns(session), nowTick);
+            send(step.input);
+            if (step.status === "stuck") return "stuck";
+            // 216/217: the gate holds at the near side until the leader passes and
+            // releases; then the next follower owns and the step completes.
+            return "running";
+          }
+          doorClaim = claimKey;
+        }
+        if (atQueue && rank0 > 0 && (self === undefined || Math.hypot(self.x - queue.x, self.z - queue.z) > 1.0)) {
+          const stepQueue = follow.step(current, otherPawns(session), nowTick);
+          send(stepQueue.input);
+          if (stepQueue.status === "stuck") return "stuck";
+          return "running";
+        }
+        if (atQueue && rank0 > 0) {
+          // At the queue, now step up to the near stand with the leader gone.
+          const near = walkToPoint(current, nearStand, new Set());
+          if (!near) return "failed";
+          follow = makeFollow(near);
+          atQueue = false;
+          return "running";
+        }
         if (self && Math.hypot(self.x - stand.x, self.z - stand.z) <= 0.3) return "done";
         const step = follow.step(current, otherPawns(session), nowTick);
         send(step.input);
@@ -1292,6 +1481,8 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
     }
     const follow = makeFollow(walked);
     let waitStart = 0;
+    let use: UseState | undefined;
+    let doorIdx = 0;
     return {
       id,
       kind: "pickup",
@@ -1305,6 +1496,21 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
       tick(current, nowTick, now) {
         if (pickupTaken(session, item)) return "done";
         const self = session.world.self();
+        const nextDoor = walked.doors?.[doorIdx];
+        if (nextDoor && self) {
+          const body = session.world.doorBody(nextDoor);
+          if (body && Math.hypot(self.x - body.position[0], self.z - body.position[2]) <= DOOR_REACH) {
+            use ??= { started: now, sent: false, second: false, secondAt: 0 };
+            const status = pressDoor(session, nextDoor, use, current, now, send, false);
+            if (status === "failed") return "failed";
+            if (status === "done") {
+              log(`DOOROPEN id=${nextDoor} at=${self.x.toFixed(2)},${self.z.toFixed(2)} reason=route ms=0`);
+              doorIdx += 1;
+              use = undefined;
+            }
+            return "running";
+          }
+        }
         const touching = !!self && capsuleOverlapsAabb(
           self.x, self.y, self.z, session.world.pawnRadius, session.world.pawnHeight, item,
         );
@@ -1332,7 +1538,7 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
     if (cut >= 0) {
       const step = route.steps[cut]!;
       const doorId = step.portal.door ?? step.portal.id;
-      const stand = chooseStand(doorId, { x: step.enter[0], z: step.enter[2] }, pose);
+      const stand = chooseStand(doorId, step.from, pose);
       if (!stand) return undefined;
       const walked = walkToPoint(pose, stand, new Set());
       if (!walked) return undefined;
@@ -1369,17 +1575,80 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
       const snapped = nearestFreeCell(grid, target.x, target.z, 1, pose.y);
       if (snapped) goal = { x: snapped.x, y: pose.y, z: snapped.z };
     }
+    // 214: the main nav's `planLegs` may cross a shut-unlocked exit door and
+    // return points; the point walk owns the press. Read the place route first:
+    // a shut door on it means walk to its near pocket, press, then re-plan.
+    const herePlace = placeAt(graph, pose.x, pose.y, pose.z).id;
+    const goalPlace = placeAt(graph, goal.x, goal.y, goal.z).id;
+    if (goalPlace !== herePlace) {
+      const routeCheck = planRoute(graph, pose, goalPlace, gate);
+      const shut = routeCheck.ok
+        ? routeCheck.steps.find((row) => row.portal.kind === "door" && gate(row.portal) !== "open")
+        : undefined;
+      if (shut) {
+        const near = shut.from === herePlace ? shut.enter : shut.exit;
+        const started = Date.now();
+        const toDoor = planPath(graph, pose, { x: near[0], y: near[1], z: near[2] }, gate, {
+          view: navView(session, omit),
+          cache,
+          regions: bakedRegions(session),
+        });
+        if (toDoor.ok) {
+          const doorId = shut.portal.door ?? shut.portal.id;
+          log(`DOOROPEN id=${doorId} at=${pose.x.toFixed(2)},${pose.z.toFixed(2)} reason=route ms=${Date.now() - started}`);
+          const points = toDoor.points.map(triple);
+          return {
+            points,
+            grid: gridFor(session, graph, points, omit, placeY(graph, pose)),
+            door: { id: doorId, target: goal },
+          };
+        }
+      }
+    }
     const plan = planPath(graph, pose, goal, gate, {
       view: navView(session, omit),
       cache,
       regions: bakedRegions(session),
     });
     if (!plan.ok) {
+      if (plan.reason === "no-portal") {
+        // 214: the exit doors are shut. There is a route: walk to the near side
+        // of the first shut-unlocked door on it, press it, then re-plan once.
+        const here = placeAt(graph, pose.x, pose.y, pose.z).id;
+        const goalPlace = placeAt(graph, goal.x, goal.y, goal.z).id;
+        const started = Date.now();
+        const route = planRoute(graph, pose, goalPlace, gate);
+        const step = route.ok
+          ? route.steps.find((row) => row.portal.kind === "door" && gate(row.portal) !== "open")
+          : undefined;
+        if (step) {
+          const near = step.from === here ? step.enter : step.exit;
+          const toDoor = planPath(graph, pose, { x: near[0], y: near[1], z: near[2] }, gate, {
+            view: navView(session, omit),
+            cache,
+            regions: bakedRegions(session),
+          });
+          if (toDoor.ok) {
+            const doorId = step.portal.door ?? step.portal.id;
+            log(`DOOROPEN id=${doorId} at=${pose.x.toFixed(2)},${pose.z.toFixed(2)} reason=no-portal ms=${Date.now() - started}`);
+            const points = toDoor.points.map(triple);
+            return {
+              points,
+              grid: gridFor(session, graph, points, omit, placeY(graph, pose)),
+              door: { id: doorId, target: goal },
+            };
+          }
+        }
+      }
       log(`no plan: ${plan.reason}`);
       return undefined;
     }
     const points = plan.points.map(triple);
-    return { points, grid: gridFor(session, graph, points, omit, placeY(graph, pose)) };
+    return {
+      points,
+      grid: gridFor(session, graph, points, omit, placeY(graph, pose)),
+      ...(plan.doors !== undefined && plan.doors.length > 0 ? { doors: plan.doors } : {}),
+    };
   };
 
   /**
@@ -1391,9 +1660,15 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
     const x = Number(rawX);
     const z = Number(rawZ);
     if (!Number.isFinite(x) || !Number.isFinite(z)) return undefined;
-    const walked = walkToPoint(pose, { x, y: pose.y, z }, new Set());
+    const target = { x, y: pose.y, z };
+    let walked = walkToPoint(pose, target, new Set());
     if (!walked) return undefined;
-    const follow = makeFollow(walked);
+    let follow = makeFollow(walked);
+    let use: UseState | undefined;
+    let phase: "walk" | "press" | "retry" = "walk";
+    let doorId = walked.door?.id;
+    let doorIdx = 0;
+    let retried = false;
     return {
       id,
       kind,
@@ -1401,12 +1676,51 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
       moving: true,
       started: Date.now(),
       tick(current, nowTick) {
+        if (phase === "press" && doorId) {
+          use ??= { started: Date.now(), sent: false, second: false, secondAt: 0 };
+          const status = pressDoor(session, doorId, use, current, Date.now(), send, false);
+          if (status === "failed") return "failed";
+          if (status === "done") phase = "retry";
+          return "running";
+        }
+        if (phase === "retry") {
+          if (retried) return "failed";
+          retried = true;
+          walked = walkToPoint(current, target, new Set());
+          if (!walked) return "failed";
+          follow = makeFollow(walked);
+          doorId = walked.door?.id;
+          doorIdx = 0;
+          phase = "walk";
+          return "running";
+        }
         const self = session.world.self();
+        const nextDoor = walked.doors?.[doorIdx];
+        if (nextDoor && self) {
+          const body = session.world.doorBody(nextDoor);
+          if (body && Math.hypot(self.x - body.position[0], self.z - body.position[2]) <= DOOR_REACH) {
+            use ??= { started: Date.now(), sent: false, second: false, secondAt: 0 };
+            const status = pressDoor(session, nextDoor, use, current, Date.now(), send, false);
+            if (status === "failed") return "failed";
+            if (status === "done") {
+              log(`DOOROPEN id=${nextDoor} at=${self.x.toFixed(2)},${self.z.toFixed(2)} reason=route ms=0`);
+              doorIdx += 1;
+              use = undefined;
+            }
+            return "running";
+          }
+        }
         if (self && Math.hypot(self.x - x, self.z - z) <= 0.6) return "done";
         const step = follow.step(current, otherPawns(session), nowTick);
         send(step.input);
         if (step.status === "stuck") return "stuck";
-        if (step.status === "arrived") return "done";
+        if (step.status === "arrived") {
+          if (doorId) {
+            phase = "press";
+            return "running";
+          }
+          return "done";
+        }
         return "running";
       },
     };
@@ -1498,31 +1812,45 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
 
   const chooseStand = (
     doorId: string,
-    hint: { x: number; z: number } | undefined,
+    want: string | undefined,
     pose: Pose,
   ): { x: number; y: number; z: number } | undefined => {
     const body = session.world.doorBody(doorId);
     const graph = session.world.sceneGraph();
     if (!body || !graph) return undefined;
-    let best: { x: number; y: number; z: number } | undefined;
-    let bestScore = Infinity;
+    let namedBest: { x: number; y: number; z: number } | undefined;
+    let namedScore = Infinity;
+    let fallback: { x: number; y: number; z: number } | undefined;
+    let fallbackScore = Infinity;
+    const around = otherPawns(session);
     for (const side of ["in", "out"] as const) {
       const stand = doorStand(body, side);
       const place = placeAt(graph, stand.x, stand.y, stand.z).id;
       const route = planRoute(graph, pose, place, gate);
       if (!route.ok) continue;
       if (route.steps.some((step) => step.portal.kind === "door" && gate(step.portal) !== "open")) continue;
-      const score = hint
-        ? Math.hypot(stand.x - hint.x, stand.z - hint.z)
-        : route.cost + Math.hypot(stand.x - pose.x, stand.z - pose.z);
-      if (score < bestScore) {
-        bestScore = score;
-        best = { x: stand.x, y: stand.y, z: stand.z };
+      // 217: a pawn standing on the stand is a blocked door; prefer the free side.
+      const nearest = around.reduce(
+        (best, pawn) => Math.min(best, Math.hypot(stand.x - pawn.x, stand.z - pawn.z) - (pawn.radius ?? 0.35)),
+        Infinity,
+      );
+      const blocked = nearest < 0.9 ? 8 : 0;
+      const score = route.cost + Math.hypot(stand.x - pose.x, stand.z - pose.z) + blocked;
+      if (want !== undefined && place === want) {
+        // The named side wins even when the other side is nearer (213).
+        if (score < namedScore) {
+          namedScore = score;
+          namedBest = { x: stand.x, y: stand.y, z: stand.z };
+        }
+      } else if (score < fallbackScore) {
+        fallbackScore = score;
+        fallback = { x: stand.x, y: stand.y, z: stand.z };
       }
     }
-    return best;
+    return namedBest ?? fallback;
   };
 
+  try {
   while (Date.now() < deadline) {
     const loopStart = Date.now();
     if (!session.world.self() || !ensureGround() || !ctx) {
@@ -1569,6 +1897,16 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
     // 198: a started cover walk is held >=300 ms so a moving shooter cannot
     // flap cover <-> fire between replans.
     if (reason && exec && exec.id.startsWith("takeCover:") && Date.now() - exec.started < 300) reason = "";
+    // 213: a door step owns its door. While it walks to the stand, a door state
+    // flip is not a replan cause; otherwise every flip re-issues the step and
+    // the bot exits and re-enters the hall (the 15:31 loop).
+    if (reason === "door" && (exec?.kind === "goToDoor" || (exec?.kind === "goTo" && doorClaim !== undefined))) reason = "";
+    // 220: the 5 s safety tick must not re-plan a gated follower out of its queue
+    // slot; the gate completes on the leader's hand-off, not on a safety tick.
+    if (reason === "safety" && exec?.kind === "goToDoor") reason = "";
+    // 221: the 1.5 s threat tick must not restart the leader's door press/cross;
+    // it re-issued DOOROPEN every second and the door never completed (goap-tasks-15).
+    if (reason === "threat" && (exec?.kind === "goToDoor" || (exec?.kind === "goTo" && doorClaim !== undefined))) reason = "";
     // The fight owns the loop while `returnFire` runs: only a NEW visible
     // threat id pre-empts it; the same target moving, the 5 s safety tick and
     // door/pickup churn do not (the first run planned 39 targets, 0 shots).
@@ -1720,6 +2058,12 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
     }
     opts.onTick?.();
     await sleepRest(loopStart);
+  }
+  } finally {
+    if (doorClaim) {
+      session.claims.release(doorClaim);
+      doorClaim = undefined;
+    }
   }
   return 3;
 

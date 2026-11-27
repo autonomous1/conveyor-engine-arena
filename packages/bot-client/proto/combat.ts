@@ -244,13 +244,24 @@ export function combatActions(
   // inside `no-plan`, after `goto-at` outside it planned). Keep the nearest few
   // per kind: the plan only needs the next reachable crate.
   const nearestOf = (kind: "health" | "ammo", n: number): Array<{ item: { kind: string; id: string }; place: string; d: number }> => {
+    // 224: rank by the ROUTE, not straight-line distance. A crate inside a locked
+    // first-floor room has a straight-line d of ~2 m but a route of Infinity; the
+    // old slice(0,n) kept only those and the rearm planned into a locked door.
     const me = world.self();
     return world.pickupPlacements()
       .filter((item) => item.kind === kind && available.has(item.id))
       .map((item) => {
         const x = (item.minX + item.maxX) / 2;
         const z = (item.minZ + item.maxZ) / 2;
-        return { item, place: placeOfPickup(graph!, item), d: me ? Math.hypot(x - me.x, z - me.z) : 0 };
+        const place = placeOfPickup(graph!, item);
+        const straight = me ? Math.hypot(x - me.x, z - me.z) : 0;
+        let d = straight;
+        if (me && place && graph) {
+          const at = world.placeOf(me)?.id ?? "";
+          const route = ctx.routeCost(at, place, { at } as WorldState);
+          d = Number.isFinite(route) ? route : straight + 10_000;
+        }
+        return { item, place, d };
       })
       .sort((a2, b2) => a2.d - b2.d || (a2.item.id < b2.item.id ? -1 : 1))
       .slice(0, n);
