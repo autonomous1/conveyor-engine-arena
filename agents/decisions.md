@@ -403,7 +403,8 @@ Publish
 `git diff --no-index packages/bot-client/src packages/bot-client/proto >
 logs/<task>-proto.diff` with the runs table. The designer drafts from the diff, the
 coder ports it, the driver switches back to `../src/…` for the parity run, and
-`proto/` is deleted (or re-copied for the next POC). A driver that still imports
+`proto/` is re-copied from `src/` for the next POC — never deleted (corrected
+2026-11-26: the fork is permanent, nothing is retired). A driver that still imports
 `src/` is a production probe, not a prototype (D16).
 
 The harness itself (`command-suite.ts`, its trial table and the prototype surface)
@@ -430,3 +431,30 @@ worktree. Probes need no build — Node strips types; only the host does. `--she
 was changed to never build by default (2026-11-25, `--build 1` still forces it);
 `--test`/`--suite` still build unless `--no-build`/`--attach`, so those two modes
 must opt out.
+
+## D20 — `packages/bot-client/src` is migration output, never a behaviour surface (2026-11-27)
+
+A coder task's Files table names a `packages/bot-client/src/**` path only when the
+task cites a published `proto/` diff in its **Rapid prototype solution** line. With
+no such diff the task is bot-lane behaviour design in disguise, and the coder HALTs.
+A planner, brain or command change is a bot task on `proto/` first. When it also
+needs a shared-tree change, the halves split: the `src/shared/**` change is its own
+coder task, and the bot wiring follows later as a migration of the proto diff.
+
+**Why:** D18's fork only prevents divergence if `src/` is written by one author per
+change. `212` asked for the door list in `src/shared/nav/**` **and** the wiring in
+`packages/bot-client/src/brain.ts` as one coder task; both halves were implemented
+and rejected, while the proto lane built the same behaviour in `proto/brain.ts`
+(`214`). Two copies of one behaviour, one per tree: the next `src → proto` copy
+would delete the proto work, and the next migration would overwrite the src work.
+The lane table already said the coder modifies `src/` only and the bot-developer
+works on `packages/bot-client/**` except `src/`; both are true and both are silent
+about what a coder task may *put* in that `src/`.
+
+**In practice:** the designer checks a bot-package path against the
+`Rapid prototype solution` line before dispatch, and the coder checks it again at
+intake. A shared-contract change is named by the coder task; the bot half waits for
+its own proto POC and migration. No lint enforces this yet: the check reads a task
+file under the gitignored `plan/`, which `modev:check` cannot see in CI, so it stays
+a dispatch/intake read until a lint over the tracked tree exists (open loop in the
+model review of 2026-11-27).

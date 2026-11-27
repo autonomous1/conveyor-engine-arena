@@ -155,13 +155,13 @@ hand-copied single file:
    `git diff --no-index packages/bot-client/src packages/bot-client/proto >
    plan/dsh-tasks/logs/<task>-proto.diff`, with the runs table and the POC
    hand-off. The designer drafts from that diff; the coder integrates it back into
-   `src/`; the parity run is `--tree src`; then delete `proto/` (or re-copy for the
-   next POC).
+   `src/`; the parity run is `--tree src`; then the operator copies `src/` back over
+   `proto/` for the next POC. The fork is never deleted (D18).
 
-`proto/` is tracked while the branch lives — `src/` is still the only product, and
-the fork is deleted in the commit that lands the port. The probe source never names
-a tree; a run that reports `tree=src` is a production probe, not a prototype
-(D16/D18).
+`proto/` is tracked for the life of the lane — `src/` is still the only product, and
+the operator re-syncs the fork after each migration; it is never deleted (D18). The
+probe source never names a tree; a run that reports `tree=src` is a production
+probe, not a prototype (D16/D18).
 
 The command suite's surface is still the single file `probe/commands-prototype.ts`
 (it prints its `SURFACE` hash): under `--tree proto` its dependencies load from

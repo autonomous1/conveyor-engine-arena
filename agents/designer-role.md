@@ -93,6 +93,14 @@ anything else under `packages/bot-client/` — no deletion of `proto/`, no retir
 of the tree hook or `--tree`. The fork is the lane's permanent working copy, not a
 temporary branch.
 
+**A coder task never designs bot behaviour in `src/`.** The Files table names a
+`packages/bot-client/src/**` path only alongside a **Rapid prototype solution** line
+and its published diff. A planner, brain or command change is a bot task on `proto/`
+first; if it also needs a shared-tree change, split it — the `src/shared/**` half is
+a coder task, the bot wiring is a later migration (D20). `212` billed both halves as
+one coder task; the operator rejected it, and the proto lane rebuilt the same
+behaviour in `proto/brain.ts` (`214`).
+
 **Scope the migration to what was published.** One proven behaviour per task where
 the published diff allows it; an umbrella port of several hundred lines hides the
 hunk that was never proven.

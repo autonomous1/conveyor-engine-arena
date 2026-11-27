@@ -30,9 +30,12 @@ with the same order and constants) and keep the migration map per file. You migr
 and **stop**: in this task `src/` is your only write surface — do not edit, delete or
 re-sync `proto/`, the probe, the tree hook or `--tree`. The operator commits `proto/`
 before your task and copies `src/` back over it after; the fork is never yours to
-retire. Enumerate its ordered operations, constants, thresholds
-and guards, and keep a mapping in the report (driver step → source function). A step
-you drop, a constant you change, or an order you swap is a divergence: justify it in
+retire. Outside a migration, `packages/bot-client/src/` is not a coder surface at
+all: a task that names a file there without a published `proto/` diff is bot-lane
+behaviour design, and you HALT (D20). Enumerate its ordered operations, constants,
+thresholds and guards, and keep a mapping in the report (driver step → source
+function). A step you drop, a constant you change, or an order you swap is a
+divergence: justify it in
 the report or keep the driver's shape. Unit tests mirror the driver; a live run
 against the product path is the parity check, and it is the bot-developer's, not
 yours.
@@ -252,6 +255,10 @@ only when, after checking source:
   retire `--tree`, or otherwise touch anything under `packages/bot-client/` outside
   `src/` — the coder's write surface in a migration is `src/` only, and the operator
   owns the fork and the re-sync;
+- the task names a `packages/bot-client/src/**` path with no **Rapid prototype
+  solution** line, or the diff it cites is not published — that `src/` is migration
+  output, never a place to design bot behaviour; the behaviour is a bot task in
+  `proto/` first (D20);
 - a sibling repo/path is required but not named by the task.
 
 A stale codemap entry, a shifted line number, or a missing generated artifact is
