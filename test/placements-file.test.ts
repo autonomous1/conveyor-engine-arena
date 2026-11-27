@@ -139,6 +139,8 @@ test("a rooms placements file loads a room, a hinged door, and obstacles", async
         hinge: "left",
         size: [1.073, 2.1, 0.08],
         open: false,
+        locked: true,
+        key: "key",
       },
     ],
     obstacles: [
@@ -170,5 +172,8 @@ test("a rooms placements file loads a room, a hinged door, and obstacles", async
   assert.ok(door);
   assert.equal(door.hinge, "left");
   assert.equal(door.model, "/assets/models/door1.glb");
+  // A room leaf compiles its baked lock like an exterior door.
+  assert.equal(door.locked, true);
+  assert.equal(door.key, "key");
   assert.ok(game.view.aabbs.some((box) => box.source === "room-case.front.0"));
 });

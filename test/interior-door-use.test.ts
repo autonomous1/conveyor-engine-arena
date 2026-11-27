@@ -86,8 +86,10 @@ test("a room-only door toggles on use and a shut leaf blocks the opening", () =>
   assert.ok(passage);
   assert.ok(ground);
   assert.ok(exterior);
-  assert.notEqual(passage.locked, true);
-  assert.notEqual(ground.locked, true);
+  assert.equal(passage.locked, true, "the room bake's lock reaches the view");
+  assert.equal(passage.key, "key");
+  assert.equal(ground.locked, true);
+  assert.equal(ground.key, "key");
   assert.equal(exterior.locked, true);
 
   const ext = doorUseVolume(exterior);
@@ -148,10 +150,11 @@ test("a room-only door toggles on use and a shut leaf blocks the opening", () =>
   const frames: DoorFrame[] = [];
   const blockers = createDoorBlockers(world);
   let seq = 0;
+  let held = false;
   const host = createArenaDoors({
     doors: loaded.view.doors,
     pawnOf: () => body(),
-    keys: { hasKey: () => false, consumeKey: () => false },
+    keys: { hasKey: () => held, consumeKey: () => held },
     sendAll: (frame) => frames.push(frame),
     ownedPawn: () => pawn,
     sessionId: () => 1,
@@ -160,7 +163,7 @@ test("a room-only door toggles on use and a shut leaf blocks the opening", () =>
   const snap = (id: string) => host.snapshot().find((door) => door.id === id);
   assert.ok(snap(PASSAGE));
   assert.equal(snap(PASSAGE)?.open, false);
-  assert.equal(snap(PASSAGE)?.locked, false);
+  assert.equal(snap(PASSAGE)?.locked, true);
   assert.equal(snap(EXTERIOR)?.locked, true);
 
   const axes = doorAxes(passage);
@@ -176,8 +179,16 @@ test("a room-only door toggles on use and a shut leaf blocks the opening", () =>
   assert.ok(pos.x < leaf.maxX + radius + 0.25, `pawn should be against the shut leaf, x=${pos.x}`);
   assert.equal(pickDoorForUse(rows, body())?.id, PASSAGE);
 
+  // Without the key the locked room leaf stays shut.
+  host.onFrame(1, useFrame(++seq));
+  assert.equal(snap(PASSAGE)?.open, false);
+  assert.equal(frames.length, 0);
+
+  // With the key held, one use unlocks and opens it.
+  held = true;
   host.onFrame(1, useFrame(++seq));
   assert.equal(snap(PASSAGE)?.open, true);
+  assert.equal(snap(PASSAGE)?.locked, false);
   assert.equal(frames.at(-1)?.id, PASSAGE);
   assert.equal(frames.at(-1)?.open, true);
   host.onFrame(1, useFrame(++seq));

@@ -157,8 +157,9 @@ test("the baked graph loads, and placeAt names the floor-3 cab and hall", () => 
   };
   const parsed = parseSceneGraph(baked, loaded.view.doors);
   assert.ok(parsed.graph);
-  // Room leaves drop locked/key on the view. The bake keeps the placement lock.
-  // Those disagreements are the only issues. Building doors match, and the view wins.
+  // The view carries the bake's room lock (216); the baked graph's room portals
+  // still say unlocked, so those are the disagreements. The view wins, and the
+  // sibling bake will carry the portal lock.
   let disagreed = 0;
   for (const portal of baked.portals) {
     if (portal.kind !== "door" || !portal.door) continue;
@@ -168,8 +169,8 @@ test("the baked graph loads, and placeAt names the floor-3 cab and hall", () => 
     const sameKey = (portal.key ?? undefined) === (leaf.key ?? undefined);
     if (sameLock && sameKey) continue;
     disagreed += 1;
-    assert.equal(leaf.locked, undefined, portal.id);
-    assert.equal(portal.locked, true, portal.id);
+    assert.equal(leaf.locked, true, portal.id);
+    assert.equal(portal.locked, undefined, portal.id);
   }
   assert.equal(parsed.issues.length, disagreed);
   for (const issue of parsed.issues) {

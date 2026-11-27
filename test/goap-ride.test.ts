@@ -21,7 +21,9 @@ test("a_stop_goal_grounds_one_ride_to_the_goal_shaft", () => {
   const rides = actions.filter((action) => action.id.startsWith("rideTo:"));
   assert.equal(rides.length, 1);
   assert.equal(rides[0]!.id, `rideTo:${shaft}:${portal.b}`);
-  assert.ok(actions.length < 100, `action set ${actions.length}`);
+  // The bake locks 58 room portals (216), so every locked leaf with a key
+  // grounds one `unlock:` action on top of the old set.
+  assert.ok(actions.length < 260, `action set ${actions.length}`);
   const plan = chooseGoal(buildWorldState({ at: portal.a, pickups: [], doors }), [upGoal], actions, ctx, { maxExpand: 5000 });
   assert.ok(plan);
   assert.deepEqual(plan.steps, [`rideTo:${shaft}:${portal.b}`]);

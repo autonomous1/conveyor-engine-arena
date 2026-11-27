@@ -119,8 +119,8 @@ obstacle array then `addObstacle`; `sync` finds that box
 blocker; elevators call it per room door on every moving tick
 (`src/server/elevators.ts`). `press` copies `state.values()` per
 press, sorts to a snapshot only for `snapshot`, and `tryUseDoor`
-keeps the key held (`src/shared/doors.ts`). The use-seq gate is per client
-(`drop`).
+keeps the key held (`src/shared/doors.ts`). A room leaf compiles its baked lock
+like an exterior door (216). The use-seq gate is per client (`drop`).
 
 ## 6. Elevators
 

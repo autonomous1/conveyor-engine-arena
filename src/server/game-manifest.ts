@@ -1807,9 +1807,6 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
         scale: building.scale,
       });
     }
-    // A rooms file leaf has no exterior twin. A lock copied from the door
-    // asset would ignore KeyE. Keyed locks stay on doors.placements.json.
-    const roomLeaf = ref.file.endsWith("rooms.placements.json");
     for (const door of baked.doors) {
       const asset = assets.get(door.model);
       if (!asset || asset.kind !== "model") continue;
@@ -1821,8 +1818,8 @@ export function compileGame(doc: unknown, read: (uri: string) => Uint8Array | un
         hinge: door.hinge,
         size: door.size,
         open: door.open,
-        ...(!roomLeaf && door.locked ? { locked: true } : {}),
-        ...(!roomLeaf && door.key ? { key: door.key } : {}),
+        ...(door.locked ? { locked: true } : {}),
+        ...(door.key ? { key: door.key } : {}),
       });
     }
     for (const box of baked.boxes) {

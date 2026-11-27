@@ -126,7 +126,11 @@ test("an elevator shaft has no plan in under 500 ms", () => {
 
 test("routeCost compiles once for the same door facts", () => {
   const ctx = createBotContext(graph!, pickups);
-  const state = world();
+  // The bake locks the room leaves (216), and the strict hall route crosses
+  // them. This test is the road-cache contract, so its simulated world carries
+  // the doors unlocked; the lock path is covered by the goap lock tests.
+  const state: Record<string, string | number | boolean> = { ...world() };
+  for (const door of doorFacts(graph!)) state[`doorLocked:${door.id}`] = false;
   const hall = ctx.routeCost(at, HALL, state);
   assert.ok(hall > 0 && Number.isFinite(hall), `hall route ${hall}`);
   const again = ctx.routeCost(at, HALL, state);
