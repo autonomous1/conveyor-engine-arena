@@ -118,7 +118,7 @@ The roster frame is `playerRoster` (`players.ts`), a pure function over
 | B | loadout | `kit` (`pickups.ts`) | two Maps | pawn id → ammo, weapon | `take` | per session; `forget` on reuse and close |
 | B | inventory | `pickupHost` (`pickups.ts`) | Set + Map + bags | placement id → placement; pawn → key set | `take`, `consumeKey` | until taken; `forget` on reuse |
 | B | latest input | `held` | Map (`game.ts`) | pawn id → `HeldInput` | `admit` | per tick; dropped on death/teleport/reuse/close |
-| S | agent records | `agents` (`world-loader.ts`) | `WanderAgent[]` | id → role, gait, goal, path, override, heading, nextTurn | loop + brain | boot-created; fields per tick |
+| S | agent records | `agents` (`world-loader.ts`) | `WanderAgent[]` | id → role, team, gait, goal, path, override, heading, nextTurn | loop + brain | boot-created; fields per tick |
 | B | wander walks | `wanderWalks` (`game.ts`) | WeakMap | agent → walk | `steerUnownedWander` | per walk; `clearWalk` |
 | S | player/NPC groups | `npcIds`, `padIds` | Sets | — | host construction | boot-only |
 | B | bot-debug ids | `botIds` | array | — | boot when `botDebug` | boot-only |

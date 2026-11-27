@@ -271,14 +271,17 @@ export function createArenaHost(loaded: LoadedArena, opts: ArenaHostOptions = {}
       const live = new Map(doorHost.snapshot().map((door) => [door.id, door.open]));
       const shut = shutDoorBoxes(loaded.view.doors.map((door) => ({ ...door, open: live.get(door.id) ?? door.open })));
       const claimed = claimClearSpawn(loaded.world, owned, loaded.playerSpawns, reservedPads, loaded.spatialDag, shut);
-      const pad = claimed ?? loaded.playerSpawns[0];
+      const agent = loaded.agents.find((item) => item.id === owned);
+      // The seat's team is its loader pad's. The claim may place the pawn
+      // elsewhere for clearance, but it never re-teams the seat; a failed claim
+      // falls back to a pad of the seat's own team, not pad 0's.
+      const seatTeam = agent?.team;
+      const pad = claimed
+        ?? (seatTeam === undefined ? undefined : loaded.playerSpawns.find((row) => row.team === seatTeam))
+        ?? loaded.playerSpawns[0];
       if (pad) {
         placePawn(loaded.world, owned, pad);
-        const agent = loaded.agents.find((item) => item.id === owned);
-        if (agent) {
-          agent.heading = pad.yaw;
-          agent.team = pad.team;
-        }
+        if (agent) agent.heading = pad.yaw;
         reservedPads.set(owned, pad);
         // One frame to everyone: this pawn just appeared on the pad (a client beams it in).
         const joined = encodeFrame(spawnFrame(owned, pad.x, pad.y, pad.z));
