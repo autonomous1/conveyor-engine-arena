@@ -8,7 +8,7 @@ import type { ArenaView } from "../../../src/shared/arena-view.js";
 import type { ClaimRow, MsgRow } from "../../../src/shared/bot-protocol.js";
 import type { GrenadePose } from "../../../src/shared/grenade.js";
 import { yawFromQuat } from "../../../src/shared/look.js";
-import type { PickupKind, PickupPlacement } from "../../../src/shared/pickups.js";
+import { pickupBoxSource, type PickupKind, type PickupPlacement } from "../../../src/shared/pickups.js";
 import { parseBakedRegions, type BakedRegionsFile } from "../../../src/shared/nav/regions.js";
 import { placeAt, parseSceneGraph, type CabState, type SceneGraph } from "../../../src/shared/scene-graph.js";
 import { loadSpatialDAG, type SpatialDAG } from "../../../src/shared/spatial-dag.js";
@@ -116,6 +116,15 @@ const MSG_RING = 64;
  * The bot's mutable arena model and the accessors the brain reads each tick.
  */
 export type BotWorld = {
+  /**
+   * The live nav AABBs: the static welcome boxes minus every taken pickup's
+   * collision box. The host removes the box when the pickup is taken; a pawn
+   * left inside the stale box's radius-inflated cell then fails every plan with
+   * `start-blocked` (the weapon-shelf trap). Computed from the live id list on
+   * every read, so a pickup that reappears in a later welcome gets its box back.
+   * @post Only boxes whose `source` is a taken pickup's id or `pickupBoxSource`
+   *       leave; a box with no `source` always stays.
+   */
   readonly aabbs: readonly WorldAabb[];
   readonly playerSpawns: readonly { id: string; x: number; z: number; yaw: number }[];
   readonly pawnRadius: number;
@@ -194,7 +203,7 @@ export type BotWorld = {
 export function createBotWorld(view: WorldView): BotWorld {
   let regions: BakedRegionsFile | undefined;
   let regionsHash: string | undefined;
-  const aabbs = [...(view.aabbs ?? [])];
+  const staticAabbs = [...(view.aabbs ?? [])];
   const playerSpawns = [...(view.playerSpawns ?? [])];
   const doorDefs = view.doors ?? [];
   const doorBodies = new Map<string, DoorBody>();
@@ -238,10 +247,26 @@ export function createBotWorld(view: WorldView): BotWorld {
   let spatialDag: SpatialDAG | undefined;
   let spatialDagLoaded = false;
 
+  /** The static boxes minus the taken pickups' boxes; recomputed from the live ids. */
+  const liveAabbs = (): readonly WorldAabb[] => {
+    if (placements.length === 0) return staticAabbs;
+    const liveIds = new Set(pickupIds);
+    const taken = new Set<string>();
+    for (const placement of placements) {
+      if (liveIds.has(placement.id)) continue;
+      taken.add(placement.id);
+      taken.add(pickupBoxSource(placement.id));
+    }
+    if (taken.size === 0) return staticAabbs;
+    return staticAabbs.filter((box) => box.source === undefined || !taken.has(box.source));
+  };
+
   const self = (): PawnPose | undefined => (ownedId === undefined ? undefined : pawns.get(ownedId));
 
   return {
-    aabbs,
+    get aabbs() {
+      return liveAabbs();
+    },
     playerSpawns,
     pawnRadius,
     pawnHeight,
