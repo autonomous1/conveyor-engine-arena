@@ -2,8 +2,10 @@
  * Arena world model for a connected bot. No Node builtins and no WebSocket.
  * Snapshots supply pawn poses. Arena frames supply doors, keys, and the scene graph.
  */
-// ARCHITECTURE: The bot's arena model: pawns, doors, elevators, grenade poses, pickups, claims, messages, scene graph, and regions.
-// Wiring: connection.ts builds it from welcome/frames (including `t: "grenade"`); the brain reads it.
+// ARCHITECTURE: The bot's arena model: pawns, doors, elevators, grenade poses, pickups, claims, messages, scene graph, regions, and the last players frame's teams.
+// Wiring: connection.ts builds it from welcome/frames (including `t: "grenade"` and the players frame's `teams`); the brain reads it.
+// Order: A `players` frame replaces the id set and the team map together; `applyWelcome` seeds only the id set.
+// Invariants: `teamOf` is undefined for an id off the last players frame (and for a pawn with no team).
 import type { ArenaView } from "../../../src/shared/arena-view.js";
 import type { ClaimRow, MsgRow } from "../../../src/shared/bot-protocol.js";
 import type { GrenadePose } from "../../../src/shared/grenade.js";
@@ -116,6 +118,15 @@ const MSG_RING = 64;
  * The bot's mutable arena model and the accessors the brain reads each tick.
  */
 export type BotWorld = {
+  /**
+   * The live nav AABBs: the static welcome boxes minus every taken pickup's
+   * collision box. The host removes the box when the pickup is taken; a pawn
+   * left inside the stale box's radius-inflated cell then fails every plan with
+   * `start-blocked` (the weapon-shelf trap). Computed from the live id list on
+   * every read, so a pickup that reappears in a later welcome gets its box back.
+   * @post Only boxes whose `source` is a taken pickup's id or `pickupBoxSource`
+   *       leave; a box with no `source` always stays.
+   */
   readonly aabbs: readonly WorldAabb[];
   readonly playerSpawns: readonly { id: string; x: number; z: number; yaw: number }[];
   readonly pawnRadius: number;
@@ -161,9 +172,17 @@ export type BotWorld = {
   /** Health row for any entity the host has reported. */
   healthOf(entity: number): { entity: number; hp: number; dead: boolean } | undefined;
   playerIds(): ReadonlySet<number>;
-  /** Roster ids plus the host's optional `teams` rows (208); both follow the frame. */
+  /**
+   * Roster ids plus the host's optional `teams` rows; both follow the frame.
+   * @post The previous id set and team map are cleared before the frame is
+   *       written; a frame without `teams` leaves no team rows.
+   */
   applyPlayers(ids: readonly number[], teams?: readonly { id: number; team: string }[]): void;
-  /** The last roster frame's team for a pawn, or undefined (no team / unknown id). */
+  /**
+   * The last roster frame's team for a pawn.
+   * @post `undefined` for a pawn with no team and for an id off the last frame.
+   * @see PlayersFrame
+   */
   teamOf(id: number): string | undefined;
   role(): string | undefined;
   scope(): readonly string[] | undefined;
@@ -242,16 +261,7 @@ export function createBotWorld(view: WorldView): BotWorld {
   let spatialDag: SpatialDAG | undefined;
   let spatialDagLoaded = false;
 
-  /**
-   * 219: the live nav AABBs — the static welcome boxes minus every taken
-   * pickup's collision box. The host removes the box when the pickup is taken;
-   * the welcome-time list does not, and a pawn left in the box's
-   * radius-inflated cell then fails every plan with `start-blocked` (the
-   * weapon-shelf trap). Computed from the live id list on every read, so a
-   * pickup that reappears in a later welcome gets its box back.
-   * @post only boxes whose `source` is a taken pickup's id or `pickupBoxSource`
-   *       leave; a box with no `source` always stays.
-   */
+  /** The static boxes minus the taken pickups' boxes; recomputed from the live ids. */
   const liveAabbs = (): readonly WorldAabb[] => {
     if (placements.length === 0) return staticAabbs;
     const liveIds = new Set(pickupIds);
@@ -264,24 +274,12 @@ export function createBotWorld(view: WorldView): BotWorld {
     if (taken.size === 0) return staticAabbs;
     return staticAabbs.filter((box) => box.source === undefined || !taken.has(box.source));
   };
-  /** 219 POC probe: the report's shelf weapon; logs when the live set changes. */
-  const TRAP_BOX = "alien-weapon-1-7-3-box";
-  let trapProbeSig = "";
-  const probeTrap = (boxes: readonly WorldAabb[]): void => {
-    const present = boxes.some((box) => box.source === TRAP_BOX || box.source === "alien-weapon-1-7-3");
-    const next = `${boxes.length}:${present ? 1 : 0}`;
-    if (next === trapProbeSig) return;
-    trapProbeSig = next;
-    console.log(`TrapProbe aabbs=${boxes.length} box=${TRAP_BOX} present=${present ? 1 : 0}`);
-  };
 
   const self = (): PawnPose | undefined => (ownedId === undefined ? undefined : pawns.get(ownedId));
 
   return {
     get aabbs() {
-      const live = liveAabbs();
-      probeTrap(live);
-      return live;
+      return liveAabbs();
     },
     playerSpawns,
     pawnRadius,

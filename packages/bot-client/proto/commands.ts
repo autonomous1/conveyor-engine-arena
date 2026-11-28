@@ -7,7 +7,9 @@
 // Wiring: drivers under packages/bot-client/tests create one host and call
 //   `dispatch`; `parseCommand` is the typed entry for a second bot.
 // Order: create the host after the session owns a pawn; `dispatch` is
-//   one-at-a-time (the busy invariant).
+//   one-at-a-time (the busy invariant); an explicit combat verb forces its goal
+//   at 100 except `regroup` (45), and `defend` is a posture loop, not the
+//   one-shot 198 goal.
 // Invariants: a second `dispatch` while busy rejects with `code:1,
 //   why:"busy"` (test: dispatch_rejects_while_busy).
 import type { BotSession } from "./connection.js";
@@ -27,7 +29,7 @@ const TASK_TIMEOUT_MS = 180_000;
 /** The packed status is capped for the host's text frame. */
 const MAX_TEXT = 256;
 
-/** The twelve handler names. `status` and `abort` are host methods, not handlers. */
+/** The twenty-one handler names. `status` and `abort` are host methods, not handlers. */
 export type CommandName = "arm" | "goto" | "stand" | "path" | "gotoAt" | "walk" | "reload" | "hunt" | "patrol" | "retrieve" | "getkey" | "projectile"
   | "seekHealth" | "takeCover" | "returnFire" | "retreat" | "rearm" | "survive" | "defend" | "assault" | "regroup";
 
@@ -132,7 +134,7 @@ export type CommandHost = {
 
 /**
  * Parse and validate one command.
- * @post The twelve handler names return a normalized `Command`; an unknown name
+ * @post The twenty-one handler names return a normalized `Command`; an unknown name
  *       returns `{error:"unknown-task"}`; bad arguments return the handler's
  *       own string (`bad-args`/`unsupported-weapon`).
  */
@@ -278,14 +280,9 @@ export function parseCommand(raw: { name: string; args?: Record<string, unknown>
 class AbortMission extends Error {}
 
 /**
- * Create the command host for one connected session.
- * @pre The session is connected and owns a pawn.
- * @post The projectile's trace/attempts/rows come back on the result's
- *       `artifact`; the host never writes a file.
- */
-/**
  * The next untried ammo crate in selector order (202). The caller puts the pin
  * first; a tried pin falls through to the nearest untried. Pure: no world.
+ * @post The first candidate whose id is not in `tried`, or undefined.
  */
 export function nextReloadCandidate<T extends { item: { id: string } }>(candidates: readonly T[], tried: ReadonlySet<string>): T | undefined {
   return candidates.find((row) => !tried.has(row.item.id));
@@ -294,6 +291,8 @@ export function nextReloadCandidate<T extends { item: { id: string } }>(candidat
 /**
  * The cycle's verdict (202): `no-crate` only when the first fresh scan was
  * empty; otherwise the last crate's own reason (never a neighbour's).
+ * @post `{why:"no-crate"}` only for an empty first scan, `gone` with no
+ *       attempt, else the last attempt's own why/crate.
  */
 export function reloadVerdict(
   scanSize: number,
@@ -305,9 +304,10 @@ export function reloadVerdict(
 }
 
 /**
- * One command host over a connected session: parse, dispatch, busy and abort.
- * @post A second dispatch while busy rejects `code:1, why:"busy"`; the host
- *       owns no socket and writes no file.
+ * Create the command host for one connected session.
+ * @pre The session is connected and owns a pawn.
+ * @post The projectile's trace/attempts/rows come back on the result's
+ *       `artifact`; the host never writes a file.
  */
 export function createCommandHost(options: CreateCommandHostOptions): CommandHost {
   const session = options.session;
@@ -635,7 +635,7 @@ type Placement = { id: string; kind?: string; minX: number; maxX: number; minZ: 
 // `runMission` per attempt also gives the retry `reason=initial` and the cold
 // budget, so a transient mid-mission `threat` no-plan does not end the hunt.
 const RELOAD_ATTEMPTS = 6;
-const reloadCycle = async (pin?: string, claim?: "goal" | "advisory"): Promise<{ ok: boolean; code: number; why?: string; ammo: number; crate?: string }> => {
+const reloadCycle = async (pin?: string, claim?: "goal" | "advisory", operatorId?: number): Promise<{ ok: boolean; code: number; why?: string; ammo: number; crate?: string }> => {
   const firstScan = availableProps("ammo");
   if (firstScan.length === 0) return { ok: false, code: 1, why: "no-crate", ammo: world.ammo() };
   const tried = new Set<string>();
@@ -662,6 +662,7 @@ const reloadCycle = async (pin?: string, claim?: "goal" | "advisory"): Promise<{
       const code = await runMission(session, mission, {
         timeoutMs: RELOAD_TIMEOUT_MS,
         claim,
+        operatorId,
         onTick: abortTick,
         log: (line) => {
           record(`  reload ${line}`);
@@ -743,7 +744,7 @@ const huntHandler = async (a: Record<string, unknown>, opts?: DispatchOptions): 
     }
     if (world.ammo() <= 0) {
       reloads += 1;
-      if (!(await reloadCycle(undefined, opts?.claim)).ok) {
+      if (!(await reloadCycle(undefined, opts?.claim, opts?.operatorId)).ok) {
         record(`HUNT end kills=${kills} shots=${shots} minutes=${minutes} elapsed=${taskElapsed(startedAt)}s`);
         return { ok: false, code: 1, why: "no-ammo" };
       }
@@ -1743,6 +1744,8 @@ const surviveHandler = async (_a: Record<string, unknown>, opts?: DispatchOption
  * in-fight behaviour (it releases once `defended` is live); a posture needs a
  * loop, so the verb holds and runs the proven attack mission at each
  * acquisition. The one-shot goal made `1 defend` walk to cover and return.
+ * @why A posture needs a loop; the 198 `defend` goal releases once `defended`
+ *      is live, so it cannot hold a spot.
  */
 const defendHandler = async (a: Record<string, unknown>): Promise<CommandResult> => {
   const minutes = Math.max(0.1, Math.min(10, Number(a.minutes ?? 2)));

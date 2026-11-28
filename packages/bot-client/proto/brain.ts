@@ -165,8 +165,6 @@ type Walk = {
   doorId?: string;
   /** 214: a shut door blocks the point route; the walk is to its near side. */
   door?: { id: string; target: { x: number; y: number; z: number } };
-  /** 212's nav: the shut-unlocked doors the planned point route crosses, in order. */
-  doors?: string[];
 };
 
 type UseState = {
@@ -1122,7 +1120,6 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
     let use: UseState | undefined;
     let phase: "walk" | "press" | "retry" = "walk";
     let doorId = walked.door?.id;
-    let doorIdx = 0;
     let retried = false;
     let stopped = false;
     return {
@@ -1149,26 +1146,10 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
           goal = resolvedStand ?? goal;
           follow = makeFollow(walked);
           doorId = walked.door?.id;
-          doorIdx = 0;
           phase = "walk";
           return "running";
         }
         const self = session.world.self();
-        const nextDoor = walked.doors?.[doorIdx];
-        if (nextDoor && self) {
-          const body = session.world.doorBody(nextDoor);
-          if (body && Math.hypot(self.x - body.position[0], self.z - body.position[2]) <= DOOR_REACH) {
-            use ??= { started: Date.now(), sent: false, second: false, secondAt: 0 };
-            const status = pressDoor(session, nextDoor, use, current, Date.now(), send, false);
-            if (status === "failed") return "failed";
-            if (status === "done") {
-              log(`DOOROPEN id=${nextDoor} at=${self.x.toFixed(2)},${self.z.toFixed(2)} reason=route ms=0`);
-              doorIdx += 1;
-              use = undefined;
-            }
-            return "running";
-          }
-        }
         if (self && Math.hypot(self.x - goal.x, self.z - goal.z) <= STAND_TOLERANCE) {
           if (Math.abs(self.y - goal.y) > STAND_GOAL_Y) return "failed";
           if (!stopped) {
@@ -1481,8 +1462,6 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
     }
     const follow = makeFollow(walked);
     let waitStart = 0;
-    let use: UseState | undefined;
-    let doorIdx = 0;
     return {
       id,
       kind: "pickup",
@@ -1496,21 +1475,6 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
       tick(current, nowTick, now) {
         if (pickupTaken(session, item)) return "done";
         const self = session.world.self();
-        const nextDoor = walked.doors?.[doorIdx];
-        if (nextDoor && self) {
-          const body = session.world.doorBody(nextDoor);
-          if (body && Math.hypot(self.x - body.position[0], self.z - body.position[2]) <= DOOR_REACH) {
-            use ??= { started: now, sent: false, second: false, secondAt: 0 };
-            const status = pressDoor(session, nextDoor, use, current, now, send, false);
-            if (status === "failed") return "failed";
-            if (status === "done") {
-              log(`DOOROPEN id=${nextDoor} at=${self.x.toFixed(2)},${self.z.toFixed(2)} reason=route ms=0`);
-              doorIdx += 1;
-              use = undefined;
-            }
-            return "running";
-          }
-        }
         const touching = !!self && capsuleOverlapsAabb(
           self.x, self.y, self.z, session.world.pawnRadius, session.world.pawnHeight, item,
         );
@@ -1644,11 +1608,7 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
       return undefined;
     }
     const points = plan.points.map(triple);
-    return {
-      points,
-      grid: gridFor(session, graph, points, omit, placeY(graph, pose)),
-      ...(plan.doors !== undefined && plan.doors.length > 0 ? { doors: plan.doors } : {}),
-    };
+    return { points, grid: gridFor(session, graph, points, omit, placeY(graph, pose)) };
   };
 
   /**
@@ -1667,7 +1627,6 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
     let use: UseState | undefined;
     let phase: "walk" | "press" | "retry" = "walk";
     let doorId = walked.door?.id;
-    let doorIdx = 0;
     let retried = false;
     return {
       id,
@@ -1690,26 +1649,10 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
           if (!walked) return "failed";
           follow = makeFollow(walked);
           doorId = walked.door?.id;
-          doorIdx = 0;
           phase = "walk";
           return "running";
         }
         const self = session.world.self();
-        const nextDoor = walked.doors?.[doorIdx];
-        if (nextDoor && self) {
-          const body = session.world.doorBody(nextDoor);
-          if (body && Math.hypot(self.x - body.position[0], self.z - body.position[2]) <= DOOR_REACH) {
-            use ??= { started: Date.now(), sent: false, second: false, secondAt: 0 };
-            const status = pressDoor(session, nextDoor, use, current, Date.now(), send, false);
-            if (status === "failed") return "failed";
-            if (status === "done") {
-              log(`DOOROPEN id=${nextDoor} at=${self.x.toFixed(2)},${self.z.toFixed(2)} reason=route ms=0`);
-              doorIdx += 1;
-              use = undefined;
-            }
-            return "running";
-          }
-        }
         if (self && Math.hypot(self.x - x, self.z - z) <= 0.6) return "done";
         const step = follow.step(current, otherPawns(session), nowTick);
         send(step.input);
