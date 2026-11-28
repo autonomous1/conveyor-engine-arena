@@ -2,8 +2,10 @@
  * Arena world model for a connected bot. No Node builtins and no WebSocket.
  * Snapshots supply pawn poses. Arena frames supply doors, keys, and the scene graph.
  */
-// ARCHITECTURE: The bot's arena model: pawns, doors, elevators, grenade poses, pickups, claims, messages, scene graph, and regions.
-// Wiring: connection.ts builds it from welcome/frames (including `t: "grenade"`); the brain reads it.
+// ARCHITECTURE: The bot's arena model: pawns, doors, elevators, grenade poses, pickups, claims, messages, scene graph, regions, and the last players frame's teams.
+// Wiring: connection.ts builds it from welcome/frames (including `t: "grenade"` and the players frame's `teams`); the brain reads it.
+// Order: A `players` frame replaces the id set and the team map together; `applyWelcome` seeds only the id set.
+// Invariants: `teamOf` is undefined for an id off the last players frame (and for a pawn with no team).
 import type { ArenaView } from "../../../src/shared/arena-view.js";
 import type { ClaimRow, MsgRow } from "../../../src/shared/bot-protocol.js";
 import type { GrenadePose } from "../../../src/shared/grenade.js";
@@ -170,7 +172,18 @@ export type BotWorld = {
   /** Health row for any entity the host has reported. */
   healthOf(entity: number): { entity: number; hp: number; dead: boolean } | undefined;
   playerIds(): ReadonlySet<number>;
-  applyPlayers(ids: readonly number[]): void;
+  /**
+   * Roster ids plus the host's optional `teams` rows; both follow the frame.
+   * @post The previous id set and team map are cleared before the frame is
+   *       written; a frame without `teams` leaves no team rows.
+   */
+  applyPlayers(ids: readonly number[], teams?: readonly { id: number; team: string }[]): void;
+  /**
+   * The last roster frame's team for a pawn.
+   * @post `undefined` for a pawn with no team and for an id off the last frame.
+   * @see PlayersFrame
+   */
+  teamOf(id: number): string | undefined;
   role(): string | undefined;
   scope(): readonly string[] | undefined;
   sceneGraph(): SceneGraph | undefined;
@@ -234,6 +247,7 @@ export function createBotWorld(view: WorldView): BotWorld {
   let sawMessages = false;
   const vitals = new Map<number, { entity: number; hp: number; dead: boolean }>();
   const players = new Set<number>();
+  const teamsById = new Map<number, string>();
   let ownedId: number | undefined;
   let pickupIds: string[] = [];
   let heldKeys: string[] = [];
@@ -355,9 +369,14 @@ export function createBotWorld(view: WorldView): BotWorld {
     playerIds() {
       return players;
     },
-    applyPlayers(ids) {
+    applyPlayers(ids, teams) {
       players.clear();
       for (const id of ids) players.add(id);
+      teamsById.clear();
+      for (const row of teams ?? []) teamsById.set(row.id, row.team);
+    },
+    teamOf(id) {
+      return teamsById.get(id);
     },
     role() {
       return role;

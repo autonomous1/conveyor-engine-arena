@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createCommandHost, parseCommand } from "../packages/bot-client/src/commands.ts";
 
-const NAMES = ["arm", "goto", "stand", "path", "gotoAt", "walk", "reload", "hunt", "patrol", "retrieve", "getkey", "projectile"];
+const NAMES = ["arm", "goto", "stand", "path", "gotoAt", "walk", "reload", "hunt", "patrol", "retrieve", "getkey", "projectile", "seekHealth", "takeCover", "returnFire", "retreat", "rearm", "survive", "defend", "assault", "regroup"];
 
 type WorldOptions = {
   placeOf?: (pos: { x: number; y: number; z: number }) => { id: string; kind: string };
@@ -10,8 +10,10 @@ type WorldOptions = {
   weapon?: () => string;
   ammo?: () => number;
   hp?: () => number;
+  keys?: () => string[];
   pickups?: () => string[];
   pickupPlacements?: () => Array<{ id: string; kind?: string; minX: number; maxX: number; minZ: number; maxZ: number; minY?: number; maxY?: number }>;
+  claimsSupported?: boolean;
 };
 
 /** The minimal session port; `calls` records every read so a test can prove "not touched". */
@@ -34,7 +36,7 @@ function fakeSession(options: WorldOptions = {}) {
     ammo: () => (options.ammo ? options.ammo() : 30),
     pickups: () => (options.pickups ? options.pickups() : ["key"]),
     pickupPlacements: () => (options.pickupPlacements ? options.pickupPlacements() : []),
-    keys: () => [],
+    keys: () => (options.keys ? options.keys() : []),
     others: () => (options.others ? options.others() : []),
     playerIds: () => {
       calls.push("playerIds");
@@ -53,7 +55,9 @@ function fakeSession(options: WorldOptions = {}) {
     messages: () => [],
     messagesSupported: () => false,
     claims: () => new Map(),
+    claimsSupported: () => options.claimsSupported === true,
   };
+  const acquired: string[] = [];
   const session = {
     world,
     input: {
@@ -65,11 +69,11 @@ function fakeSession(options: WorldOptions = {}) {
       callElevator() {},
     },
     messages: { say: () => true },
-    claims: { acquire() {}, release() {} },
+    claims: { acquire(key: string) { acquired.push(key); }, release() {} },
     close() {},
     spectate: false,
   };
-  return { session, calls };
+  return { session, calls, acquired };
 }
 
 async function waitUntil(predicate: () => boolean, ms: number): Promise<boolean> {
@@ -80,6 +84,13 @@ async function waitUntil(predicate: () => boolean, ms: number): Promise<boolean>
   }
   return predicate();
 }
+
+test("parse_command_accepts_the_combat_vocabulary", () => {
+  assert.deepEqual(parseCommand({ name: "survive" }), { name: "survive" });
+  assert.deepEqual(parseCommand({ name: "defend", args: {} }), { name: "defend", minutes: 2, radius: 30 });
+  assert.deepEqual(parseCommand({ name: "regroup", args: { place: "hall" } }), { name: "regroup", place: "hall" });
+  assert.deepEqual(parseCommand({ name: "returnFire", args: { pawnId: 7 } }), { name: "returnFire", pawnId: 7 });
+});
 
 test("parse_command_accepts_every_handler", () => {
   const cases: Array<{ name: string; args: Record<string, unknown> }> = [
@@ -95,6 +106,15 @@ test("parse_command_accepts_every_handler", () => {
     { name: "retrieve", args: { pickup: "key" } },
     { name: "getkey", args: {} },
     { name: "projectile", args: { bands: [5, 10, 20], throws: 4, seconds: 120 } },
+    { name: "seekHealth", args: { crate: "health-1" } },
+    { name: "takeCover", args: {} },
+    { name: "returnFire", args: { pawnId: 7 } },
+    { name: "retreat", args: { place: "hall" } },
+    { name: "rearm", args: {} },
+    { name: "survive", args: {} },
+    { name: "defend", args: {} },
+    { name: "assault", args: { pawnId: 7 } },
+    { name: "regroup", args: { place: "hall" } },
   ];
   for (const item of cases) {
     const parsed = parseCommand(item);
@@ -131,6 +151,15 @@ test("parse_command_preserves_every_bad_args_why", () => {
     { name: "projectile", args: { throws: 0 }, why: "bad-args" },
     { name: "projectile", args: { throws: 9 }, why: "bad-args" },
     { name: "projectile", args: { seconds: 5 }, why: "bad-args" },
+    { name: "seekHealth", args: {}, why: "bad-args" },
+    { name: "retreat", args: {}, why: "bad-args" },
+    { name: "returnFire", args: { pawnId: 0 }, why: "bad-args" },
+    { name: "assault", args: { pawnId: -1 }, why: "bad-args" },
+    { name: "defend", args: { minutes: 0 }, why: "bad-args" },
+    { name: "defend", args: { minutes: 11 }, why: "bad-args" },
+    { name: "defend", args: { radius: 0 }, why: "bad-args" },
+    { name: "defend", args: { radius: 61 }, why: "bad-args" },
+    { name: "regroup", args: {}, why: "bad-args" },
     { name: "no-such-command", args: {}, why: "unknown-task" },
   ];
   for (const item of bad) {
@@ -175,6 +204,15 @@ test("command_names_match_the_registry", () => {
     patrol: { places: ["a", "b"] },
     retrieve: { pickup: "key" },
     projectile: {},
+    seekHealth: { crate: "health-1" },
+    takeCover: {},
+    returnFire: { pawnId: 7 },
+    retreat: { place: "hall" },
+    rearm: {},
+    survive: {},
+    defend: {},
+    assault: { pawnId: 7 },
+    regroup: { place: "hall" },
   };
   for (const name of NAMES) {
     assert.ok(!("error" in parseCommand({ name, args: required[name] })), name);
@@ -183,6 +221,20 @@ test("command_names_match_the_registry", () => {
   // arm and getkey take no arguments, so an empty request parses.
   assert.deepEqual(parseCommand({ name: "arm" }), { name: "arm" });
   assert.deepEqual(parseCommand({ name: "getkey" }), { name: "getkey" });
+});
+
+test("dispatch_threads_claim_and_operator_id", { timeout: 10_000 }, async () => {
+  // A team-issued order acquires the per-seat advisory claim before the brain
+  // starts. The fake session has no scene graph, so the brain then returns
+  // no-plan — the claim was still acquired with the goal:pawn key.
+  const { session, acquired } = fakeSession({ claimsSupported: true });
+  const host = createCommandHost({ session, log: () => {} });
+  const result = await host.dispatch(
+    { id: "g1", name: "goto", args: { place: "hall" } },
+    { claim: "advisory", operatorId: 99 },
+  );
+  assert.ok(acquired.includes("reach:hall:7"), acquired.join(","));
+  assert.equal(result.ok, false);
 });
 
 test("stand_abort_interrupts_the_walk", { timeout: 5000 }, async () => {
@@ -230,18 +282,42 @@ test("dispatch_rejects_while_busy", async () => {
   assert.equal(done.why, "aborted");
 });
 
-test("the arm retrieves the weapon after the climb when the stand left it unarmed", async () => {
-  // 153 F2: the climb's stand resolves to a cell 0.52 m outside the weapon's
-  // pickup box, so a stand alone cannot take it. The arm must follow the stand
-  // with the retrieve mission (the driver's fix), before the step-off.
-  const { session } = fakeSession({ weapon: () => "", ammo: () => 0, pickups: () => ["alien-weapon-1"] });
+test("the arm rescans the available weapons", async () => {
+  // 192: the arena has four weapons; the arm no longer pins one id or pad. It
+  // ranks the available props and tries each until the weapon is held.
+  const placements = [
+    { id: "alien-weapon-1", kind: "weapon", minX: -13.9, maxX: -13.5, minZ: 16.3, maxZ: 16.7 },
+    { id: "alien-weapon-1-7-3", kind: "weapon", minX: -23.9, maxX: -23.5, minZ: 16.3, maxZ: 16.7 },
+  ];
+  const { session } = fakeSession({
+    weapon: () => "",
+    ammo: () => 0,
+    pickups: () => placements.map((item) => item.id),
+    pickupPlacements: () => placements,
+  });
   const logs: string[] = [];
   const host = createCommandHost({ session, log: (line) => logs.push(line) });
   const result = await host.dispatch({ id: "a1", name: "arm" });
   assert.equal(result.ok, false);
-  assert.ok(logs.some((line) => line.includes("arm: retrieve the weapon")), logs.join("\n"));
-  assert.ok(logs.some((line) => line.startsWith("  weapon ")), `the retrieve mission never ran\n${logs.join("\n")}`);
-  assert.ok(logs.some((line) => line.includes("arm retrieve code=")), logs.join("\n"));
+  assert.ok(logs.some((line) => line.includes("arm: try alien-weapon-1")), logs.join("\n"));
+  assert.ok(logs.some((line) => line.includes("arm: try alien-weapon-1-7-3")), logs.join("\n"));
+  assert.match(String(result.why), /^not-armed\(/);
+});
+
+test("getkey iterates the available keys", async () => {
+  const placements = [
+    { id: "key-3", kind: "key", minX: 1, maxX: 1.4, minZ: 2, maxZ: 2.4 },
+    { id: "key-9", kind: "key", minX: 3, maxX: 3.4, minZ: 4, maxZ: 4.4 },
+  ];
+  const { session } = fakeSession({
+    pickups: () => placements.map((item) => item.id),
+    pickupPlacements: () => placements,
+    keys: () => [],
+  });
+  const host = createCommandHost({ session, log: () => {} });
+  const result = await host.dispatch({ id: "k1", name: "getkey" });
+  assert.equal(result.ok, false);
+  assert.match(String(result.why), /^no-key\(key-3:code2,key-9:code2\)$/);
 });
 
 test("hunt heals at hp 50 and reloads at ammo 0 instead of stopping", async () => {

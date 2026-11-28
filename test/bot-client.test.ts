@@ -147,6 +147,20 @@ test("the bot world stores grenade poses and logs the stop points", () => {
   assert.notEqual(world.landed(), world.landed(), "landed() copies the store");
 });
 
+test("the world rosters teams from the players frame", () => {
+  const world = createBotWorld({ aabbs: [], doors: [], playerSpawns: [] });
+  world.applyPlayers([7, 9], [{ id: 7, team: "a" }, { id: 9, team: "b" }]);
+  assert.equal(world.teamOf(7), "a");
+  assert.equal(world.teamOf(9), "b");
+  // A later frame replaces the roster: an id it drops loses its team.
+  world.applyPlayers([7], [{ id: 7, team: "a" }]);
+  assert.equal(world.teamOf(7), "a");
+  assert.equal(world.teamOf(9), undefined);
+  // A frame without `teams` clears the roster's teams (the frame is the whole roster).
+  world.applyPlayers([7]);
+  assert.equal(world.teamOf(7), undefined);
+});
+
 test("headless bot connects, models the arena, and moves", { timeout: 120_000 }, async () => {
   const dir = mkdtempSync(path.join(tmpdir(), "arena-bot-client-"));
   const keyFile = path.join(dir, "ed25519.key.pem");

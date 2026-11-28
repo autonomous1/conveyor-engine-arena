@@ -28,7 +28,7 @@ const { loadSigner, mint } = await import("../src/server/auth/tokens.ts");
 const { startArenaServer } = await import("../src/server/main.ts");
 const { connectBot } = await import("../packages/bot-client/src/connection.ts");
 const { runCli } = await import("../packages/bot-client/src/cli.ts");
-const { runMission } = await import("../packages/bot-client/src/brain.ts");
+const { patrolLegOutcome, runMission, stuckOutcome } = await import("../packages/bot-client/src/brain.ts");
 const { parseMission } = await import("../packages/bot-client/src/missions.ts");
 const { moveIntent } = await import("../src/shared/look.ts");
 const { wishTo } = await import("../src/shared/nav/follow.ts");
@@ -188,6 +188,24 @@ test("brain, predict, and missions stay free of node, ws, and the host", () => {
   assert.equal(parseMission("patrol:room-a,hall")?.kind, "patrol");
   assert.equal(parseMission("nope"), undefined);
   assert.ok(moveIntent(Math.PI, 1, 0).moveZ < -0.9);
+});
+
+test("patrol_leg_policy_and_stuck_giveup", () => {
+  // 201: one leg = one reach; a `no plan:` leg retries once, then skips; two
+  // consecutive skips stop the patrol; any other 2/3 propagates.
+  assert.deepEqual(patrolLegOutcome(0, null, 0, false), { action: "advance", consecutiveSkips: 0 });
+  assert.deepEqual(patrolLegOutcome(2, "unsatisfiable", 0, false), { action: "retry", consecutiveSkips: 0 });
+  assert.deepEqual(patrolLegOutcome(2, "unsatisfiable", 0, true), { action: "skip", consecutiveSkips: 1 });
+  assert.deepEqual(patrolLegOutcome(2, "unsatisfiable", 1, true), { action: "stop", consecutiveSkips: 2 });
+  assert.deepEqual(patrolLegOutcome(2, null, 0, false), { action: "propagate", consecutiveSkips: 0 });
+  assert.deepEqual(patrolLegOutcome(3, null, 0, false), { action: "propagate", consecutiveSkips: 0 });
+
+  // 204: a new stuck signature gets one avoid retry; the same signature twice
+  // gives up instead of re-issuing the same goTo forever.
+  assert.deepEqual(stuckOutcome("goTo:hall|1.00|2.00", "", 0), { action: "avoid", retries: 0 });
+  assert.deepEqual(stuckOutcome("goTo:hall|1.00|2.00", "goTo:hall|1.00|2.00", 0), { action: "avoid", retries: 1 });
+  assert.deepEqual(stuckOutcome("goTo:hall|1.00|2.00", "goTo:hall|1.00|2.00", 1), { action: "giveup", retries: 2 });
+  assert.deepEqual(stuckOutcome("goTo:other|1.00|2.00", "goTo:hall|1.00|2.00", 1), { action: "avoid", retries: 0 });
 });
 
 test("ce-bot usage exits", async () => {

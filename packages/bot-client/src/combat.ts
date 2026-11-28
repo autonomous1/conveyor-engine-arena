@@ -7,14 +7,18 @@
  */
 // ARCHITECTURE: The bot-client combat vocabulary: `combatFacts` (a WorldState
 //   fragment), `combatActions` (wrapping existing executors), `combatGoals` (the
-//   survival ladder) and `chooseCombatGoal` (per-goal heuristics).
+//   band ladder `survive`/`heal`/`defend`/`rearm`) and `chooseCombatGoal`
+//   (per-goal heuristics).
 // Wiring: src/brain.ts merges the facts/actions into its plan loop and plans
-//   with the ladder; test/goap-combat.test.ts drives the offline matrices.
+//   with the ladder; test/goap-combat.test.ts and tests/combat-goap.ts drive the
+//   offline and parity matrices.
 // Order: facts come from the live session every state build; the actions are
 //   rebuilt per plan because their targets (crates, cover points) move.
 // Invariants: `combatFacts` never mutates the session; `underFire`'s clock is the
-//   caller's (buildWorldState stays pure); every action wraps an executor the
-//   brain already has and no action has a non-positive cost.
+//   caller's (buildWorldState stays pure); the facts are live per state build
+//   (`safe`, `hpPressured`, `needsRetreat`, live `defended`); `crateMetres` counts a
+//   crate in the bot's own place as 0 m; every action wraps an executor the brain
+//   already has and no action has a non-positive cost.
 import type { Action, Goal, Fact, Plan, PlanOptions, WorldState } from "../../../src/shared/bots/goap.js";
 import { plan } from "../../../src/shared/bots/goap.js";
 import type { BotCtx } from "../../../src/shared/bots/actions.js";
@@ -50,30 +54,67 @@ const metresTo = (s: WorldState, ctx: BotCtx, place: string | undefined): number
   return m > 0 && Number.isFinite(m) ? m : Infinity;
 };
 
+/**
+ * Pickup-local metres: a 0 m route is valid — the crate is in the place the
+ * pawn already stands in, and the pickup is the step that ends there. Using
+ * `metresTo` here made `seekHealth` unusable from the crate's own place, so the
+ * only `hpHigh` action was dead, the floor was 0 and A* burned the cold budget
+ * (the 192 heal starve). Cover/retreat keep the strict `metresTo`.
+ */
+const crateMetres = (s: WorldState, ctx: BotCtx, place: string | undefined): number => {
+  if (!place) return Infinity;
+  const m = ctx.routeCost(String(s.at), place, s);
+  return Number.isFinite(m) && m >= 0 ? m : Infinity;
+};
+
 /** Hostile pawns: the interim team rule (players friendly, NPCs enemy). */
-function hostiles(session: BotSession): Array<{ id: number; x: number; y: number; z: number }> {
+function hostiles(
+  session: BotSession,
+  enemies?: ReadonlySet<number>,
+): Array<{ id: number; x: number; y: number; z: number }> {
   // Optional calls: the real `BotWorld` always has these; the real-graph test
   // doubles implement only the movement surface, and the combat facts must not
   // turn a partial double into a crash.
+  // 199: NPCs are always hostile; a player is hostile only when declared in
+  // `enemies` (SquadView v1). Absent `enemies` = today's NPC-only rule.
   const players = session.world.playerIds?.() ?? new Set<number>();
   return session.world.others().filter((pawn) => {
-    if (players.has(pawn.id)) return false;
-    return session.world.healthOf?.(pawn.id)?.dead !== true;
+    if (session.world.healthOf?.(pawn.id)?.dead === true) return false;
+    if (players.has(pawn.id)) return enemies?.has(pawn.id) === true;
+    return true;
   });
+}
+
+/** Hostiles inside `meters` with line of sight from the eye (the imperative rule's ring). */
+function threatCount(session: BotSession, meters: number, enemies?: ReadonlySet<number>): number {
+  const self = session.world.self();
+  if (!self) return 0;
+  const boxes = session.world.aabbs ?? [];
+  const eye = { x: self.x, y: self.y + EYE_HEIGHT, z: self.z };
+  let n = 0;
+  for (const pawn of hostiles(session, enemies)) {
+    if (Math.hypot(pawn.x - self.x, pawn.z - self.z) > meters) continue;
+    if (!hasLineOfSight(eye, { x: pawn.x, y: pawn.y + EYE_HEIGHT, z: pawn.z }, boxes)) continue;
+    n += 1;
+  }
+  return n;
 }
 
 /**
  * The nearest hostile with line of sight from the eye, inside `THREAT_M`.
  * @post Undefined when the eye is unknown or nothing is visible.
  */
-export function visibleThreat(session: BotSession): { id: number; x: number; y: number; z: number } | undefined {
+export function visibleThreat(
+  session: BotSession,
+  enemies?: ReadonlySet<number>,
+): { id: number; x: number; y: number; z: number } | undefined {
   const self = session.world.self();
   const boxes = session.world.aabbs ?? [];
   if (!self) return undefined;
   const eye = { x: self.x, y: self.y + EYE_HEIGHT, z: self.z };
   let best: { id: number; x: number; y: number; z: number } | undefined;
   let bestD = THREAT_M;
-  for (const pawn of hostiles(session)) {
+  for (const pawn of hostiles(session, enemies)) {
     const d = Math.hypot(pawn.x - self.x, pawn.z - self.z);
     if (d > bestD) continue;
     const target = { x: pawn.x, y: pawn.y + EYE_HEIGHT, z: pawn.z };
@@ -85,12 +126,40 @@ export function visibleThreat(session: BotSession): { id: number; x: number; y: 
 }
 
 /**
- * The combat facts as a `WorldState` fragment.
- * @post `underFire` is `now - clock.at <= UNDER_FIRE_MS`; `inCover` is the LOS to
- *       the visible threat blocked from the current point; `hpWounded` is
- *       `hp <= 50` (the imperative rule's edge, not the review's strict `< 50`).
+ * The watch key for the visible threat: id + its rounded pose (198's `threat` replan).
+ * @post 2 m pose rounding; `-` when nothing is visible.
  */
-export function combatFacts(session: BotSession, clock: HpClock, now = Date.now()): Record<string, Fact> {
+export function threatWatchKey(session: BotSession, enemies?: ReadonlySet<number>): string {
+  const threat = visibleThreat(session, enemies);
+  // >2 m movement, per 198: a 0.1 m key re-triggered the warm replan every tick
+  // while a target merely walked (the 200 live run logged `reason=threat` twice
+  // in 4 s of a plain regroup walk).
+  return threat ? `${threat.id}:${Math.round(threat.x / 2)}:${Math.round(threat.z / 2)}` : "-";
+}
+
+/**
+ * The last visible threat per session (198's `threatGone`).
+ * @why A process-global id would leak across sessions in one process (the test
+ *      runner hosts several bots): a `defended` fact computed from another
+ *      bot's last target is wrong.
+ */
+const lastThreatBySession = new WeakMap<BotSession, number>();
+
+/**
+ * The combat facts as a `WorldState` fragment.
+ * @post `underFire` is `now - clock.at <= UNDER_FIRE_MS`; `hpPressured` is
+ *       critical hp or wounded with two hostiles inside 8 m; `safe` is no
+ *       hostile inside 12 m and no fresh damage; `needsRetreat` is pressured or
+ *       wounded and unsafe; `defended` is live (out of the threat's sight, the
+ *       target down, or the last threat gone); `hpWounded` is `hp <= 50` (the
+ *       imperative rule's edge, not the review's strict `< 50`).
+ */
+export function combatFacts(
+  session: BotSession,
+  clock: HpClock,
+  now = Date.now(),
+  opts: { missionTarget?: number; enemies?: ReadonlySet<number> } = {},
+): Record<string, Fact> {
   const facts: Record<string, Fact> = {};
   const self = session.world.self();
   const health = session.world.health?.();
@@ -100,61 +169,145 @@ export function combatFacts(session: BotSession, clock: HpClock, now = Date.now(
     if (hp <= WOUNDED_HP) facts.hpWounded = true;
     if (hp < CRITICAL_HP) facts.hpCritical = true;
   }
-  if (now - clock.at <= UNDER_FIRE_MS) facts.underFire = true;
+  const underFire = now - clock.at <= UNDER_FIRE_MS;
+  if (underFire) facts.underFire = true;
+  // The imperative retreat rule as facts (brain.ts: RETREAT_HP 25, 2 threats at
+  // 8 m): a pressured soldier breaks contact before the critical heal.
+  const threats = threatCount(session, 8, opts.enemies);
+  if (typeof hp === "number") {
+    if (hp < CRITICAL_HP || (hp <= WOUNDED_HP && threats >= 2)) facts.hpPressured = true;
+  }
+  // `safe`: no hostile inside 12 m with LOS and no damage in the last 1.5 s.
+  const safe = !underFire && threatCount(session, 12, opts.enemies) === 0;
+  if (safe) facts.safe = true;
+  // Retreat is available when pressured OR when a wounded soldier must break
+  // contact to heal (`!safe`); the latter closes the hp 25–50 + one-threat hole.
+  if (facts.hpPressured === true || (facts.hpWounded === true && !safe)) facts.needsRetreat = true;
   if ((session.world.weapon() ?? "").length > 0) facts.hasWeapon = true;
   if (session.world.ammo() > 0) facts.hasAmmo = true;
   const available = new Set(session.world.pickups());
   const crates = session.world.pickupPlacements().filter((item) => item.kind === "health" && available.has(item.id));
   if (crates.length > 0) facts.canHeal = true;
-  const threat = visibleThreat(session);
+  const threat = visibleThreat(session, opts.enemies);
+  const boxes = session.world.aabbs ?? [];
+  // The store is read once for this build and written with what is visible now;
+  // `trackedThreatId` is the proto's post-write id (the current threat when one
+  // is visible, else the last seen), so a target swap cannot mark us defended.
+  const lastThreatId = lastThreatBySession.get(session);
+  if (threat) lastThreatBySession.set(session, threat.id);
+  const trackedThreatId = threat ? threat.id : lastThreatId;
+  // The mission target is looked up in `others()` even when dead (the health
+  // frame must still satisfy the goal); `hostiles()` excludes dead pawns.
+  const missionPawn = opts.missionTarget !== undefined ? session.world.others().find((p2) => p2.id === opts.missionTarget) : undefined;
+  const target = threat ?? missionPawn;
   if (threat) {
     facts.threatVisible = true;
     if (self) {
       const d = Math.hypot(threat.x - self.x, threat.z - self.z);
       if (d < 12) facts.threatNear = true;
-      const boxes = session.world.aabbs ?? [];
       const eye = { x: self.x, y: self.y + EYE_HEIGHT, z: self.z };
-      const target = { x: threat.x, y: threat.y + EYE_HEIGHT, z: threat.z };
-      if (!hasLineOfSight(eye, target, boxes)) facts.inCover = true;
+      const tgt = { x: threat.x, y: threat.y + EYE_HEIGHT, z: threat.z };
+      if (!hasLineOfSight(eye, tgt, boxes)) facts.inCover = true;
     }
   }
+  if (target && self) {
+    const eye = { x: self.x, y: self.y + EYE_HEIGHT, z: self.z };
+    const tgt = { x: target.x, y: target.y + EYE_HEIGHT, z: target.z };
+    const los = hasLineOfSight(eye, tgt, boxes);
+    // 199: the health frame is the only truth (absence is not death).
+    const down = session.world.healthOf(target.id)?.dead === true;
+    if (!los || down) facts.defended = true;
+    if (down) facts.targetDown = true;
+  }
+  // The assault releases on the ordered pawn's health frame even when another
+  // hostile is the one in sight (`target` above is the visible threat): the
+  // hunt's per-target accounting reads this, not the in-sight target's death.
+  if (opts.missionTarget !== undefined && session.world.healthOf?.(opts.missionTarget)?.dead === true) {
+    facts.threatDown = true;
+  }
+  // `defended` is live (198): in cover, the target down, or the last threat gone.
+  // `threatGone` = the last threat id is absent from `others()` OR nothing is
+  // visible/blocked and the 1.5 s damage memory has expired. A hidden shooter
+  // that just hit us is NOT gone (underFire stays hot).
+  const gone = trackedThreatId !== undefined && !hostiles(session, opts.enemies).some((p2) => p2.id === trackedThreatId);
+  const noVisible = !threat;
+  if (gone || (noVisible && !underFire && !target)) facts.defended = true;
   return facts;
 }
 
 /**
- * One action per available health crate, the cover point, the visible threat,
- * the retreat point, and one per available ammo crate.
+ * The nearest health/ammo crates (six per kind), the cover point, the visible
+ * threat, the retreat point, and the named target.
  * @post Every action wraps an executor the brain has; targets are the live pose,
  *       so the list is rebuilt per plan (never cached).
  */
-export function combatActions(session: BotSession, ctx: BotCtx, opts: { target?: number } = {}): Action<BotCtx>[] {
+export function combatActions(
+  session: BotSession,
+  ctx: BotCtx,
+  opts: { target?: number; enemies?: ReadonlySet<number>; onNote?: (line: string) => void } = {},
+): Action<BotCtx>[] {
   const world = session.world;
   const graph = world.sceneGraph();
   const self = world.self();
   const actions: Action<BotCtx>[] = [];
   if (!graph || !self) return actions;
   const available = new Set(world.pickups());
-  const threat = visibleThreat(session);
+  const threat = visibleThreat(session, opts.enemies);
+  // The map has ~78 ammo and ~76 health crates; one action per crate made the
+  // action set 390 and the `hasAmmo` floor evaluated 78 reload costs per node,
+  // so a 2-step rearm plan starved the 4 s budget (192-hunt 19:19: reload from
+  // inside `no-plan`, after `goto-at` outside it planned). Keep the nearest few
+  // per kind: the plan only needs the next reachable crate.
+  const nearestOf = (kind: "health" | "ammo", n: number): Array<{ item: PickupPlacement; place: string; d: number }> => {
+    // 224: rank by the ROUTE, not straight-line distance. A crate inside a locked
+    // first-floor room has a straight-line d of ~2 m but a route of Infinity; the
+    // old slice(0,n) kept only those and the rearm planned into a locked door.
+    const me = world.self();
+    return world.pickupPlacements()
+      .filter((item) => item.kind === kind && available.has(item.id))
+      .map((item) => {
+        const x = (item.minX + item.maxX) / 2;
+        const z = (item.minZ + item.maxZ) / 2;
+        const place = placeOfPickup(graph, item);
+        const straight = me ? Math.hypot(x - me.x, z - me.z) : 0;
+        let d = straight;
+        if (me && place) {
+          const at = world.placeOf(me)?.id ?? "";
+          const route = ctx.routeCost(at, place, { at } as WorldState);
+          d = Number.isFinite(route) ? route : straight + 10_000;
+        }
+        return { item, place, d };
+      })
+      .sort((a2, b2) => a2.d - b2.d || (a2.item.id < b2.item.id ? -1 : 1))
+      .slice(0, n);
+  };
   const crateActions = (kind: "health" | "ammo"): void => {
-    for (const item of world.pickupPlacements()) {
-      if (item.kind !== kind || !available.has(item.id)) continue;
-      const place = placeOfPickup(graph, item);
+    const nearest = nearestOf(kind, 6);
+    for (const { item, place } of nearest) {
+      if (!available.has(item.id)) continue;
       const id = kind === "health" ? `seekHealth:${item.id}` : `reload:${item.id}`;
       actions.push({
         id,
         pre: kind === "health"
-          ? { hpWounded: true, [availFact(item.id)]: true, [AT]: place }
+          // Never heal in the line: `safe` is satisfied when already out of the
+          // ring or produced by `retreat` (197).
+          ? { hpWounded: true, [availFact(item.id)]: true, [AT]: place, safe: true }
           : { [HAS_AMMO]: false, [availFact(item.id)]: true, [AT]: place },
         eff: kind === "health"
           ? { hpHigh: true, [availFact(item.id)]: false }
           : { [HAS_AMMO]: true, [availFact(item.id)]: false },
-        usable: (s, c) => Number.isFinite(metresTo(s, c, place)),
-        cost: (s, c) => Math.max(MIN_M, metresTo(s, c, place)) / WALK_MPS,
+        usable: (s, c) => Number.isFinite(crateMetres(s, c, place)),
+        // A critical soldier must win the heal race: positive near-zero, so the
+        // planner accepts it while `survive` 90 still ranks above `heal` 80.
+        cost: (s, c) => (kind === "health" && s.hpCritical ? 0.01 : Math.max(MIN_M, crateMetres(s, c, place)) / WALK_MPS),
       });
     }
   };
   crateActions("health");
   crateActions("ammo");
+  const hpNow = session.world.health?.()?.hp;
+  const pressured = typeof hpNow === "number" && (hpNow < CRITICAL_HP || (hpNow <= WOUNDED_HP && threatCount(session, 8, opts.enemies) >= 2));
+  if (pressured && !actions.some((act) => act.id.startsWith("seekHealth:"))) opts.onNote?.("survive: no crate");
   if (threat) {
     const boxes = world.aabbs ?? [];
     const eye = { x: self.x, y: self.y + EYE_HEIGHT, z: self.z };
@@ -178,17 +331,20 @@ export function combatActions(session: BotSession, ctx: BotCtx, opts: { target?:
     actions.push({
       id: `returnFire:${threat.id}`,
       pre: { [HAS_WEAPON]: true, [HAS_AMMO]: true, threatVisible: true },
-      eff: { threatDown: true, defended: true },
+      // The generic threat only satisfies the assault order when it *is* the
+      // ordered pawn; `defend` (want defended) still gets the shot otherwise.
+      eff: { defended: true, ...(opts.target === threat.id ? { threatDown: true } : {}) },
       usable: () => true,
       cost: (s) => FIRE_S * (s.hpWounded ? FIRE_WOUNDED_MUL : 1),
     });
     // Retreat: a walkable point away from the threat, still on this floor.
     const away = awayPoint(session, threat);
+    if (!away) opts.onNote?.("survive: no exit");
     if (away) {
       const place = world.placeOf(away)?.id;
       actions.push({
         id: `retreat:${away.x.toFixed(1)},${away.z.toFixed(1)}`,
-        pre: { hpCritical: true },
+        pre: { needsRetreat: true },
         eff: { safe: true },
         usable: (s, c) => Number.isFinite(metresTo(s, c, place)),
         cost: (s, c) => Math.max(MIN_M, metresTo(s, c, place)) / WALK_MPS,
@@ -254,10 +410,11 @@ function awayPoint(session: BotSession, threat: { x: number; y: number; z: numbe
 }
 
 /**
- * The ladder: survive (critical 90 / wounded 80), defend (cover and fire at 70),
- * rearm 55, the mission, idle.
+ * The ladder: survive (pressured 90), heal (wounded, unpressured 80), defend
+ * (cover and fire at 70), rearm 55, the mission, idle.
  * @post A mission whose want is `threatDown` is the assault order at 60; any
- *       other mission keeps its own priority.
+ *       other mission keeps its own priority, and a `heal` mission is not
+ *       appended twice (the band is the goal).
  */
 export function combatGoals(state: WorldState, mission?: Goal): Goal[] {
   // `rearm` is combat readiness, not self-preservation: scoped to an assault
@@ -265,19 +422,42 @@ export function combatGoals(state: WorldState, mission?: Goal): Goal[] {
   // `survive`/`defend` stay global — they only fire on hp/under-fire facts.
   const assault = mission?.want.threatDown === true;
   const goals: Goal[] = [
-    { id: "survive", want: { hpHigh: true }, priority: (s) => (s.hpCritical ? 90 : s.hpWounded ? 80 : 0) },
+    // `survive`/`heal` are disjoint bands: critical retreats, wounded heals.
+    { id: "survive", want: { hpHigh: true }, priority: (s) => (s.hpPressured ? 90 : 0) },
+    { id: "heal", want: { hpHigh: true }, priority: (s) => (s.hpWounded && !s.hpPressured ? 80 : 0) },
     // One goal, both actions: the two-goal OR (cover first by array order) makes
     // the cost knob inert, so cover and fire both effect `defended` and the
     // route/8 s costs decide (184's report states the deviation).
     { id: "defend", want: { defended: true }, priority: (s) => (s.underFire && !s.hpCritical ? 70 : 0) },
-    { id: "rearm", want: { [HAS_AMMO]: true }, priority: (s) => (assault && s[HAS_WEAPON] === true && s[HAS_AMMO] !== true ? 55 : 0) },
+    // 198: `underFire` also gates rearm (no ammo mid-fight), keeping the 188
+    // scope for reach/stand/patrol (no threatDown, not under fire).
+    { id: "rearm", want: { [HAS_AMMO]: true }, priority: (s) => ((assault || s.underFire === true) && s[HAS_WEAPON] === true && s[HAS_AMMO] !== true ? 55 : 0) },
   ];
-  if (mission) {
-    const assault = mission.want.threatDown === true;
+  if (mission && mission.id !== "heal") {
     goals.push(assault ? { ...mission, priority: () => 60 } : mission);
   }
   goals.push({ id: "idle", want: {}, priority: () => 10 });
   return goals;
+}
+
+/**
+ * The forced heal goal: the hunt's `hp <= 50` trigger runs it directly, the
+ * ladder keeps the band priority. A duplicate `heal` mission is not appended.
+ * @why The hunt's forced heal is not the ladder: the trigger fires at a
+ *      different point than the `wounded && !pressured` band.
+ */
+export function healGoal(): Goal {
+  return { id: "heal", want: { hpHigh: true }, priority: () => 80 };
+}
+
+/**
+ * The regroup order: drive to an anchor place at 45.
+ * @why 45 is deliberately NOT forced (186's verbs run at 100): a rally order
+ *      yields to survive/heal/defend/rearm and resumes when the fight ends. The
+ *      anchor's `at` fact is live, so the goal releases on arrival.
+ */
+export function regroupGoal(anchor: string): Goal {
+  return { id: `regroup:${anchor}`, want: { at: anchor }, priority: () => 45 };
 }
 
 /**
@@ -331,7 +511,9 @@ const satisfies = (s: WorldState, want: WorldState): boolean => {
  * @why `chooseGoal` shares one `PlanOptions` across every candidate, so a ladder
  *      with different goal places cannot use `estimateSeconds` there: one plan
  *      per ranked goal keeps the route heuristic that makes the 177 plans fast.
- * @post Same ranking and tie rule as `chooseGoal` (priority, then array order).
+ * @post Same ranking and tie rule as `chooseGoal` (priority, then array order);
+ *       `actionsFor` narrows the action set per goal (an assault order plans
+ *       with the combat set alone).
  */
 export function chooseCombatGoal(
   state: WorldState,
@@ -339,6 +521,7 @@ export function chooseCombatGoal(
   actions: readonly Action<BotCtx>[],
   ctx: BotCtx,
   optsFor: (goal: Goal) => PlanOptions,
+  actionsFor?: (goal: Goal) => readonly Action<BotCtx>[],
 ): Plan | undefined {
   const ranked = goals
     .map((g, i) => ({ g, i, p: g.priority(state) }))
@@ -347,7 +530,7 @@ export function chooseCombatGoal(
   for (const r of ranked) {
     const opts = optsFor(r.g);
     if (opts.deadlineMs !== undefined && opts.now && opts.now() >= opts.deadlineMs) return undefined;
-    const found = plan(state, r.g, actions as readonly Action<BotCtx>[], ctx, opts);
+    const found = plan(state, r.g, (actionsFor ? actionsFor(r.g) : actions) as readonly Action<BotCtx>[], ctx, opts);
     if (found) return found;
   }
   return undefined;

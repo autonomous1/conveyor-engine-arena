@@ -4,15 +4,19 @@
  */
 // ARCHITECTURE: The bot executor: goal claim, GOAP plan, route, walk, use, ride, and pickup state machine.
 // Wiring: runMission/runBrain from the CLI and live tests; it drives BotSession input/world.
+// Order: a step result is handled before a new plan — a stuck gets one avoid retry and a
+//   repeated signature gives up (204); then the mission's watch replans on a door/pickup
+//   change, the 1 Hz threat watch, or the 5 s safety, and only safety/threat take the warm budget.
 // Invariants: A pursue plan is rebuilt on >=1 m target drift or 200 ms; the straight line is the fallback;
 //   the retreat plans one cover/away point, replans only on stuck/a cover LOS failure, and holds when no
 //   point plans; the stand fact and the stand walk measure one plan-resolved goal, y included;
 //   every plan-step kind has one binder in STEP_BINDERS, and a step's kind/arg are set by its
-//   binder, never re-parsed from the id; a `safety` plan gets PLAN_BUDGET_MS, and a missed warm
-//   attempt retries once at COLD_PLAN_BUDGET_MS; the combat ladder plans through
+//   binder, never re-parsed from the id; a `safety` plan gets PLAN_BUDGET_MS, a missed warm
+//   attempt retries once at COLD_PLAN_BUDGET_MS, and a `threat` plan gets
+//   THREAT_PLAN_BUDGET_MS; the combat ladder plans through
 //   combatGoals/chooseCombatGoal with the combat actions (test: combat_ladder_matrices).
 import type { BotCtx } from "../../../src/shared/bots/actions.js";
-import { createBotContext, estimateSeconds, groundActions, placeOfPickup } from "../../../src/shared/bots/actions.js";
+import { createBotContext, estimateSeconds, goTo, groundActions, pickup, placeOfPickup } from "../../../src/shared/bots/actions.js";
 import type { Action, Fact, Goal, Plan, PlanOptions, WorldState } from "../../../src/shared/bots/goap.js";
 import { chooseGoal } from "../../../src/shared/bots/goap.js";
 import { buildWorldState, STAND, type WorldSnapshot } from "../../../src/shared/bots/state.js";
@@ -33,7 +37,7 @@ import type { Mission } from "./missions.js";
 import { createMotionPredictor } from "./predict.js";
 import { hasLineOfSightDag } from "../../../src/shared/hitscan.js";
 import { nearestCover } from "../../../src/shared/bots/cover.js";
-import { assaultGoal, chooseCombatGoal, combatActions, combatFacts, combatGoals, combatHeuristic, type HpClock } from "./combat.js";
+import { assaultGoal, chooseCombatGoal, combatActions, combatFacts, combatGoals, combatHeuristic, threatWatchKey, type HpClock } from "./combat.js";
 
 const STEP_MS = 1000 / INPUT_HZ;
 const RIDE_SUMMON_MS = 30_000;
@@ -56,6 +60,13 @@ const STAND_GOAL_Y = 0.6;
  */
 const PLAN_BUDGET_MS = 600;
 /**
+ * Budget for a `threat` replan (the 1 Hz threat watch): a mid-fight state change
+ * where a shooter moved. The hunt-3 live heal plan measured 976 ms on the new
+ * map's 277-ground-action set, over the 600 ms warm budget, so the first heal
+ * replan found nothing; 1.5 s covers it without the 4 s input-loop block.
+ */
+const THREAT_PLAN_BUDGET_MS = 1_500;
+/**
  * Budget for a plan after the state changed: the mission's first plan, and the
  * first plan after a finished action, a door/pickup change, or a `stuck`.
  * `goap.plan` calls `h(start)` before its first `expired()` check, so a new
@@ -76,6 +87,13 @@ const PURSUE_LEAD_M = 6;
 const PURSUE_SPEED = MOVE_SPEED;
 const GRAPH_WAIT_MS = 1_500;
 const USE_WAIT_MS = 1_000;
+/** 212/214: the pawn is at a planned door when this close to its body. */
+const DOOR_REACH = 1.5;
+/** 217: team goto-at spread — the assigned vertex on this polygon. */
+const TEAM_SPREAD_R = 1.2;
+const TEAM_SPREAD_A = 0;
+/** 218: followers queue this far behind the near door stand. */
+const TEAM_QUEUE_M = 2;
 const PICKUP_WAIT_MS = 2_000;
 const NO_GRAPH = "no scene graph (token lacks scene-graph scope?)";
 
@@ -95,7 +113,33 @@ export type BrainOptions = {
   maxEvaluations?: number;
   /** Per-plan budget in ms. Default 250; the mission deadline still wins. */
   planMs?: number;
+  /** 199: the declared hostile player ids (SquadView v1). Absent = NPCs only. */
+  enemies?: ReadonlySet<number>;
+  /**
+   * The host goal claim. Default (`"goal"`/undefined) waits for the key;
+   * `"advisory"` acquires without waiting (a team-issued order); `false` skips
+   * the claim entirely (the hunt's free-for-all).
+   */
+  claim?: boolean | "goal" | "advisory";
+  /** The human operator's pawn: excluded from team leader/rank (217). */
+  operatorId?: number;
 };
+
+/**
+ * The stuck policy (204): the first stuck on a step gets one avoid retry; the
+ * same stuck signature twice gets a second retry; the third gives up with a
+ * reason instead of re-issuing the same goTo forever. Pure for the matrix.
+ */
+export type StuckOutcome = { action: "avoid" | "giveup"; retries: number };
+
+/**
+ * The stuck outcome for one step signature.
+ * @post A new signature → one avoid retry; the same signature twice → give up.
+ */
+export function stuckOutcome(signature: string, previous: string, retries: number): StuckOutcome {
+  if (signature !== previous) return { action: "avoid", retries: 0 };
+  return retries + 1 >= 2 ? { action: "giveup", retries: retries + 1 } : { action: "avoid", retries: retries + 1 };
+}
 
 type TickStatus = "running" | "done" | "failed" | "stuck";
 
@@ -119,6 +163,8 @@ type Walk = {
   points: Triple[];
   grid: Grid;
   doorId?: string;
+  /** 214: a shut door blocks the point route; the walk is to its near side. */
+  door?: { id: string; target: { x: number; y: number; z: number } };
 };
 
 type UseState = {
@@ -127,6 +173,34 @@ type UseState = {
   second: boolean;
   secondAt: number;
 };
+
+/**
+ * The patrol leg policy (201), pure so the matrix can drive it.
+ * - 0 → advance;
+ * - 2 with a `no plan:` line → retry the leg once, then skip it (or stop after 2
+ *   consecutive skips);
+ * - any other 2 (refused/lost/no-ammo/died) or 3 → propagate.
+ */
+export type PatrolLegOutcome = { action: "advance" | "retry" | "skip" | "stop" | "propagate"; consecutiveSkips: number };
+
+/**
+ * The patrol leg outcome for one leg.
+ * @post The retry/skip/stop/propagate rule above; the leg index survives a dead leg.
+ */
+export function patrolLegOutcome(
+  code: number,
+  noPlan: string | null,
+  consecutiveSkips: number,
+  retried: boolean,
+): PatrolLegOutcome {
+  if (code === 0) return { action: "advance", consecutiveSkips: 0 };
+  if (code === 2 && noPlan !== null) {
+    if (!retried) return { action: "retry", consecutiveSkips };
+    const skips = consecutiveSkips + 1;
+    return skips >= 2 ? { action: "stop", consecutiveSkips: skips } : { action: "skip", consecutiveSkips: skips };
+  }
+  return { action: "propagate", consecutiveSkips };
+}
 
 /**
  * Run one goal, or loop a patrol until the timeout. Exit 0 met, 2 no plan, 3 timeout.
@@ -138,10 +212,46 @@ export async function runMission(session: BotSession, mission: Mission, opts: Br
   const timeoutMs = opts.timeoutMs ?? 300_000;
   const deadline = Date.now() + timeoutMs;
   let index = 0;
+  let consecutiveSkips = 0;
   while (Date.now() < deadline) {
-    const goal = reach(mission.places[index]!);
-    const code = await runBrain(session, goal, { ...opts, timeoutMs: deadline - Date.now() });
-    if (code !== 0) return code;
+    const place = mission.places[index]!;
+    // One leg = one `reach(place)`; the ladder inside runBrain pre-empts for
+    // combat and the leg resumes because its `at` fact is still unmet (201).
+    let noPlan: string | null = null;
+    const legLog = (line: string): void => {
+      opts.log?.(line);
+      const m = /no plan: ([a-z-]+)/.exec(line);
+      if (m) noPlan = m[1]!;
+    };
+    let code = await runBrain(session, reach(place), { ...opts, timeoutMs: deadline - Date.now(), log: legLog });
+    let retried = false;
+    let outcome = patrolLegOutcome(code, noPlan, consecutiveSkips, retried);
+    if (outcome.action === "retry") {
+      retried = true;
+      let retryNoPlan: string | null = null;
+      code = await runBrain(session, reach(place), {
+        ...opts,
+        timeoutMs: deadline - Date.now(),
+        log: (line) => {
+          opts.log?.(line);
+          const m = /no plan: ([a-z-]+)/.exec(line);
+          if (m) retryNoPlan = m[1]!;
+        },
+      });
+      outcome = patrolLegOutcome(code, retryNoPlan, consecutiveSkips, retried);
+    }
+    if (outcome.action === "propagate") return code;
+    if (outcome.action === "stop") {
+      opts.log?.(`patrol: stop after ${outcome.consecutiveSkips} dead legs`);
+      return 2;
+    }
+    if (outcome.action === "skip") {
+      opts.log?.(`patrol: skip leg=${place} reason=${noPlan ?? "unknown"}`);
+      consecutiveSkips = outcome.consecutiveSkips;
+      index = (index + 1) % mission.places.length;
+      continue;
+    }
+    consecutiveSkips = 0;
     index = (index + 1) % mission.places.length;
   }
   return 3;
@@ -645,9 +755,24 @@ export async function runAttack(session: BotSession, targetId: number, opts: Bra
  * @post 0 met, 2 no plan/target, 3 timeout or lost claim.
  */
 export async function runBrain(session: BotSession, goal: Goal, opts: BrainOptions = {}): Promise<number> {
-  const key = goal.id;
-  const supported = session.world.claimsSupported?.() === true;
+  // 226: team goto-at gives every seat the same goal id; a shared advisory claim
+  // made the seats contend the same key and replan constantly. Scope it per seat.
+  const selfKey = session.world.self()?.id ?? 0;
+  const key = `${goal.id}:${selfKey}`;
+  const supported = opts.claim !== false && session.world.claimsSupported?.() === true;
   if (supported && session.world.self() !== undefined) {
+    if (opts.claim === "advisory") {
+      // A team-issued order: acquire and go. The first owner keeps the key, the
+      // rest act anyway; the host ignores a non-owner's release (claims.ts).
+      const self = session.world.self();
+      session.claims.acquire(key, 30_000);
+      try {
+        return await runBrainInner(session, goal, opts);
+      } finally {
+        clearInterval((session as { __claimRenew?: ReturnType<typeof setInterval> }).__claimRenew);
+        if (self && session.world.claims().get(key)?.owner === self.id) session.claims.release?.(key);
+      }
+    }
     const claimed = await claimGoal(session, key, Date.now() + (opts.timeoutMs ?? 300_000), opts.log ?? (() => {}));
     if (!claimed) return 3;
     try {
@@ -670,6 +795,14 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
 
   let stand: Stand | undefined;
   const standTarget = (goal as Partial<StandGoal>).stand;
+  // 230: `stand:x,y,z` carries no facing; the resolved yaw (0) is a default, not
+  // a contract. Requiring it made the STAND fact wait for the pawn to face 0
+  // while the follow/avoid steering kept turning it (goap-tasks-21: 5 of 6
+  // near-goal samples at d<=0.35 failed only on dyaw, yaw 1.0-2.3 rad; the
+  // 14-43 s churn). A door stand and an explicit `stand:...,yaw` keep the check.
+  const standYawSet = standTarget === undefined
+    ? true
+    : standTarget.kind === "door" || standTarget.yaw !== undefined;
   if (standTarget) {
     const graph = session.world.sceneGraph();
     const views: DoorView[] = [];
@@ -703,19 +836,27 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
   let grounded = "";
   let plan: Plan | undefined;
   let exec: Running | undefined;
+  let doorClaim: string | undefined;
+  /** Stops the `returnFire` executor's background `runAttack` on a replan. */
+  let stopAttack: (() => void) | undefined;
   let pending = "";
   let watchDoors = "";
   let watchPickups = "";
+  let watchThreat = "";
+  let threatReplanAt = 0;
   let planAt = 0;
   let tick = 0;
   let stuckCount = 0;
+  let stuckSig = "";
+  let stuckRetries = 0;
   let failStreak = 0;
   let lastCmd: FollowInput | undefined;
   let lastReason = "initial";
   /** The caller-owned hp clock for `underFire` (a drop within 1.5 s). */
-  let hpClock: HpClock = { hp: 100, at: -Infinity };
-  /** Set when a `returnFire` step finishes with the target dead: the mission's met fact. */
-  let firedDown = false;
+  // Start at the live hp, not 100: a run that begins at hp 50 used to stamp a
+  // "drop" on its first state build and report underFire for 1.5 s with no
+  // shooter (the hunt's heal dead-end).
+  let hpClock: HpClock = { hp: session.world.health?.()?.hp ?? 100, at: -Infinity };
 
   /**
    * The grounding union: the mission, the ladder's wants (so `hasAmmo` pulls the
@@ -758,7 +899,51 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
     // miss (a health crate is neither a key nor gear).
     const groundStarted = performance.now();
     actions = groundActions(graph, placements, groundGoalsNow(), stand);
-    log(`ground actions=${actions.length} ms=${(performance.now() - groundStarted).toFixed(1)}`);
+    // Shared `groundActions` drops keys no locked door names (`pickupsInOrder`
+    // keeps only the ranked keys), so the new arena's four routine keys cannot
+    // be planned: `retrieve:key-<n>` grounds no `pickup:key-<n>` and starves the
+    // cold budget (192). Append the mission's own holding pickup and its place;
+    // the shared fix is a coder task.
+    const holdingId = Object.keys(goal.want).find((k) => k.startsWith("holding:") && goal.want[k] === true);
+    if (holdingId) {
+      const id = holdingId.slice("holding:".length);
+      if (!actions.some((a) => a.id === `pickup:${id}`)) {
+        const item = placements.find((row) => row.id === id);
+        if (item) {
+          const place = placeOfPickup(graph, item);
+          if (!actions.some((a) => a.id === `goTo:${place}`)) actions.push(goTo(place));
+          actions.push(pickup(item, place));
+        }
+      }
+    }
+    // A closed-but-unlocked door is not in the goal-shaped set (it grounds only
+    // locked doors with a key), so a route out of the building cannot plan
+    // around it: the 192-hunt reload planned a 1-step, 3.1 s route to an outside
+    // ammo box from inside. Merge the unlocked-door actions from the full set;
+    // locked doors stay the union's job (a key must be held to unlock).
+    const lockedDoors = new Set(
+      graph.portals.filter((portal) => portal.kind === "door" && portal.locked === true).map((portal) => portal.door ?? portal.id),
+    );
+    const doorActions = groundActions(graph, placements, undefined)
+      .filter((act) => act.id.startsWith("goToDoor:") && !lockedDoors.has(act.id.slice("goToDoor:".length).split(":")[0]!));
+    let doorAdded = 0;
+    for (const act of doorActions) {
+      if (actions.some((row) => row.id === act.id)) continue;
+      actions.push(act);
+      doorAdded += 1;
+    }
+    // A `hasAmmo` order must use the combat `reload:<crate>` (which pays the
+    // walk); the shared `pickup:<ammo>` costs a flat ACT_S, ignoring the route,
+    // so it collapsed the floor and made the rearm search a 248-action Dijkstra
+    // (192-hunt 19:19: a 2-step plan missed the 4 s budget; found at 8 s as a
+    // room-pickup detour). Drop those pickups for this order only.
+    if (goal.want.hasAmmo === true && !Object.keys(goal.want).some((k) => k.startsWith("holding:"))) {
+      const ammoIds = new Set(placements.filter((item) => item.kind === "ammo").map((item) => item.id));
+      const before = actions.length;
+      actions = actions.filter((act) => !(act.id.startsWith("pickup:") && ammoIds.has(act.id.slice("pickup:".length))));
+      if (before !== actions.length) log(`ground drop-ammo-pickups=${before - actions.length}`);
+    }
+    log(`ground actions=${actions.length} unlocked-doors=+${doorAdded} ms=${(performance.now() - groundStarted).toFixed(1)}`);
     ctx = createBotContext(graph, placements, {
       position: () => {
         const self = session.world.self();
@@ -796,13 +981,12 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
     // ~100 ms wrong, and a safety replan cannot afford it (162).
     const state: Record<string, Fact> = {
       ...buildWorldState(snapshot(exec?.moving === true)),
-      ...combatFacts(session, hpClock),
+      ...combatFacts(session, hpClock, Date.now(), { missionTarget: missionTarget() ?? undefined, enemies: opts.enemies }),
     };
-    if (firedDown) state.threatDown = true;
     const self = session.world.self();
     if (stand && resolvedStand && self && Math.hypot(self.x - resolvedStand.x, self.z - resolvedStand.z) <= STAND_TOLERANCE &&
         Math.abs(self.y - resolvedStand.y) <= STAND_GOAL_Y &&
-        Math.abs(angleDiff(self.yaw, resolvedStand.yaw)) <= STAND_TOLERANCE) state[STAND] = stand.key;
+        (!standYawSet || Math.abs(angleDiff(self.yaw, resolvedStand.yaw)) <= STAND_TOLERANCE)) state[STAND] = stand.key;
     return state;
   };
 
@@ -840,6 +1024,11 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
     let phase: "walk" | "use" = "walk";
     let use: UseState | undefined;
     const follow = makeFollow(walked);
+    const releaseDoor = (): void => {
+      if (!doorClaim) return;
+      session.claims.release(doorClaim);
+      doorClaim = undefined;
+    };
     return {
       id,
       kind: "goTo",
@@ -850,9 +1039,13 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
         sticky = undefined;
       },
       tick(current, nowTick, now) {
-        if (phase === "walk" && !walked.doorId && here() === place) return "done";
+        if (phase === "walk" && !walked.doorId && here() === place) {
+          releaseDoor();
+          return "done";
+        }
         if (phase === "use" && walked.doorId && use) {
           this.moving = false;
+          if (!use.sent) log(`DOOROPEN id=${walked.doorId} at=${current.x.toFixed(2)},${current.z.toFixed(2)} reason=claim ms=0`);
           return pressDoor(session, walked.doorId, use, current, now, send, false);
         }
         const step = follow.step(current, otherPawns(session), nowTick);
@@ -865,7 +1058,11 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
             use = { started: now, sent: false, second: false, secondAt: 0 };
             return "running";
           }
-          return here() === place ? "done" : "failed";
+          if (here() === place) {
+            releaseDoor();
+            return "done";
+          }
+          return "failed";
         }
         return "running";
       },
@@ -883,17 +1080,47 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
 
   const beginStand = (id: string, key: string, pose: Pose): Running | undefined => {
     if (!stand || stand.key !== key) return undefined;
-    const walked = walkToPoint(pose, stand, new Set());
+    // 217: do not converge on one point — each team member takes its own vertex.
+    const self1 = session.world.self();
+    const team1 = self1 ? session.world.teamOf(self1.id) : undefined;
+    const teamIds1 = team1 !== undefined
+      ? [...session.world.playerIds()]
+          .filter((id) => session.world.teamOf(id) === team1 && id !== opts.operatorId)
+          .sort((a, b) => a - b)
+      : [];
+    const rank1 = self1 ? teamIds1.indexOf(self1.id) : -1;
+    const n1 = teamIds1.length;
+    const spread = n1 > 1 && rank1 >= 0
+      ? {
+          x: stand.x + TEAM_SPREAD_R * Math.cos(TEAM_SPREAD_A + (2 * Math.PI * rank1) / n1),
+          y: stand.y,
+          z: stand.z + TEAM_SPREAD_R * Math.sin(TEAM_SPREAD_A + (2 * Math.PI * rank1) / n1),
+          yaw: stand.yaw,
+        }
+      : stand;
+    let walked = walkToPoint(pose, spread, new Set());
     if (!walked) return undefined;
+    // 223: the walk targets the member's own vertex — never the shared point.
+    // 228: the ARRIVAL TEST and the STAND fact must be the same reachable point
+    // (the 151 invariant above). 223 made the arrival test the spread vertex
+    // while `resolvedStand` (the fact) stayed the walk's snapped last point; when
+    // `planPath` snaps the vertex, the action finishes 0.35 m from the vertex but
+    // the fact (measured at the snap) never latches, so the 1.5 s `threat` tick
+    // restarts it (goap-tasks-19: 69 `replan threat` in the 47.63 order, 33-43 s
+    // settles; the threat-free 71.31 order settled in 6.7-9.7 s). The seat may
+    // stop up to the snap (~1 m) off its vertex; the vertex distinction stands.
     resolveStandGoal(walked);
-    const goal = resolvedStand;
-    if (!goal) return undefined;
+    let goal = resolvedStand ?? spread;
     // At the goal's XZ but off its floor: no walk can finish here. Fail the
     // start so the brain's fail streak returns the mission instead of spinning.
     const here0 = session.world.self();
     if (here0 && Math.hypot(here0.x - goal.x, here0.z - goal.z) <= STAND_TOLERANCE &&
         Math.abs(here0.y - goal.y) > STAND_GOAL_Y) return undefined;
-    const follow = makeFollow(walked);
+    let follow = makeFollow(walked);
+    let use: UseState | undefined;
+    let phase: "walk" | "press" | "retry" = "walk";
+    let doorId = walked.door?.id;
+    let retried = false;
     let stopped = false;
     return {
       id,
@@ -902,6 +1129,26 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
       moving: true,
       started: Date.now(),
       tick(current, nowTick) {
+        if (phase === "press" && doorId) {
+          use ??= { started: Date.now(), sent: false, second: false, secondAt: 0 };
+          const status = pressDoor(session, doorId, use, current, Date.now(), send, false);
+          if (status === "failed") return "failed";
+          if (status === "done") phase = "retry";
+          return "running";
+        }
+        if (phase === "retry") {
+          if (retried) return "failed";
+          retried = true;
+          walked = walkToPoint(current, spread, new Set());
+          if (!walked) return "failed";
+          resolveStandGoal(walked);
+          // 228: the re-walk may snap elsewhere; the arrival test follows the fact.
+          goal = resolvedStand ?? goal;
+          follow = makeFollow(walked);
+          doorId = walked.door?.id;
+          phase = "walk";
+          return "running";
+        }
         const self = session.world.self();
         if (self && Math.hypot(self.x - goal.x, self.z - goal.z) <= STAND_TOLERANCE) {
           if (Math.abs(self.y - goal.y) > STAND_GOAL_Y) return "failed";
@@ -915,6 +1162,10 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
         send(step.input);
         if (step.status === "stuck") return "stuck";
         if (step.status === "arrived") {
+          if (doorId) {
+            phase = "press";
+            return "running";
+          }
           if (!stopped) {
             stopped = true;
             send({ moveX: 0, moveZ: 0, yaw: goal.yaw });
@@ -1054,12 +1305,58 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
 
   const beginDoor = (id: string, arg: string, pose: Pose): Running | undefined => {
     // `goToDoor:<door>:<place>` names the side; the door is the part before it.
-    const doorId = arg.includes(":") ? arg.slice(0, arg.indexOf(":")) : arg;
-    const stand = chooseStand(doorId, undefined, pose);
+    // 213: the named place is the stand side — never the nearest/current side.
+    const cut = arg.indexOf(":");
+    const doorId = cut < 0 ? arg : arg.slice(0, cut);
+    const named = cut < 0 ? undefined : arg.slice(cut + 1);
+    const stand = chooseStand(doorId, named, pose);
     if (!stand) return undefined;
-    const walked = walkToPoint(pose, stand, new Set());
+    // 218: the leader takes the near stand; the followers wait 2 m behind it so
+    // they cannot crowd the doorway and stall the leader.
+    const self0 = session.world.self();
+    const team0 = self0 ? session.world.teamOf(self0.id) : undefined;
+    const ids0 = team0 !== undefined
+      ? [...session.world.playerIds()].filter((id) => session.world.teamOf(id) === team0 && id !== opts.operatorId).sort((a, b) => a - b)
+      : [];
+    const rank0 = self0 ? ids0.indexOf(self0.id) : -1;
+    let queue = stand;
+    let nearStand = stand;
+    if (rank0 > 0) {
+      const body0 = session.world.doorBody(doorId);
+      if (body0) {
+        const dx = stand.x - body0.position[0];
+        const dz = stand.z - body0.position[2];
+        const len = Math.hypot(dx, dz) || 1;
+        const dist = TEAM_QUEUE_M * rank0;
+        const nx = dx / len;
+        const nz = dz / len;
+        // 222: the queue is behind the door (normal); the follower's own near
+        // offset is sideways (tangent) so it never walks back to the leader's stand.
+        queue = { x: stand.x + nx * dist, y: stand.y, z: stand.z + nz * dist };
+        nearStand = { x: stand.x - nz * dist, y: stand.y, z: stand.z + nx * dist };
+      }
+    }
+    const graph = session.world.sceneGraph();
+    const standPlace = graph ? placeAt(graph, stand.x, stand.y, stand.z).id : "?";
+    const self = session.world.self();
+    const here = self ? session.world.placeOf(self)?.id : undefined;
+    const team = self ? session.world.teamOf(self.id) : undefined;
+    const teamIds = team !== undefined
+      ? [...session.world.playerIds()]
+          .filter((id) => session.world.teamOf(id) === team && id !== opts.operatorId)
+          .sort((a, b) => a - b)
+      : [];
+    const rank = self ? teamIds.indexOf(self.id) : -1;
+    const leaderId = teamIds[0];
+    const isLeader = self !== undefined && self.id === leaderId;
+    const claimKey = `door:${team ?? "-"}:${doorId}`;
+    if (isLeader) session.claims.acquire(claimKey, 30_000);
+    let owned = false;
+    log(`door ${doorId} named=${named ?? "-"} stand=${standPlace} side=${here !== undefined && standPlace === here ? "near" : "far"} claim=${claimKey} lead=${leaderId ?? "-"} rank=${rank}`);
+    let walked = walkToPoint(pose, queue, new Set());
     if (!walked) return undefined;
-    const follow = makeFollow(walked);
+    let follow = makeFollow(walked);
+    let atQueue = rank0 > 0;
     return {
       id,
       kind: "goToDoor",
@@ -1071,6 +1368,40 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
       },
       tick(current, nowTick) {
         const self = session.world.self();
+        if (!owned) {
+          const row = session.world.claims().get(claimKey);
+          // 227: the leader retries too. The host table is first-come
+          // (`claims.ts` ignores a claim while another pawn owns the key); a
+          // follower whose beginDoor ran first can hold the door, and the old
+          // `!isLeader` guard left the leader waiting on its own follower's
+          // whole mission. 225: seat 1 (leader) stalled 160 s at the hall door
+          // and only the `stuck` recovery at 162.5 s freed it.
+          if (row === undefined) session.claims.acquire(claimKey, 30_000);
+          owned = self !== undefined && session.world.claims().get(claimKey)?.owner === self.id;
+          if (!owned) {
+            const step = follow.step(current, otherPawns(session), nowTick);
+            send(step.input);
+            if (step.status === "stuck") return "stuck";
+            // 216/217: the gate holds at the near side until the leader passes and
+            // releases; then the next follower owns and the step completes.
+            return "running";
+          }
+          doorClaim = claimKey;
+        }
+        if (atQueue && rank0 > 0 && (self === undefined || Math.hypot(self.x - queue.x, self.z - queue.z) > 1.0)) {
+          const stepQueue = follow.step(current, otherPawns(session), nowTick);
+          send(stepQueue.input);
+          if (stepQueue.status === "stuck") return "stuck";
+          return "running";
+        }
+        if (atQueue && rank0 > 0) {
+          // At the queue, now step up to the near stand with the leader gone.
+          const near = walkToPoint(current, nearStand, new Set());
+          if (!near) return "failed";
+          follow = makeFollow(near);
+          atQueue = false;
+          return "running";
+        }
         if (self && Math.hypot(self.x - stand.x, self.z - stand.z) <= 0.3) return "done";
         const step = follow.step(current, otherPawns(session), nowTick);
         send(step.input);
@@ -1171,7 +1502,7 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
     if (cut >= 0) {
       const step = route.steps[cut]!;
       const doorId = step.portal.door ?? step.portal.id;
-      const stand = chooseStand(doorId, { x: step.enter[0], z: step.enter[2] }, pose);
+      const stand = chooseStand(doorId, step.from, pose);
       if (!stand) return undefined;
       const walked = walkToPoint(pose, stand, new Set());
       if (!walked) return undefined;
@@ -1208,12 +1539,71 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
       const snapped = nearestFreeCell(grid, target.x, target.z, 1, pose.y);
       if (snapped) goal = { x: snapped.x, y: pose.y, z: snapped.z };
     }
+    // 214: the main nav's `planLegs` may cross a shut-unlocked exit door and
+    // return points; the point walk owns the press. Read the place route first:
+    // a shut door on it means walk to its near pocket, press, then re-plan.
+    const herePlace = placeAt(graph, pose.x, pose.y, pose.z).id;
+    const goalPlace = placeAt(graph, goal.x, goal.y, goal.z).id;
+    if (goalPlace !== herePlace) {
+      const routeCheck = planRoute(graph, pose, goalPlace, gate);
+      const shut = routeCheck.ok
+        ? routeCheck.steps.find((row) => row.portal.kind === "door" && gate(row.portal) !== "open")
+        : undefined;
+      if (shut) {
+        const near = shut.from === herePlace ? shut.enter : shut.exit;
+        const started = Date.now();
+        const toDoor = planPath(graph, pose, { x: near[0], y: near[1], z: near[2] }, gate, {
+          view: navView(session, omit),
+          cache,
+          regions: bakedRegions(session),
+        });
+        if (toDoor.ok) {
+          const doorId = shut.portal.door ?? shut.portal.id;
+          log(`DOOROPEN id=${doorId} at=${pose.x.toFixed(2)},${pose.z.toFixed(2)} reason=route ms=${Date.now() - started}`);
+          const points = toDoor.points.map(triple);
+          return {
+            points,
+            grid: gridFor(session, graph, points, omit, placeY(graph, pose)),
+            door: { id: doorId, target: goal },
+          };
+        }
+      }
+    }
     const plan = planPath(graph, pose, goal, gate, {
       view: navView(session, omit),
       cache,
       regions: bakedRegions(session),
     });
     if (!plan.ok) {
+      if (plan.reason === "no-portal") {
+        // 214: the exit doors are shut. There is a route: walk to the near side
+        // of the first shut-unlocked door on it, press it, then re-plan once.
+        const here = placeAt(graph, pose.x, pose.y, pose.z).id;
+        const goalPlace = placeAt(graph, goal.x, goal.y, goal.z).id;
+        const started = Date.now();
+        const route = planRoute(graph, pose, goalPlace, gate);
+        const step = route.ok
+          ? route.steps.find((row) => row.portal.kind === "door" && gate(row.portal) !== "open")
+          : undefined;
+        if (step) {
+          const near = step.from === here ? step.enter : step.exit;
+          const toDoor = planPath(graph, pose, { x: near[0], y: near[1], z: near[2] }, gate, {
+            view: navView(session, omit),
+            cache,
+            regions: bakedRegions(session),
+          });
+          if (toDoor.ok) {
+            const doorId = step.portal.door ?? step.portal.id;
+            log(`DOOROPEN id=${doorId} at=${pose.x.toFixed(2)},${pose.z.toFixed(2)} reason=no-portal ms=${Date.now() - started}`);
+            const points = toDoor.points.map(triple);
+            return {
+              points,
+              grid: gridFor(session, graph, points, omit, placeY(graph, pose)),
+              door: { id: doorId, target: goal },
+            };
+          }
+        }
+      }
       log(`no plan: ${plan.reason}`);
       return undefined;
     }
@@ -1230,9 +1620,14 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
     const x = Number(rawX);
     const z = Number(rawZ);
     if (!Number.isFinite(x) || !Number.isFinite(z)) return undefined;
-    const walked = walkToPoint(pose, { x, y: pose.y, z }, new Set());
+    const target = { x, y: pose.y, z };
+    let walked = walkToPoint(pose, target, new Set());
     if (!walked) return undefined;
-    const follow = makeFollow(walked);
+    let follow = makeFollow(walked);
+    let use: UseState | undefined;
+    let phase: "walk" | "press" | "retry" = "walk";
+    let doorId = walked.door?.id;
+    let retried = false;
     return {
       id,
       kind,
@@ -1240,12 +1635,35 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
       moving: true,
       started: Date.now(),
       tick(current, nowTick) {
+        if (phase === "press" && doorId) {
+          use ??= { started: Date.now(), sent: false, second: false, secondAt: 0 };
+          const status = pressDoor(session, doorId, use, current, Date.now(), send, false);
+          if (status === "failed") return "failed";
+          if (status === "done") phase = "retry";
+          return "running";
+        }
+        if (phase === "retry") {
+          if (retried) return "failed";
+          retried = true;
+          walked = walkToPoint(current, target, new Set());
+          if (!walked) return "failed";
+          follow = makeFollow(walked);
+          doorId = walked.door?.id;
+          phase = "walk";
+          return "running";
+        }
         const self = session.world.self();
         if (self && Math.hypot(self.x - x, self.z - z) <= 0.6) return "done";
         const step = follow.step(current, otherPawns(session), nowTick);
         send(step.input);
         if (step.status === "stuck") return "stuck";
-        if (step.status === "arrived") return "done";
+        if (step.status === "arrived") {
+          if (doorId) {
+            phase = "press";
+            return "running";
+          }
+          return "done";
+        }
         return "running";
       },
     };
@@ -1272,19 +1690,27 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
     if (!Number.isInteger(targetId)) return undefined;
     void pose;
     let outcome: "running" | "done" | "failed" = "running";
+    let stopped = false;
     void runAttack(session, targetId, {
       log,
       error,
-      onTick: opts.onTick,
+      onTick: () => {
+        opts.onTick?.();
+        // A brain replan supersedes this fight; the throw unwinds the attack.
+        if (stopped) throw new Error("returnFire stopped");
+      },
       timeoutMs: Math.max(2_000, deadline - Date.now()),
     })
       .then((code) => {
-        if (code === 0) firedDown = true;
+        // 199: no executor flag; `threatDown` comes from the health frame only.
         outcome = code === 0 ? "done" : "failed";
       })
       .catch(() => {
         outcome = "failed";
       });
+    stopAttack = () => {
+      stopped = true;
+    };
     return {
       id,
       kind: "returnFire",
@@ -1329,31 +1755,45 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
 
   const chooseStand = (
     doorId: string,
-    hint: { x: number; z: number } | undefined,
+    want: string | undefined,
     pose: Pose,
   ): { x: number; y: number; z: number } | undefined => {
     const body = session.world.doorBody(doorId);
     const graph = session.world.sceneGraph();
     if (!body || !graph) return undefined;
-    let best: { x: number; y: number; z: number } | undefined;
-    let bestScore = Infinity;
+    let namedBest: { x: number; y: number; z: number } | undefined;
+    let namedScore = Infinity;
+    let fallback: { x: number; y: number; z: number } | undefined;
+    let fallbackScore = Infinity;
+    const around = otherPawns(session);
     for (const side of ["in", "out"] as const) {
       const stand = doorStand(body, side);
       const place = placeAt(graph, stand.x, stand.y, stand.z).id;
       const route = planRoute(graph, pose, place, gate);
       if (!route.ok) continue;
       if (route.steps.some((step) => step.portal.kind === "door" && gate(step.portal) !== "open")) continue;
-      const score = hint
-        ? Math.hypot(stand.x - hint.x, stand.z - hint.z)
-        : route.cost + Math.hypot(stand.x - pose.x, stand.z - pose.z);
-      if (score < bestScore) {
-        bestScore = score;
-        best = { x: stand.x, y: stand.y, z: stand.z };
+      // 217: a pawn standing on the stand is a blocked door; prefer the free side.
+      const nearest = around.reduce(
+        (best, pawn) => Math.min(best, Math.hypot(stand.x - pawn.x, stand.z - pawn.z) - (pawn.radius ?? 0.35)),
+        Infinity,
+      );
+      const blocked = nearest < 0.9 ? 8 : 0;
+      const score = route.cost + Math.hypot(stand.x - pose.x, stand.z - pose.z) + blocked;
+      if (want !== undefined && place === want) {
+        // The named side wins even when the other side is nearer (213).
+        if (score < namedScore) {
+          namedScore = score;
+          namedBest = { x: stand.x, y: stand.y, z: stand.z };
+        }
+      } else if (score < fallbackScore) {
+        fallbackScore = score;
+        fallback = { x: stand.x, y: stand.y, z: stand.z };
       }
     }
-    return best;
+    return namedBest ?? fallback;
   };
 
+  try {
   while (Date.now() < deadline) {
     const loopStart = Date.now();
     if (!session.world.self() || !ensureGround() || !ctx) {
@@ -1379,18 +1819,50 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
       continue;
     }
     const hpNow = session.world.health?.()?.hp;
-    if (typeof hpNow === "number" && hpNow < hpClock.hp) hpClock = { hp: hpNow, at: Date.now() };
+    // Track the last hp, not the running minimum: after a heal the next hit is
+    // a drop again and must refresh `underFire` (F6 in the hunt review).
+    if (typeof hpNow === "number" && hpNow !== hpClock.hp) {
+      hpClock = hpNow < hpClock.hp
+        ? { hp: hpNow, at: Date.now() }
+        : { hp: hpNow, at: hpClock.at };
+    }
     const state = worldState();
     if (satisfies(state, goal.want)) return 0;
 
-    const parts = watchParts(session);
+    const parts = watchParts(session, opts.enemies);
     let reason = "";
     if (!plan) reason = pending || "initial";
     else if (Date.now() - planAt >= REPLAN_MS) reason = "safety";
     else if (parts.doors !== watchDoors) reason = "door";
     else if (parts.pickups !== watchPickups && !activePickup) reason = "pickup";
+    else if (parts.threat !== watchThreat && Date.now() - threatReplanAt >= 1_000) reason = "threat";
 
+    // 198: a started cover walk is held >=300 ms so a moving shooter cannot
+    // flap cover <-> fire between replans.
+    if (reason && exec && exec.id.startsWith("takeCover:") && Date.now() - exec.started < 300) reason = "";
+    // 213: a door step owns its door. While it walks to the stand, a door state
+    // flip is not a replan cause; otherwise every flip re-issues the step and
+    // the bot exits and re-enters the hall (the 15:31 loop).
+    if (reason === "door" && (exec?.kind === "goToDoor" || (exec?.kind === "goTo" && doorClaim !== undefined))) reason = "";
+    // 220: the 5 s safety tick must not re-plan a gated follower out of its queue
+    // slot; the gate completes on the leader's hand-off, not on a safety tick.
+    if (reason === "safety" && exec?.kind === "goToDoor") reason = "";
+    // 221: the 1.5 s threat tick must not restart the leader's door press/cross;
+    // it re-issued DOOROPEN every second and the door never completed (goap-tasks-15).
+    if (reason === "threat" && (exec?.kind === "goToDoor" || (exec?.kind === "goTo" && doorClaim !== undefined))) reason = "";
+    // The fight owns the loop while `returnFire` runs: only a NEW visible
+    // threat id pre-empts it; the same target moving, the 5 s safety tick and
+    // door/pickup churn do not (the first run planned 39 targets, 0 shots).
+    if (reason && exec?.kind === "returnFire") {
+      const threatId = parts.threat === "-" ? "" : parts.threat.split(":")[0];
+      const preempt = reason === "threat" && threatId !== "" && threatId !== exec.arg;
+      if (!preempt) reason = "";
+    }
     if (reason) {
+      // A replan supersedes the fight: stop the old runAttack so two attacks
+      // never share the input loop.
+      if (exec?.kind === "returnFire") stopAttack?.();
+      stopAttack = undefined;
       const groundedCtx = ctx;
       if (!groundedCtx) return 2;
       // A macrotask between replans so the timeout and the socket can run.
@@ -1398,13 +1870,22 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
       if (Date.now() >= deadline) return 3;
       if (reason !== "initial") log(`replan ${reason} t=${secs()}s`);
       // The cold cap follows the state change: `safety` is the only periodic
-      // same-state refresh, so only it stays on the warm budget.
-      const budgetMs = opts.planMs ?? (reason === "safety" ? PLAN_BUDGET_MS : COLD_PLAN_BUDGET_MS);
+      // same-state refresh, so it stays on the warm budget. `threat` is a
+      // mid-fight state change (a moving shooter) and gets 1.5 s: the hunt-3
+      // heal plan measured 976 ms, over the 600 ms warm budget.
+      const budgetMs = opts.planMs ?? (reason === "threat" ? THREAT_PLAN_BUDGET_MS : reason === "safety" ? PLAN_BUDGET_MS : COLD_PLAN_BUDGET_MS);
       // Build the ladder's action set before the plan clock starts: the combat
       // cover scan walks the scene AABBs (188), and charging it to the plan
       // deadline made a valid plan start already expired.
+      // 199: an ordered target that is a player must be declared hostile; refuse
+      // a squadmate instead of silently re-targeting the nearest NPC.
+      const ordered = missionTarget();
+      if (goal.want.threatDown === true && ordered !== undefined && session.world.playerIds?.().has(ordered) === true && opts.enemies?.has(ordered) !== true) {
+        log(`assault: not-a-hostile id=${ordered}`);
+        return 2;
+      }
       const ladder = combatGoals(state, goal);
-      const combat = combatActions(session, groundedCtx, { target: missionTarget() });
+      const combat = combatActions(session, groundedCtx, { target: missionTarget(), enemies: opts.enemies, onNote: log });
       const planActions = combat.length > 0 ? [...actions, ...combat] : actions;
       log(`plan ladder target=${missionTarget() ?? "-"} combat=${combat.length} goals=${ladder.map((g) => `${g.id}@${g.priority(state)}`).join(",")}`);
       const planDeadline = Math.min(deadline, Date.now() + budgetMs);
@@ -1424,7 +1905,7 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
       };
       log("plan start");
       const planStarted = Date.now();
-      plan = chooseCombatGoal(state, ladder, planActions, groundedCtx, planOpts);
+      plan = chooseCombatGoal(state, ladder, planActions, groundedCtx, planOpts, (g) => (g.want.threatDown === true ? combat : planActions));
       // A periodic replan gets 250 ms; if that is not enough for a state that
       // exists, retry once at the cold budget before declaring `unsatisfiable`
       // (136).
@@ -1432,7 +1913,7 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
         plan = chooseCombatGoal(state, ladder, planActions, groundedCtx, (g) => ({
           ...planOpts(g),
           deadlineMs: Math.min(deadline, Date.now() + COLD_PLAN_BUDGET_MS),
-        }));
+        }), (g) => (g.want.threatDown === true ? combat : planActions));
       }
       const planMs = Date.now() - planStarted;
       log(`plan done ${planMs}ms steps=${plan?.steps.length ?? 0} expanded=${plan?.expanded ?? 0}`);
@@ -1440,6 +1921,8 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
       stuckCount = 0;
       watchDoors = parts.doors;
       watchPickups = parts.pickups;
+      watchThreat = parts.threat;
+      if (reason === "threat") threatReplanAt = Date.now();
       planAt = Date.now();
       pending = "";
       lastReason = reason;
@@ -1474,6 +1957,7 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
         continue;
       }
       failStreak = 0;
+      if (created.id.startsWith("takeCover:")) log(`cover start ${created.id}`);
       exec = created;
       log(`start ${id} t=${secs()}s reason=${lastReason}`);
       lastReason = "plan";
@@ -1487,6 +1971,8 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
       plan = undefined;
       exec = undefined;
       stuckCount = 0;
+      stuckSig = "";
+      stuckRetries = 0;
     } else if (result === "failed") {
       finish(exec, true);
       pending = `${exec.id} failed`;
@@ -1496,6 +1982,15 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
     } else if (result === "stuck") {
       stuckCount += 1;
       if (stuckCount >= 2) {
+        const sig = `${exec.id}|${(Math.round(pose.x * 4) / 4).toFixed(2)}|${(Math.round(pose.z * 4) / 4).toFixed(2)}`;
+        const outcome = stuckOutcome(sig, stuckSig, stuckRetries);
+        if (outcome.action === "giveup") {
+          log(`stuck: no alternate route id=${exec.id} at=${pose.x.toFixed(2)},${pose.z.toFixed(2)}`);
+          return 2;
+        }
+        log(`stuck: avoid id=${exec.id} at=${pose.x.toFixed(2)},${pose.z.toFixed(2)} retry=${outcome.retries}`);
+        stuckSig = sig;
+        stuckRetries = outcome.retries;
         pending = "stuck";
         plan = undefined;
         exec = undefined;
@@ -1506,6 +2001,12 @@ async function runBrainInner(session: BotSession, goal: Goal, opts: BrainOptions
     }
     opts.onTick?.();
     await sleepRest(loopStart);
+  }
+  } finally {
+    if (doorClaim) {
+      session.claims.release(doorClaim);
+      doorClaim = undefined;
+    }
   }
   return 3;
 
@@ -1578,10 +2079,14 @@ function pressDoor(
   return "running";
 }
 
-function watchParts(session: BotSession): { doors: string; pickups: string } {
+function watchParts(
+  session: BotSession,
+  enemies?: ReadonlySet<number>,
+): { doors: string; pickups: string; threat: string } {
   return {
     doors: session.world.doors().map((door) => `${door.id}:${door.open ? 1 : 0}:${door.locked ? 1 : 0}`).join(","),
     pickups: [...session.world.pickups()].sort().join(","),
+    threat: threatWatchKey(session, enemies),
   };
 }
 
@@ -1671,11 +2176,18 @@ function outsideGridFor(
   const view = navView(session, omit);
   const shut = new Set<string>();
   for (const door of view.doors) if (!door.open) shut.add(door.id);
+  // 204: the live cab boxes must be in the grid. Without `cabs`, `navBoxes`
+  // drops every elevator-room box (`roomShift` = "drop"), so the walker routes
+  // through the cab walls the collision detector reports (the goap-tasks-2
+  // stuck loop). The cache key includes the cab signature so a moved cab
+  // rebuilds the grid.
+  const cabs = session.world.cabs?.() ?? [];
+  const cabKey = cabs.map((cab) => `${cab.id}:${cab.at}:${cab.y}`).join(",");
   // 0.25 m is ~288 ms for the whole outside (220k cells); 0.5 m is ~166 ms.
-  const key = `outside|${[...omit].sort().join(",")}|${[...shut].sort().join(",")}|${view.pawnRadius}|${view.pawnHeight}`;
+  const key = `outside|${[...omit].sort().join(",")}|${[...shut].sort().join(",")}|${view.pawnRadius}|${view.pawnHeight}|${cabKey}`;
   const hit = cache.get(key);
   if (hit) return hit;
-  const grid = buildGrid(spec.area, navBoxes(view, graph, shut), {
+  const grid = buildGrid(spec.area, navBoxes(view, graph, shut, cabs), {
     cell: 0.5,
     radius: view.pawnRadius,
     height: view.pawnHeight,
@@ -1755,7 +2267,9 @@ function gridFor(
   const view = navView(session, omit);
   const shut = new Set<string>();
   for (const door of view.doors) if (!door.open) shut.add(door.id);
-  return buildGrid(area, navBoxes(view, graph, shut), {
+  // 204: same cab fix as outsideGridFor — see the comment there.
+  const cabs = session.world.cabs?.() ?? [];
+  return buildGrid(area, navBoxes(view, graph, shut, cabs), {
     cell: 0.25,
     radius: view.pawnRadius,
     height: view.pawnHeight,

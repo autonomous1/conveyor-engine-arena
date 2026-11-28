@@ -1,18 +1,22 @@
 /**
- * The bot command layer: twelve typed handlers over a connected BotSession.
+ * The bot command layer: twenty-one typed handlers over a connected BotSession.
  * Node-only: no CLI, no token, no filesystem.
  */
-// ARCHITECTURE: The bot's twelve-handler command surface: parse, dispatch,
+// ARCHITECTURE: The bot's twenty-one-handler command surface: parse, dispatch,
 //   status, and the cooperative abort, over a connected session.
 // Wiring: drivers under packages/bot-client/tests create one host and call
 //   `dispatch`; `parseCommand` is the typed entry for a second bot.
 // Order: create the host after the session owns a pawn; `dispatch` is
-//   one-at-a-time (the busy invariant).
+//   one-at-a-time (the busy invariant); an explicit combat verb forces its goal
+//   at 100 except `regroup` (45), and `defend` is a posture loop, not the
+//   one-shot 198 goal.
 // Invariants: a second `dispatch` while busy rejects with `code:1,
 //   why:"busy"` (test: dispatch_rejects_while_busy).
 import type { BotSession } from "./connection.js";
-import { runMission } from "./brain.js";
+import { runAttack, runBrain, runMission } from "./brain.js";
+import { assaultGoal, healGoal, regroupGoal } from "./combat.js";
 import { parseMission } from "./missions.js";
+import type { Goal } from "../../../src/shared/bots/goap.js";
 import { hasLineOfSight } from "../../../src/shared/hitscan.js";
 import { EYE_HEIGHT, PITCH_LIMIT } from "../../../src/shared/look.js";
 import { GRENADE_BLAST_MIN_PERCENT, GRENADE_BLAST_RADIUS, GRENADE_GRAVITY, GRENADE_SPEED, type GrenadePose } from "../../../src/shared/grenade.js";
@@ -25,8 +29,9 @@ const TASK_TIMEOUT_MS = 180_000;
 /** The packed status is capped for the host's text frame. */
 const MAX_TEXT = 256;
 
-/** The twelve handler names. `status` and `abort` are host methods, not handlers. */
-export type CommandName = "arm" | "goto" | "stand" | "path" | "gotoAt" | "walk" | "reload" | "hunt" | "patrol" | "retrieve" | "getkey" | "projectile";
+/** The twenty-one handler names. `status` and `abort` are host methods, not handlers. */
+export type CommandName = "arm" | "goto" | "stand" | "path" | "gotoAt" | "walk" | "reload" | "hunt" | "patrol" | "retrieve" | "getkey" | "projectile"
+  | "seekHealth" | "takeCover" | "returnFire" | "retreat" | "rearm" | "survive" | "defend" | "assault" | "regroup";
 
 /**
  * Command Args type: the normalized arguments of each handler.
@@ -44,6 +49,15 @@ export type CommandArgs = {
   retrieve: { pickup: string; place?: string };
   getkey: {};
   projectile: { bands: number[]; throws: number; seconds: number; trial: string; fallback: string; filter: string; route: string };
+  seekHealth: { crate: string };
+  takeCover: {};
+  returnFire: { pawnId: number };
+  retreat: { place: string };
+  rearm: {};
+  survive: {};
+  defend: { minutes?: number; radius?: number };
+  assault: { pawnId: number };
+  regroup: { place: string };
 };
 
 /**
@@ -88,7 +102,7 @@ export type CommandStatus = {
 /**
  * Dispatch Options type.
  */
-export type DispatchOptions = { onLine?: (line: string) => void };
+export type DispatchOptions = { onLine?: (line: string) => void; claim?: "goal" | "advisory"; operatorId?: number };
 
 /**
  * Create Command Host Options type.
@@ -120,7 +134,7 @@ export type CommandHost = {
 
 /**
  * Parse and validate one command.
- * @post The twelve handler names return a normalized `Command`; an unknown name
+ * @post The twenty-one handler names return a normalized `Command`; an unknown name
  *       returns `{error:"unknown-task"}`; bad arguments return the handler's
  *       own string (`bad-args`/`unsupported-weapon`).
  */
@@ -131,6 +145,11 @@ export function parseCommand(raw: { name: string; args?: Record<string, unknown>
       return { name: "arm" };
     case "getkey":
       return { name: "getkey" };
+    case "regroup": {
+      const place = typeof a.place === "string" ? a.place : "";
+      if (place.length === 0) return { error: "bad-args" };
+      return { name: "regroup", place };
+    }
     case "goto": {
       const place = typeof a.place === "string" ? a.place : "";
       if (place.length === 0) return { error: "bad-args" };
@@ -219,6 +238,39 @@ export function parseCommand(raw: { name: string; args?: Record<string, unknown>
         route: typeof a.route === "string" ? a.route : "point",
       };
     }
+    case "seekHealth": {
+      const crate = typeof a.crate === "string" ? a.crate : "";
+      if (crate.length === 0) return { error: "bad-args" };
+      return { name: "seekHealth", crate };
+    }
+    case "takeCover":
+      return { name: "takeCover" };
+    case "returnFire": {
+      const pawnId = Number(a.pawnId);
+      if (!Number.isInteger(pawnId) || pawnId <= 0) return { error: "bad-args" };
+      return { name: "returnFire", pawnId };
+    }
+    case "retreat": {
+      const place = typeof a.place === "string" ? a.place : "";
+      if (place.length === 0) return { error: "bad-args" };
+      return { name: "retreat", place };
+    }
+    case "rearm":
+      return { name: "rearm" };
+    case "survive":
+      return { name: "survive" };
+    case "defend": {
+      const minutes = a.minutes === undefined ? 2 : Number(a.minutes);
+      const radius = a.radius === undefined ? 30 : Number(a.radius);
+      if (!Number.isFinite(minutes) || minutes <= 0 || minutes > 10) return { error: "bad-args" };
+      if (!Number.isFinite(radius) || radius <= 0 || radius > 60) return { error: "bad-args" };
+      return { name: "defend", minutes, radius };
+    }
+    case "assault": {
+      const pawnId = Number(a.pawnId);
+      if (!Number.isInteger(pawnId) || pawnId <= 0) return { error: "bad-args" };
+      return { name: "assault", pawnId };
+    }
     default:
       return { error: "unknown-task" };
   }
@@ -226,6 +278,30 @@ export function parseCommand(raw: { name: string; args?: Record<string, unknown>
 
 /** Cooperative abort: the mission tick throws, so `runMission` unwinds. */
 class AbortMission extends Error {}
+
+/**
+ * The next untried ammo crate in selector order (202). The caller puts the pin
+ * first; a tried pin falls through to the nearest untried. Pure: no world.
+ * @post The first candidate whose id is not in `tried`, or undefined.
+ */
+export function nextReloadCandidate<T extends { item: { id: string } }>(candidates: readonly T[], tried: ReadonlySet<string>): T | undefined {
+  return candidates.find((row) => !tried.has(row.item.id));
+}
+
+/**
+ * The cycle's verdict (202): `no-crate` only when the first fresh scan was
+ * empty; otherwise the last crate's own reason (never a neighbour's).
+ * @post `{why:"no-crate"}` only for an empty first scan, `gone` with no
+ *       attempt, else the last attempt's own why/crate.
+ */
+export function reloadVerdict(
+  scanSize: number,
+  attempts: ReadonlyArray<{ crate: string; why: string }>,
+): { why: string; crate?: string } {
+  if (scanSize === 0) return { why: "no-crate" };
+  const last = attempts[attempts.length - 1];
+  return last ? { why: last.why, crate: last.crate } : { why: "gone" };
+}
 
 /**
  * Create the command host for one connected session.
@@ -367,59 +443,75 @@ const standAtPoint = async (point: { x: number; z: number }, ms: number, label: 
   }
 };
 
-const armHandler = async (): Promise<CommandResult> => {
-  if ((world.weapon() ?? "") !== "") return { ok: true, code: 0, note: "already-armed" };
-  if (![...world.pickups()].includes("alien-weapon-1")) {
-    record("arm: alien-weapon-1 is not on the map");
-    return { ok: false, code: 1, why: "not-armed" };
-  }
-  record("arm: east approach");
-  await standAtPoint({ x: -13.9, z: 16.5 }, 60_000, "arm east");
-  record("arm: climb");
-  const climbed = await standAtPoint({ x: -23.9, z: 16.5 }, 60_000, "arm climb");
-  record(`arm climb=${climbed} weapon=${world.weapon() ?? "none"} ammo=${world.ammo()}`);
-  // The 152 stand goal resolves to the snapped free cell, ~0.5 m short of the
-  // weapon's pickup box; a stand can latch the fact there and never take the
-  // item (task 153). The weapon is a pickup, so ask the pickup mission for it.
-  if ((world.weapon() ?? "") === "" && [...world.pickups()].includes("alien-weapon-1")) {
-    record("arm: retrieve the weapon");
-    const weapon = world.pickupPlacements().find((p) => p.id === "alien-weapon-1");
-    const belowBox = (): boolean => {
-      const self = world.self();
-      return !!weapon && !!self && self.y + world.pawnHeight < (weapon.minY ?? 0);
-    };
-    for (let attempt = 0; attempt < 2 && (world.weapon() ?? "") === ""; attempt += 1) {
-      const mission = parseMission("retrieve:alien-weapon-1@outside");
-      let code = 1;
-      if (mission) {
-        code = await runMission(session, mission, {
-          timeoutMs: 10_000,
-          onTick: abortTick,
-          log: (line) => record(`  weapon ${line}`),
-          error: (line) => record(`  weapon ERROR ${line}`),
-        });
-      }
-      record(`arm retrieve code=${code} weapon=${world.weapon() ?? "none"} ammo=${world.ammo()}`);
-      // A failed pickup off the crate top gets one re-climb, then a retry;
-      // do not press under the weapon for the whole mission timeout.
-      if ((world.weapon() ?? "") === "" && attempt === 0 && belowBox()) {
-        record("arm: re-climb for the weapon");
-        await standAtPoint({ x: -23.9, z: 16.5 }, 30_000, "arm re-climb");
-      }
-    }
-  }
+type PropRow = { id: string; kind?: string; minX: number; maxX: number; minZ: number; maxZ: number; minY?: number; maxY?: number };
+type Prop = { item: PropRow; place: string; d: number; rank: number };
+
+/**
+ * Available props of one kind, nearest-reachable first.
+ * @why The arena moved the spawns inside with four weapons and four keys; the old
+ *      handlers pinned one id and one pad. One selector ranks every candidate by
+ *      same-place, then same-floor, then XZ distance; the caller retrieves the
+ *      first that works and falls through to the next. `reload` uses it too.
+ */
+const availableProps = (kind: "weapon" | "key" | "ammo"): Prop[] => {
+  const avail = new Set(world.pickups());
   const me = world.self();
-  if (me && me.y > 0.6) await standAtPoint({ x: -14.0, z: 16.5 }, 30_000, "arm step-off");
-  return (world.weapon() ?? "") !== "" ? { ok: true, code: 0 } : { ok: false, code: 1, why: "not-armed" };
+  const here = me ? world.placeOf(me)?.id : undefined;
+  const rows = (world.pickupPlacements() as readonly PropRow[])
+    .filter((p) => p.kind === kind && avail.has(p.id))
+    .map((p) => {
+      const x = (p.minX + p.maxX) / 2;
+      const z = (p.minZ + p.maxZ) / 2;
+      const place = world.placeOf({ x, y: (p.minY ?? 0) + 0.2, z })?.id ?? "outside";
+      const d = me ? Math.hypot(x - me.x, z - me.z) : 0;
+      const samePlace = here !== undefined && here === place;
+      const sameFloor = me ? Math.abs((p.minY ?? 0) - me.y) <= 1.5 : true;
+      return { item: p, place, d, rank: (samePlace ? 0 : 1000) + (sameFloor ? 0 : 500) + d };
+    })
+    .sort((a, b) => a.rank - b.rank || (a.item.id < b.item.id ? -1 : 1));
+  record(`${kind}: candidates=[${rows.map((r) => `${r.item.id}@${r.place}@d=${r.d.toFixed(1)}`).join(" ") || "-"}]`);
+  return rows;
 };
 
-const runMissionTask = async (missionText: string, label: string): Promise<CommandResult> => {
+const armHandler = async (_a: Record<string, unknown>, opts?: DispatchOptions): Promise<CommandResult> => {
+  if ((world.weapon() ?? "") !== "") return { ok: true, code: 0, note: "already-armed" };
+  const failures: string[] = [];
+  const tried = new Set<string>();
+  // Re-scan each attempt: a concurrent seat may take a prop between the scan
+  // and the plan, and the stale snapshot then fails every remaining candidate.
+  for (let attempt = 0; attempt < 8 && (world.weapon() ?? "") === ""; attempt += 1) {
+    const candidate = availableProps("weapon").find((row) => !tried.has(row.item.id));
+    if (!candidate) break;
+    tried.add(candidate.item.id);
+    record(`arm: try ${candidate.item.id}@${candidate.place} d=${candidate.d.toFixed(1)}`);
+    const mission = parseMission(`retrieve:${candidate.item.id}@${candidate.place}`);
+    if (!mission) {
+      failures.push(`${candidate.item.id}:bad-mission`);
+      continue;
+    }
+    const code = await runMission(session, mission, {
+      timeoutMs: 60_000,
+      claim: opts?.claim, operatorId: opts?.operatorId,
+      onTick: abortTick,
+      log: (line) => record(`  arm ${line}`),
+      error: (line) => record(`  arm ERROR ${line}`),
+    });
+    record(`arm: ${candidate.item.id} code=${code} weapon=${world.weapon() ?? "none"}`);
+    if ((world.weapon() ?? "") === "") failures.push(`${candidate.item.id}:code${code}`);
+  }
+  if ((world.weapon() ?? "") !== "") return { ok: true, code: 0 };
+  return { ok: false, code: 1, why: failures.length === 0 ? "no-weapon" : `not-armed(${failures.join(",")})` };
+};
+
+const runMissionTask = async (missionText: string, label: string, claim?: "goal" | "advisory", operatorId?: number): Promise<CommandResult> => {
   const mission = parseMission(missionText);
   if (!mission) return { ok: false, code: 1, why: "bad-args" };
   let lastNoPlan: string | null = null;
   try {
     const code = await runMission(session, mission, {
       timeoutMs: TASK_TIMEOUT_MS,
+      claim,
+      operatorId,
       onTick: abortTick,
       log: (line) => {
         onLine?.(`${label} ${line}`);
@@ -438,10 +530,10 @@ const runMissionTask = async (missionText: string, label: string): Promise<Comma
   }
 };
 
-const gotoHandler = async (a: Record<string, unknown>): Promise<CommandResult> => {
+const gotoHandler = async (a: Record<string, unknown>, opts?: DispatchOptions): Promise<CommandResult> => {
   const place = typeof a.place === "string" ? a.place : "";
   if (place.length === 0) return { ok: false, code: 1, why: "bad-args" };
-  return runMissionTask(`reach:${place}`, "goto");
+  return runMissionTask(`reach:${place}`, "goto", opts?.claim, opts?.operatorId);
 };
 
 // Task 132: a point destination is a wishTo walk, not a `stand:` plan. The
@@ -478,7 +570,7 @@ const standHandler = async (a: Record<string, unknown>): Promise<CommandResult> 
 };
 
 // Task 149: the planned twin of `stand`; 132 keeps `stand` on wishTo.
-const pathHandler = async (a: Record<string, unknown>): Promise<CommandResult> => {
+const pathHandler = async (a: Record<string, unknown>, opts?: DispatchOptions): Promise<CommandResult> => {
   const x = Number(a.x);
   const y = Number(a.y);
   const z = Number(a.z);
@@ -488,7 +580,7 @@ const pathHandler = async (a: Record<string, unknown>): Promise<CommandResult> =
   if (abortRequested) return { ok: false, code: 4, why: "aborted" };
   record(`PATH start x=${x} y=${y} z=${z} yaw=${yawArg ?? "keep"}`);
   const missionText = `stand:${x},${y},${z}${yawArg === undefined ? "" : `,${yawArg}`}`;
-  const result = await runMissionTask(missionText, "path");
+  const result = await runMissionTask(missionText, "path", opts?.claim, opts?.operatorId);
   const done = world.self();
   record(`PATH ${result.ok ? "done" : "fail"} why=${result.ok ? "-" : result.why} at=${done ? `${done.x.toFixed(2)},${done.y.toFixed(2)},${done.z.toFixed(2)}` : "?"}`);
   return result.ok ? { ...result, data: { x, y, z, ...(yawArg !== undefined ? { yaw: yawArg } : {}) } } : result;
@@ -496,7 +588,7 @@ const pathHandler = async (a: Record<string, unknown>): Promise<CommandResult> =
 
 // Task 167: a bare x,z point. The caller gives two numbers; the pawn's own
 // floor supplies y, so the mission is the `path`-shaped `stand:` goal.
-const gotoAtHandler = async (a: Record<string, unknown>): Promise<CommandResult> => {
+const gotoAtHandler = async (a: Record<string, unknown>, opts?: DispatchOptions): Promise<CommandResult> => {
   const x = Number(a.x);
   const z = Number(a.z);
   if (!Number.isFinite(x) || !Number.isFinite(z)) return { ok: false, code: 1, why: "bad-args" };
@@ -511,6 +603,7 @@ const gotoAtHandler = async (a: Record<string, unknown>): Promise<CommandResult>
   try {
     const code = await runMission(session, mission, {
       timeoutMs: TASK_TIMEOUT_MS,
+      claim: opts?.claim, operatorId: opts?.operatorId,
       onTick: abortTick,
       log: (line) => {
         record(`  gotoAt ${line}`);
@@ -537,89 +630,77 @@ const gotoAtHandler = async (a: Record<string, unknown>): Promise<CommandResult>
 const RELOAD_TIMEOUT_MS = 90_000;
 type Placement = { id: string; kind?: string; minX: number; maxX: number; minZ: number; maxZ: number; minY?: number; maxY?: number };
 
-// Task 156: the hunt's mid-run cycle (the 108 driver's heal/reload).
-const reloadCycle = async (pin?: string): Promise<{ ok: boolean; code: number; why?: string; ammo: number; crate?: string }> => {
-  const avail = new Set(world.pickups());
-  const me = world.self();
-  const crates = (world.pickupPlacements() as readonly Placement[])
-    .filter((p) => p.kind === "ammo" && avail.has(p.id))
-    .filter((p) => (world.placeOf({ x: (p.minX + p.maxX) / 2, y: (p.minY ?? 0) + 0.2, z: (p.minZ + p.maxZ) / 2 })?.id ?? "") === "outside")
-    .map((p) => ({ p, d: me ? Math.hypot((p.minX + p.maxX) / 2 - me.x, (p.minZ + p.maxZ) / 2 - me.z) : 0 }))
-    .sort((u, v) => (pin ? (u.p.id === pin ? -1 : v.p.id === pin ? 1 : 0) : u.d - v.d) || (u.p.id < v.p.id ? -1 : u.p.id > v.p.id ? 1 : 0));
-  const crate = crates[0]?.p;
-  if (!crate) return { ok: false, code: 1, why: "no-crate", ammo: world.ammo() };
-  record(`RELOAD start ammo=${world.ammo()} crate=${crate.id}`);
-  const mission = parseMission(`retrieve:${crate.id}@outside`);
-  if (!mission) return { ok: false, code: 1, why: "bad-args", ammo: world.ammo(), crate: crate.id };
-  let lastNoPlan: string | null = null;
-  const code = await runMission(session, mission, {
-    timeoutMs: RELOAD_TIMEOUT_MS,
-    onTick: abortTick,
-    log: (line) => {
-      record(`  reload ${line}`);
-      const m = /no plan: ([a-z-]+)/.exec(line);
-      if (m) lastNoPlan = m[1]!;
-    },
-    error: (line) => record(`  reload ERROR ${line}`),
-  });
-  const ammo = world.ammo();
-  if (code === 0 && ammo > 0) {
-    record(`RELOAD done crate=${crate.id} ammo=${ammo} code=${code}`);
-    return { ok: true, code: 0, ammo, crate: crate.id };
-  }
-  const why = code === 0 ? "no-ammo" : code === 2 ? `no-plan:${lastNoPlan ?? "unknown"}` : code === 3 ? "timeout" : `code:${code}`;
-  record(`RELOAD fail crate=${crate.id} why=${why}`);
-  return { ok: false, code: code === 0 ? 1 : code, why, ammo, crate: crate.id };
-};
-
-const healCycle = async (): Promise<boolean> => {
-  const deadline = Date.now() + 120_000;
-  const failed = new Map<string, number>();
-  let attempts = 0;
-  record(`HEAL start hp=${world.health()?.hp ?? "?"}`);
-  while (Date.now() < deadline) {
-    if ((world.health()?.hp ?? 0) >= 100) { record("HEAL done hp=100"); return true; }
-    if (attempts >= 8) { record("HEAL fail attempts=8"); return false; }
-    const me = world.self();
-    if (!me) return false;
-    const avail = new Set(world.pickups());
-    const crates = (world.pickupPlacements() as readonly Placement[])
-      .filter((p) => p.kind === "health" && avail.has(p.id) && (failed.get(p.id) ?? 0) < Date.now())
-      .map((p) => {
-        const x = (p.minX + p.maxX) / 2;
-        const z = (p.minZ + p.maxZ) / 2;
-        const outside = (world.placeOf({ x, y: 0.3, z })?.id ?? "") === "outside";
-        return { p, d: Math.hypot(x - me.x, z - me.z), outside };
-      })
-      .sort((a, b) => (a.outside === b.outside ? a.d - b.d : a.outside ? -1 : 1));
-    const crate = crates[0]?.p;
-    if (!crate) { await sleep(1000); continue; }
-    const mission = parseMission(`retrieve:${crate.id}@outside`);
-    const hpBefore = world.health()?.hp ?? 0;
-    if (mission) await runMission(session, mission, { timeoutMs: 60_000, onTick: abortTick, log: (l) => record(`  heal ${l}`), error: (l) => record(`  heal ERROR ${l}`) });
-    const hpAfter = world.health()?.hp ?? 0;
-    if (hpAfter >= 100) { record("HEAL done hp=100"); return true; }
-    if (hpAfter <= hpBefore) {
-      attempts += 1;
-      failed.set(crate.id, Date.now() + 60_000);
-      record(`HEAL crate=${crate.id} no-hp ${hpBefore}->${hpAfter}; blacklisted 60s`);
+// Task 156/202: the hunt's mid-run cycle (the 108 driver's heal/reload). It
+// re-scans the ammo crates on every failure (the arm/getkey pattern): a fresh
+// `runMission` per attempt also gives the retry `reason=initial` and the cold
+// budget, so a transient mid-mission `threat` no-plan does not end the hunt.
+const RELOAD_ATTEMPTS = 6;
+const reloadCycle = async (pin?: string, claim?: "goal" | "advisory", operatorId?: number): Promise<{ ok: boolean; code: number; why?: string; ammo: number; crate?: string }> => {
+  const firstScan = availableProps("ammo");
+  if (firstScan.length === 0) return { ok: false, code: 1, why: "no-crate", ammo: world.ammo() };
+  const tried = new Set<string>();
+  const attempts: Array<{ crate: string; why: string }> = [];
+  let lastCode = 1;
+  for (let i = 0; i < RELOAD_ATTEMPTS; i += 1) {
+    const fresh = availableProps("ammo");
+    const ranked = pin
+      ? [...fresh.filter((row) => row.item.id === pin), ...fresh.filter((row) => row.item.id !== pin)]
+      : fresh;
+    const chosen = nextReloadCandidate(ranked, tried);
+    if (!chosen) break;
+    tried.add(chosen.item.id);
+    const crate = chosen.item;
+    // A transient no-plan on a reachable crate gets ONE fresh retry on the same
+    // crate (a new runMission starts with reason=initial and the cold budget;
+    // the 202 probe plans that state in 187 ms). Gone/timed-out crates do not
+    // retry — the crate is not there or the route is too long.
+    for (let retry = 0; retry < 2; retry += 1) {
+      record(`RELOAD start ammo=${world.ammo()} crate=${crate.id}@${chosen.place}`);
+      const mission = parseMission(`retrieve:${crate.id}@${chosen.place}`);
+      if (!mission) return { ok: false, code: 1, why: "bad-args", ammo: world.ammo(), crate: crate.id };
+      let lastNoPlan: string | null = null;
+      const code = await runMission(session, mission, {
+        timeoutMs: RELOAD_TIMEOUT_MS,
+        claim,
+        operatorId,
+        onTick: abortTick,
+        log: (line) => {
+          record(`  reload ${line}`);
+          const m = /no plan: ([a-z-]+)/.exec(line);
+          if (m) lastNoPlan = m[1]!;
+        },
+        error: (line) => record(`  reload ERROR ${line}`),
+      });
+      const ammo = world.ammo();
+      if (code === 0 && ammo > 0) {
+        record(`RELOAD done crate=${crate.id} ammo=${ammo} code=${code}`);
+        return { ok: true, code: 0, ammo, crate: crate.id };
+      }
+      lastCode = code !== 0 ? code : 1;
+      const why = !world.pickups().includes(crate.id) ? "gone"
+        : code === 2 ? `no-plan:${lastNoPlan ?? "unknown"}`
+        : code === 3 ? "timeout"
+        : code === 0 ? "no-ammo" : `code:${code}`;
+      record(`RELOAD fail crate=${crate.id} why=${why}`);
+      if (retry === 0 && why.startsWith("no-plan:")) continue;
+      attempts.push({ crate: crate.id, why });
+      break;
     }
-    await sleep(400);
   }
-  const hp = world.health()?.hp ?? 0;
-  record(`HEAL fail hp=${hp}`);
-  return hp >= 100;
+  const verdict = reloadVerdict(firstScan.length, attempts);
+  if (attempts.length > 0) record(`RELOAD skipped=${attempts.length}`);
+  return { ok: false, code: lastCode, why: verdict.why, ammo: world.ammo(), crate: verdict.crate };
 };
 
-const reloadHandler = async (a: Record<string, unknown>): Promise<CommandResult> => {
+const reloadHandler = async (a: Record<string, unknown>, opts?: DispatchOptions): Promise<CommandResult> => {
   if (world.ammo() > 0) return { ok: true, code: 0, note: "already-loaded", data: { ammo: world.ammo() } };
   const pin = typeof a.crate === "string" && a.crate.length > 0 ? a.crate : undefined;
-  const r = await reloadCycle(pin);
+  const r = await reloadCycle(pin, opts?.claim, opts?.operatorId);
   if (r.ok) return { ok: true, code: 0, data: { ammo: r.ammo, crate: r.crate } };
   return { ok: false, code: r.code, why: r.why ?? "no-crate" };
 };
 
-const huntHandler = async (a: Record<string, unknown>): Promise<CommandResult> => {
+const huntHandler = async (a: Record<string, unknown>, opts?: DispatchOptions): Promise<CommandResult> => {
   const startedAt = Date.now();
   const minutes = a.minutes === undefined ? 2 : Number(a.minutes);
   if (!Number.isFinite(minutes) || minutes < 0.5 || minutes > 10) return { ok: false, code: 1, why: "bad-args" };
@@ -645,11 +726,25 @@ const huntHandler = async (a: Record<string, unknown>): Promise<CommandResult> =
     // hunt that cannot reload ends no-ammo; a failed heal does not end it.
     if ((world.health()?.hp ?? 0) <= 50) {
       heals += 1;
-      if (!(await healCycle())) record(`HUNT heal failed hp=${world.health()?.hp ?? "?"}; continuing`);
+      // The heal is a GOAP goal (193): heal@80 -> seekHealth:<crate>, the
+      // action owns placeOfPickup and beginPickup executes. No crate loop, no
+      // per-crate blacklist, no world.placeOf place. A failure is a fact, not
+      // an abort: the hunt continues (the next cycle retries).
+      const healStarted = Date.now();
+      record(`HEAL start hp=${world.health()?.hp ?? "?"}`);
+      const healCode = await runBrain(session, healGoal(), {
+        timeoutMs: Math.min(60_000, Math.max(1_000, deadline - Date.now())),
+        claim: opts?.claim, operatorId: opts?.operatorId,
+        onTick: abortTick,
+        log: (line) => record(`  heal ${line}`),
+        error: (line) => record(`  heal ERROR ${line}`),
+      });
+      record(`HEAL result code=${healCode} hp=${world.health()?.hp ?? "?"} ms=${Date.now() - healStarted}`);
+      await sleep(400);
     }
     if (world.ammo() <= 0) {
       reloads += 1;
-      if (!(await reloadCycle()).ok) {
+      if (!(await reloadCycle(undefined, opts?.claim, opts?.operatorId)).ok) {
         record(`HUNT end kills=${kills} shots=${shots} minutes=${minutes} elapsed=${taskElapsed(startedAt)}s`);
         return { ok: false, code: 1, why: "no-ammo" };
       }
@@ -665,13 +760,17 @@ const huntHandler = async (a: Record<string, unknown>): Promise<CommandResult> =
     record(`HUNT target id=${tgt.id} d=${nearest.d.toFixed(1)} place=outside`);
     let outcome = "timeout";
     let targetShots = 0;
-    const mission = parseMission(`attack:${tgt.id}`);
-    if (!mission) continue;
-    const code = await runMission(session, mission, {
+    // The hunt runs the GOAP ladder, not `runAttack` directly: `survive`,
+    // `heal` and `defend` pre-empt `assault` at 60, so `underFire`,
+    // `hpPressured` and the visible threat decide the next action. The claim
+    // stays off (free-for-all: two seats may chase the same pawn).
+    const code = await runBrain(session, assaultGoal(tgt.id), {
       timeoutMs: Math.min(60_000, Math.max(1_000, deadline - Date.now())),
+      claim: false,
       onTick: abortTick,
       log: (line) => {
         record(`  hunt ${line}`);
+        // The ladder line is the evidence: goals=<id>@<priority> shows the facts.
         if (/attack: fire/.test(line)) { shots += 1; targetShots += 1; }
         if (/attack: dead/.test(line)) outcome = "dead";
         else if (/attack: lost/.test(line)) outcome = "lost";
@@ -693,7 +792,7 @@ const huntHandler = async (a: Record<string, unknown>): Promise<CommandResult> =
   return { ok: true, code: 0, data: { minutes, kills, shots, reloads, heals, hp: world.healthOf(selfId)?.hp ?? null } };
 };
 
-const patrolHandler = async (a: Record<string, unknown>): Promise<CommandResult> => {
+const patrolHandler = async (a: Record<string, unknown>, opts?: DispatchOptions): Promise<CommandResult> => {
   const startedAt = Date.now();
   const raw = Array.isArray(a.places) ? a.places : [];
   if (raw.length < 2 || raw.some((p) => typeof p !== "string" || (p as string).trim().length === 0)) {
@@ -722,6 +821,7 @@ const patrolHandler = async (a: Record<string, unknown>): Promise<CommandResult>
   try {
     code = await runMission(session, mission, {
       timeoutMs: minutes * 60_000,
+      claim: opts?.claim, operatorId: opts?.operatorId,
       onTick: abortTick,
       log: (line) => {
         record(`  patrol ${line}`);
@@ -744,7 +844,7 @@ type PickupRow = { id: string; kind?: string; minX: number; maxX: number; minZ: 
 function pickupPlace(item: PickupRow): string {
   return world.placeOf({ x: (item.minX + item.maxX) / 2, y: (item.minY ?? 0) + 0.2, z: (item.minZ + item.maxZ) / 2 })?.id ?? "outside";
 }
-const retrieveHandler = async (a: Record<string, unknown>): Promise<CommandResult> => {
+const retrieveHandler = async (a: Record<string, unknown>, opts?: DispatchOptions): Promise<CommandResult> => {
   const pickup = typeof a.pickup === "string" ? a.pickup : "";
   if (pickup.length === 0) return { ok: false, code: 1, why: "bad-args" };
   const item = (world.pickupPlacements() as readonly PickupRow[]).find((row) => row.id === pickup);
@@ -756,6 +856,7 @@ const retrieveHandler = async (a: Record<string, unknown>): Promise<CommandResul
   let lastNoPlan: string | null = null;
   const code = await runMission(session, mission, {
     timeoutMs: TASK_TIMEOUT_MS,
+    claim: opts?.claim, operatorId: opts?.operatorId,
     onTick: abortTick,
     log: (line) => {
       record(`  retrieve ${line}`);
@@ -775,10 +876,30 @@ const retrieveHandler = async (a: Record<string, unknown>): Promise<CommandResul
   return { ok: false, code, why: `code:${code}` };
 };
 
-const getkeyHandler = async (): Promise<CommandResult> => {
-  const key = (world.pickupPlacements() as readonly PickupRow[]).find((row) => row.kind === "key" && world.pickups().includes(row.id));
-  if (!key) return { ok: false, code: 1, why: "no-key" };
-  return retrieveHandler({ pickup: key.id });
+const getkeyHandler = async (_a: Record<string, unknown>, opts?: DispatchOptions): Promise<CommandResult> => {
+  const failures: string[] = [];
+  const tried = new Set<string>();
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    if (world.keys().length > 0) return { ok: true, code: 0 };
+    const candidate = availableProps("key").find((row) => !tried.has(row.item.id));
+    if (!candidate) break;
+    tried.add(candidate.item.id);
+    const mission = parseMission(`retrieve:${candidate.item.id}@${candidate.place}`);
+    if (!mission) {
+      failures.push(`${candidate.item.id}:bad-mission`);
+      continue;
+    }
+    const code = await runMission(session, mission, {
+      timeoutMs: 45_000,
+      claim: opts?.claim, operatorId: opts?.operatorId,
+      onTick: abortTick,
+      log: (line) => record(`  getkey ${line}`),
+      error: (line) => record(`  getkey ERROR ${line}`),
+    });
+    if (world.keys().includes(candidate.item.id)) return { ok: true, code: 0 };
+    failures.push(`${candidate.item.id}:code${code}`);
+  }
+  return { ok: false, code: 1, why: `no-key(${failures.join(",")})` };
 };
 
 // The point planner's `stand` wedges on the wall between the south pad and the key
@@ -1551,7 +1672,170 @@ const projectileHandler = async (a: Record<string, unknown>): Promise<CommandRes
   return createProjectile({ bands, throws: throwsRaw, seconds, trial, fallback, filter, route })();
 };
 
-const HANDLERS: Record<string, (a: Record<string, unknown>) => Promise<CommandResult>> = {
+/**
+ * A combat verb is an explicit operator order: it forces its goal at priority
+ * 100, above the ladder's own priorities (184), and runs the normal brain
+ * plan/executor path — no bespoke loop.
+ * @post 0 met, 2 no plan, 3 timeout, 4 aborted.
+ */
+const runGoalTask = async (label: string, goal: Goal, claim?: "goal" | "advisory", operatorId?: number): Promise<CommandResult> => {
+  let lastNoPlan: string | null = null;
+  try {
+    const code = await runBrain(session, { ...goal, priority: () => 100 }, {
+      timeoutMs: TASK_TIMEOUT_MS,
+      claim,
+      operatorId,
+      onTick: abortTick,
+      log: (line) => {
+        // The run log keeps the plan lines: the shell dispatch passes no onLine,
+        // and a no-plan without its ladder is undiagnosable (the 192 rearm failure).
+        record(`  ${label} ${line}`);
+        onLine?.(`${label} ${line}`);
+        const m = /no plan: ([a-z-]+)/.exec(line);
+        if (m) lastNoPlan = m[1]!;
+      },
+      error: (line) => record(`  ${label} ERROR ${line}`),
+    });
+    if (code === 0) return { ok: true, code: 0 };
+    if (code === 2) return { ok: false, code: 2, why: `no-plan:${lastNoPlan ?? "unknown"}` };
+    if (code === 3) return { ok: false, code: 3, why: "timeout" };
+    return { ok: false, code, why: `code:${code}` };
+  } catch (err) {
+    if (err instanceof AbortMission) return { ok: false, code: 4, why: "aborted" };
+    return { ok: false, code: 1, why: `error:${err instanceof Error ? err.message : String(err)}` };
+  }
+};
+
+const seekHealthHandler = async (a: Record<string, unknown>, opts?: DispatchOptions): Promise<CommandResult> => {
+  const crate = typeof a.crate === "string" ? a.crate : "";
+  if (crate.length === 0) return { ok: false, code: 1, why: "bad-args" };
+  record(`SEEK start crate=${crate}`);
+  const result = await runGoalTask(`seek-health ${crate}`, { id: `seekHealth:${crate}`, want: { hpHigh: true }, priority: () => 100 }, opts?.claim, opts?.operatorId);
+  record(`SEEK end crate=${crate} ok=${result.ok ? 1 : 0}${result.ok ? "" : ` why=${result.why}`}`);
+  return result;
+};
+
+const takeCoverHandler = async (_a: Record<string, unknown>, opts?: DispatchOptions): Promise<CommandResult> =>
+  runGoalTask("take-cover", { id: "takeCover", want: { inCover: true }, priority: () => 100 }, opts?.claim, opts?.operatorId);
+
+const returnFireHandler = async (a: Record<string, unknown>, opts?: DispatchOptions): Promise<CommandResult> => {
+  const pawnId = Number(a.pawnId);
+  if (!Number.isInteger(pawnId) || pawnId <= 0) return { ok: false, code: 1, why: "bad-args" };
+  return runGoalTask(`return-fire ${pawnId}`, assaultGoal(pawnId), opts?.claim, opts?.operatorId);
+};
+
+const retreatHandler = async (a: Record<string, unknown>, opts?: DispatchOptions): Promise<CommandResult> => {
+  const place = typeof a.place === "string" ? a.place : "";
+  if (place.length === 0) return { ok: false, code: 1, why: "bad-args" };
+  // The 184 `retreat:<place>` action carries a `hpCritical` pre and a `safe`
+  // effect no goal wants; an operator-forced retreat is a reach to the place.
+  return runMissionTask(`reach:${place}`, "retreat", opts?.claim, opts?.operatorId);
+};
+
+const rearmHandler = async (_a: Record<string, unknown>, opts?: DispatchOptions): Promise<CommandResult> =>
+  runGoalTask("rearm", { id: "rearm", want: { hasAmmo: true }, priority: () => 100 }, opts?.claim, opts?.operatorId);
+
+const surviveHandler = async (_a: Record<string, unknown>, opts?: DispatchOptions): Promise<CommandResult> =>
+  runGoalTask("survive", { id: "survive", want: { hpHigh: true }, priority: () => 100 }, opts?.claim, opts?.operatorId);
+
+/**
+ * The defend POSTURE (the shell verb): hold this spot and shoot NPCs that come
+ * inside `radius`, for `minutes`. The 198 GOAP `defend` goal is the ladder's
+ * in-fight behaviour (it releases once `defended` is live); a posture needs a
+ * loop, so the verb holds and runs the proven attack mission at each
+ * acquisition. The one-shot goal made `1 defend` walk to cover and return.
+ * @why A posture needs a loop; the 198 `defend` goal releases once `defended`
+ *      is live, so it cannot hold a spot.
+ */
+const defendHandler = async (a: Record<string, unknown>): Promise<CommandResult> => {
+  const minutes = Math.max(0.1, Math.min(10, Number(a.minutes ?? 2)));
+  const radius = Math.max(4, Math.min(60, Number(a.radius ?? 30)));
+  const deadline = Date.now() + minutes * 60_000;
+  const me0 = world.self();
+  if (!me0) return { ok: false, code: 1, why: "lost-self" };
+  const hold = { x: me0.x, y: me0.y, z: me0.z };
+  let attacks = 0;
+  let kills = 0;
+  record(`DEFEND start hp=${world.health()?.hp ?? "?"} pos=${hold.x.toFixed(2)},${hold.z.toFixed(2)} radius=${radius} minutes=${minutes}`);
+  while (Date.now() < deadline) {
+    abortTick();
+    const self = world.self();
+    if (!self) return { ok: false, code: 1, why: "lost-self" };
+    if (world.health()?.dead === true) return { ok: false, code: 1, why: "died" };
+    const players = world.playerIds?.() ?? new Set<number>();
+    const nearest = world.others()
+      .filter((pawn) => !players.has(pawn.id) && world.healthOf?.(pawn.id)?.dead !== true)
+      .map((pawn) => ({ pawn, d: Math.hypot(pawn.x - self.x, pawn.z - self.z) }))
+      .filter((row) => row.d <= radius)
+      .sort((l, r) => l.d - r.d)[0];
+    if (nearest) {
+      // A posture must keep itself loaded: `arm` picks the weapon, not the ammo.
+      if (world.ammo() <= 0) {
+        const reload = await reloadCycle();
+        record(`DEFEND reload ok=${reload.ok} why=${reload.why ?? "-"} ammo=${world.ammo()}`);
+        if (!reload.ok) await sleep(500);
+        continue;
+      }
+      attacks += 1;
+      record(`DEFEND acquire id=${nearest.pawn.id} d=${nearest.d.toFixed(1)}`);
+      const code = await runAttack(session, nearest.pawn.id, {
+        timeoutMs: Math.min(60_000, Math.max(5_000, deadline - Date.now())),
+        onTick: abortTick,
+        log: (line) => record(`  defend ${line}`),
+        error: (line) => record(`  defend ERROR ${line}`),
+      });
+      if (world.healthOf?.(nearest.pawn.id)?.dead === true) kills += 1;
+      if (code !== 0) {
+        // Backoff: a refused/lost/no-ammo attack must not spin the loop.
+        record(`DEFEND attack id=${nearest.pawn.id} code=${code} kills=${kills} retry-in=500ms`);
+        await sleep(500);
+      } else {
+        record(`DEFEND attack id=${nearest.pawn.id} code=${code} kills=${kills}`);
+      }
+      continue;
+    }
+    // Nothing in the ring: hold the exact spot (drift back if a chase moved us).
+    const drift = Math.hypot(self.x - hold.x, self.z - hold.z);
+    if (drift > 2) await standAtPoint({ x: hold.x, z: hold.z }, Math.min(30_000, Math.max(2_000, deadline - Date.now())), "defend hold");
+    else await sleep(250);
+  }
+  record(`DEFEND end attacks=${attacks} kills=${kills} hp=${world.health()?.hp ?? "?"}`);
+  return { ok: true, code: 0 };
+};
+
+const assaultHandler = async (a: Record<string, unknown>, opts?: DispatchOptions): Promise<CommandResult> => {
+  const pawnId = Number(a.pawnId);
+  if (!Number.isInteger(pawnId) || pawnId <= 0) return { ok: false, code: 1, why: "bad-args" };
+  return runGoalTask(`assault ${pawnId}`, assaultGoal(pawnId), opts?.claim, opts?.operatorId);
+};
+
+const regroupHandler = async (a: Record<string, unknown>, opts?: DispatchOptions): Promise<CommandResult> => {
+  const place = typeof a.place === "string" ? a.place : "";
+  const graph = session.world.sceneGraph();
+  if (!graph || !graph.placeById.has(place)) {
+    record(`regroup: bad-anchor ${place}`);
+    return { ok: false, code: 1, why: "bad-anchor" };
+  }
+  // Not `runGoalTask`: the order must sit at its ladder priority 45, not 100.
+  let lastNoPlan: string | null = null;
+  const code = await runBrain(session, regroupGoal(place), {
+    timeoutMs: TASK_TIMEOUT_MS,
+    claim: opts?.claim, operatorId: opts?.operatorId,
+    onTick: abortTick,
+    log: (line) => {
+      record(`  regroup ${line}`);
+      const m = /no plan: ([a-z-]+)/.exec(line);
+      if (m) lastNoPlan = m[1]!;
+    },
+    error: (line) => record(`  regroup ERROR ${line}`),
+  });
+  if (code === 0) return { ok: true, code: 0 };
+  if (code === 2) return { ok: false, code: 2, why: `no-plan:${lastNoPlan ?? "unknown"}` };
+  if (code === 3) return { ok: false, code: 3, why: "timeout" };
+  return { ok: false, code, why: `code:${code}` };
+};
+
+const HANDLERS: Record<string, (a: Record<string, unknown>, opts?: DispatchOptions) => Promise<CommandResult>> = {
   arm: armHandler,
   goto: gotoHandler,
   stand: standHandler,
@@ -1564,6 +1848,15 @@ const HANDLERS: Record<string, (a: Record<string, unknown>) => Promise<CommandRe
   retrieve: retrieveHandler,
   getkey: getkeyHandler,
   projectile: projectileHandler,
+  seekHealth: seekHealthHandler,
+  takeCover: takeCoverHandler,
+  returnFire: returnFireHandler,
+  retreat: retreatHandler,
+  rearm: rearmHandler,
+  survive: surviveHandler,
+  defend: defendHandler,
+  assault: assaultHandler,
+  regroup: regroupHandler,
 };
 
   async function dispatch(request: CommandRequest, opts: DispatchOptions = {}): Promise<CommandResult> {
@@ -1581,7 +1874,7 @@ const HANDLERS: Record<string, (a: Record<string, unknown>) => Promise<CommandRe
     players = new Set<number>(world.playerIds());
     let result: CommandResult;
     try {
-      result = await handler(request.args ?? {});
+      result = await handler(request.args ?? {}, opts);
     } catch (err) {
       result = err instanceof AbortMission
         ? { ok: false, code: 4, why: "aborted" }
