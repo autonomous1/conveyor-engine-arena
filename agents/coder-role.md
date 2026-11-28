@@ -24,10 +24,14 @@ reference implementation. The driver must be self-contained: if it imports the
 behaviour under test, there is nothing to port — it is a production fix, and the
 task must say so (see D16).
 
-**The prototype is a package fork.** When the task cites a `proto/` diff, the
-migration is that diff, file by file: apply each hunk to `src/` (or re-derive it
-with the same order and constants) and keep the migration map per file. You migrate
-and **stop**: in this task `src/` is your only write surface — do not edit, delete or
+**The prototype is a package fork.** When the task cites a `proto/` diff, that diff
+is your **checklist, not a patch** — never `git apply` it. The prototype is not
+production: re-express every file and hunk in `src/` in production shape (four-slot
+header, tags, types, error handling, naming, `.js` imports) while keeping its order,
+constants and guards. The migration map has one row per **file and hunk** in the
+diff: migrated (and what source symbol it becomes), or deferred/out-of-scope with
+the reason. A file the map never mentions is an incomplete migration, not a smaller
+one (D21). You migrate and **stop**: in this task `src/` is your only write surface — do not edit, delete or
 re-sync `proto/`, the probe, the tree hook or `--tree`. The operator commits `proto/`
 before your task and copies `src/` back over it after; the fork is never yours to
 retire. Outside a migration, `packages/bot-client/src/` is not a coder surface at
@@ -35,8 +39,8 @@ all: a task that names a file there without a published `proto/` diff is bot-lan
 behaviour design, and you HALT (D20). Enumerate its ordered operations, constants,
 thresholds and guards, and keep a mapping in the report (driver step → source
 function). A step you drop, a constant you change, or an order you swap is a
-divergence: justify it in
-the report or keep the driver's shape. Unit tests mirror the driver; a live run
+divergence: justify it in the report or keep the driver's shape. Unit tests mirror
+the driver; a live run
 against the product path is the parity check, and it is the bot-developer's, not
 yours.
 
@@ -339,6 +343,19 @@ Run, in order:
 For a prototype-derived task, also review your migration map against the driver
 line by line before the report: the live parity run is the bot-developer's, and a
 divergence you can name now is cheaper than one it finds later.
+
+**For a migration task — one that cites a `proto/` diff — also account for the diff
+itself.** (Skip this block for every other task; a fresh or arena task has no fork
+to reconcile.)
+
+```bash
+git diff --no-index packages/bot-client/src packages/bot-client/proto
+```
+
+Paste the residual in the report. It must contain only the hunks the task names as
+instrumentation or as deferred, each with the reason. An un-named hunk is an
+incomplete migration: migrate it now, or report it as a deferral — the operator's
+next `cp -r src proto` deletes whatever is left, silently (D21).
 
 **Iterate on one file, scope once.** While fixing, run the edited test alone
 (`node --import ./scripts/ts-ext-register.mjs --test test/<file>.test.ts`, ~2–12 s);

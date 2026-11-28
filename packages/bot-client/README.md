@@ -282,9 +282,13 @@ refused/lost/no-ammo), `3` timeout, `4` auth/seat — those are the `code=` in a
    the migration analysis (ordered operations, constants, guards), and the task
    proposal. That package is the **executable spec**.
 6. **Migrate.** The designer drafts the coder task from the POC; the coder
-   integrates the diff into `src/` with the fail-first test and the scoped run.
-   Then the bot-developer re-runs the same scenario with `--tree src` — the
-   driver is the control — and the operator re-syncs `src/` → `proto/`.
+   **re-expresses** the published diff in `src/` — never `git apply`, because the
+   prototype is not production (headers, tags, types, error handling) — with the
+   fail-first test and the scoped run. The map has one row per file and hunk; the
+   coder finishes with `git diff --no-index src proto` and pastes the residual,
+   which must be only the instrumentation or deferrals the task names. Then the
+   bot-developer re-runs the same scenario with `--tree src` — the driver is the
+   control — and only then the operator re-syncs `src/` → `proto/`.
 
 ### The lanes, in one line
 

@@ -458,3 +458,29 @@ its own proto POC and migration. No lint enforces this yet: the check reads a ta
 file under the gitignored `plan/`, which `modev:check` cannot see in CI, so it stays
 a dispatch/intake read until a lint over the tracked tree exists (open loop in the
 model review of 2026-11-27).
+
+## D21 — A migration accounts for the whole published diff, and is never applied as one (2026-11-28)
+
+On a **migration task** the coder's spec is `git diff --no-index
+packages/bot-client/src packages/bot-client/proto` at the task's base commit — the
+diff itself, not a prose summary of it. Every file and hunk gets one row in the migration map: migrated (and
+which source symbol it becomes), or deferred/out-of-scope with the reason. The task
+is done only when the residual diff contains nothing but the hunks the task names as
+instrumentation or as deferred, and the coder pastes that residual in the report.
+
+The diff is a **checklist, never a patch**: `git apply` is forbidden. The prototype
+is not production — each hunk is re-expressed with the four-slot header, tags, types,
+error handling, naming and `.js` imports, preserving its order, constants and guards.
+
+**Why:** the 219 migration moved `proto/world.ts` but the fork also carried team
+goto-at (`brain.ts`, `combat.ts`, `commands.ts`, `connection.ts`). The task's map was
+driver-step shaped, so files the coder never opened had no row, nothing failed, and
+the operator's `cp -r src proto` silently deleted the un-migrated work. It survived
+only because the fork commits (`5524a14`, `2c05dc9`) still held it, and the operator
+restored from them. A map with a row per file and hunk cannot pass an untouched file
+unnoticed; a map of steps can.
+
+**In practice:** the designer hands the diff file, the coder's report opens with the
+file table, and completion is checked by diffing the two trees after the task — the
+residual must equal the named complement. The operator's re-sync is the destructive
+step, so the residual is read before it, never after.

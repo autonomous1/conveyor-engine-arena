@@ -48,6 +48,11 @@ exists and must port it, not re-derive it. Every POC-derived task therefore carr
 - a **Migration analysis** section: one row per prototype step — the driver's
   operation, the constant/guard it relies on, and the source behaviour that must
   reproduce it;
+- the **published diff itself** (`logs/<task>-proto.diff`, `git diff --no-index
+  packages/bot-client/src packages/bot-client/proto` at the base commit) as the
+  checklist — one map row per **file and hunk**, and a completion clause: the
+  residual diff after the task must equal only the hunks the task names as
+  instrumentation or deferred (D21);
 - a **prototype-parity acceptance**: after the port, the bot-developer runs the
   driver's scenario against the product path and pastes both outputs.
 
@@ -103,7 +108,10 @@ behaviour in `proto/brain.ts` (`214`).
 
 **Scope the migration to what was published.** One proven behaviour per task where
 the published diff allows it; an umbrella port of several hundred lines hides the
-hunk that was never proven.
+hunk that was never proven. When the fork carries more than one POC, name the others
+as **deferred** in the map — a file the task never mentions is a file the coder has
+no reason to open, and `219`'s fork lost its `brain.ts` work at the re-sync exactly
+that way (D21).
 
 **Number from the whole pipeline.** A new task number is one past both the task files
 and the ledger rows. The ledger already numbers POC runs (203 = the `defend`

@@ -41,16 +41,25 @@ Read `agents/AGENTS.md` first. Then this file. Then the KB sections named in **K
 2. <step>
 3. <step>
 
-### Migration analysis
+### Migration analysis (prototype-derived tasks only — omit this whole section for a fresh task)
 
-<Prototype-derived tasks only. One row per prototype step: the driver's operation,
-the constant or guard it relies on (and the failure that put it there), and the
-source behaviour that must reproduce it. A dropped step, a changed constant or a
-swapped order is a divergence — justify it here or keep the driver's shape.>
+<Prototype-derived tasks only. The **published diff** is the checklist
+(`logs/<task>-proto.diff` = `git diff --no-index packages/bot-client/src
+packages/bot-client/proto` at the base commit). One row per **file and hunk** in
+it — not only the driver steps you read. Name the source symbol it becomes, the
+constant/guard/order it relies on (and the failure that put it there), and the
+status: `migrate`, or `defer` with the reason. A hunk with no row is an incomplete
+migration, and the operator's re-sync deletes it. The diff is a reference, never a
+patch: `git apply` is forbidden (D21).>
 
-| driver step (operation) | relies on (const / guard / order) | source behaviour that must match |
-|---|---|---|
-| <…> | <…> | <…> |
+| diff file | hunk / driver step | relies on (const / guard / order) | source behaviour that must match | status |
+|---|---|---|---|---|
+| <…> | <…> | <…> | <…> | migrate / defer + why |
+
+**Migration completion:** <after the task, `git diff --no-index
+packages/bot-client/src packages/bot-client/proto` shows only <the instrumentation
+hunks this task names> and <the deferred files named above>; the coder pastes the
+residual diff in the report.>
 
 ### Implementation note
 
