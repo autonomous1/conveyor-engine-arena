@@ -8,7 +8,7 @@ import type { ArenaView } from "../../../src/shared/arena-view.js";
 import type { ClaimRow, MsgRow } from "../../../src/shared/bot-protocol.js";
 import type { GrenadePose } from "../../../src/shared/grenade.js";
 import { yawFromQuat } from "../../../src/shared/look.js";
-import type { PickupKind, PickupPlacement } from "../../../src/shared/pickups.js";
+import { pickupBoxSource, type PickupKind, type PickupPlacement } from "../../../src/shared/pickups.js";
 import { parseBakedRegions, type BakedRegionsFile } from "../../../src/shared/nav/regions.js";
 import { placeAt, parseSceneGraph, type CabState, type SceneGraph } from "../../../src/shared/scene-graph.js";
 import { loadSpatialDAG, type SpatialDAG } from "../../../src/shared/spatial-dag.js";
@@ -197,7 +197,7 @@ export type BotWorld = {
 export function createBotWorld(view: WorldView): BotWorld {
   let regions: BakedRegionsFile | undefined;
   let regionsHash: string | undefined;
-  const aabbs = [...(view.aabbs ?? [])];
+  const staticAabbs = [...(view.aabbs ?? [])];
   const playerSpawns = [...(view.playerSpawns ?? [])];
   const doorDefs = view.doors ?? [];
   const doorBodies = new Map<string, DoorBody>();
@@ -242,10 +242,47 @@ export function createBotWorld(view: WorldView): BotWorld {
   let spatialDag: SpatialDAG | undefined;
   let spatialDagLoaded = false;
 
+  /**
+   * 219: the live nav AABBs — the static welcome boxes minus every taken
+   * pickup's collision box. The host removes the box when the pickup is taken;
+   * the welcome-time list does not, and a pawn left in the box's
+   * radius-inflated cell then fails every plan with `start-blocked` (the
+   * weapon-shelf trap). Computed from the live id list on every read, so a
+   * pickup that reappears in a later welcome gets its box back.
+   * @post only boxes whose `source` is a taken pickup's id or `pickupBoxSource`
+   *       leave; a box with no `source` always stays.
+   */
+  const liveAabbs = (): readonly WorldAabb[] => {
+    if (placements.length === 0) return staticAabbs;
+    const liveIds = new Set(pickupIds);
+    const taken = new Set<string>();
+    for (const placement of placements) {
+      if (liveIds.has(placement.id)) continue;
+      taken.add(placement.id);
+      taken.add(pickupBoxSource(placement.id));
+    }
+    if (taken.size === 0) return staticAabbs;
+    return staticAabbs.filter((box) => box.source === undefined || !taken.has(box.source));
+  };
+  /** 219 POC probe: the report's shelf weapon; logs when the live set changes. */
+  const TRAP_BOX = "alien-weapon-1-7-3-box";
+  let trapProbeSig = "";
+  const probeTrap = (boxes: readonly WorldAabb[]): void => {
+    const present = boxes.some((box) => box.source === TRAP_BOX || box.source === "alien-weapon-1-7-3");
+    const next = `${boxes.length}:${present ? 1 : 0}`;
+    if (next === trapProbeSig) return;
+    trapProbeSig = next;
+    console.log(`TrapProbe aabbs=${boxes.length} box=${TRAP_BOX} present=${present ? 1 : 0}`);
+  };
+
   const self = (): PawnPose | undefined => (ownedId === undefined ? undefined : pawns.get(ownedId));
 
   return {
-    aabbs,
+    get aabbs() {
+      const live = liveAabbs();
+      probeTrap(live);
+      return live;
+    },
     playerSpawns,
     pawnRadius,
     pawnHeight,
